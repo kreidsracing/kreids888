@@ -20,7 +20,7 @@
    =========================================================== */
 
 // ⬇⬇⬇  HIER DEINE YOUTUBE-CHANNEL-ID EINTRAGEN  ⬇⬇⬇
-const YOUTUBE_CHANNEL_ID = ""; // <<< z.B. "UCxxxxxxxxxxxxxxxxxxxxxx"
+const YOUTUBE_CHANNEL_ID = "UCtFDX_OtRwq-z8gJBo2e96w"; // <<< z.B. "UCxxxxxxxxxxxxxxxxxxxxxx"
 // ⬆⬆⬆  HIER DEINE YOUTUBE-CHANNEL-ID EINTRAGEN  ⬆⬆⬆
 
 // Wird genutzt, solange keine Channel-ID gesetzt ist ODER der Live-Abruf fehlschlägt.
