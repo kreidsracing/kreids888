@@ -29,12 +29,19 @@
 // URL eintragen -> Seite lädt dann automatisch live. Leer lassen = manuell.
 const RATINGS_API_URL = "";
 
-// Manuelle Werte, solange kein Live-Proxy existiert. Einfach ausfüllen:
+// ⬇⬇⬇  HIER DEINE WERTE EINTRAGEN  ⬇⬇⬇
+// ============================================================
+//   ██  TRAG HIER DEINE IRACING-WERTE EIN  ██
+// ============================================================
+// irating  -> deine Zahl OHNE Anführungszeichen, z.B. 3450
+// license  -> als Text in "...", z.B. "A 4.99"
+// category -> als Text in "...", z.B. "Sports Car"
 const MANUAL_RATINGS = {
-  irating:  null,  // z.B. 3450 (reine Zahl, ohne Punkte/Kommas)
-  license:  "",    // z.B. "A 4.99"
-  category: "",    // z.B. "Sports Car"
+  irating:  null,  // <<< HIER Zahl eintragen, z.B. 3450
+  license:  "",    // <<< HIER Lizenz eintragen, z.B. "A 4.99"
+  category: "",    // <<< HIER Kategorie eintragen, z.B. "Sports Car"
 };
+// ⬆⬆⬆  HIER DEINE WERTE EINTRAGEN  ⬆⬆⬆
 
 function normalizeApiPayload(data) {
   return {
