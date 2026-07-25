@@ -108,6 +108,114 @@ body::before{content:"";position:fixed;inset:0;z-index:-2;
 .video.playing{cursor:default}
 .video iframe{width:100%;height:100%;border:0;display:block}
 
+/* ============ HERO v2 (Vollbild-Hintergrund + Fahrerbild) ============ */
+.hero-bg{position:absolute;inset:0;z-index:-1;overflow:hidden;background:#000}
+.hero-bg-img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;
+  object-position:center 20%;opacity:.55;transition:opacity .4s;transform:scale(1.06)}
+/* Carbon/Grid-Fallback: greift automatisch, solange kein eigenes Foto hinterlegt ist */
+.hero-bg-grid{position:absolute;inset:0;
+  background-image:
+    linear-gradient(rgba(225,19,36,.06) 1px,transparent 1px),
+    linear-gradient(90deg,rgba(225,19,36,.06) 1px,transparent 1px);
+  background-size:46px 46px;
+  mask-image:radial-gradient(circle at 78% 20%,#000 0%,transparent 70%);
+  -webkit-mask-image:radial-gradient(circle at 78% 20%,#000 0%,transparent 70%)}
+.hero-bg-overlay{position:absolute;inset:0;
+  background:
+    linear-gradient(100deg,rgba(10,11,14,.97) 20%,rgba(10,11,14,.75) 55%,rgba(10,11,14,.4) 100%),
+    linear-gradient(0deg,var(--carbon) 0%,transparent 22%)}
+
+.hero{padding:56px 0 34px}
+.hero-grid--v2{align-items:center}
+.role-row{display:flex;flex-wrap:wrap;gap:10px;margin-top:16px}
+.role-chip{font-family:var(--disp);font-weight:700;font-size:12.5px;letter-spacing:.14em;text-transform:uppercase;
+  color:var(--steel);border:1px solid var(--line);background:rgba(19,21,27,.55);
+  backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);padding:7px 13px}
+.role-chip:first-child{color:var(--white);border-color:var(--red)}
+
+.hero-title{font-family:var(--disp);font-weight:900;line-height:.9;letter-spacing:-.01em;
+  font-size:clamp(46px,9vw,84px);text-transform:uppercase}
+.hero-title .r{color:var(--red);text-shadow:0 0 40px var(--red-glow)}
+
+.cta-row--v2{margin-top:26px}
+.btn-glow{position:relative}
+.btn-twitch{background:var(--red);color:#fff;box-shadow:0 8px 28px var(--red-glow)}
+.btn-twitch:hover{background:var(--red-deep)}
+.btn-youtube,.btn-instagram,.btn-outline{background:#0d0e12;color:#fff;border-color:var(--line)}
+.btn-glow:hover{transform:skewX(-10deg) translateY(-2px);border-color:var(--red);
+  box-shadow:0 10px 30px rgba(225,19,36,.35)}
+.btn-twitch:hover{transform:skewX(-10deg) translateY(-2px)}
+
+/* Fahrerportrait */
+.hero-right{display:flex;justify-content:center}
+.portrait-frame{position:relative;width:100%;max-width:420px;aspect-ratio:4/5;
+  border:2px solid var(--line);background:linear-gradient(180deg,#15171e,#0d0e12);
+  box-shadow:0 20px 60px rgba(0,0,0,.65);overflow:hidden}
+.portrait-frame::before{content:"";position:absolute;inset:0;z-index:2;pointer-events:none;
+  background:linear-gradient(180deg,transparent 60%,rgba(0,0,0,.75) 100%)}
+.portrait-frame::after{content:"";position:absolute;top:0;right:0;width:46%;height:100%;z-index:1;
+  background:linear-gradient(120deg,transparent 40%,rgba(225,19,36,.10) 40%);pointer-events:none}
+.portrait-img{width:100%;height:100%;object-fit:cover;display:block;position:relative;z-index:0;transition:.3s}
+.portrait-frame:hover .portrait-img{transform:scale(1.035)}
+/* Fallback-Icon, solange kein Foto in assets/fahrer.jpg liegt */
+.portrait-fallback{display:none;position:absolute;inset:0;align-items:center;justify-content:center;color:var(--steel-d)}
+.portrait-fallback svg{width:38%;height:38%}
+.portrait-frame.no-img .portrait-img{display:none}
+.portrait-frame.no-img .portrait-fallback{display:flex}
+.portrait-plate{position:absolute;left:16px;bottom:16px;z-index:3;font-family:var(--disp);font-weight:800;
+  font-size:13px;letter-spacing:.12em;text-transform:uppercase;color:#fff;
+  background:rgba(0,0,0,.55);border-left:3px solid var(--red);padding:8px 12px;backdrop-filter:blur(4px)}
+
+/* ---- Fade-In / Zoom Reveal-Animation (rein CSS) ---- */
+.reveal{animation:heroFadeUp .8s cubic-bezier(.2,.7,.2,1) both}
+.reveal-delay{animation-delay:.15s}
+@keyframes heroFadeUp{
+  from{opacity:0;transform:translateY(22px) scale(.98)}
+  to{opacity:1;transform:translateY(0) scale(1)}
+}
+@keyframes bgZoomIn{from{transform:scale(1.12)}to{transform:scale(1.06)}}
+.hero-bg-img{animation:bgZoomIn 1.4s ease-out both}
+
+/* ============ FAHRERSTATISTIKEN ============ */
+.stats-section{padding:60px 0 20px}
+.stats-title{font-family:var(--disp);font-weight:900;font-size:clamp(30px,6vw,48px);
+  text-transform:uppercase;letter-spacing:-.01em;line-height:.95;margin-bottom:8px}
+.stats-title .r{color:var(--red)}
+.stats-src-note{font-size:12.5px;color:var(--steel-d);margin-bottom:26px}
+.stats-src-note a{color:var(--steel);border-bottom:1px dotted var(--line)}
+.stats-src-note a:hover{color:var(--red)}
+.stats-status{color:var(--steel-d);font-style:italic}
+.stats-status.is-live{color:var(--red)}
+.stats-status.is-fallback{color:var(--steel-d)}
+
+.stats-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:14px}
+@media(max-width:960px){.stats-grid{grid-template-columns:repeat(3,1fr)}}
+@media(max-width:540px){.stats-grid{grid-template-columns:repeat(2,1fr);gap:10px}}
+
+.stat-box{position:relative;text-align:center;padding:26px 12px;
+  background:rgba(19,21,27,.55);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
+  border:1px solid var(--line);border-radius:10px;overflow:hidden;
+  transition:transform .2s,border-color .2s,box-shadow .2s}
+.stat-box::before{content:"";position:absolute;top:0;left:0;width:100%;height:2px;background:var(--red);
+  transform:scaleX(0);transform-origin:left;transition:transform .3s}
+.stat-box:hover{transform:translateY(-4px);border-color:rgba(225,19,36,.4);
+  box-shadow:0 14px 34px rgba(0,0,0,.45)}
+.stat-box:hover::before{transform:scaleX(1)}
+.stat-value{font-family:var(--disp);font-weight:900;font-size:clamp(28px,4.4vw,40px);
+  color:var(--white);letter-spacing:-.01em;line-height:1}
+.stat-value .r{color:var(--red)}
+.stat-label{margin-top:8px;font-family:var(--disp);font-weight:600;font-size:11.5px;
+  letter-spacing:.12em;text-transform:uppercase;color:var(--steel)}
+
+/* ============ VIDEO-SECTION (unter Statistiken) ============ */
+.video-section{padding:20px 0 60px}
+.video-section-in{display:grid;grid-template-columns:.9fr 1.1fr;gap:36px;align-items:center}
+@media(max-width:860px){.video-section-in{grid-template-columns:1fr}}
+.video-section-h{font-family:var(--disp);font-weight:800;font-size:clamp(22px,4vw,32px);
+  text-transform:uppercase;letter-spacing:-.005em;line-height:1.05;margin-bottom:12px}
+.video-section-h .r{color:var(--red)}
+.video-section-p{color:var(--steel);font-size:15px;max-width:40ch}
+
 /* hero jump chips */
 .hero-jump-wrap{margin-top:26px;border-top:1px solid var(--line);padding-top:20px}
 .hero-jump{display:flex;flex-wrap:wrap;gap:10px}

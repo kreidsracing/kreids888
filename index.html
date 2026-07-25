@@ -13,30 +13,56 @@
 <nav id="site-nav"></nav>
 
 <header class="hero">
-  <div class="hero-cut"></div>
-  <div class="container hero-grid">
-    <div class="hero-left">
+  <!-- Vollbild-Hintergrund: eigenes Foto/Video kann einfach unter assets/ abgelegt werden.
+       Fehlt die Datei, greift automatisch der Carbon/Grid-Fallback (siehe CSS .hero-bg). -->
+  <div class="hero-bg">
+    <img class="hero-bg-img" src="assets/hero-bg.jpg" alt=""
+         onerror="this.style.opacity='0'" loading="eager">
+    <div class="hero-bg-grid"></div>
+    <div class="hero-bg-overlay"></div>
+  </div>
+
+  <div class="container hero-grid hero-grid--v2">
+    <div class="hero-left reveal">
       <div class="eyebrow">Sim Racing · Endurance · Prototype</div>
-      <h1>KREIDS<span class="r">888</span></h1>
-      <div class="hero-sub"><b>S. KREID</b> · #888 · Founder of <b>Snail Pace Racing</b></div>
+      <h1 class="hero-title">Stefan<br><span class="r">Kreid</span></h1>
+      <div class="role-row">
+        <span class="role-chip">Sim Racer</span>
+        <span class="role-chip">Endurance Driver</span>
+        <span class="role-chip">Content Creator</span>
+      </div>
       <div class="plate"><span class="num">888</span><span class="name">S. KREID</span></div>
-      <div class="cta-row">
-        <a class="btn btn-red" href="https://twitch.tv/kreids888" target="_blank" rel="noopener">
-          <span><span class="live-dot"></span> Twitch — Live</span></a>
-        <a class="btn btn-yt" href="https://youtube.com/@Kreids888" target="_blank" rel="noopener">
-          <span>▶ YouTube <b class="badge2k">2K</b></span></a>
+
+      <div class="cta-row cta-row--v2">
+        <a class="btn btn-glow btn-twitch" href="https://twitch.tv/kreids888" target="_blank" rel="noopener">
+          <span><span class="live-dot"></span> Twitch</span></a>
+        <a class="btn btn-glow btn-youtube" href="https://youtube.com/@Kreids888" target="_blank" rel="noopener">
+          <span>▶ YouTube</span></a>
+        <a class="btn btn-glow btn-instagram" href="https://instagram.com/kreids888" target="_blank" rel="noopener">
+          <span>Instagram</span></a>
+        <a class="btn btn-glow btn-outline" href="events.html">
+          <span>Rennkalender</span></a>
       </div>
     </div>
-    <div class="hero-right">
-      <div class="video" id="yt" data-id="Yvv1yh9lG0w">
-        <img src="https://i.ytimg.com/vi/Yvv1yh9lG0w/maxresdefault.jpg"
-             onerror="this.onerror=null;this.src='https://i.ytimg.com/vi/Yvv1yh9lG0w/hqdefault.jpg'"
-             alt="Video-Vorschau" loading="lazy">
-        <button class="play" aria-label="Video abspielen">▶</button>
-        <div class="video-tag">Watch</div>
+
+    <div class="hero-right reveal reveal-delay">
+      <div class="portrait-frame">
+        <!-- Eigenes Fahrerbild einfach als assets/fahrer.jpg ablegen -->
+        <img class="portrait-img" src="assets/fahrer.jpg" alt="Stefan Kreid"
+             onerror="this.closest('.portrait-frame').classList.add('no-img')" loading="eager">
+        <div class="portrait-fallback" aria-hidden="true">
+          <svg viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="100" cy="86" r="52" stroke="currentColor" stroke-width="3"/>
+            <path d="M48 86a52 52 0 0 1 104 0" stroke="currentColor" stroke-width="3"/>
+            <rect x="60" y="96" width="80" height="26" rx="4" stroke="currentColor" stroke-width="3"/>
+            <path d="M30 190c8-38 40-60 70-60s62 22 70 60" stroke="currentColor" stroke-width="3"/>
+          </svg>
+        </div>
+        <div class="portrait-plate">#888 · S. KREID</div>
       </div>
     </div>
   </div>
+
   <div class="hero-jump-wrap"><div class="container">
     <div class="hero-jump">
       <a href="about.html">Über mich</a>
@@ -48,7 +74,67 @@
   </div></div>
 </header>
 
+<!-- ============ FAHRERSTATISTIKEN ============
+     Karten werden versuchsweise per fetch von snailpaceracing.org geladen
+     (Details & Fallback-Logik in stats.js). Layout steht schon vollständig. -->
+<section class="stats-section" id="stats">
+  <div class="container">
+    <div class="lap-tag">Karriere · Live-Daten</div>
+    <h2 class="stats-title">Fahrer<span class="r">statistik</span></h2>
+    <p class="stats-src-note">
+      Quelle: <a href="https://snailpaceracing.org/fahrer/#fahrer/c:1123750" target="_blank" rel="noopener">Snail Pace Racing</a>
+      <span id="statsStatus" class="stats-status">· wird geladen …</span>
+    </p>
+
+    <div class="stats-grid" id="statsGrid">
+      <div class="stat-box" data-key="starts">
+        <div class="stat-value" data-target="">–</div>
+        <div class="stat-label">Starts</div>
+      </div>
+      <div class="stat-box" data-key="siege">
+        <div class="stat-value" data-target="">–</div>
+        <div class="stat-label">Siege</div>
+      </div>
+      <div class="stat-box" data-key="podien">
+        <div class="stat-value" data-target="">–</div>
+        <div class="stat-label">Podien</div>
+      </div>
+      <div class="stat-box" data-key="poles">
+        <div class="stat-value" data-target="">–</div>
+        <div class="stat-label">Pole Positions</div>
+      </div>
+      <div class="stat-box" data-key="fastlaps">
+        <div class="stat-value" data-target="">–</div>
+        <div class="stat-label">Schnellste Runden</div>
+      </div>
+      <div class="stat-box" data-key="avgplace">
+        <div class="stat-value" data-target="" data-decimal="1">–</div>
+        <div class="stat-label">Ø Platzierung</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ VIDEO-VORSCHAU (aus dem alten Hero hierher verschoben) ============ -->
+<section class="video-section">
+  <div class="container video-section-in">
+    <div class="video-section-text">
+      <div class="lap-tag">Neuestes Video</div>
+      <h3 class="video-section-h">Rennen verpasst? <span class="r">Hier reinschauen.</span></h3>
+      <p class="video-section-p">Highlights, Onboards und volle Streams gibt's auf YouTube — Klick startet direkt das Video.</p>
+    </div>
+    <div class="video" id="yt" data-id="Yvv1yh9lG0w">
+      <img src="https://i.ytimg.com/vi/Yvv1yh9lG0w/maxresdefault.jpg"
+           onerror="this.onerror=null;this.src='https://i.ytimg.com/vi/Yvv1yh9lG0w/hqdefault.jpg'"
+           alt="Video-Vorschau" loading="lazy">
+      <button class="play" aria-label="Video abspielen">▶</button>
+      <div class="video-tag">Watch</div>
+    </div>
+  </div>
+</section>
+
 <footer id="site-footer"></footer>
 <script src="components.js"></script>
+<script src="stats.js" defer></script>
 </body>
 </html>
