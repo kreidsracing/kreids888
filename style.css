@@ -338,3 +338,8 @@ footer{border-top:2px solid var(--red);background:var(--panel);padding:44px 0 40
 .poster-block .poster-head{align-self:flex-start}
 .poster-block .poster-frame{max-width:330px;width:100%}
 .poster-block .poster-dl{max-width:330px;width:100%}
+
+/* Live-Ansicht: volle Bildschirmhöhe (statt festes 16:10) */
+.frame-body.frame-full{aspect-ratio:auto;height:calc(100vh - 190px);min-height:520px}
+.frame-body.frame-full iframe{width:100%;height:100%;border:0;display:block}
+@media(max-width:760px){.frame-body.frame-full{height:calc(100vh - 210px)}}
