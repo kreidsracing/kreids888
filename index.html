@@ -11,17 +11,33 @@
 </head>
 <body>
 <nav id="site-nav"></nav>
+
 <header class="hero">
   <div class="hero-cut"></div>
-  <div class="container">
-    <div class="eyebrow">Sim Racing · Endurance · Prototype</div>
-    <h1>KREIDS<span class="r">888</span></h1>
-    <div class="hero-sub"><b>S. KREID</b> · #888 · Founder of <b>Snail Pace Racing</b></div>
-    <div class="plate"><span class="num">888</span><span class="name">S. KREID</span></div>
-    <div class="cta-row">
-      <a class="btn btn-red" href="https://twitch.tv/kreids888" target="_blank" rel="noopener"><span>▶ Twitch</span></a>
-      <a class="btn btn-ghost" href="https://youtube.com/@Kreids888" target="_blank" rel="noopener"><span>▶ YouTube</span></a>
+  <div class="container hero-grid">
+    <div class="hero-left">
+      <div class="eyebrow">Sim Racing · Endurance · Prototype</div>
+      <h1>KREIDS<span class="r">888</span></h1>
+      <div class="hero-sub"><b>S. KREID</b> · #888 · Founder of <b>Snail Pace Racing</b></div>
+      <div class="plate"><span class="num">888</span><span class="name">S. KREID</span></div>
+      <div class="cta-row">
+        <a class="btn btn-red" href="https://twitch.tv/kreids888" target="_blank" rel="noopener">
+          <span><span class="live-dot"></span> Twitch — Live</span></a>
+        <a class="btn btn-yt" href="https://youtube.com/@Kreids888" target="_blank" rel="noopener">
+          <span>▶ YouTube <b class="badge2k">2K</b></span></a>
+      </div>
     </div>
+    <div class="hero-right">
+      <div class="video" id="yt" data-id="Yvv1yh9lG0w">
+        <img src="https://i.ytimg.com/vi/Yvv1yh9lG0w/maxresdefault.jpg"
+             onerror="this.onerror=null;this.src='https://i.ytimg.com/vi/Yvv1yh9lG0w/hqdefault.jpg'"
+             alt="Video-Vorschau" loading="lazy">
+        <button class="play" aria-label="Video abspielen">▶</button>
+        <div class="video-tag">Watch</div>
+      </div>
+    </div>
+  </div>
+  <div class="hero-jump-wrap"><div class="container">
     <div class="hero-jump">
       <a href="about.html">Über mich</a>
       <a href="live.html">Live-Timing</a>
@@ -29,8 +45,9 @@
       <a href="setup.html">Setup</a>
       <a href="community.html">Community</a>
     </div>
-  </div>
+  </div></div>
 </header>
+
 <footer id="site-footer"></footer>
 <script src="components.js"></script>
 </body>
