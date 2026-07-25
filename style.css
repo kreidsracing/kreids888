@@ -190,11 +190,31 @@ body::before{content:"";position:fixed;inset:0;z-index:-2;
   transition:border-color .2s,box-shadow .2s}
 .frame-wrap--glass:hover{border-color:rgba(225,19,36,.35)}
 .frame-wrap--glass .frame-head{background:rgba(25,28,36,.6)}
-.frame-open{margin-left:auto;font-family:var(--disp);font-weight:700;font-size:12px;letter-spacing:.08em;text-transform:uppercase;
-  color:var(--steel);border:1px solid var(--line);padding:6px 11px;transition:.15s;white-space:nowrap}
-.frame-open:hover{color:#fff;border-color:var(--red);box-shadow:0 0 14px rgba(225,19,36,.25)}
-.frame-body--tall{aspect-ratio:16/11}
-@media(max-width:640px){.frame-body--tall{aspect-ratio:3/4}}
+
+/* Croppt die eingebettete SPR-Seite oben ab, damit deren eigene Navigation
+   nicht doppelt zu unserer Nav erscheint. Trick: der iframe wird per
+   position:absolute um --spr-crop nach oben verschoben und um denselben
+   Betrag höher gemacht; der sichtbare Ausschnitt (.frame-body--tall) bleibt
+   normal groß und schneidet den Überstand per overflow:hidden weg.
+   --spr-crop ggf. anpassen, falls sich die SPR-Navbar-Höhe mal ändert. */
+.frame-body--tall{aspect-ratio:16/11;position:relative;overflow:hidden;--spr-crop:64px}
+.frame-body--tall iframe{position:absolute;top:calc(var(--spr-crop) * -1);left:0;
+  width:100%;height:calc(100% + var(--spr-crop));border:0;display:block}
+@media(max-width:640px){.frame-body--tall{aspect-ratio:3/4;--spr-crop:56px}}
+
+/* Ratings-Zeile: iRating / Lizenz / Kategorie */
+.ratings-row{display:flex;flex-wrap:wrap;gap:12px;margin-top:16px}
+.rating-pill{flex:1 1 160px;text-align:center;padding:18px 14px;
+  background:rgba(19,21,27,.55);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
+  border:1px solid var(--line);border-radius:10px;transition:transform .2s,border-color .2s,box-shadow .2s}
+.rating-pill:hover{transform:translateY(-3px);border-color:rgba(225,19,36,.4);box-shadow:0 12px 28px rgba(0,0,0,.4)}
+.rating-val{display:block;font-family:var(--disp);font-weight:900;font-size:clamp(22px,3.6vw,30px);
+  color:var(--white);letter-spacing:-.01em;line-height:1}
+.rating-val--text{font-size:clamp(16px,2.6vw,20px);color:var(--red)}
+.rating-lbl{display:block;margin-top:6px;font-family:var(--disp);font-weight:600;font-size:11px;
+  letter-spacing:.14em;text-transform:uppercase;color:var(--steel)}
+.ratings-note{margin-top:12px;font-size:12px;color:var(--steel-d)}
+.ratings-note code{color:var(--steel);background:rgba(255,255,255,.06);padding:1px 5px;border-radius:3px}
 
 /* ============ VIDEO-SECTION (unter Statistiken) ============ */
 .video-section{padding:20px 0 60px}

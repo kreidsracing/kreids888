@@ -75,13 +75,14 @@
 </header>
 
 <!-- ============ FAHRERSTATISTIKEN ============
-     Direktes Embed der Snail-Pace-Racing-Fahrerseite (echte Live-Daten,
-     keine Nachbildung von Zahlen). Gleiches .frame-wrap-Prinzip wie auf
-     live.html, hier nur im Glass-Look fürs Homepage-Design. -->
+     Direktes Embed der Snail-Pace-Racing-Fahrerseite (echte, live von SPR
+     gepflegte iRacing-Daten). Die iframe wird oben um die Höhe der
+     SPR-eigenen Navigation "hochgeschoben" (siehe .frame-body--tall in
+     style.css), damit im Embed nicht zweimal ein Menü zu sehen ist. -->
 <section class="stats-section" id="stats">
   <div class="container">
     <div class="lap-tag">Karriere · Live-Daten</div>
-    <h2 class="stats-title">Fahrer<span class="r">statistik</span></h2>
+    <h2 class="stats-title">Racing <span class="r">by Snail Pace Racing</span></h2>
     <p class="stats-src-note">
       Live eingebettet von <a href="https://snailpaceracing.org/fahrer/#fahrer/c:1123750" target="_blank" rel="noopener">Snail Pace Racing</a>
       — Starts, Siege, Podien, Fahrzeuge &amp; volle Renn-Historie.
@@ -91,15 +92,30 @@
       <div class="frame-head">
         <span class="dot"></span>
         <span>Snail Pace Racing · Fahrerprofil #888</span>
-        <a class="frame-open" href="https://snailpaceracing.org/fahrer/#fahrer/c:1123750" target="_blank" rel="noopener">Vollansicht ↗</a>
       </div>
       <div class="frame-body frame-body--tall">
         <iframe src="https://snailpaceracing.org/fahrer/#fahrer/c:1123750"
                 title="Fahrerstatistik Stefan Kreid — Snail Pace Racing" loading="lazy"></iframe>
-        <!-- Fallback, falls die Zielseite das Einbetten per X-Frame-Options blockiert:
-             der "Vollansicht ↗"-Link oben rechts führt immer direkt zur Original-Seite. -->
       </div>
     </div>
+
+    <!-- Ratings-Zeile: iRating / Safety Rating / Lizenz. Werte & Live-Anbindung
+         (optional über einen eigenen Garage61-Proxy) werden in ratings.js gepflegt. -->
+    <div class="ratings-row" id="ratingsRow">
+      <div class="rating-pill" data-key="irating">
+        <span class="rating-val" data-target="">–</span>
+        <span class="rating-lbl">iRating</span>
+      </div>
+      <div class="rating-pill" data-key="license">
+        <span class="rating-val rating-val--text">–</span>
+        <span class="rating-lbl">Lizenz</span>
+      </div>
+      <div class="rating-pill" data-key="category">
+        <span class="rating-val rating-val--text">–</span>
+        <span class="rating-lbl">Kategorie</span>
+      </div>
+    </div>
+    <p class="ratings-note" id="ratingsNote">Werte werden manuell gepflegt — Bearbeiten in <code>ratings.js</code>.</p>
   </div>
 </section>
 
@@ -123,5 +139,6 @@
 
 <footer id="site-footer"></footer>
 <script src="components.js"></script>
+<script src="ratings.js" defer></script>
 </body>
 </html>
