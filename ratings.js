@@ -50,16 +50,7 @@ function normalizeApiPayload(data) {
     category: data.category ?? data.categoryName  ?? "",
   };
 }
-};
-// ⬆⬆⬆  HIER DEINE WERTE EINTRAGEN  ⬆⬆⬆
 
-function normalizeApiPayload(data) {
-  return {
-    irating:  data.irating  ?? data.iRating  ?? null,
-    license:  data.license  ?? data.licenseClass ?? "",
-    category: data.category ?? data.categoryName  ?? "",
-  };
-}
 
 async function tryLoadLiveRatings() {
   if (!RATINGS_API_URL) throw new Error("Keine RATINGS_API_URL gesetzt");
