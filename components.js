@@ -48,9 +48,8 @@ const navHTML = `
 const footHTML = `
 <div class="container foot-in">
   <a class="foot-brand" href="index.html">KREIDS<span class="r">888</span></a>
-  <div class="foot-c">Collab / Business: <a href="mailto:kontakt@kreids888.de">kontakt@kreids888.de</a></div>
 </div>
-<div class="container"><div class="foot-note">© 2026 Kreids888 · #888 · Snail Pace Racing · Built on GitHub Pages</div></div>`;
+<div class="container"><div class="foot-note">© 2026 Kreids888 · #888 · Built on GitHub Pages</div></div>`;
 
 const navEl=document.getElementById("site-nav");
 const footEl=document.getElementById("site-footer");
