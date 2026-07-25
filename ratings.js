@@ -37,7 +37,7 @@ const RATINGS_API_URL = "";
 // license  -> als Text in "...", z.B. "A 4.99"
 // category -> als Text in "...", z.B. "Sports Car"
 const MANUAL_RATINGS = {
-  irating:  1773,  // <<< HIER Zahl eintragen, z.B. 3450
+  irating:  1779,  // <<< HIER Zahl eintragen, z.B. 3450
   license:  "A",    // <<< HIER Lizenz eintragen, z.B. "A 4.99"
   category: "Sportscar",    // <<< HIER Kategorie eintragen, z.B. "Sports Car"
 };
@@ -51,6 +51,12 @@ function normalizeApiPayload(data) {
   };
 }
 
+async function tryLoadLiveRatings() {
+  if (!RATINGS_API_URL) throw new Error("Keine RATINGS_API_URL gesetzt");
+  const res = await fetch(RATINGS_API_URL);
+  if (!res.ok) throw new Error("HTTP " + res.status);
+  return normalizeApiPayload(await res.json());
+}
 
 async function tryLoadLiveRatings() {
   if (!RATINGS_API_URL) throw new Error("Keine RATINGS_API_URL gesetzt");
