@@ -168,18 +168,38 @@ function drawPoster(){
     });
   }
   // Footer: Logo statt "Folgen & Glocke an"
-  ctx.fillStyle=red;ctx.fillRect(0,H-300,W,4);
-  if(LOGO_OK && LOGO_IMG.width){
-    const maxW=780,maxH=180;
-    const r=Math.min(maxW/LOGO_IMG.width,maxH/LOGO_IMG.height);
-    const w=LOGO_IMG.width*r,h=LOGO_IMG.height*r;
-    ctx.drawImage(LOGO_IMG,(W-w)/2,H-70-h,w,h);
-  }else{
-    ctx.textAlign="center";ctx.fillStyle=white;ctx.font='900 84px "Saira Condensed", Impact, sans-serif';
-    ctx.fillText("KREIDS888",W/2,H-150);
-    ctx.fillStyle=steel;ctx.font='600 40px "Saira Condensed", sans-serif';
-    ctx.fillText("TWITCH + YOUTUBE",W/2,H-90);ctx.textAlign="left";
-  }
+ctx.fillStyle = red;
+ctx.fillRect(0, H - 300, W, 4);
+
+if (LOGO_OK && LOGO_IMG.width) {
+
+    // Logo nahezu über die komplette Breite
+    const padding = 20; // Abstand links/rechts
+    const maxWidth = W - (padding * 2);
+
+    const scale = maxWidth / LOGO_IMG.width;
+
+    const w = LOGO_IMG.width * scale;
+    const h = LOGO_IMG.height * scale;
+
+    const x = (W - w) / 2;
+    const y = H - h - 40;
+
+    ctx.drawImage(LOGO_IMG, x, y, w, h);
+
+} else {
+
+    ctx.textAlign = "center";
+    ctx.fillStyle = white;
+    ctx.font = '900 84px "Saira Condensed", Impact, sans-serif';
+    ctx.fillText("KREIDS888", W / 2, H - 150);
+
+    ctx.fillStyle = steel;
+    ctx.font = '600 40px "Saira Condensed", sans-serif';
+    ctx.fillText("TWITCH + YOUTUBE", W / 2, H - 90);
+
+    ctx.textAlign = "left";
+}
   ctx.textBaseline="alphabetic";
 }
 
