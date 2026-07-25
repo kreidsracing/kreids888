@@ -184,28 +184,17 @@ body::before{content:"";position:fixed;inset:0;z-index:-2;
 .stats-src-note{font-size:12.5px;color:var(--steel-d);margin-bottom:26px}
 .stats-src-note a{color:var(--steel);border-bottom:1px dotted var(--line)}
 .stats-src-note a:hover{color:var(--red)}
-.stats-status{color:var(--steel-d);font-style:italic}
-.stats-status.is-live{color:var(--red)}
-.stats-status.is-fallback{color:var(--steel-d)}
-
-.stats-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:14px}
-@media(max-width:960px){.stats-grid{grid-template-columns:repeat(3,1fr)}}
-@media(max-width:540px){.stats-grid{grid-template-columns:repeat(2,1fr);gap:10px}}
-
-.stat-box{position:relative;text-align:center;padding:26px 12px;
-  background:rgba(19,21,27,.55);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
-  border:1px solid var(--line);border-radius:10px;overflow:hidden;
-  transition:transform .2s,border-color .2s,box-shadow .2s}
-.stat-box::before{content:"";position:absolute;top:0;left:0;width:100%;height:2px;background:var(--red);
-  transform:scaleX(0);transform-origin:left;transition:transform .3s}
-.stat-box:hover{transform:translateY(-4px);border-color:rgba(225,19,36,.4);
-  box-shadow:0 14px 34px rgba(0,0,0,.45)}
-.stat-box:hover::before{transform:scaleX(1)}
-.stat-value{font-family:var(--disp);font-weight:900;font-size:clamp(28px,4.4vw,40px);
-  color:var(--white);letter-spacing:-.01em;line-height:1}
-.stat-value .r{color:var(--red)}
-.stat-label{margin-top:8px;font-family:var(--disp);font-weight:600;font-size:11.5px;
-  letter-spacing:.12em;text-transform:uppercase;color:var(--steel)}
+/* Glass-Variante des .frame-wrap (Basis-Styles kommen aus dem PAGE-Block weiter unten) */
+.frame-wrap--glass{background:rgba(19,21,27,.55);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
+  border-color:var(--line);box-shadow:0 20px 50px rgba(0,0,0,.5);
+  transition:border-color .2s,box-shadow .2s}
+.frame-wrap--glass:hover{border-color:rgba(225,19,36,.35)}
+.frame-wrap--glass .frame-head{background:rgba(25,28,36,.6)}
+.frame-open{margin-left:auto;font-family:var(--disp);font-weight:700;font-size:12px;letter-spacing:.08em;text-transform:uppercase;
+  color:var(--steel);border:1px solid var(--line);padding:6px 11px;transition:.15s;white-space:nowrap}
+.frame-open:hover{color:#fff;border-color:var(--red);box-shadow:0 0 14px rgba(225,19,36,.25)}
+.frame-body--tall{aspect-ratio:16/11}
+@media(max-width:640px){.frame-body--tall{aspect-ratio:3/4}}
 
 /* ============ VIDEO-SECTION (unter Statistiken) ============ */
 .video-section{padding:20px 0 60px}

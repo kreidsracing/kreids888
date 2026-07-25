@@ -75,41 +75,29 @@
 </header>
 
 <!-- ============ FAHRERSTATISTIKEN ============
-     Karten werden versuchsweise per fetch von snailpaceracing.org geladen
-     (Details & Fallback-Logik in stats.js). Layout steht schon vollständig. -->
+     Direktes Embed der Snail-Pace-Racing-Fahrerseite (echte Live-Daten,
+     keine Nachbildung von Zahlen). Gleiches .frame-wrap-Prinzip wie auf
+     live.html, hier nur im Glass-Look fürs Homepage-Design. -->
 <section class="stats-section" id="stats">
   <div class="container">
     <div class="lap-tag">Karriere · Live-Daten</div>
     <h2 class="stats-title">Fahrer<span class="r">statistik</span></h2>
     <p class="stats-src-note">
-      Quelle: <a href="https://snailpaceracing.org/fahrer/#fahrer/c:1123750" target="_blank" rel="noopener">Snail Pace Racing</a>
-      <span id="statsStatus" class="stats-status">· wird geladen …</span>
+      Live eingebettet von <a href="https://snailpaceracing.org/fahrer/#fahrer/c:1123750" target="_blank" rel="noopener">Snail Pace Racing</a>
+      — Starts, Siege, Podien, Fahrzeuge &amp; volle Renn-Historie.
     </p>
 
-    <div class="stats-grid" id="statsGrid">
-      <div class="stat-box" data-key="starts">
-        <div class="stat-value" data-target="">–</div>
-        <div class="stat-label">Starts</div>
+    <div class="frame-wrap frame-wrap--glass">
+      <div class="frame-head">
+        <span class="dot"></span>
+        <span>Snail Pace Racing · Fahrerprofil #888</span>
+        <a class="frame-open" href="https://snailpaceracing.org/fahrer/#fahrer/c:1123750" target="_blank" rel="noopener">Vollansicht ↗</a>
       </div>
-      <div class="stat-box" data-key="siege">
-        <div class="stat-value" data-target="">–</div>
-        <div class="stat-label">Siege</div>
-      </div>
-      <div class="stat-box" data-key="podien">
-        <div class="stat-value" data-target="">–</div>
-        <div class="stat-label">Podien</div>
-      </div>
-      <div class="stat-box" data-key="poles">
-        <div class="stat-value" data-target="">–</div>
-        <div class="stat-label">Pole Positions</div>
-      </div>
-      <div class="stat-box" data-key="fastlaps">
-        <div class="stat-value" data-target="">–</div>
-        <div class="stat-label">Schnellste Runden</div>
-      </div>
-      <div class="stat-box" data-key="avgplace">
-        <div class="stat-value" data-target="" data-decimal="1">–</div>
-        <div class="stat-label">Ø Platzierung</div>
+      <div class="frame-body frame-body--tall">
+        <iframe src="https://snailpaceracing.org/fahrer/#fahrer/c:1123750"
+                title="Fahrerstatistik Stefan Kreid — Snail Pace Racing" loading="lazy"></iframe>
+        <!-- Fallback, falls die Zielseite das Einbetten per X-Frame-Options blockiert:
+             der "Vollansicht ↗"-Link oben rechts führt immer direkt zur Original-Seite. -->
       </div>
     </div>
   </div>
@@ -135,6 +123,5 @@
 
 <footer id="site-footer"></footer>
 <script src="components.js"></script>
-<script src="stats.js" defer></script>
 </body>
 </html>
