@@ -167,41 +167,72 @@ function drawPoster(){
       ctx.fillStyle=steel;ctx.font='600 38px "Saira Condensed", sans-serif';ctx.fillText(fmtTime(s.dt),tx,ty+10);
     });
   }
-  // Footer: Logo statt "Folgen & Glocke an"
+  // ================= FOOTER =================
 ctx.fillStyle = red;
 ctx.fillRect(0, H - 300, W, 4);
 
-if (LOGO_OK && LOGO_IMG.width) {
+// Bilder laden
+const PHOTO = new Image();
+PHOTO.crossOrigin = "anonymous";
+PHOTO.src = "https://i.postimg.cc/JzTLD014/Download-Photoroom.png";
 
-    // Logo nahezu über die komplette Breite
-    const padding = 20; // Abstand links/rechts
-    const maxWidth = W - (padding * 2);
+const TWITCH = new Image();
+TWITCH.crossOrigin = "anonymous";
+TWITCH.src = "https://i.postimg.cc/d1jbRfJ5/Twitch.png";
 
-    const scale = maxWidth / LOGO_IMG.width;
+const YOUTUBE = new Image();
+YOUTUBE.crossOrigin = "anonymous";
+YOUTUBE.src = "https://i.postimg.cc/y8JzqnT8/YT-panel2.png";
 
-    const w = LOGO_IMG.width * scale;
-    const h = LOGO_IMG.height * scale;
+// Kasten
+const boxX = 40;
+const boxY = 1550;
+const boxW = W - 80;
+const boxH = 330;
 
-    const x = (W - w) / 2;
-    const y = H - h - 40;
+ctx.fillStyle = "#12151c";
+ctx.fillRect(boxX, boxY, boxW, boxH);
 
-    ctx.drawImage(LOGO_IMG, x, y, w, h);
+// Bild links
+if (PHOTO.complete && PHOTO.naturalWidth) {
 
-} else {
+    const imgW = 300;
+    const imgH = 300;
 
-    ctx.textAlign = "center";
-    ctx.fillStyle = white;
-    ctx.font = '900 84px "Saira Condensed", Impact, sans-serif';
-    ctx.fillText("KREIDS888", W / 2, H - 150);
-
-    ctx.fillStyle = steel;
-    ctx.font = '600 40px "Saira Condensed", sans-serif';
-    ctx.fillText("TWITCH + YOUTUBE", W / 2, H - 90);
-
-    ctx.textAlign = "left";
+    ctx.drawImage(
+        PHOTO,
+        boxX + 15,
+        boxY + 15,
+        imgW,
+        imgH
+    );
 }
-  ctx.textBaseline="alphabetic";
+
+// Twitch Panel
+if (TWITCH.complete && TWITCH.naturalWidth) {
+
+    ctx.drawImage(
+        TWITCH,
+        boxX + 340,
+        boxY + 25,
+        650,
+        125
+    );
 }
+
+// YouTube Panel
+if (YOUTUBE.complete && YOUTUBE.naturalWidth) {
+
+    ctx.drawImage(
+        YOUTUBE,
+        boxX + 340,
+        boxY + 175,
+        650,
+        125
+    );
+}
+
+ctx.textBaseline = "alphabetic";
 
 async function initStreams(){
   const {ok,items}=await loadICS();
