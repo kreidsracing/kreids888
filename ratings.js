@@ -37,9 +37,9 @@ const RATINGS_API_URL = "";
 // license  -> als Text in "...", z.B. "A 4.99"
 // category -> als Text in "...", z.B. "Sports Car"
 const MANUAL_RATINGS = {
-  irating:  null,  // <<< HIER Zahl eintragen, z.B. 3450
-  license:  "",    // <<< HIER Lizenz eintragen, z.B. "A 4.99"
-  category: "",    // <<< HIER Kategorie eintragen, z.B. "Sports Car"
+  irating:  1773,  // <<< HIER Zahl eintragen, z.B. 3450
+  license:  "A",    // <<< HIER Lizenz eintragen, z.B. "A 4.99"
+  category: "Sportscar",    // <<< HIER Kategorie eintragen, z.B. "Sports Car"
 };
 // ⬆⬆⬆  HIER DEINE WERTE EINTRAGEN  ⬆⬆⬆
 
