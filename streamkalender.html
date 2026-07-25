@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>KREIDS888 · Streamkalender</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Saira+Condensed:wght@500;600;700;800;900&family=Barlow:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<nav id="site-nav"></nav>
+
+<main class="page">
+  <div class="container">
+    <div class="lap-tag">Lap 06 — Schedule</div>
+    <h2>Streamkalender</h2>
+    <div class="sk-banner" id="sk-banner"></div>
+    <div class="sk-grid">
+      <div>
+        <div id="stream-list"></div>
+      </div>
+      <div class="poster-col">
+        <div class="poster-head">Poster · Story 9:16</div>
+        <div class="poster-frame">
+          <canvas id="poster" width="1080" height="1920"></canvas>
+        </div>
+        <button class="poster-dl" id="poster-dl">⬇ Als Bild speichern</button>
+        <p class="poster-note">Fertige Story-Grafik deiner nächsten Streams — direkt posten auf Instagram, Discord & Co. Aktualisiert sich automatisch aus deiner Google-Tabelle.</p>
+      </div>
+    </div>
+  </div>
+</main>
+
+<footer id="site-footer"></footer>
+<script src="components.js"></script>
+<script src="streams.js"></script>
+</body>
+</html>

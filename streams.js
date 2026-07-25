@@ -2,11 +2,11 @@
    STREAMKALENDER — füllt sich aus deiner Google-Tabelle.
    ------------------------------------------------------------
    SO VERBINDEST DU DEINE TABELLE:
-   1) Google Tabelle anlegen mit Kopfzeile (Zeile 1):
-        Datum | Uhrzeit | Titel | Plattform
-      Beispiel-Zeile:
-        2026-08-04 | 20:00 | SPR GT3 Challenge – Rd 4 | Twitch
-      (Datum als 2026-08-04  ODER  04.08.2026)
+   1) Google Tabelle mit Kopfzeile (Zeile 1):
+        Streamen? | Datum | Uhrzeit | Titel | Plattform
+      In "Streamen?" trägst du Ja/Nein ein -> nur "Ja" erscheint.
+      (Datum als 2026-08-04 ODER 04.08.2026 · Uhrzeit 20:00)
+      Fehlt die Spalte "Streamen?", werden ALLE Zeilen gezeigt.
    2) In Google: Datei -> Freigeben -> Im Web veröffentlichen
       -> "Gesamtes Dokument", Format "CSV" -> Veröffentlichen
    3) Die angezeigte Link-URL hier unten bei SHEET_CSV_URL einsetzen.
@@ -57,12 +57,17 @@ function parseDate(dStr,tStr){
   return new Date(y,m-1,d,hh,mm);
 }
 
+function truthy(v){return /^\s*(ja|j|x|yes|y|true|1|✓|✔)/i.test(v||"");}
+function hasStreamCol(raw){return raw.some(r=>("streamen?" in r)||("streamen" in r));}
+
 function toItems(raw){
   const now=new Date();now.setHours(0,0,0,0);
+  const useFilter=hasStreamCol(raw);   // Spalte "Streamen?" vorhanden -> nur angehakte zeigen
   return raw.map(r=>{
+    if(useFilter && !truthy(pick(r,["streamen?","streamen"]))) return null;
     const dt=parseDate(pick(r,["datum","date"])||r.datum, pick(r,["uhrzeit","zeit","time"])||r.uhrzeit);
     return dt?{dt,titel:pick(r,["titel","title","stream","spiel"])||r.titel||"Stream",
-      plattform:pick(r,["plattform","platform"])||r.plattform||"Twitch"}:null;
+      plattform:pick(r,["plattform","platform"])||r.plattform||"Twitch + YouTube"}:null;
   }).filter(x=>x&&x.dt>=now).sort((a,b)=>a.dt-b.dt);
 }
 
