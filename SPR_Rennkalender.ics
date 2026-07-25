@@ -1,0 +1,253 @@
+BEGIN:VCALENDAR
+VERSION:2.0
+PRODID:-//Snail Pace Racing//Rennkalender//DE
+CALSCALE:GREGORIAN
+METHOD:PUBLISH
+X-WR-CALNAME:SPR Rennkalender
+X-WR-TIMEZONE:Europe/Berlin
+BEGIN:VEVENT
+UID:spr-1782382530814-r2-2026@snailpaceracing.org
+DTSTAMP:20260725T155214Z
+DTSTART;TZID=Europe/Berlin:20260727T190000
+SUMMARY:R2 - Adelaide - SPR | Porsche CUP 2026
+DESCRIPTION:SPR | Porsche CUP 2026\nTraining: 45 min\nQuali: 15 min\nRennen: 00:45
+END:VEVENT
+BEGIN:VEVENT
+UID:spr-1782384013328-r3-2026@snailpaceracing.org
+DTSTAMP:20260725T155214Z
+DTSTART;TZID=Europe/Berlin:20260803T190000
+SUMMARY:R3 - Barcelona - SPR LMP2 Challenge 2026
+DESCRIPTION:SPR LMP2 Challenge 2026\nTraining: 45 min\nQuali: 15 min\nRennen: 00:45
+END:VEVENT
+BEGIN:VEVENT
+UID:spr-1782226280373-r3-2026@snailpaceracing.org
+DTSTAMP:20260725T155214Z
+DTSTART;TZID=Europe/Berlin:20260807T190000
+SUMMARY:R3 - Zolder - Sommer Endurance CUP 2026 2026
+DESCRIPTION:Sommer Endurance CUP 2026 2026\nTraining: 40 min\nQuali: 20 min\nRennen: 03:00
+END:VEVENT
+BEGIN:VEVENT
+UID:spr-1782382530814-r3-2026@snailpaceracing.org
+DTSTAMP:20260725T155214Z
+DTSTART;TZID=Europe/Berlin:20260810T190000
+SUMMARY:R3 - Lime Rock Park - SPR | Porsche CUP 2026
+DESCRIPTION:SPR | Porsche CUP 2026\nTraining: 45 min\nQuali: 15 min\nRennen: 00:45
+END:VEVENT
+BEGIN:VEVENT
+UID:spr-1783073614706-r1-2026@snailpaceracing.org
+DTSTAMP:20260725T155214Z
+DTSTART;TZID=Europe/Berlin:20260812T190000
+SUMMARY:R1 - Nürburgring Combined - SPR Event | Nordschleifen Racing 2026
+DESCRIPTION:SPR Event | Nordschleifen Racing 2026\nTraining: 35 min\nQuali: 25 min\nRennen: 01:30
+END:VEVENT
+BEGIN:VEVENT
+UID:spr-1782384013328-r4-2026@snailpaceracing.org
+DTSTAMP:20260725T155214Z
+DTSTART;TZID=Europe/Berlin:20260817T190000
+SUMMARY:R4 - Monza - SPR LMP2 Challenge 2026
+DESCRIPTION:SPR LMP2 Challenge 2026\nTraining: 45 min\nQuali: 15 min\nRennen: 00:45
+END:VEVENT
+BEGIN:VEVENT
+UID:spr-1782226280373-r4-2026@snailpaceracing.org
+DTSTAMP:20260725T155214Z
+DTSTART;TZID=Europe/Berlin:20260820T190000
+SUMMARY:R4 - Miami - Sommer Endurance CUP 2026 2026
+DESCRIPTION:Sommer Endurance CUP 2026 2026\nTraining: 40 min\nQuali: 20 min\nRennen: 03:00
+END:VEVENT
+BEGIN:VEVENT
+UID:spr-1782382530814-r4-2026@snailpaceracing.org
+DTSTAMP:20260725T155214Z
+DTSTART;TZID=Europe/Berlin:20260824T190000
+SUMMARY:R4 - St. Petersburg - SPR | Porsche CUP 2026
+DESCRIPTION:SPR | Porsche CUP 2026\nTraining: 45 min\nQuali: 15 min\nRennen: 00:45
+END:VEVENT
+BEGIN:VEVENT
+UID:spr-1777127909568-r1-2026@snailpaceracing.org
+DTSTAMP:20260725T155214Z
+DTSTART;TZID=Europe/Berlin:20260903T190000
+SUMMARY:R1 - Spezial - Community entscheidet - Snail Pace Events 2026/2
+DESCRIPTION:Snail Pace Events 2026/2
+END:VEVENT
+BEGIN:VEVENT
+UID:spr-1782385882647-r1-2026@snailpaceracing.org
+DTSTAMP:20260725T155214Z
+DTSTART;TZID=Europe/Berlin:20260907T190000
+SUMMARY:R1 - Daytona - SPR Sportscar Championship 2026
+DESCRIPTION:SPR Sportscar Championship 2026\nTraining: 30 min\nQuali: 30 min\nRennen: 01:30
+END:VEVENT
+BEGIN:VEVENT
+UID:spr-1782398385230-r1-2026@snailpaceracing.org
+DTSTAMP:20260725T155214Z
+DTSTART;TZID=Europe/Berlin:20260909T181500
+SUMMARY:R1 - Nürburgring Combined - VLN Eifel Racing Season 2 2026
+DESCRIPTION:VLN Eifel Racing Season 2 2026\nTraining: 30 min\nQuali: 30 min\nRennen: 00:90
+END:VEVENT
+BEGIN:VEVENT
+UID:spr-1782396983727-r1-2026@snailpaceracing.org
+DTSTAMP:20260725T155214Z
+DTSTART;TZID=Europe/Berlin:20260914T190000
+SUMMARY:R1 - Sebring - GT3 Performance CUP - S2 2026
+DESCRIPTION:GT3 Performance CUP - S2 2026\nTraining: 40 min\nQuali: 20 min\nRennen: 01:00
+END:VEVENT
+BEGIN:VEVENT
+UID:spr-1782385882647-r2-2026@snailpaceracing.org
+DTSTAMP:20260725T155214Z
+DTSTART;TZID=Europe/Berlin:20260921T190000
+SUMMARY:R2 - Barcelona - SPR Sportscar Championship 2026
+DESCRIPTION:SPR Sportscar Championship 2026\nTraining: 30 min\nQuali: 30 min\nRennen: 01:30
+END:VEVENT
+BEGIN:VEVENT
+UID:spr-1782396983727-r2-2026@snailpaceracing.org
+DTSTAMP:20260725T155214Z
+DTSTART;TZID=Europe/Berlin:20260928T190000
+SUMMARY:R2 - Bathurst - GT3 Performance CUP - S2 2026
+DESCRIPTION:GT3 Performance CUP - S2 2026\nTraining: 40 min\nQuali: 20 min\nRennen: 01:00
+END:VEVENT
+BEGIN:VEVENT
+UID:spr-1782385882647-r3-2026@snailpaceracing.org
+DTSTAMP:20260725T155214Z
+DTSTART;TZID=Europe/Berlin:20261005T190000
+SUMMARY:R3 - Le Mans - SPR Sportscar Championship 2026
+DESCRIPTION:SPR Sportscar Championship 2026\nTraining: 30 min\nQuali: 30 min\nRennen: 01:30
+END:VEVENT
+BEGIN:VEVENT
+UID:spr-1782398385230-r2-2026@snailpaceracing.org
+DTSTAMP:20260725T155214Z
+DTSTART;TZID=Europe/Berlin:20261007T181500
+SUMMARY:R2 - Nürburgring Combined - VLN Eifel Racing Season 2 2026
+DESCRIPTION:VLN Eifel Racing Season 2 2026\nTraining: 30 min\nQuali: 30 min\nRennen: 00:75
+END:VEVENT
+BEGIN:VEVENT
+UID:spr-1782396983727-r3-2026@snailpaceracing.org
+DTSTAMP:20260725T155214Z
+DTSTART;TZID=Europe/Berlin:20261012T190000
+SUMMARY:R3 - Monza - GT3 Performance CUP - S2 2026
+DESCRIPTION:GT3 Performance CUP - S2 2026\nTraining: 40 min\nQuali: 20 min\nRennen: 01:00
+END:VEVENT
+BEGIN:VEVENT
+UID:spr-1782385882647-r4-2026@snailpaceracing.org
+DTSTAMP:20260725T155214Z
+DTSTART;TZID=Europe/Berlin:20261019T190000
+SUMMARY:R4 - Magny Cours - SPR Sportscar Championship 2026
+DESCRIPTION:SPR Sportscar Championship 2026\nTraining: 30 min\nQuali: 30 min\nRennen: 01:30
+END:VEVENT
+BEGIN:VEVENT
+UID:spr-1777127909568-r2-2026@snailpaceracing.org
+DTSTAMP:20260725T155214Z
+DTSTART;TZID=Europe/Berlin:20261021T190000
+SUMMARY:R2 - Spezial - Community entscheidet - Snail Pace Events 2026/2
+DESCRIPTION:Snail Pace Events 2026/2
+END:VEVENT
+BEGIN:VEVENT
+UID:spr-1784197271477-r1-2026@snailpaceracing.org
+DTSTAMP:20260725T155214Z
+DTSTART;TZID=Europe/Berlin:20261024T120000
+SUMMARY:R1 - Daytona - Endurance Sportscar Challenge 2026
+DESCRIPTION:Endurance Sportscar Challenge 2026\nTraining: 60 min\nQuali: 30 min\nRennen: 06:00
+END:VEVENT
+BEGIN:VEVENT
+UID:spr-1782396983727-r4-2026@snailpaceracing.org
+DTSTAMP:20260725T155214Z
+DTSTART;TZID=Europe/Berlin:20261026T190000
+SUMMARY:R4 - Adelaide - GT3 Performance CUP - S2 2026
+DESCRIPTION:GT3 Performance CUP - S2 2026\nTraining: 40 min\nQuali: 20 min\nRennen: 01:00
+END:VEVENT
+BEGIN:VEVENT
+UID:spr-1782398385230-r3-2026@snailpaceracing.org
+DTSTAMP:20260725T155214Z
+DTSTART;TZID=Europe/Berlin:20261104T181500
+SUMMARY:R3 - Nürburgring Combined - VLN Eifel Racing Season 2 2026
+DESCRIPTION:VLN Eifel Racing Season 2 2026\nTraining: 30 min\nQuali: 30 min\nRennen: 00:75
+END:VEVENT
+BEGIN:VEVENT
+UID:spr-1782396983727-r5-2026@snailpaceracing.org
+DTSTAMP:20260725T155214Z
+DTSTART;TZID=Europe/Berlin:20261109T190000
+SUMMARY:R5 - Road America - GT3 Performance CUP - S2 2026
+DESCRIPTION:GT3 Performance CUP - S2 2026\nTraining: 40 min\nQuali: 20 min\nRennen: 01:00
+END:VEVENT
+BEGIN:VEVENT
+UID:spr-1784197271477-r2-2026@snailpaceracing.org
+DTSTAMP:20260725T155214Z
+DTSTART;TZID=Europe/Berlin:20261114T120000
+SUMMARY:R2 - Spa Franchorchamps - Endurance Sportscar Challenge 2026
+DESCRIPTION:Endurance Sportscar Challenge 2026\nTraining: 60 min\nQuali: 30 min\nRennen: 08:00
+END:VEVENT
+BEGIN:VEVENT
+UID:spr-1782385882647-r6-2026@snailpaceracing.org
+DTSTAMP:20260725T155214Z
+DTSTART;TZID=Europe/Berlin:20261116T190000
+SUMMARY:R6 - Sebring - SPR Sportscar Championship 2026
+DESCRIPTION:SPR Sportscar Championship 2026\nTraining: 30 min\nQuali: 30 min\nRennen: 01:30
+END:VEVENT
+BEGIN:VEVENT
+UID:spr-1777127909568-r3-2026@snailpaceracing.org
+DTSTAMP:20260725T155214Z
+DTSTART;TZID=Europe/Berlin:20261118T190000
+SUMMARY:R3 - Spezial - Community entscheidet - Snail Pace Events 2026/2
+DESCRIPTION:Snail Pace Events 2026/2
+END:VEVENT
+BEGIN:VEVENT
+UID:spr-1782396983727-r6-2026@snailpaceracing.org
+DTSTAMP:20260725T155214Z
+DTSTART;TZID=Europe/Berlin:20261123T190000
+SUMMARY:R6 - Silverstone - GT3 Performance CUP - S2 2026
+DESCRIPTION:GT3 Performance CUP - S2 2026\nTraining: 40 min\nQuali: 20 min\nRennen: 01:00
+END:VEVENT
+BEGIN:VEVENT
+UID:spr-1782385882647-r7-2026@snailpaceracing.org
+DTSTAMP:20260725T155214Z
+DTSTART;TZID=Europe/Berlin:20261130T190000
+SUMMARY:R7 - Mugelo - SPR Sportscar Championship 2026
+DESCRIPTION:SPR Sportscar Championship 2026\nTraining: 30 min\nQuali: 30 min\nRennen: 01:30
+END:VEVENT
+BEGIN:VEVENT
+UID:spr-1782398385230-r4-2026@snailpaceracing.org
+DTSTAMP:20260725T155214Z
+DTSTART;TZID=Europe/Berlin:20261202T181500
+SUMMARY:R4 - Nürburgring Combined - VLN Eifel Racing Season 2 2026
+DESCRIPTION:VLN Eifel Racing Season 2 2026\nTraining: 30 min\nQuali: 30 min\nRennen: 00:90
+END:VEVENT
+BEGIN:VEVENT
+UID:spr-1782396983727-r7-2026@snailpaceracing.org
+DTSTAMP:20260725T155214Z
+DTSTART;TZID=Europe/Berlin:20261207T190000
+SUMMARY:R7 - Road Atlanta - GT3 Performance CUP - S2 2026
+DESCRIPTION:GT3 Performance CUP - S2 2026\nTraining: 40 min\nQuali: 20 min\nRennen: 01:00
+END:VEVENT
+BEGIN:VEVENT
+UID:spr-1784197271477-r3-2026@snailpaceracing.org
+DTSTAMP:20260725T155214Z
+DTSTART;TZID=Europe/Berlin:20261212T120000
+SUMMARY:R3 - Road America - Endurance Sportscar Challenge 2026
+DESCRIPTION:Endurance Sportscar Challenge 2026\nTraining: 60 min\nQuali: 30 min\nRennen: 06:00
+END:VEVENT
+BEGIN:VEVENT
+UID:spr-1782385882647-r8-2026@snailpaceracing.org
+DTSTAMP:20260725T155214Z
+DTSTART;TZID=Europe/Berlin:20261214T190000
+SUMMARY:R8 - Spa Franchorchamps - SPR Sportscar Championship 2026
+DESCRIPTION:SPR Sportscar Championship 2026\nTraining: 30 min\nQuali: 30 min\nRennen: 01:30
+END:VEVENT
+BEGIN:VEVENT
+UID:spr-1777127909568-r4-2026@snailpaceracing.org
+DTSTAMP:20260725T155214Z
+DTSTART;TZID=Europe/Berlin:20261216T190000
+SUMMARY:R4 - Spezial - Community entscheidet - Snail Pace Events 2026/2
+DESCRIPTION:Snail Pace Events 2026/2
+END:VEVENT
+BEGIN:VEVENT
+UID:spr-1784197271477-r4-2027@snailpaceracing.org
+DTSTAMP:20260725T155214Z
+DTSTART;TZID=Europe/Berlin:20270709T120000
+SUMMARY:R4 - Le Mans  - Endurance Sportscar Challenge 2026
+DESCRIPTION:Endurance Sportscar Challenge 2026\nTraining: 60 min\nQuali: 30 min\nRennen: 10:00
+END:VEVENT
+BEGIN:VEVENT
+UID:spr-1782385882647-r5-112026@snailpaceracing.org
+DTSTAMP:20260725T155214Z
+DTSTART;TZID=Europe/Berlin:1120260203T190000
+SUMMARY:R5 - Long Beach - SPR Sportscar Championship 2026
+DESCRIPTION:SPR Sportscar Championship 2026\nTraining: 30 min\nQuali: 30 min\nRennen: 01:30
+END:VEVENT
+END:VCALENDAR

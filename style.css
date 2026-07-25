@@ -325,3 +325,16 @@ footer{border-top:2px solid var(--red);background:var(--panel);padding:44px 0 40
   padding:14px;cursor:pointer;transition:.15s}
 .poster-dl:hover{background:var(--red-deep)}
 .poster-note{font-size:11px;color:var(--steel-d);margin-top:8px;max-width:340px;line-height:1.5}
+
+/* ===== Streamkalender: Auswahl-Häkchen + Poster unter Kalender ===== */
+.stream{grid-template-columns:auto auto 1fr;cursor:pointer;user-select:none}
+.stream .stream-cb{display:none}
+.stream .cbox{width:28px;height:28px;border:2px solid var(--line);flex:none;position:relative;transition:.15s;background:var(--panel2)}
+.stream .stream-cb:checked + .cbox{background:var(--red);border-color:var(--red)}
+.stream .stream-cb:checked + .cbox::after{content:"✓";position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:900;font-size:17px}
+.stream.off{opacity:.42}
+.stream:hover{transform:none;border-color:var(--red)}
+.poster-block{margin-top:38px;border-top:1px solid var(--line);padding-top:30px;display:flex;flex-direction:column;align-items:center;gap:0}
+.poster-block .poster-head{align-self:flex-start}
+.poster-block .poster-frame{max-width:330px;width:100%}
+.poster-block .poster-dl{max-width:330px;width:100%}
