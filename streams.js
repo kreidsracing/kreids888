@@ -167,72 +167,21 @@ function drawPoster(){
       ctx.fillStyle=steel;ctx.font='600 38px "Saira Condensed", sans-serif';ctx.fillText(fmtTime(s.dt),tx,ty+10);
     });
   }
-  // ================= FOOTER =================
-ctx.fillStyle = red;
-ctx.fillRect(0, H - 300, W, 4);
-
-// Bilder laden
-const PHOTO = new Image();
-PHOTO.crossOrigin = "anonymous";
-PHOTO.src = "https://i.postimg.cc/JzTLD014/Download-Photoroom.png";
-
-const TWITCH = new Image();
-TWITCH.crossOrigin = "anonymous";
-TWITCH.src = "https://i.postimg.cc/d1jbRfJ5/Twitch.png";
-
-const YOUTUBE = new Image();
-YOUTUBE.crossOrigin = "anonymous";
-YOUTUBE.src = "https://i.postimg.cc/y8JzqnT8/YT-panel2.png";
-
-// Kasten
-const boxX = 40;
-const boxY = 1550;
-const boxW = W - 80;
-const boxH = 330;
-
-ctx.fillStyle = "#12151c";
-ctx.fillRect(boxX, boxY, boxW, boxH);
-
-// Bild links
-if (PHOTO.complete && PHOTO.naturalWidth) {
-
-    const imgW = 300;
-    const imgH = 300;
-
-    ctx.drawImage(
-        PHOTO,
-        boxX + 15,
-        boxY + 15,
-        imgW,
-        imgH
-    );
+  // Footer: Logo statt "Folgen & Glocke an"
+  ctx.fillStyle=red;ctx.fillRect(0,H-300,W,4);
+  if(LOGO_OK && LOGO_IMG.width){
+    const maxW=780,maxH=180;
+    const r=Math.min(maxW/LOGO_IMG.width,maxH/LOGO_IMG.height);
+    const w=LOGO_IMG.width*r,h=LOGO_IMG.height*r;
+    ctx.drawImage(LOGO_IMG,(W-w)/2,H-70-h,w,h);
+  }else{
+    ctx.textAlign="center";ctx.fillStyle=white;ctx.font='900 84px "Saira Condensed", Impact, sans-serif';
+    ctx.fillText("KREIDS888",W/2,H-150);
+    ctx.fillStyle=steel;ctx.font='600 40px "Saira Condensed", sans-serif';
+    ctx.fillText("TWITCH + YOUTUBE",W/2,H-90);ctx.textAlign="left";
+  }
+  ctx.textBaseline="alphabetic";
 }
-
-// Twitch Panel
-if (TWITCH.complete && TWITCH.naturalWidth) {
-
-    ctx.drawImage(
-        TWITCH,
-        boxX + 340,
-        boxY + 25,
-        650,
-        125
-    );
-}
-
-// YouTube Panel
-if (YOUTUBE.complete && YOUTUBE.naturalWidth) {
-
-    ctx.drawImage(
-        YOUTUBE,
-        boxX + 340,
-        boxY + 175,
-        650,
-        125
-    );
-}
-
-ctx.textBaseline = "alphabetic";
 
 async function initStreams(){
   const {ok,items}=await loadICS();
