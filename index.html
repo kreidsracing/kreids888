@@ -16,7 +16,7 @@
   <!-- Vollbild-Hintergrund: eigenes Foto/Video kann einfach unter assets/ abgelegt werden.
        Fehlt die Datei, greift automatisch der Carbon/Grid-Fallback (siehe CSS .hero-bg). -->
   <div class="hero-bg">
-    <img class="hero-bg-img" src="assets/hero-bg.jpg" alt=""
+    <img class="hero-bg-img" src="https://i.postimg.cc/QdhgzxGw/Screenshot-2026-07-25-233347.jpg" alt=""
          onerror="this.style.opacity='0'" loading="eager">
     <div class="hero-bg-grid"></div>
     <div class="hero-bg-overlay"></div>
@@ -73,33 +73,32 @@
   </div></div>
 </header>
 
-<!-- ============ FAHRERSTATISTIKEN ============
-     Direktes Embed der Snail-Pace-Racing-Fahrerseite (echte, live von SPR
-     gepflegte iRacing-Daten). Die iframe wird oben um die Höhe der
-     SPR-eigenen Navigation "hochgeschoben" (siehe .frame-body--tall in
-     style.css), damit im Embed nicht zweimal ein Menü zu sehen ist. -->
+<!-- ============ VIDEO ============
+     Läuft automatisch (stumm, wegen Browser-Autoplay-Regeln) sobald die
+     Seite geladen ist. Ton lässt sich per Klick auf den Ton-Button dazuschalten. -->
+<section class="video-section">
+  <div class="container video-section-in">
+    <div class="video-section-text">
+      <div class="lap-tag">Neuestes Video</div>
+      <h3 class="video-section-h">Rennen verpasst? <span class="r">Hier reinschauen.</span></h3>
+      <p class="video-section-p">Highlights, Onboards und volle Streams gibt's auf YouTube — läuft direkt hier auf der Seite.</p>
+    </div>
+    <div class="video video--autoplay" id="yt" data-id="Yvv1yh9lG0w">
+      <iframe id="ytFrame"
+              src="https://www.youtube.com/embed/Yvv1yh9lG0w?autoplay=1&mute=1&rel=0&playsinline=1&enablejsapi=1"
+              title="Kreids888 Video" allow="autoplay; encrypted-media; fullscreen" allowfullscreen></iframe>
+      <button class="sound-toggle" id="soundToggle" aria-label="Ton an/aus">🔇 Ton an</button>
+    </div>
+  </div>
+</section>
+
+<!-- ============ MEINE IRACING-DATEN ============
+     Eigene, manuell gepflegte Werte — Bearbeiten in ratings.js. -->
 <section class="stats-section" id="stats">
   <div class="container">
-    <div class="lap-tag">Karriere · Live-Daten</div>
-    <h2 class="stats-title">Racing <span class="r">by Snail Pace Racing</span></h2>
-    <p class="stats-src-note">
-      Live eingebettet von <a href="https://snailpaceracing.org/fahrer/#fahrer/c:1123750" target="_blank" rel="noopener">Snail Pace Racing</a>
-      — Starts, Siege, Podien, Fahrzeuge &amp; volle Renn-Historie.
-    </p>
+    <div class="lap-tag">Aktuelle Werte</div>
+    <h2 class="stats-title">Meine <span class="r">iRacing-Daten</span></h2>
 
-    <div class="frame-wrap frame-wrap--glass">
-      <div class="frame-head">
-        <span class="dot"></span>
-        <span>Snail Pace Racing · Fahrerprofil #888</span>
-      </div>
-      <div class="frame-body frame-body--tall">
-        <iframe src="https://snailpaceracing.org/fahrer/#fahrer/c:1123750"
-                title="Fahrerstatistik Stefan Kreid — Snail Pace Racing" loading="lazy"></iframe>
-      </div>
-    </div>
-
-    <!-- Ratings-Zeile: iRating / Safety Rating / Lizenz. Werte & Live-Anbindung
-         (optional über einen eigenen Garage61-Proxy) werden in ratings.js gepflegt. -->
     <div class="ratings-row" id="ratingsRow">
       <div class="rating-pill" data-key="irating">
         <span class="rating-val" data-target="">–</span>
@@ -115,24 +114,6 @@
       </div>
     </div>
     <p class="ratings-note" id="ratingsNote">Werte werden manuell gepflegt — Bearbeiten in <code>ratings.js</code>.</p>
-  </div>
-</section>
-
-<!-- ============ VIDEO-VORSCHAU (aus dem alten Hero hierher verschoben) ============ -->
-<section class="video-section">
-  <div class="container video-section-in">
-    <div class="video-section-text">
-      <div class="lap-tag">Neuestes Video</div>
-      <h3 class="video-section-h">Rennen verpasst? <span class="r">Hier reinschauen.</span></h3>
-      <p class="video-section-p">Highlights, Onboards und volle Streams gibt's auf YouTube — Klick startet direkt das Video.</p>
-    </div>
-    <div class="video" id="yt" data-id="Yvv1yh9lG0w">
-      <img src="https://i.ytimg.com/vi/Yvv1yh9lG0w/maxresdefault.jpg"
-           onerror="this.onerror=null;this.src='https://i.ytimg.com/vi/Yvv1yh9lG0w/hqdefault.jpg'"
-           alt="Video-Vorschau" loading="lazy">
-      <button class="play" aria-label="Video abspielen">▶</button>
-      <div class="video-tag">Watch</div>
-    </div>
   </div>
 </section>
 

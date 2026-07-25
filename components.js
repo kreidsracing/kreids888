@@ -5,6 +5,7 @@
 const LINKS = [
   {href:"about.html",     label:"Über mich"},
   {href:"live.html",      label:"Live"},
+  {href:"events.html",    label:"Rennkalender"},
   {href:"streamkalender.html", label:"Streamkalender"},
   {href:"setup.html",     label:"Setup"},
   {href:"community.html", label:"Community"},
@@ -67,12 +68,22 @@ if(burger&&navlinks){
   });
 }
 
-// ---- Video: erst beim Klick laden (hält die Seite schnell) ----
-const yt=document.getElementById("yt");
-if(yt){
-  yt.addEventListener("click",()=>{
-    const id=yt.dataset.id;
-    yt.innerHTML='<iframe src="https://www.youtube.com/embed/'+id+'?autoplay=1&rel=0" title="Kreids888 Video" allow="autoplay; encrypted-media; fullscreen" allowfullscreen></iframe>';
-    yt.classList.add("playing");
+// ---- Video: läuft automatisch (stumm) — Ton lässt sich dazuschalten ----
+// Browser erlauben Autoplay mit Ton grundsätzlich nicht; daher startet das
+// Video stumm und der Nutzer kann per Button den Ton aktivieren (steuert
+// den YouTube-Player über die postMessage-API, dafür braucht die iframe-URL
+// den Parameter "enablejsapi=1").
+const soundToggle=document.getElementById("soundToggle");
+const ytFrame=document.getElementById("ytFrame");
+if(soundToggle&&ytFrame){
+  let muted=true;
+  soundToggle.addEventListener("click",()=>{
+    muted=!muted;
+    ytFrame.contentWindow.postMessage(JSON.stringify({
+      event:"command",
+      func: muted?"mute":"unMute",
+      args:[]
+    }),"*");
+    soundToggle.textContent = muted ? "🔇 Ton an" : "🔊 Ton aus";
   });
 }
