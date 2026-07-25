@@ -12,7 +12,7 @@
    3) Die angezeigte Link-URL hier unten bei SHEET_CSV_URL einsetzen.
    Fertig — die Seite füllt sich dann automatisch.
    =========================================================== */
-const SHEET_CSV_URL = ""; // <-- hier deine veröffentlichte CSV-URL eintragen
+const SHEET_CSV_URL = "https://kreidsracing.github.io/kreids888/streamkalender.html"; // <-- hier deine veröffentlichte CSV-URL eintragen
 
 // Handles fürs Poster
 const HANDLE_TWITCH = "twitch.tv/kreids888";
