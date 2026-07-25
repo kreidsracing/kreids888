@@ -16,7 +16,7 @@
   <!-- Vollbild-Hintergrund: eigenes Foto/Video kann einfach unter assets/ abgelegt werden.
        Fehlt die Datei, greift automatisch der Carbon/Grid-Fallback (siehe CSS .hero-bg). -->
   <div class="hero-bg">
-    <img class="hero-bg-img" src="assets/hero-bg.jpg" alt=""
+    <img class="hero-bg-img" src="https://i.postimg.cc/QdhgzxGw/Screenshot-2026-07-25-233347.jpg" alt=""
          onerror="this.style.opacity='0'" loading="eager">
     <div class="hero-bg-grid"></div>
     <div class="hero-bg-overlay"></div>
@@ -40,44 +40,37 @@
           <span>▶ YouTube</span></a>
         <a class="btn btn-glow btn-instagram" href="https://instagram.com/kreids888" target="_blank" rel="noopener">
           <span>Instagram</span></a>
+        <a class="btn btn-glow btn-outline" href="events.html">
+          <span>Rennkalender</span></a>
       </div>
     </div>
 
     <div class="hero-right reveal reveal-delay">
-      <div class="profile-card">
-        <div class="portrait-frame">
-          <!-- Eigenes Fahrerbild -->
-          <img class="portrait-img" src="https://i.postimg.cc/QdhgzxGw/Screenshot-2026-07-25-233347.jpg" alt="Stefan Kreid"
-               onerror="this.closest('.portrait-frame').classList.add('no-img')" loading="eager">
-          <div class="portrait-fallback" aria-hidden="true">
-            <svg viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <circle cx="100" cy="86" r="52" stroke="currentColor" stroke-width="3"/>
-              <path d="M48 86a52 52 0 0 1 104 0" stroke="currentColor" stroke-width="3"/>
-              <rect x="60" y="96" width="80" height="26" rx="4" stroke="currentColor" stroke-width="3"/>
-              <path d="M30 190c8-38 40-60 70-60s62 22 70 60" stroke="currentColor" stroke-width="3"/>
-            </svg>
-          </div>
-          <div class="portrait-plate">#888 · S. KREID</div>
+      <div class="portrait-frame">
+        <!-- Eigenes Fahrerbild einfach als assets/fahrer.jpg ablegen -->
+        <img class="portrait-img" src="assets/fahrer.jpg" alt="Stefan Kreid"
+             onerror="this.closest('.portrait-frame').classList.add('no-img')" loading="eager">
+        <div class="portrait-fallback" aria-hidden="true">
+          <svg viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="100" cy="86" r="52" stroke="currentColor" stroke-width="3"/>
+            <path d="M48 86a52 52 0 0 1 104 0" stroke="currentColor" stroke-width="3"/>
+            <rect x="60" y="96" width="80" height="26" rx="4" stroke="currentColor" stroke-width="3"/>
+            <path d="M30 190c8-38 40-60 70-60s62 22 70 60" stroke="currentColor" stroke-width="3"/>
+          </svg>
         </div>
-
-        <!-- iRacing-Werte als Kartenfuß direkt unter dem Bild — siehe ratings.js für die Werte. -->
-        <div class="profile-stats" id="ratingsRow">
-          <div class="rating-pill" data-key="irating">
-            <span class="rating-val" data-target="">–</span>
-            <span class="rating-lbl">iRating</span>
-          </div>
-          <div class="rating-pill" data-key="license">
-            <span class="rating-val rating-val--text">–</span>
-            <span class="rating-lbl">Lizenz</span>
-          </div>
-          <div class="rating-pill" data-key="category">
-            <span class="rating-val rating-val--text">–</span>
-            <span class="rating-lbl">Kategorie</span>
-          </div>
-        </div>
+        <div class="portrait-plate">#888 · S. KREID</div>
       </div>
     </div>
   </div>
+
+  <div class="hero-jump-wrap"><div class="container">
+    <div class="hero-jump">
+      <a href="about.html">Über mich</a>
+      <a href="live.html">Live-Timing</a>
+      <a href="setup.html">Setup</a>
+      <a href="community.html">Community</a>
+    </div>
+  </div></div>
 </header>
 
 <!-- ============ VIDEO ============
@@ -96,6 +89,31 @@
               title="Kreids888 Video" allow="autoplay; encrypted-media; fullscreen" allowfullscreen></iframe>
       <button class="sound-toggle" id="soundToggle" aria-label="Ton an/aus">🔇 Ton an</button>
     </div>
+  </div>
+</section>
+
+<!-- ============ MEINE IRACING-DATEN ============
+     Eigene, manuell gepflegte Werte — Bearbeiten in ratings.js. -->
+<section class="stats-section" id="stats">
+  <div class="container">
+    <div class="lap-tag">Aktuelle Werte</div>
+    <h2 class="stats-title">Meine <span class="r">iRacing-Daten</span></h2>
+
+    <div class="ratings-row" id="ratingsRow">
+      <div class="rating-pill" data-key="irating">
+        <span class="rating-val" data-target="">–</span>
+        <span class="rating-lbl">iRating</span>
+      </div>
+      <div class="rating-pill" data-key="license">
+        <span class="rating-val rating-val--text">–</span>
+        <span class="rating-lbl">Lizenz</span>
+      </div>
+      <div class="rating-pill" data-key="category">
+        <span class="rating-val rating-val--text">–</span>
+        <span class="rating-lbl">Kategorie</span>
+      </div>
+    </div>
+    <p class="ratings-note" id="ratingsNote">Werte werden manuell gepflegt — Bearbeiten in <code>ratings.js</code>.</p>
   </div>
 </section>
 
