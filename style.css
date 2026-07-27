@@ -610,6 +610,10 @@ footer{border-top:2px solid var(--red);background:var(--panel);padding:44px 0 40
 .sk-time{font-family:var(--disp);font-weight:900;font-size:20px;color:var(--white);font-variant-numeric:tabular-nums;line-height:1}
 .sk-time small{display:block;font-size:10px;letter-spacing:.14em;color:var(--steel);font-weight:600;margin-top:3px}
 .sk-main{min-width:0}
+.sk-main{min-width:0;display:flex;gap:14px;align-items:center}
+.sk-txt{min-width:0}
+.sk-thumb{width:132px;aspect-ratio:16/9;object-fit:cover;flex:none;border:1px solid var(--line);border-radius:4px;background:#000}
+@media(max-width:560px){.sk-thumb{width:90px}}
 .sk-title{font-family:var(--disp);font-weight:800;font-size:17px;color:var(--white);line-height:1.15}
 .sk-meta{font-size:13px;color:var(--steel);margin-top:3px}
 .sk-right{display:flex;flex-direction:column;align-items:flex-end;gap:6px;flex:none}

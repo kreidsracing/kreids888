@@ -129,10 +129,12 @@
       if(dl!==curDay){ if(curDay) html+="</div>"; html+='<div class="sk-day"><div class="sk-day-h">'+dl+'</div>'; curDay=dl; }
       var time=e.time?esc(e.time):"–";
       var meta=[e.series,e.track].filter(Boolean).map(esc).join(" · ");
+      var img=e.image?'<img class="sk-thumb" src="'+esc(e.image)+'" alt="" loading="lazy" onerror="this.style.display=\'none\'">':'';
       html+='<div class="sk-item" data-type="'+esc(e.type||"Rennen")+'">'+
         '<div class="sk-time">'+time+'<small>UHR</small></div>'+
-        '<div class="sk-main"><div class="sk-title">'+esc(e.title)+'</div>'+
-          (meta?'<div class="sk-meta">'+meta+'</div>':'')+'</div>'+
+        '<div class="sk-main">'+img+
+          '<div class="sk-txt"><div class="sk-title">'+esc(e.title)+'</div>'+
+          (meta?'<div class="sk-meta">'+meta+'</div>':'')+'</div></div>'+
         '<div class="sk-right"><span class="sk-badge">'+esc(e.type||"Rennen")+'</span>'+
           '<span class="sk-race yes">🔴 Ich fahre</span></div>'+
       '</div>';
@@ -152,7 +154,7 @@
   });
 
   /* ================= 9:16-Poster: NUR die aktuelle Woche ================= */
-  var LOGO_SRC="https://i.postimg.cc/c4WQb4fc/kreidslogo-twitch-u-yt.png";
+  var LOGO_SRC="https://i.postimg.cc/cC8FkHnv/kreidslogo-twitch-u-yt-3.png";
   var LOGO_IMG=new Image(), LOGO_OK=false;
   LOGO_IMG.crossOrigin="anonymous";
   LOGO_IMG.onload=function(){LOGO_OK=true;};
@@ -190,8 +192,6 @@
     ctx.fillStyle=carbon;ctx.fillRect(0,0,W,H);
     var g=ctx.createRadialGradient(W*0.85,-100,50,W*0.85,-100,700);
     g.addColorStop(0,"rgba(225,19,36,.30)");g.addColorStop(1,"rgba(225,19,36,0)");ctx.fillStyle=g;ctx.fillRect(0,0,W,H);
-    ctx.save();ctx.globalAlpha=.05;ctx.fillStyle=white;ctx.font='900 640px "Saira Condensed", Impact, sans-serif';
-    ctx.textAlign="center";ctx.textBaseline="middle";ctx.fillText("888",W/2,H*0.52);ctx.restore();
     ctx.fillStyle=red;ctx.fillRect(0,0,W,14);
     // Header
     ctx.textAlign="left";ctx.textBaseline="alphabetic";
@@ -229,18 +229,19 @@
         ctx.fillText(fmtTime(dt)+" Uhr",tx,ty+10);
       });
     }
-    // Footer: Logo
+    // Footer: Logo (füllt das untere Band)
     ctx.fillStyle=red;ctx.fillRect(0,H-300,W,4);
+    var bandMid=H-150; // Mitte des unteren Bandes (1620..1920)
     if(LOGO_OK && LOGO_IMG.width){
-      var maxW2=780,maxH=180;
+      var maxW2=920,maxH=230;
       var r=Math.min(maxW2/LOGO_IMG.width,maxH/LOGO_IMG.height);
       var lw=LOGO_IMG.width*r,lh2=LOGO_IMG.height*r;
-      ctx.drawImage(LOGO_IMG,(W-lw)/2,H-70-lh2,lw,lh2);
+      ctx.drawImage(LOGO_IMG,(W-lw)/2,bandMid-lh2/2,lw,lh2);
     }else{
-      ctx.textAlign="center";ctx.fillStyle=white;ctx.font='900 84px "Saira Condensed", Impact, sans-serif';
-      ctx.fillText("KREIDS888",W/2,H-150);
-      ctx.fillStyle=steel;ctx.font='600 40px "Saira Condensed", sans-serif';
-      ctx.fillText("TWITCH + YOUTUBE",W/2,H-90);ctx.textAlign="left";
+      ctx.textAlign="center";ctx.fillStyle=white;ctx.font='900 100px "Saira Condensed", Impact, sans-serif';
+      ctx.fillText("KREIDS888",W/2,bandMid-6);
+      ctx.fillStyle=steel;ctx.font='600 42px "Saira Condensed", sans-serif';
+      ctx.fillText("TWITCH + YOUTUBE",W/2,bandMid+54);ctx.textAlign="left";
     }
     ctx.textBaseline="alphabetic";
   }
