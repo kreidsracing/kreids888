@@ -6,6 +6,7 @@ const LINKS = [
   {href:"about.html",     label:"Über mich"},
   {href:"live.html",      label:"Live"},
   {href:"streamkalender.html", label:"Streamkalender"},
+  {href:"news.html",      label:"News"},
   {href:"setup.html",     label:"Setup"},
   {href:"community.html", label:"Community"},
 ];

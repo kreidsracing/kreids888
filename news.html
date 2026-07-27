@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>KREIDS888 · News</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Saira+Condensed:wght@500;600;700;800;900&family=Barlow:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+<meta name="description" content="News, Updates und Rennberichte von Kreids888 — Sim Racing auf iRacing.">
+<link rel="canonical" href="https://kreids888.com/news.html">
+<meta name="robots" content="index, follow">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="KREIDS888">
+<meta property="og:locale" content="de_DE">
+<meta property="og:title" content="KREIDS888 · News">
+<meta property="og:description" content="News, Updates und Rennberichte von Kreids888.">
+<meta property="og:url" content="https://kreids888.com/news.html">
+<meta property="og:image" content="https://kreids888.com/assets/og-image.jpg">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="theme-color" content="#0a0a0a">
+</head>
+<body>
+<nav id="site-nav"></nav>
+<main class="page">
+  <div class="container">
+    <div class="lap-tag">Newsroom</div>
+    <h2>News &amp; <span class="r">Updates</span></h2>
+
+    <div id="newsGrid" class="news-grid"><p class="sk-empty">Beiträge werden geladen…</p></div>
+
+    <article id="newsArticle" class="article" hidden>
+      <a class="article-back" href="#" onclick="closeArticle(event)">← Zurück zur Übersicht</a>
+      <img id="artCover" class="article-cover" alt="" hidden>
+      <div class="article-date" id="artDate"></div>
+      <h1 class="article-title" id="artTitle"></h1>
+      <div class="article-body" id="artBody"></div>
+    </article>
+  </div>
+</main>
+<footer id="site-footer"></footer>
+<script src="components.js"></script>
+<script>
+(function(){
+  var ADMIN_API="https://kreids888-admin.kreids.workers.dev";
+  var POSTS=[];
+  var esc=function(s){return String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");};
+  var MO=["Jan","Feb","März","Apr","Mai","Jun","Jul","Aug","Sep","Okt","Nov","Dez"];
+  function fmtDate(d){ var p=String(d||"").split("-"); if(p.length<3) return d||""; return (+p[2])+". "+MO[(+p[1])-1]+" "+p[0]; }
+
+  /* --- Mini-Markdown (ohne Backslash-Regex) --- */
+  function mdLinkify(s){
+    var out="",i=0;
+    while(true){
+      var lb=s.indexOf("[",i); if(lb<0){out+=s.slice(i);break;}
+      var rb=s.indexOf("](",lb); var rp=rb>=0?s.indexOf(")",rb+2):-1;
+      if(rb<0||rp<0){out+=s.slice(i);break;}
+      out+=s.slice(i,lb);
+      var txt=s.slice(lb+1,rb), url=s.slice(rb+2,rp);
+      if(url.indexOf("http")===0) out+='<a href="'+url+'" target="_blank" rel="noopener">'+txt+'</a>';
+      else out+=s.slice(lb,rp+1);
+      i=rp+1;
+    }
+    return out;
+  }
+  function mdInline(s){
+    s=esc(s); var parts=s.split("**"), r="";
+    for(var i=0;i<parts.length;i++){ r+=(i%2?"<strong>"+parts[i]+"</strong>":parts[i]); }
+    return mdLinkify(r);
+  }
+  function mdRender(text){
+    var NL=String.fromCharCode(10);
+    var lines=String(text||"").split(NL);
+    var html="",para=[];
+    function flush(){ if(para.length){ html+="<p>"+para.join("<br>")+"</p>"; para=[]; } }
+    for(var i=0;i<lines.length;i++){
+      var t=lines[i].trim();
+      if(t===""){ flush(); continue; }
+      if(t.indexOf("![")===0 && t.indexOf("](")>0 && t.charAt(t.length-1)===")"){
+        var u=t.substring(t.indexOf("](")+2,t.length-1);
+        flush(); html+='<img class="article-img" src="'+esc(u)+'" alt="" loading="lazy">'; continue;
+      }
+      if(t.substring(0,3)==="## "){ flush(); html+="<h3>"+mdInline(t.substring(3))+"</h3>"; continue; }
+      if(t.substring(0,2)==="> "){ flush(); html+="<blockquote>"+mdInline(t.substring(2))+"</blockquote>"; continue; }
+      para.push(mdInline(t));
+    }
+    flush(); return html;
+  }
+
+  function renderGrid(){
+    var el=document.getElementById("newsGrid");
+    if(!POSTS.length){ el.innerHTML='<p class="sk-empty">Noch keine Beiträge — schau bald wieder vorbei!</p>'; return; }
+    el.innerHTML=POSTS.map(function(p){
+      var cover=p.cover?'<div class="nc-cover" style="background-image:url('+"'"+encodeURI(p.cover)+"'"+')"></div>':'<div class="nc-cover nc-cover--none"><span>KREIDS<b>888</b></span></div>';
+      var ex=p.excerpt?p.excerpt:(p.body||"").replace(/[#*>!\[\]()]/g," ").slice(0,140);
+      return '<a class="news-card" href="#post-'+encodeURIComponent(p.id)+'">'+
+        cover+
+        '<div class="nc-body">'+
+          '<div class="nc-date">'+esc(fmtDate(p.date))+'</div>'+
+          '<div class="nc-title">'+esc(p.title||"(ohne Titel)")+'</div>'+
+          '<div class="nc-ex">'+esc(ex)+'</div>'+
+          '<span class="nc-more">Weiterlesen →</span>'+
+        '</div>'+
+      '</a>';
+    }).join("");
+  }
+
+  function openArticle(id){
+    var p=null; for(var i=0;i<POSTS.length;i++){ if(POSTS[i].id===id){ p=POSTS[i]; break; } }
+    if(!p){ closeArticle(); return; }
+    document.getElementById("newsGrid").hidden=true;
+    var art=document.getElementById("newsArticle"); art.hidden=false;
+    var cov=document.getElementById("artCover");
+    if(p.cover){ cov.src=p.cover; cov.hidden=false; } else { cov.hidden=true; }
+    document.getElementById("artDate").textContent=fmtDate(p.date);
+    document.getElementById("artTitle").textContent=p.title||"(ohne Titel)";
+    document.getElementById("artBody").innerHTML=(p.excerpt?'<p class="article-lead">'+esc(p.excerpt)+'</p>':'')+mdRender(p.body||"");
+    window.scrollTo(0,0);
+  }
+  window.closeArticle=function(ev){ if(ev) ev.preventDefault();
+    document.getElementById("newsArticle").hidden=true;
+    document.getElementById("newsGrid").hidden=false;
+    if(location.hash){ history.pushState("", document.title, location.pathname); }
+  };
+
+  function route(){
+    var h=location.hash||"";
+    if(h.indexOf("#post-")===0){ openArticle(decodeURIComponent(h.slice(6))); }
+    else { document.getElementById("newsArticle").hidden=true; document.getElementById("newsGrid").hidden=false; }
+  }
+  window.addEventListener("hashchange", route);
+
+  fetch(ADMIN_API+"/api/news").then(function(r){return r.json();}).then(function(d){
+    POSTS=Array.isArray(d.posts)?d.posts:[];
+    renderGrid(); route();
+  }).catch(function(){
+    document.getElementById("newsGrid").innerHTML='<p class="sk-empty">News konnten nicht geladen werden.</p>';
+  });
+})();
+</script>
+</body></html>

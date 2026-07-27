@@ -19,9 +19,6 @@
 <meta property="og:url" content="https://kreids888.com/setup.html">
 <meta property="og:image" content="https://kreids888.com/assets/og-image.jpg">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="KREIDS888 · Mein Setup">
-<meta name="twitter:description" content="Das Sim-Racing-Setup von Kreids888 — PC, Hardware und Sim-Rig im Detail.">
-<meta name="twitter:image" content="https://kreids888.com/assets/og-image.jpg">
 <meta name="theme-color" content="#0a0a0a">
 </head>
 <body>
@@ -30,52 +27,51 @@
   <div class="container">
     <div class="lap-tag">The Rig</div>
     <h2>Mein Setup</h2>
-    <p class="setup-intro">Womit ich fahre und streame — vom PC bis zum Rig. Platzhalter fülle ich nach und nach mit den echten Komponenten.</p>
-
-    <!-- ============ PC / HARDWARE ============ -->
-    <section class="setup-group">
-      <div class="setup-group-head">
-        <span class="idx">01</span>
-        <div class="head-txt">
-          <h3>PC &amp; Hardware</h3>
-          <span class="sub">Rechenpower &amp; Peripherie</span>
-        </div>
-      </div>
-      <div class="rig">
-        <div class="rig-item"><div class="cat">GPU</div><div class="name">RTX 5080</div></div>
-        <div class="rig-item"><div class="cat">CPU</div><div class="name">Ryzen 7 9800X3D</div></div>
-        <div class="rig-item is-empty"><div class="cat">Mainboard</div><div class="name">— folgt —</div></div>
-        <div class="rig-item is-empty"><div class="cat">RAM</div><div class="name">— folgt —</div></div>
-        <div class="rig-item is-empty"><div class="cat">Speicher</div><div class="name">— folgt —</div></div>
-        <div class="rig-item is-empty"><div class="cat">Netzteil</div><div class="name">— folgt —</div></div>
-        <div class="rig-item is-empty"><div class="cat">Kühlung</div><div class="name">— folgt —</div></div>
-        <div class="rig-item"><div class="cat">Monitore</div><div class="name">Triple 3× 32" AOC + 29"</div></div>
-      </div>
-    </section>
-
-    <!-- ============ SIM-RIG ============ -->
-    <section class="setup-group">
-      <div class="setup-group-head">
-        <span class="idx">02</span>
-        <div class="head-txt">
-          <h3>Sim-Rig</h3>
-          <span class="sub">Base · Wheel · Pedale · Chassis</span>
-        </div>
-      </div>
-      <div class="rig">
-        <div class="rig-item"><div class="cat">Wheelbase</div><div class="name">Asetek Forte</div></div>
-        <div class="rig-item"><div class="cat">Wheel</div><div class="name">Bavarian Simtec Omeg Pro</div></div>
-        <div class="rig-item"><div class="cat">Pedale</div><div class="name">Simagic P2000</div></div>
-        <div class="rig-item is-empty"><div class="cat">Rig / Chassis</div><div class="name">— folgt —</div></div>
-        <div class="rig-item is-empty"><div class="cat">Handbremse</div><div class="name">— folgt —</div></div>
-        <div class="rig-item is-empty"><div class="cat">Shifter</div><div class="name">— folgt —</div></div>
-        <div class="rig-item is-empty"><div class="cat">Sitz</div><div class="name">— folgt —</div></div>
-        <div class="rig-item is-empty"><div class="cat">Sonstiges</div><div class="name">— folgt —</div></div>
-      </div>
-    </section>
+    <p class="setup-intro">Womit ich fahre und streame — vom PC bis zum Rig.</p>
+    <div id="setupContainer"><p class="sk-empty">Setup wird geladen…</p></div>
   </div>
 </main>
 <footer id="site-footer"></footer>
 <script src="components.js"></script>
+<script>
+(function(){
+  var ADMIN_API="https://kreids888-admin.kreids.workers.dev";
+  var container=document.getElementById("setupContainer");
+  var esc=function(s){return String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");};
+
+  var DEFAULTS=[
+    {title:"PC & Hardware",sub:"Rechenpower & Peripherie",items:[
+      {cat:"GPU",name:"RTX 5080"},{cat:"CPU",name:"Ryzen 7 9800X3D"},{cat:"Mainboard",name:""},
+      {cat:"RAM",name:""},{cat:"Speicher",name:""},{cat:"Netzteil",name:""},{cat:"Kühlung",name:""},
+      {cat:"Monitore",name:'Triple 3x 32" AOC + 29"'}]},
+    {title:"Sim-Rig",sub:"Base · Wheel · Pedale · Chassis",items:[
+      {cat:"Wheelbase",name:"Asetek Forte"},{cat:"Wheel",name:"Bavarian Simtec Omeg Pro"},
+      {cat:"Pedale",name:"Simagic P2000"},{cat:"Rig / Chassis",name:""},{cat:"Handbremse",name:""},
+      {cat:"Shifter",name:""},{cat:"Sitz",name:""},{cat:"Sonstiges",name:""}]}
+  ];
+
+  function render(sections){
+    if(!sections||!sections.length){ container.innerHTML='<p class="sk-empty">Setup wird bald ergänzt.</p>'; return; }
+    container.innerHTML=sections.map(function(sec,i){
+      var idx=(i+1)<10?"0"+(i+1):""+(i+1);
+      var items=(sec.items||[]).map(function(it){
+        var empty=!it.name||!String(it.name).trim();
+        return '<div class="rig-item'+(empty?" is-empty":"")+'">'+
+          '<div class="cat">'+esc(it.cat)+'</div>'+
+          '<div class="name">'+(empty?"— folgt —":esc(it.name))+'</div></div>';
+      }).join("");
+      return '<section class="setup-group">'+
+        '<div class="setup-group-head"><span class="idx">'+idx+'</span>'+
+        '<div class="head-txt"><h3>'+esc(sec.title)+'</h3>'+
+        (sec.sub?'<span class="sub">'+esc(sec.sub)+'</span>':'')+'</div></div>'+
+        '<div class="rig">'+items+'</div></section>';
+    }).join("");
+  }
+
+  fetch(ADMIN_API+"/api/setup").then(function(r){return r.json();}).then(function(d){
+    render((d&&Array.isArray(d.sections)&&d.sections.length)?d.sections:DEFAULTS);
+  }).catch(function(){ render(DEFAULTS); });
+})();
+</script>
 </body>
 </html>

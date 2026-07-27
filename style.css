@@ -661,3 +661,35 @@ footer{border-top:2px solid var(--red);background:var(--panel);padding:44px 0 40
   justify-content:center;background:rgba(225,19,36,.92);border-radius:50%;color:#fff;font-size:14px;padding-left:2px}
 .short-title{position:absolute;left:10px;right:10px;bottom:10px;z-index:2;color:#fff;font-family:var(--disp);
   font-weight:700;font-size:13px;line-height:1.15;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+
+/* ============================================================
+   NEWS / BLOG
+   ============================================================ */
+.news-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:22px;margin-top:22px}
+.news-card{display:flex;flex-direction:column;background:linear-gradient(180deg,var(--panel),var(--panel2));border:1px solid var(--line);text-decoration:none;overflow:hidden;transition:.18s;position:relative}
+.news-card::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--red);transform:scaleY(0);transform-origin:top;transition:transform .2s}
+.news-card:hover{border-color:var(--red);transform:translateY(-4px)}
+.news-card:hover::before{transform:scaleY(1)}
+.nc-cover{aspect-ratio:16/9;background-size:cover;background-position:center;background-color:#0b0c10}
+.nc-cover--none{display:flex;align-items:center;justify-content:center;background:radial-gradient(120% 120% at 80% -20%,rgba(225,19,36,.25),transparent 60%),#0d0e13}
+.nc-cover--none span{font-family:var(--disp);font-weight:900;font-size:34px;letter-spacing:.04em;color:#20242e}
+.nc-cover--none b{color:#3a1519}
+.nc-body{padding:16px 16px 18px;display:flex;flex-direction:column;gap:8px;flex:1}
+.nc-date{font-family:var(--disp);font-weight:700;text-transform:uppercase;letter-spacing:.1em;font-size:11px;color:var(--red)}
+.nc-title{font-family:var(--disp);font-weight:800;text-transform:uppercase;font-size:20px;line-height:1.08;color:var(--white)}
+.nc-ex{font-size:14px;line-height:1.55;color:var(--steel);flex:1}
+.nc-more{font-family:var(--disp);font-weight:700;text-transform:uppercase;letter-spacing:.05em;font-size:12px;color:var(--white);margin-top:4px}
+.news-card:hover .nc-more{color:var(--red)}
+.article{max-width:760px;margin-top:10px}
+.article-back{display:inline-block;font-family:var(--disp);font-weight:700;text-transform:uppercase;letter-spacing:.05em;font-size:12px;color:var(--steel);text-decoration:none;margin-bottom:18px}
+.article-back:hover{color:var(--red)}
+.article-cover{width:100%;border:1px solid var(--line);margin-bottom:18px;display:block}
+.article-date{font-family:var(--disp);font-weight:700;text-transform:uppercase;letter-spacing:.1em;font-size:12px;color:var(--red);margin-bottom:6px}
+.article-title{font-family:var(--disp);font-weight:900;text-transform:uppercase;font-size:38px;line-height:1.03;margin:0 0 20px;color:var(--white)}
+.article-lead{font-size:18px;line-height:1.6;color:var(--white);font-weight:500;margin:0 0 18px}
+.article-body p{font-size:16px;line-height:1.75;color:#cfd4dd;margin:0 0 16px}
+.article-body h3{font-family:var(--disp);font-weight:800;text-transform:uppercase;font-size:22px;margin:26px 0 10px;color:#fff}
+.article-body blockquote{border-left:3px solid var(--red);margin:0 0 16px;padding:6px 0 6px 16px;color:var(--steel);font-size:16px}
+.article-body .article-img{width:100%;border:1px solid var(--line);margin:6px 0 18px;display:block}
+.article-body a{color:var(--red)}
+@media(max-width:560px){.article-title{font-size:28px}}
