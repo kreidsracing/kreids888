@@ -27,7 +27,7 @@
 
 // Sobald ihr einen eigenen Proxy (z.B. Garage61-Backend) habt, hier die
 // URL eintragen -> Seite lädt dann automatisch live. Leer lassen = manuell.
-const RATINGS_API_URL = "";
+const RATINGS_API_URL = "https://kreids888-irating.kreids.workers.dev/";
 
 // ⬇⬇⬇  HIER DEINE WERTE EINTRAGEN  ⬇⬇⬇
 // ============================================================
