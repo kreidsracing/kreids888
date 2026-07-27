@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://kreids888.com/sitemap.xml
