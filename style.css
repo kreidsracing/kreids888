@@ -510,6 +510,7 @@ footer{border-top:2px solid var(--red);background:var(--panel);padding:44px 0 40
 /* =========================================================
    UPCOMING mit Thumbnail — zweispaltiges Layout
    ========================================================= */
+.bc-live[hidden],.bc-upcoming[hidden],.bc-offline[hidden]{display:none!important}
 .bc-upcoming{display:flex;gap:26px;align-items:center}
 .bc-up-main{flex:1;min-width:0}
 .bc-up-thumb{position:relative;flex:0 0 42%;max-width:440px;aspect-ratio:16/9;
