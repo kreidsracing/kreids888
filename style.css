@@ -594,6 +594,11 @@ footer{border-top:2px solid var(--red);background:var(--panel);padding:44px 0 40
   font-family:var(--disp);font-weight:700;text-transform:uppercase;letter-spacing:.06em;font-size:12px;
   padding:9px 16px;cursor:pointer;transition:.15s}
 .sk-print:hover{border-color:var(--red)}
+.sk-weeknav{display:inline-flex;align-items:center;gap:12px}
+.sk-wkbtn{background:#14161d;border:1px solid var(--line);color:var(--white);font-family:var(--disp);font-weight:800;text-transform:uppercase;letter-spacing:.05em;font-size:13px;padding:9px 14px;cursor:pointer}
+.sk-wkbtn:hover:not(:disabled){border-color:var(--red)}
+.sk-wkbtn:disabled{opacity:.35;cursor:default}
+.sk-wklabel{font-family:var(--disp);font-weight:800;text-transform:uppercase;letter-spacing:.03em;font-size:15px;color:var(--white);min-width:210px;text-align:center}
 .sk-day{margin-bottom:22px}
 .sk-day-h{font-family:var(--disp);font-weight:800;text-transform:uppercase;letter-spacing:.04em;
   font-size:15px;color:var(--red);border-bottom:1px solid var(--line);padding-bottom:7px;margin-bottom:10px}

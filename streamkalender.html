@@ -31,11 +31,12 @@
     <div class="lap-tag">Kalender</div>
     <h2>Streamkalender</h2>
     <div class="sk-toolbar">
-      <div class="sk-filter">
-        <button id="fAll" class="on" onclick="setFilter('all')">Alles</button>
-        <button id="fRacing" onclick="setFilter('racing')">Nur wo ich fahre</button>
+      <div class="sk-weeknav">
+        <button id="wkPrev" class="sk-wkbtn" onclick="weekStep(-1)">◀ Woche</button>
+        <span id="wkLabel" class="sk-wklabel">…</span>
+        <button id="wkNext" class="sk-wkbtn" onclick="weekStep(1)">Woche ▶</button>
       </div>
-      <button class="sk-print" onclick="downloadPoster()">📥 Als Bild speichern (9:16)</button>
+      <button class="sk-print" onclick="downloadPoster()">📥 Diese Woche als Bild (9:16)</button>
     </div>
     <div id="skList"><p class="sk-empty">Kalender wird geladen…</p></div>
     <canvas id="skPoster" width="1080" height="1920" style="display:none"></canvas>
@@ -47,9 +48,12 @@
 (function(){
   var ADMIN_API="https://kreids888-admin.kreids.workers.dev";
   var WD=["Sonntag","Montag","Dienstag","Mittwoch","Donnerstag","Freitag","Samstag"];
+  var WD_S=["So","Mo","Di","Mi","Do","Fr","Sa"];
   var MON=["Jan","Feb","März","Apr","Mai","Jun","Jul","Aug","Sep","Okt","Nov","Dez"];
-  var ALL=[], FILTER="all", CURRENT=[];
   var esc=function(s){return String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");};
+
+  var WEEKS=[];   // [{monday:Date, sunday:Date, items:[...]}]
+  var IDX=0;
 
   function parseDT(e){
     var p=(e.date||"").split("-");
@@ -57,37 +61,80 @@
     var t=(e.time||"00:00").split(":");
     return new Date(+p[0],+p[1]-1,+p[2],+(t[0]||0),+(t[1]||0));
   }
+  function mondayOf(dt){
+    var d=new Date(dt); d.setHours(0,0,0,0);
+    var wd=(d.getDay()+6)%7;            // Mo=0 … So=6
+    d.setDate(d.getDate()-wd);
+    return d;
+  }
+  function fmtTime(dt){return String(dt.getHours()).padStart(2,"0")+":"+String(dt.getMinutes()).padStart(2,"0");}
   function dayLabel(dt){ return WD[dt.getDay()]+", "+dt.getDate()+". "+MON[dt.getMonth()]+" "+dt.getFullYear(); }
+  function weekLabel(w){
+    var a=w.monday, b=w.sunday;
+    var sameMonth=a.getMonth()===b.getMonth();
+    var left=a.getDate()+(sameMonth?"":". "+MON[a.getMonth()]);
+    return left+". – "+b.getDate()+". "+MON[b.getMonth()]+" "+b.getFullYear();
+  }
 
-  window.setFilter=function(f){
-    FILTER=f;
-    document.getElementById("fAll").classList.toggle("on",f==="all");
-    document.getElementById("fRacing").classList.toggle("on",f==="racing");
+  /* Termine -> nur "ich fahre" -> in Wochen gruppieren */
+  function buildWeeks(entries){
+    var races=entries
+      .map(function(e){ e._dt=parseDT(e); return e; })
+      .filter(function(e){ return e._dt && e.racing!==false; })
+      .sort(function(a,b){ return a._dt-b._dt; });
+
+    var map={};
+    races.forEach(function(e){
+      var mon=mondayOf(e._dt);
+      var key=mon.getTime();
+      if(!map[key]){ var sun=new Date(mon); sun.setDate(mon.getDate()+6); sun.setHours(23,59,59,999);
+        map[key]={monday:mon,sunday:sun,items:[]}; }
+      map[key].items.push(e);
+    });
+    var weeks=Object.keys(map).map(function(k){return map[k];})
+      .sort(function(a,b){return a.monday-b.monday;});
+    return weeks;
+  }
+
+  function startIndex(){
+    var today=new Date(); today.setHours(0,0,0,0);
+    for(var i=0;i<WEEKS.length;i++){ if(WEEKS[i].sunday>=today) return i; }
+    return WEEKS.length? WEEKS.length-1 : 0;   // alles vorbei -> letzte Woche
+  }
+
+  window.weekStep=function(dir){
+    IDX=Math.max(0,Math.min(WEEKS.length-1,IDX+dir));
     render();
   };
 
   function render(){
     var el=document.getElementById("skList");
-    var now=new Date(); now.setHours(0,0,0,0);
-    var list=ALL.map(function(e){e._dt=parseDT(e);return e;})
-      .filter(function(e){return e._dt && e._dt>=now;})
-      .filter(function(e){return FILTER==="all" || e.racing!==false;})
-      .sort(function(a,b){return a._dt-b._dt;});
-    CURRENT=list;
-    if(!list.length){ el.innerHTML='<p class="sk-empty">Keine kommenden Termine. Schau bald wieder vorbei!</p>'; return; }
+    var lbl=document.getElementById("wkLabel");
+    var prev=document.getElementById("wkPrev"), next=document.getElementById("wkNext");
+
+    if(!WEEKS.length){
+      lbl.textContent="—";
+      prev.disabled=true; next.disabled=true;
+      el.innerHTML='<p class="sk-empty">Aktuell keine Rennen eingetragen. Schau bald wieder vorbei!</p>';
+      return;
+    }
+    var w=WEEKS[IDX];
+    lbl.textContent=weekLabel(w);
+    prev.disabled=(IDX<=0);
+    next.disabled=(IDX>=WEEKS.length-1);
+
     var html="", curDay="";
-    list.forEach(function(e){
+    w.items.forEach(function(e){
       var dl=dayLabel(e._dt);
       if(dl!==curDay){ if(curDay) html+="</div>"; html+='<div class="sk-day"><div class="sk-day-h">'+dl+'</div>'; curDay=dl; }
       var time=e.time?esc(e.time):"–";
       var meta=[e.series,e.track].filter(Boolean).map(esc).join(" · ");
-      var racing=e.racing!==false;
-      html+='<div class="sk-item" data-type="'+esc(e.type||"Stream")+'">'+
+      html+='<div class="sk-item" data-type="'+esc(e.type||"Rennen")+'">'+
         '<div class="sk-time">'+time+'<small>UHR</small></div>'+
         '<div class="sk-main"><div class="sk-title">'+esc(e.title)+'</div>'+
           (meta?'<div class="sk-meta">'+meta+'</div>':'')+'</div>'+
-        '<div class="sk-right"><span class="sk-badge">'+esc(e.type||"Stream")+'</span>'+
-          '<span class="sk-race '+(racing?'yes':'no')+'">'+(racing?'🔴 Ich fahre':'nicht dabei')+'</span></div>'+
+        '<div class="sk-right"><span class="sk-badge">'+esc(e.type||"Rennen")+'</span>'+
+          '<span class="sk-race yes">🔴 Ich fahre</span></div>'+
       '</div>';
     });
     if(curDay) html+="</div>";
@@ -95,21 +142,22 @@
   }
 
   fetch(ADMIN_API+"/api/calendar").then(function(r){return r.json();}).then(function(d){
-    ALL=Array.isArray(d.entries)?d.entries:[]; render();
+    var entries=Array.isArray(d.entries)?d.entries:[];
+    WEEKS=buildWeeks(entries);
+    IDX=startIndex();
+    render();
   }).catch(function(){
     document.getElementById("skList").innerHTML='<p class="sk-empty">Kalender konnte nicht geladen werden.</p>';
+    document.getElementById("wkLabel").textContent="—";
   });
 
-  /* ================= 9:16-Poster zum Herunterladen ================= */
-  var WD_S=["So","Mo","Di","Mi","Do","Fr","Sa"];
+  /* ================= 9:16-Poster: NUR die aktuelle Woche ================= */
   var LOGO_SRC="https://i.postimg.cc/c4WQb4fc/kreidslogo-twitch-u-yt.png";
   var LOGO_IMG=new Image(), LOGO_OK=false;
   LOGO_IMG.crossOrigin="anonymous";
   LOGO_IMG.onload=function(){LOGO_OK=true;};
   LOGO_IMG.onerror=function(){LOGO_OK=false;};
   LOGO_IMG.src=LOGO_SRC;
-
-  function fmtTime(dt){return String(dt.getHours()).padStart(2,"0")+":"+String(dt.getMinutes()).padStart(2,"0")+" Uhr";}
 
   function fitTitle(ctx,text,maxW,startSize,minSize){
     text=text.toUpperCase();
@@ -136,7 +184,7 @@
 
   function drawPoster(){
     var cv=document.getElementById("skPoster"); if(!cv) return;
-    var items=CURRENT.slice(0,7);
+    var w=WEEKS[IDX]; var items=(w?w.items:[]).slice(0,7);
     var ctx=cv.getContext("2d"); var W=1080,H=1920;
     var red="#e11324",carbon="#0a0b0e",white="#f4f5f7",steel="#8b929c",panel="#14161d",line="#242832";
     ctx.fillStyle=carbon;ctx.fillRect(0,0,W,H);
@@ -147,41 +195,38 @@
     ctx.fillStyle=red;ctx.fillRect(0,0,W,14);
     // Header
     ctx.textAlign="left";ctx.textBaseline="alphabetic";
-    ctx.fillStyle=red;ctx.font='700 40px "Saira Condensed", sans-serif';ctx.fillText("S T R E A M   K A L E N D E R",80,150);
+    ctx.fillStyle=red;ctx.font='700 40px "Saira Condensed", sans-serif';ctx.fillText("S T R E A M   W E E K",80,150);
     ctx.fillStyle=white;ctx.font='900 150px "Saira Condensed", Impact, sans-serif';ctx.fillText("KREIDS",78,300);
     var kw=ctx.measureText("KREIDS").width;ctx.fillStyle=red;ctx.fillText("888",82+kw+10,300);
     ctx.fillStyle=steel;ctx.font='600 40px "Saira Condensed", sans-serif';
-    ctx.fillText(FILTER==="racing"?"NUR WO ICH FAHRE":"KOMMENDE TERMINE",82,364);
+    ctx.fillText(w?weekLabel(w).toUpperCase():"",82,364);
     ctx.strokeStyle=line;ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(80,410);ctx.lineTo(W-80,410);ctx.stroke();
     // Rows
     var areaTop=470, areaBot=1520;
     if(!items.length){
       ctx.fillStyle=steel;ctx.font='700 54px "Saira Condensed", sans-serif';ctx.textAlign="center";
-      ctx.fillText("KEINE KOMMENDEN TERMINE",W/2,(areaTop+areaBot)/2);ctx.textAlign="left";
+      ctx.fillText("DIESE WOCHE KEINE RENNEN",W/2,(areaTop+areaBot)/2);ctx.textAlign="left";
     }else{
       var rowH=(areaBot-areaTop)/items.length, ch=Math.min(rowH-16,260);
       items.forEach(function(s,i){
         var dt=s._dt; var y=areaTop+i*rowH;
         ctx.fillStyle=panel;ctx.fillRect(80,y,W-160,ch);
         ctx.fillStyle=red;ctx.fillRect(80,y,10,ch);
-        // Wochentag + Datum
         ctx.textAlign="center";
         ctx.fillStyle=red;ctx.font='900 74px "Saira Condensed", Impact, sans-serif';
         ctx.fillText(WD_S[dt.getDay()].toUpperCase(),195,y+ch*0.44);
         ctx.fillStyle=steel;ctx.font='600 36px "Saira Condensed", sans-serif';
         ctx.fillText(dt.getDate()+". "+MON[dt.getMonth()],195,y+ch*0.70);
         ctx.strokeStyle=line;ctx.beginPath();ctx.moveTo(310,y+26);ctx.lineTo(310,y+ch-26);ctx.stroke();
-        // Titel + Zeit
         var tx=345, maxW=(W-90)-tx;
-        var fit=fitTitle(ctx,s.title||"Stream",maxW,52,30);
+        var fit=fitTitle(ctx,s.title||"Rennen",maxW,52,30);
         var lh=fit.size*1.02;
         var blockH=fit.lines.length*lh + 44;
         var ty=y+(ch-blockH)/2+fit.size;
         ctx.textAlign="left";ctx.fillStyle=white;ctx.font='800 '+fit.size+'px "Saira Condensed", sans-serif';
         fit.lines.forEach(function(l){ctx.fillText(l,tx,ty);ty+=lh;});
         ctx.fillStyle=steel;ctx.font='600 38px "Saira Condensed", sans-serif';
-        var meta=(s.time?fmtTime(dt):"")+(s.racing!==false?"   🔴 ich fahre":"");
-        ctx.fillText(meta,tx,ty+10);
+        ctx.fillText(fmtTime(dt)+" Uhr",tx,ty+10);
       });
     }
     // Footer: Logo
@@ -189,8 +234,8 @@
     if(LOGO_OK && LOGO_IMG.width){
       var maxW2=780,maxH=180;
       var r=Math.min(maxW2/LOGO_IMG.width,maxH/LOGO_IMG.height);
-      var w=LOGO_IMG.width*r,h=LOGO_IMG.height*r;
-      ctx.drawImage(LOGO_IMG,(W-w)/2,H-70-h,w,h);
+      var lw=LOGO_IMG.width*r,lh2=LOGO_IMG.height*r;
+      ctx.drawImage(LOGO_IMG,(W-lw)/2,H-70-lh2,lw,lh2);
     }else{
       ctx.textAlign="center";ctx.fillStyle=white;ctx.font='900 84px "Saira Condensed", Impact, sans-serif';
       ctx.fillText("KREIDS888",W/2,H-150);
@@ -201,15 +246,15 @@
   }
 
   window.downloadPoster=function(){
-    if(!CURRENT.length){ alert("Keine kommenden Termine zum Speichern."); return; }
-    // Schrift sicher geladen -> dann zeichnen
+    if(!WEEKS.length || !WEEKS[IDX] || !WEEKS[IDX].items.length){ alert("Diese Woche gibt es keine Rennen zum Speichern."); return; }
     var ready = document.fonts ? document.fonts.ready : Promise.resolve();
     ready.then(function(){
       drawPoster();
       var cv=document.getElementById("skPoster");
       try{
         var url=cv.toDataURL("image/png");
-        var a=document.createElement("a");a.href=url;a.download="kreids888-streamkalender.png";a.click();
+        var a=document.createElement("a");a.href=url;
+        a.download="kreids888-streamweek-"+WEEKS[IDX].monday.toISOString().slice(0,10)+".png";a.click();
       }catch(e){
         alert("Der externe Logo-Link sperrt den Bild-Download (CORS). Lösung: Logo als kreidslogo.png ins Repo legen und im Skript LOGO_SRC darauf zeigen — dann klappt der Download sicher.");
       }
