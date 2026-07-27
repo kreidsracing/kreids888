@@ -8,45 +8,95 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Saira+Condensed:wght@500;600;700;800;900&family=Barlow:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
-<meta name="description" content="Streamkalender von Kreids888 — wann ich live auf Twitch und YouTube gehe.">
+<meta name="description" content="Streamkalender von Kreids888 — wann ich live auf Twitch und YouTube gehe: Rennen, Training, Streams.">
 <link rel="canonical" href="https://kreids888.com/streamkalender.html">
 <meta name="robots" content="index, follow">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="KREIDS888">
 <meta property="og:locale" content="de_DE">
 <meta property="og:title" content="KREIDS888 · Streamkalender">
-<meta property="og:description" content="Streamkalender von Kreids888 — wann ich live auf Twitch und YouTube gehe.">
+<meta property="og:description" content="Streamkalender von Kreids888 — Rennen, Training und Streams.">
 <meta property="og:url" content="https://kreids888.com/streamkalender.html">
 <meta property="og:image" content="https://kreids888.com/assets/og-image.jpg">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="KREIDS888 · Streamkalender">
-<meta name="twitter:description" content="Streamkalender von Kreids888 — wann ich live auf Twitch und YouTube gehe.">
+<meta name="twitter:description" content="Streamkalender von Kreids888 — Rennen, Training und Streams.">
 <meta name="twitter:image" content="https://kreids888.com/assets/og-image.jpg">
 <meta name="theme-color" content="#0a0a0a">
 </head>
 <body>
 <nav id="site-nav"></nav>
-
 <main class="page">
   <div class="container">
-    <div class="lap-tag">Lap 06 — Schedule</div>
+    <div class="lap-tag">Kalender</div>
     <h2>Streamkalender</h2>
-    <div class="sk-banner" id="sk-banner"></div>
-
-    <div id="stream-list"></div>
-
-    <div class="poster-block">
-      <div class="poster-head">Poster</div>
-      <div class="poster-frame">
-        <canvas id="poster" width="1080" height="1920"></canvas>
+    <div class="sk-toolbar">
+      <div class="sk-filter">
+        <button id="fAll" class="on" onclick="setFilter('all')">Alles</button>
+        <button id="fRacing" onclick="setFilter('racing')">Nur wo ich fahre</button>
       </div>
-      <button class="poster-dl" id="poster-dl">⬇ Als Bild speichern</button>
+      <button class="sk-print" onclick="window.print()">🖨 Druckansicht</button>
     </div>
+    <div id="skList"><p class="sk-empty">Kalender wird geladen…</p></div>
   </div>
 </main>
-
 <footer id="site-footer"></footer>
 <script src="components.js"></script>
-<script src="streams.js"></script>
-</body>
-</html>
+<script>
+(function(){
+  var ADMIN_API="https://kreids888-admin.kreids.workers.dev";
+  var WD=["Sonntag","Montag","Dienstag","Mittwoch","Donnerstag","Freitag","Samstag"];
+  var MON=["Jan","Feb","März","Apr","Mai","Jun","Jul","Aug","Sep","Okt","Nov","Dez"];
+  var ALL=[], FILTER="all";
+  var esc=function(s){return String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");};
+
+  function parseDT(e){
+    var p=(e.date||"").split("-");
+    if(p.length<3) return null;
+    var t=(e.time||"00:00").split(":");
+    return new Date(+p[0],+p[1]-1,+p[2],+(t[0]||0),+(t[1]||0));
+  }
+  function dayLabel(dt){ return WD[dt.getDay()]+", "+dt.getDate()+". "+MON[dt.getMonth()]+" "+dt.getFullYear(); }
+
+  window.setFilter=function(f){
+    FILTER=f;
+    document.getElementById("fAll").classList.toggle("on",f==="all");
+    document.getElementById("fRacing").classList.toggle("on",f==="racing");
+    render();
+  };
+
+  function render(){
+    var el=document.getElementById("skList");
+    var now=new Date(); now.setHours(0,0,0,0);
+    var list=ALL.map(function(e){e._dt=parseDT(e);return e;})
+      .filter(function(e){return e._dt && e._dt>=now;})
+      .filter(function(e){return FILTER==="all" || e.racing!==false;})
+      .sort(function(a,b){return a._dt-b._dt;});
+    if(!list.length){ el.innerHTML='<p class="sk-empty">Keine kommenden Termine. Schau bald wieder vorbei!</p>'; return; }
+    var html="", curDay="";
+    list.forEach(function(e){
+      var dl=dayLabel(e._dt);
+      if(dl!==curDay){ if(curDay) html+="</div>"; html+='<div class="sk-day"><div class="sk-day-h">'+dl+'</div>'; curDay=dl; }
+      var time=e.time?esc(e.time):"–";
+      var meta=[e.series,e.track].filter(Boolean).map(esc).join(" · ");
+      var racing=e.racing!==false;
+      html+='<div class="sk-item" data-type="'+esc(e.type||"Stream")+'">'+
+        '<div class="sk-time">'+time+'<small>UHR</small></div>'+
+        '<div class="sk-main"><div class="sk-title">'+esc(e.title)+'</div>'+
+          (meta?'<div class="sk-meta">'+meta+'</div>':'')+'</div>'+
+        '<div class="sk-right"><span class="sk-badge">'+esc(e.type||"Stream")+'</span>'+
+          '<span class="sk-race '+(racing?'yes':'no')+'">'+(racing?'🔴 Ich fahre':'nicht dabei')+'</span></div>'+
+      '</div>';
+    });
+    if(curDay) html+="</div>";
+    el.innerHTML=html;
+  }
+
+  fetch(ADMIN_API+"/api/calendar").then(function(r){return r.json();}).then(function(d){
+    ALL=Array.isArray(d.entries)?d.entries:[]; render();
+  }).catch(function(){
+    document.getElementById("skList").innerHTML='<p class="sk-empty">Kalender konnte nicht geladen werden.</p>';
+  });
+})();
+</script>
+</body></html>
