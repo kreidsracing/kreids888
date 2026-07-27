@@ -66,7 +66,6 @@ function renderUpcoming(data){
   const watchUrl = data.videoId ? ("https://www.youtube.com/watch?v=" + data.videoId) : "https://youtube.com/@Kreids888";
   if (thumbLink && thumbImg && data.thumbnail){
     thumbImg.src = data.thumbnail;
-    thumbLink.href = watchUrl;
     thumbLink.hidden = false;
   } else if (thumbLink){
     thumbLink.hidden = true;
