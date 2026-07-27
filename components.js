@@ -12,7 +12,8 @@ const LINKS = [
 const TWITCH  = "https://twitch.tv/kreids888";
 const YOUTUBE = "https://youtube.com/@Kreids888";
 
-/* --- Ticker-Text (reiner Text, kein echter Live-Status) --- */
+/* --- Ticker: Fallback-Text (wird vom Dashboard überschrieben) --- */
+const ADMIN_API = "https://kreids888-admin.kreids.workers.dev";
 const TICKER = [
   "🔴 Hier live zu sehen",
   "Rennen live auf Twitch & YouTube",
@@ -21,10 +22,17 @@ const TICKER = [
   "Snail Pace Racing",
 ];
 
+function buildTickerItems(list){
+  return list.map(t=>`<span class="ticker-item">${escapeHtml(t)}</span><span class="ticker-sep" aria-hidden="true"></span>`).join("");
+}
+function escapeHtml(s){
+  return String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+}
+
 const current = location.pathname.split("/").pop() || "index.html";
 
 // ---- TICKER + NAV ----
-const tickerItems = TICKER.map(t=>`<span class="ticker-item">${t}<b>•</b></span>`).join("");
+const tickerItems = buildTickerItems(TICKER);
 const navHTML = `
 <div class="ticker">
   <div class="ticker-track">
@@ -54,6 +62,19 @@ const navEl=document.getElementById("site-nav");
 const footEl=document.getElementById("site-footer");
 if(navEl) navEl.innerHTML=navHTML;
 if(footEl) footEl.innerHTML=footHTML;
+
+// ---- Ticker live aus dem Dashboard laden (Fallback bleibt sonst stehen) ----
+(async function refreshTicker(){
+  try{
+    const r = await fetch(ADMIN_API + "/api/ticker");
+    if(!r.ok) return;
+    const d = await r.json();
+    if(Array.isArray(d.messages) && d.messages.length){
+      const items = buildTickerItems(d.messages);
+      document.querySelectorAll(".ticker-set").forEach(el => el.innerHTML = items);
+    }
+  }catch(e){ /* Fallback-Ticker bleibt */ }
+})();
 
 // ---- Hamburger-Menü umschalten ----
 const burger=document.getElementById("burger");
