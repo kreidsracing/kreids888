@@ -202,7 +202,7 @@
     ctx.fillText(w?weekLabel(w).toUpperCase():"",82,364);
     ctx.strokeStyle=line;ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(80,410);ctx.lineTo(W-80,410);ctx.stroke();
     // Rows
-    var areaTop=470, areaBot=1520;
+    var areaTop=470, areaBot=1440;
     if(!items.length){
       ctx.fillStyle=steel;ctx.font='700 54px "Saira Condensed", sans-serif';ctx.textAlign="center";
       ctx.fillText("DIESE WOCHE KEINE RENNEN",W/2,(areaTop+areaBot)/2);ctx.textAlign="left";
@@ -239,10 +239,10 @@
       });
     }
     // Footer: Logo (füllt das untere Band)
-    ctx.fillStyle=red;ctx.fillRect(0,H-300,W,4);
-    var bandMid=H-150; // Mitte des unteren Bandes (1620..1920)
+    ctx.fillStyle=red;ctx.fillRect(0,H-460,W,4);
+    var bandMid=H-230; // Mitte des unteren Bandes (1460..1920)
     if(LOGO_OK && LOGO_IMG.width){
-      var maxW2=920,maxH=230;
+      var maxW2=1010,maxH=400;
       var r=Math.min(maxW2/LOGO_IMG.width,maxH/LOGO_IMG.height);
       var lw=LOGO_IMG.width*r,lh2=LOGO_IMG.height*r;
       ctx.drawImage(LOGO_IMG,(W-lw)/2,bandMid-lh2/2,lw,lh2);
