@@ -20,6 +20,50 @@
 <meta property="og:image" content="https://kreids888.com/assets/og-image.jpg">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="theme-color" content="#0a0a0a">
+<style>
+/* ===== SETUP · Spec-Sheet mit Bild-Header pro Bereich ===== */
+.setup-intro{color:var(--steel);font-size:15px;max-width:60ch;margin:-14px 0 34px}
+.setup-group{margin-bottom:46px}
+
+/* Bild-Banner mit Nummer + Titel overlay */
+.sg-hero{position:relative;overflow:hidden;border:1px solid var(--line);
+  background:#0d0e13;min-height:190px;display:flex;align-items:flex-end}
+.sg-hero-img{position:absolute;inset:0;background-size:cover;background-position:center;z-index:0}
+.sg-hero-img::after{content:"";position:absolute;inset:0;
+  background:linear-gradient(90deg,rgba(10,11,14,.92) 8%,rgba(10,11,14,.55) 45%,rgba(10,11,14,.25) 100%)}
+.sg-hero--none{background:
+  radial-gradient(120% 140% at 88% -30%,rgba(225,19,36,.22),transparent 58%),
+  repeating-linear-gradient(115deg,#0d0e13 0 22px,#0f1117 22px 44px)}
+.sg-hero-strip{position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--red);
+  box-shadow:0 0 16px var(--red-glow);z-index:2}
+.sg-hero-in{position:relative;z-index:2;display:flex;align-items:center;gap:18px;padding:22px 24px}
+.sg-idx{font-family:var(--disp);font-weight:900;font-size:clamp(40px,7vw,60px);line-height:.8;
+  color:transparent;-webkit-text-stroke:2px var(--red);text-stroke:2px var(--red)}
+.sg-htxt h3{font-family:var(--disp);font-weight:900;text-transform:uppercase;letter-spacing:.005em;
+  font-size:clamp(22px,4vw,30px);line-height:.98;margin:0;color:#fff}
+.sg-htxt .sub{font-family:var(--disp);font-weight:600;font-size:12px;letter-spacing:.18em;
+  text-transform:uppercase;color:var(--steel);margin-top:5px;display:block}
+
+/* Specs als sauberes 2-Spalten-Datenblatt */
+.sg-specs{display:grid;grid-template-columns:1fr 1fr;gap:0;
+  border:1px solid var(--line);border-top:0}
+.spec{display:grid;grid-template-columns:118px 1fr;gap:14px;align-items:baseline;
+  padding:13px 18px;border-top:1px solid var(--line);position:relative}
+.sg-specs .spec:nth-child(odd){border-right:1px solid var(--line)}
+.spec .k{font-family:var(--disp);font-weight:600;font-size:11.5px;letter-spacing:.14em;
+  text-transform:uppercase;color:var(--steel);padding-top:2px}
+.spec .v{font-family:var(--disp);font-weight:700;font-size:17px;letter-spacing:.01em;
+  color:var(--white);line-height:1.2}
+.spec.is-empty .v{color:var(--steel-d);font-style:italic;font-weight:600}
+.spec:hover{background:linear-gradient(90deg,rgba(225,19,36,.05),transparent 70%)}
+
+@media(max-width:640px){
+  .sg-specs{grid-template-columns:1fr}
+  .sg-specs .spec:nth-child(odd){border-right:0}
+  .spec{grid-template-columns:96px 1fr;gap:10px;padding:12px 14px}
+  .sg-hero-in{padding:18px}
+}
+</style>
 </head>
 <body>
 <nav id="site-nav"></nav>
@@ -40,11 +84,11 @@
   var esc=function(s){return String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");};
 
   var DEFAULTS=[
-    {title:"PC & Hardware",sub:"Rechenpower & Peripherie",items:[
+    {title:"PC & Hardware",sub:"Rechenpower & Peripherie",image:"",items:[
       {cat:"GPU",name:"RTX 5080"},{cat:"CPU",name:"Ryzen 7 9800X3D"},{cat:"Mainboard",name:""},
       {cat:"RAM",name:""},{cat:"Speicher",name:""},{cat:"Netzteil",name:""},{cat:"Kühlung",name:""},
       {cat:"Monitore",name:'Triple 3x 32" AOC + 29"'}]},
-    {title:"Sim-Rig",sub:"Base · Wheel · Pedale · Chassis",items:[
+    {title:"Sim-Rig",sub:"Base · Wheel · Pedale · Chassis",image:"",items:[
       {cat:"Wheelbase",name:"Asetek Forte"},{cat:"Wheel",name:"Bavarian Simtec Omeg Pro"},
       {cat:"Pedale",name:"Simagic P2000"},{cat:"Rig / Chassis",name:""},{cat:"Handbremse",name:""},
       {cat:"Shifter",name:""},{cat:"Sitz",name:""},{cat:"Sonstiges",name:""}]}
@@ -54,17 +98,22 @@
     if(!sections||!sections.length){ container.innerHTML='<p class="sk-empty">Setup wird bald ergänzt.</p>'; return; }
     container.innerHTML=sections.map(function(sec,i){
       var idx=(i+1)<10?"0"+(i+1):""+(i+1);
-      var items=(sec.items||[]).map(function(it){
+      var img=sec.image&&String(sec.image).trim();
+      var hero='<div class="sg-hero'+(img?'':' sg-hero--none')+'">'+
+        (img?'<div class="sg-hero-img" style="background-image:url('+"'"+encodeURI(img)+"'"+')"></div>':'')+
+        '<span class="sg-hero-strip"></span>'+
+        '<div class="sg-hero-in">'+
+          '<span class="sg-idx">'+idx+'</span>'+
+          '<div class="sg-htxt"><h3>'+esc(sec.title)+'</h3>'+
+          (sec.sub?'<span class="sub">'+esc(sec.sub)+'</span>':'')+'</div>'+
+        '</div></div>';
+      var specs=(sec.items||[]).map(function(it){
         var empty=!it.name||!String(it.name).trim();
-        return '<div class="rig-item'+(empty?" is-empty":"")+'">'+
-          '<div class="cat">'+esc(it.cat)+'</div>'+
-          '<div class="name">'+(empty?"— folgt —":esc(it.name))+'</div></div>';
+        return '<div class="spec'+(empty?" is-empty":"")+'">'+
+          '<div class="k">'+esc(it.cat)+'</div>'+
+          '<div class="v">'+(empty?"— folgt —":esc(it.name))+'</div></div>';
       }).join("");
-      return '<section class="setup-group">'+
-        '<div class="setup-group-head"><span class="idx">'+idx+'</span>'+
-        '<div class="head-txt"><h3>'+esc(sec.title)+'</h3>'+
-        (sec.sub?'<span class="sub">'+esc(sec.sub)+'</span>':'')+'</div></div>'+
-        '<div class="rig">'+items+'</div></section>';
+      return '<section class="setup-group">'+hero+'<div class="sg-specs">'+specs+'</div></section>';
     }).join("");
   }
 
