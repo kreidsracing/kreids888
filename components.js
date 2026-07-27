@@ -38,7 +38,7 @@ const navHTML = `
     <button class="burger" id="burger" aria-label="Menü öffnen"><span></span><span></span><span></span></button>
     <div class="nav-links" id="navlinks">
       ${LINKS.map(l=>`<a class="${current===l.href?'active':''}" href="${l.href}">${l.label}</a>`).join("")}
-      <a class="live-pill" href="${TWITCH}" target="_blank" rel="noopener"><span class="live-dot"></span><span>LIVE</span></a>
+      <a class="live-pill" href="${YOUTUBE}" target="_blank" rel="noopener"><span class="live-dot"></span><span>LIVE</span></a>
     </div>
   </div>
 </div>`;

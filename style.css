@@ -121,7 +121,7 @@ body::before{content:"";position:fixed;inset:0;z-index:-2;
     linear-gradient(0deg,var(--carbon) 0%,transparent 22%)}
 
 .hero{padding:56px 0 34px}
-.hero-grid--v2{align-items:center}
+.hero-grid--v2{align-items:stretch}
 .role-row{display:flex;flex-wrap:wrap;gap:10px;margin-top:16px}
 .role-chip{font-family:var(--disp);font-weight:700;font-size:12.5px;letter-spacing:.14em;text-transform:uppercase;
   color:var(--steel);border:1px solid var(--line);background:rgba(19,21,27,.55);
@@ -147,7 +147,7 @@ body::before{content:"";position:fixed;inset:0;z-index:-2;
 .btn-glow:hover{transform:skewX(-10deg) translateY(-2px)}
 
 /* Fahrerportrait */
-.hero-right{display:flex;justify-content:center}
+.hero-right{display:flex;justify-content:center;align-items:stretch}
 .portrait-frame{position:relative;width:100%;max-width:420px;aspect-ratio:4/5;
   border:2px solid var(--line);background:linear-gradient(180deg,#15171e,#0d0e12);
   box-shadow:0 20px 60px rgba(0,0,0,.65);overflow:hidden}
@@ -177,8 +177,9 @@ body::before{content:"";position:fixed;inset:0;z-index:-2;
 .hero-bg-img{animation:bgZoomIn 1.4s ease-out both}
 
 /* ============ PROFILKARTE (Bild + iRacing-Werte in einer Karte) ============ */
-.profile-card{width:100%;max-width:420px;box-shadow:0 20px 60px rgba(0,0,0,.65)}
-.profile-card .portrait-frame{box-shadow:none}
+.profile-card{width:100%;max-width:420px;box-shadow:0 20px 60px rgba(0,0,0,.65);
+  display:flex;flex-direction:column}
+.profile-card .portrait-frame{box-shadow:none;flex:1 1 auto;aspect-ratio:auto;min-height:320px}
 .profile-stats{display:flex;background:linear-gradient(180deg,#15171e,#0d0e12);
   border:2px solid var(--line);border-top:3px solid var(--red)}
 .profile-stats .rating-pill{flex:1;text-align:center;padding:16px 8px;position:relative}
