@@ -444,3 +444,56 @@ footer{border-top:2px solid var(--red);background:var(--panel);padding:44px 0 40
 @keyframes btnSheen{from{left:-140%}to{left:170%}}
 .btn-glow:hover .btn-ico{filter:drop-shadow(0 0 6px rgba(255,255,255,.6))}
 @media(prefers-reduced-motion:reduce){.btn-glow:hover::after{animation:none}}
+
+/* =========================================================
+   FAHRERKARTE — iRacing-Disziplinen (Sportscar/Formel/Oval)
+   ========================================================= */
+.disciplines{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:4px}
+.disc-loading{grid-column:1/-1;font-family:var(--disp);font-weight:600;font-size:13px;
+  letter-spacing:.1em;text-transform:uppercase;color:var(--steel);padding:14px 2px}
+
+.disc-card{position:relative;overflow:hidden;background:linear-gradient(160deg,#181a21,#0e0f14);
+  border:1px solid var(--line);border-top:2px solid var(--steel-d);
+  padding:14px 14px 16px;display:flex;flex-direction:column;gap:2px;transition:.2s}
+.disc-card:hover{transform:translateY(-3px);border-color:var(--steel);
+  box-shadow:0 14px 34px rgba(0,0,0,.55)}
+/* Holo-Sheen (dezent, läuft langsam durch) */
+.disc-card::after{content:"";position:absolute;top:0;left:-160%;width:70%;height:100%;
+  background:linear-gradient(120deg,transparent,rgba(255,255,255,.10),rgba(225,19,36,.10),transparent);
+  transform:skewX(-18deg);pointer-events:none;animation:discHolo 6s ease-in-out infinite}
+.disc-card:nth-child(2)::after{animation-delay:.9s}
+.disc-card:nth-child(3)::after{animation-delay:1.8s}
+@keyframes discHolo{0%,70%{left:-160%}85%,100%{left:170%}}
+@media(prefers-reduced-motion:reduce){.disc-card::after{animation:none}}
+
+.disc-top{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px}
+.disc-label{font-family:var(--disp);font-weight:800;font-size:12px;letter-spacing:.12em;
+  text-transform:uppercase;color:var(--white)}
+.disc-badge{font-family:var(--disp);font-weight:800;font-size:11px;letter-spacing:.03em;
+  padding:3px 7px;border-radius:3px;white-space:nowrap;color:#fff;background:var(--steel-d)}
+.disc-ir{line-height:1}
+.disc-ir-val{font-family:var(--disp);font-weight:900;font-size:clamp(26px,4vw,34px);
+  color:var(--white);font-variant-numeric:tabular-nums;text-shadow:0 0 22px rgba(255,255,255,.12)}
+.disc-ir-lbl{font-family:var(--disp);font-weight:600;font-size:10px;letter-spacing:.18em;
+  text-transform:uppercase;color:var(--steel);margin-top:2px}
+
+/* iRacing-Lizenzfarben fürs Badge + Kartenakzent */
+.disc-card[data-lic="A"]{border-top-color:#1e5bd6}
+.disc-card[data-lic="A"] .disc-badge{background:#1e5bd6}
+.disc-card[data-lic="A"] .disc-ir-val{text-shadow:0 0 22px rgba(30,91,214,.4)}
+.disc-card[data-lic="B"]{border-top-color:#2fa84f}
+.disc-card[data-lic="B"] .disc-badge{background:#2fa84f}
+.disc-card[data-lic="C"]{border-top-color:#e0a91b}
+.disc-card[data-lic="C"] .disc-badge{background:#e0a91b;color:#1a1206}
+.disc-card[data-lic="D"]{border-top-color:#e0701a}
+.disc-card[data-lic="D"] .disc-badge{background:#e0701a}
+.disc-card[data-lic="R"]{border-top-color:#d62b2b}
+.disc-card[data-lic="R"] .disc-badge{background:#d62b2b}
+.disc-card[data-lic="P"]{border-top-color:#000;background:linear-gradient(160deg,#241528,#0e0f14)}
+.disc-card[data-lic="P"] .disc-badge{background:#111}
+
+@media(max-width:560px){
+  .disciplines{gap:7px}
+  .disc-card{padding:11px 10px 12px}
+  .disc-label{font-size:11px}
+}

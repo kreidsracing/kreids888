@@ -1,68 +1,34 @@
 /* ===========================================================
-   RATINGS-WIDGET — iRating / Lizenz / Kategorie auf der Startseite.
+   iRACING-DISZIPLINEN (Fahrerkarte) — lädt iRating + Lizenz je
+   Disziplin aus dem Garage61-Worker und rendert sie als Karten
+   mit farbigem Lizenz-Badge und Zähl-Animation.
    ------------------------------------------------------------
-   HINTERGRUND ZUR DATENQUELLE:
-   Die offizielle iRacing-Data-API vergibt aktuell KEINE neuen
-   OAuth-Zugänge (Registrierung von iRacing pausiert, Stand der
-   Recherche). Ein direkter Zugriff von dieser statischen Seite
-   aus ist damit gerade nicht möglich — auch technisch nicht ohne
-   Backend, da die API keine Zugangsdaten im Browser erlaubt.
-
-   Garage61 (garage61.net) ist eine Alternative: eigene, aktuell
-   offene Entwickler-API mit iRating-Daten pro Fahrer. ABER: auch
-   dort braucht es einen Auth-Token, der aus Sicherheitsgründen
-   NIE im öffentlichen Frontend-Code stehen darf. Lösung: ein
-   kleiner eigener Server/Proxy (z.B. Cloudflare Worker), der den
-   Token sicher hält und nur die fertigen Zahlen als JSON ausliefert.
-   Mehr dazu: https://garage61.net/developer
-
-   SO FUNKTIONIERT DIESES SCRIPT:
-   1) Ist unten eine RATINGS_API_URL eingetragen, wird von dort
-      versucht JSON zu laden (Format siehe normalizeApiPayload()).
-   2) Ist keine URL eingetragen (Standard) ODER schlägt das Laden
-      fehl, werden die Werte aus MANUAL_RATINGS genutzt — einfach
-      unten ausfüllen, findest du eingeloggt in deinem iRacing-
-      bzw. Garage61-Account.
+   Fällt der Worker aus, werden die MANUAL_DISCIPLINES gezeigt.
    =========================================================== */
 
-// Sobald ihr einen eigenen Proxy (z.B. Garage61-Backend) habt, hier die
-// URL eintragen -> Seite lädt dann automatisch live. Leer lassen = manuell.
 const RATINGS_API_URL = "https://kreids888-irating.kreids.workers.dev/";
 
-// ⬇⬇⬇  HIER DEINE WERTE EINTRAGEN  ⬇⬇⬇
-// ============================================================
-//   ██  TRAG HIER DEINE IRACING-WERTE EIN  ██
-// ============================================================
-// irating  -> deine Zahl OHNE Anführungszeichen, z.B. 3450
-// license  -> als Text in "...", z.B. "A 4.99"
-// category -> als Text in "...", z.B. "Sports Car"
-const MANUAL_RATINGS = {
-  irating:  1779,  // <<< HIER Zahl eintragen, z.B. 3450
-  license:  "A",    // <<< HIER Lizenz eintragen, z.B. "A 4.99"
-  category: "Sportscar",    // <<< HIER Kategorie eintragen, z.B. "Sports Car"
-};
-// ⬆⬆⬆  HIER DEINE WERTE EINTRAGEN  ⬆⬆⬆
+// Fallback, falls der Worker mal nicht erreichbar ist:
+const MANUAL_DISCIPLINES = [
+  { label: "Sportscar", irating: 1767, license: "A 3.32", licenseClass: "A" },
+  { label: "Formel",    irating: 1569, license: "C 2.42", licenseClass: "C" },
+  { label: "Oval",      irating: 1203, license: "D 1.70", licenseClass: "D" },
+];
 
-function normalizeApiPayload(data) {
-  return {
-    irating:  data.irating  ?? data.iRating  ?? null,
-    license:  data.license  ?? data.licenseClass ?? "",
-    category: data.category ?? data.categoryName  ?? "",
-  };
-}
-
-async function tryLoadLiveRatings() {
-  if (!RATINGS_API_URL) throw new Error("Keine RATINGS_API_URL gesetzt");
-  const res = await fetch(RATINGS_API_URL);
-  if (!res.ok) throw new Error("HTTP " + res.status);
-  return normalizeApiPayload(await res.json());
-}
-
-async function tryLoadLiveRatings() {
-  if (!RATINGS_API_URL) throw new Error("Keine RATINGS_API_URL gesetzt");
-  const res = await fetch(RATINGS_API_URL);
-  if (!res.ok) throw new Error("HTTP " + res.status);
-  return normalizeApiPayload(await res.json());
+async function loadDisciplines() {
+  if (!RATINGS_API_URL) return MANUAL_DISCIPLINES;
+  try {
+    const res = await fetch(RATINGS_API_URL);
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    const data = await res.json();
+    if (Array.isArray(data.disciplines) && data.disciplines.length) {
+      return data.disciplines;
+    }
+    throw new Error("keine Disziplinen im Payload");
+  } catch (err) {
+    console.info("[Ratings] Live-Abruf fehlgeschlagen, nutze Fallback:", err.message);
+    return MANUAL_DISCIPLINES;
+  }
 }
 
 function animateCount(el, target) {
@@ -71,66 +37,49 @@ function animateCount(el, target) {
   function tick(now) {
     const p = Math.min(1, (now - start) / duration);
     const eased = 1 - Math.pow(1 - p, 3);
-    el.textContent = Math.round(target * eased).toString();
+    el.textContent = Math.round(target * eased).toLocaleString("de-DE");
     if (p < 1) requestAnimationFrame(tick);
   }
   requestAnimationFrame(tick);
 }
 
-function renderRatings(ratings) {
+function cardHTML(d) {
+  const lic = (d.licenseClass || (d.license ? d.license.charAt(0) : "")).toUpperCase();
+  return (
+    '<div class="disc-card" data-lic="' + lic + '">' +
+      '<div class="disc-top">' +
+        '<span class="disc-label">' + (d.label || "") + '</span>' +
+        '<span class="disc-badge">' + (d.license || "") + '</span>' +
+      '</div>' +
+      '<div class="disc-ir"><span class="disc-ir-val" data-target="' + (d.irating || 0) + '">0</span></div>' +
+      '<div class="disc-ir-lbl">iRating</div>' +
+    '</div>'
+  );
+}
+
+function renderDisciplines(list) {
   const row = document.getElementById("ratingsRow");
   if (!row) return;
-
-  row.querySelectorAll(".rating-pill").forEach(pill => {
-    const key = pill.dataset.key;
-    const valueEl = pill.querySelector(".rating-val");
-    const value = ratings[key];
-
-    if (value === null || value === undefined || value === "") {
-      valueEl.textContent = "–";
-      return;
-    }
-    if (key === "irating") {
-      valueEl.dataset.target = value;
-      valueEl.textContent = "0";
-    } else {
-      valueEl.textContent = value; // Lizenz/Kategorie: reiner Text, kein Count-up
-    }
-  });
+  row.dataset.state = "ready";
+  row.innerHTML = list.map(cardHTML).join("");
 
   const observer = new IntersectionObserver(entries => {
     entries.forEach(entry => {
       if (!entry.isIntersecting) return;
-      const target = parseFloat(entry.target.querySelector('[data-key="irating"] .rating-val')?.dataset.target);
-      if (Number.isFinite(target)) {
-        animateCount(entry.target.querySelector('[data-key="irating"] .rating-val'), target);
-      }
+      row.querySelectorAll(".disc-ir-val").forEach(el => {
+        const t = parseFloat(el.dataset.target);
+        if (Number.isFinite(t)) animateCount(el, t);
+      });
       observer.unobserve(entry.target);
     });
-  }, { threshold: 0.4 });
+  }, { threshold: 0.35 });
   observer.observe(row);
 }
 
 async function initRatings() {
   const row = document.getElementById("ratingsRow");
-  if (!row) return; // nur auf der Startseite aktiv
-
-  const noteEl = document.getElementById("ratingsNote");
-
-  try {
-    const live = await tryLoadLiveRatings();
-    renderRatings(live);
-    if (noteEl) noteEl.textContent = "Live-Daten via Garage61-Proxy.";
-  } catch (err) {
-    console.info("[Ratings] Nutze manuelle Werte:", err.message);
-    renderRatings(MANUAL_RATINGS);
-    const hasValues = Object.values(MANUAL_RATINGS).some(v => v !== null && v !== "");
-    if (noteEl) {
-      noteEl.innerHTML = hasValues
-        ? "Werte manuell gepflegt."
-        : 'Werte bitte in <code>ratings.js</code> eintragen.';
-    }
-  }
+  if (!row) return; // nur auf der Startseite
+  const list = await loadDisciplines();
+  renderDisciplines(list);
 }
-
 initRatings();
