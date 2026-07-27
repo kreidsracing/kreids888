@@ -623,3 +623,31 @@ footer{border-top:2px solid var(--red);background:var(--panel);padding:44px 0 40
   .sk-race.yes{color:#000}.sk-race.no{color:#888}
   h2{color:#000}
 }
+
+/* =========================================================
+   FIX: .hidden — sonst bleibt u.a. "Offline" im Livetracking sichtbar
+   ========================================================= */
+.hidden{display:none !important}
+
+/* =========================================================
+   SHORTS — Reihe mit 9:16-Karten (aus dem Dashboard)
+   ========================================================= */
+.shorts-section{padding:10px 0 8px}
+.shorts-head{display:flex;align-items:baseline;gap:14px;margin-bottom:16px}
+.shorts-head h3{font-family:var(--disp);font-weight:900;text-transform:uppercase;letter-spacing:.02em;
+  font-size:clamp(20px,3.4vw,28px);margin:0}
+.shorts-head h3 .r{color:var(--red)}
+.shorts-row{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(180px,1fr);gap:14px;
+  overflow-x:auto;padding-bottom:8px;scroll-snap-type:x mandatory}
+.shorts-row::-webkit-scrollbar{height:8px}
+.shorts-row::-webkit-scrollbar-thumb{background:var(--line)}
+.short-card{position:relative;aspect-ratio:9/16;border:1px solid var(--line);border-top:3px solid var(--red);
+  overflow:hidden;background:#000;scroll-snap-align:start;display:block;text-decoration:none;transition:.2s}
+.short-card:hover{border-color:var(--red);transform:translateY(-3px);box-shadow:0 14px 34px rgba(225,19,36,.2)}
+.short-card img{width:100%;height:100%;object-fit:cover;display:block;opacity:.94;transition:.3s}
+.short-card:hover img{opacity:1;transform:scale(1.04)}
+.short-card::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,transparent 55%,rgba(0,0,0,.75))}
+.short-play{position:absolute;top:12px;right:12px;z-index:2;width:34px;height:34px;display:flex;align-items:center;
+  justify-content:center;background:rgba(225,19,36,.92);border-radius:50%;color:#fff;font-size:14px;padding-left:2px}
+.short-title{position:absolute;left:10px;right:10px;bottom:10px;z-index:2;color:#fff;font-family:var(--disp);
+  font-weight:700;font-size:13px;line-height:1.15;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
