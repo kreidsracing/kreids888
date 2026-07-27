@@ -60,6 +60,20 @@ function renderUpcoming(data){
   const when = $("bcWhen");
   const start = data.scheduledStart ? new Date(data.scheduledStart) : null;
 
+  // Thumbnail + Link (falls vorhanden)
+  const thumbLink = $("bcThumbLink");
+  const thumbImg = $("bcThumb");
+  const watchUrl = data.videoId ? ("https://www.youtube.com/watch?v=" + data.videoId) : "https://youtube.com/@Kreids888";
+  if (thumbLink && thumbImg && data.thumbnail){
+    thumbImg.src = data.thumbnail;
+    thumbLink.href = watchUrl;
+    thumbLink.hidden = false;
+  } else if (thumbLink){
+    thumbLink.hidden = true;
+  }
+  const remind = $("bcRemind");
+  if (remind) remind.href = watchUrl;
+
   if (when && start){
     when.textContent = start.toLocaleString("de-DE",{
       weekday:"long", day:"2-digit", month:"long",

@@ -106,20 +106,26 @@
 
       <!-- UPCOMING -->
       <div class="bc-upcoming" id="bcUpcoming" hidden>
-        <div class="bc-next-lbl">Nächster Stream</div>
-        <div class="bc-title" id="bcTitle">—</div>
-        <div class="countdown" id="countdown" role="timer" aria-live="polite">
-          <div class="cd-cell"><span class="cd-num" id="cdD">00</span><span class="cd-lbl">Tage</span></div>
-          <span class="cd-sep">:</span>
-          <div class="cd-cell"><span class="cd-num" id="cdH">00</span><span class="cd-lbl">Std</span></div>
-          <span class="cd-sep">:</span>
-          <div class="cd-cell"><span class="cd-num" id="cdM">00</span><span class="cd-lbl">Min</span></div>
-          <span class="cd-sep">:</span>
-          <div class="cd-cell"><span class="cd-num" id="cdS">00</span><span class="cd-lbl">Sek</span></div>
+        <div class="bc-up-main">
+          <div class="bc-next-lbl">Nächster Stream</div>
+          <div class="bc-title" id="bcTitle">—</div>
+          <div class="countdown" id="countdown" role="timer" aria-live="polite">
+            <div class="cd-cell"><span class="cd-num" id="cdD">00</span><span class="cd-lbl">Tage</span></div>
+            <span class="cd-sep">:</span>
+            <div class="cd-cell"><span class="cd-num" id="cdH">00</span><span class="cd-lbl">Std</span></div>
+            <span class="cd-sep">:</span>
+            <div class="cd-cell"><span class="cd-num" id="cdM">00</span><span class="cd-lbl">Min</span></div>
+            <span class="cd-sep">:</span>
+            <div class="cd-cell"><span class="cd-num" id="cdS">00</span><span class="cd-lbl">Sek</span></div>
+          </div>
+          <div class="bc-when" id="bcWhen"></div>
+          <a class="btn btn-glow btn-twitch" id="bcRemind" href="https://youtube.com/@Kreids888" target="_blank" rel="noopener">
+            <span>Zur Ankündigung auf YouTube</span></a>
         </div>
-        <div class="bc-when" id="bcWhen"></div>
-        <a class="btn btn-glow btn-twitch" id="bcRemind" href="https://youtube.com/@Kreids888" target="_blank" rel="noopener">
-          <span>Zur Ankündigung auf YouTube</span></a>
+        <a class="bc-up-thumb" id="bcThumbLink" href="https://youtube.com/@Kreids888" target="_blank" rel="noopener" hidden>
+          <img id="bcThumb" alt="Vorschau des angekündigten Streams" loading="lazy">
+          <span class="bc-thumb-play" aria-hidden="true">▶</span>
+        </a>
       </div>
 
       <!-- OFFLINE -->
