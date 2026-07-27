@@ -139,10 +139,10 @@ body::before{content:"";position:fixed;inset:0;z-index:-2;
 .cta-row--v2{margin-top:26px}
 .btn-glow{position:relative}
 /* Marken-Buttons: Twitch (Lila), YouTube (Rot), Instagram (Gradient) */
-.btn-twitch{background:#9146ff;color:#fff;border-color:#9146ff;box-shadow:0 8px 28px rgba(145,70,255,.4)}
-.btn-twitch:hover{background:#7c34e6;border-color:#7c34e6;transform:skewX(-10deg) translateY(-2px);box-shadow:0 10px 32px rgba(145,70,255,.5)}
-.btn-yt-red{background:#ff0000;color:#fff;border-color:#ff0000;box-shadow:0 8px 28px rgba(255,0,0,.32)}
-.btn-yt-red:hover{background:#cc0000;border-color:#cc0000;transform:skewX(-10deg) translateY(-2px);box-shadow:0 10px 32px rgba(255,0,0,.45)}
+.btn-twitch{background:#9146ff;color:#fff;border-color:#9146ff;box-shadow:0 6px 22px rgba(145,70,255,.55),0 0 0 1px rgba(145,70,255,.25)}
+.btn-twitch:hover{background:#7c34e6;border-color:#7c34e6;transform:skewX(-10deg) translateY(-2px);box-shadow:0 12px 36px rgba(145,70,255,.7)}
+.btn-yt-red{background:#ff0000;color:#fff;border-color:#ff0000;box-shadow:0 6px 22px rgba(255,0,0,.5),0 0 0 1px rgba(255,0,0,.25)}
+.btn-yt-red:hover{background:#cc0000;border-color:#cc0000;transform:skewX(-10deg) translateY(-2px);box-shadow:0 12px 36px rgba(255,0,0,.65)}
 .btn-outline{background:#0d0e12;color:#fff;
   border:2px solid transparent;
   background-image:linear-gradient(#0d0e12,#0d0e12),linear-gradient(45deg,#feda75,#d62976,#4f5bd5);
@@ -442,13 +442,17 @@ footer{border-top:2px solid var(--red);background:var(--panel);padding:44px 0 40
 .btn-ico{width:18px;height:18px;flex:none;display:block}
 .btn-glow{position:relative;overflow:hidden}
 .btn-glow>span{position:relative;z-index:1}
-.btn-glow::after{content:"";position:absolute;top:0;left:-140%;width:55%;height:100%;
-  background:linear-gradient(120deg,transparent,rgba(255,255,255,.5),transparent);
-  transform:skewX(6deg);pointer-events:none}
+.btn-glow::after{content:"";position:absolute;top:0;left:-150%;width:55%;height:100%;
+  background:linear-gradient(120deg,transparent,rgba(255,255,255,.55),transparent);
+  transform:skewX(6deg);pointer-events:none;animation:btnSheen 5s ease-in-out infinite}
+/* versetzt, damit nicht alle gleichzeitig blitzen */
+.cta-row .btn-glow:nth-child(2)::after{animation-delay:.7s}
+.cta-row .btn-glow:nth-child(3)::after{animation-delay:1.4s}
+.bc-offline .btn-glow:nth-child(2)::after{animation-delay:.7s}
+@keyframes btnSheen{0%,62%{left:-150%}82%,100%{left:175%}}
 .btn-glow:hover::after{animation:btnSheen .7s ease forwards}
-@keyframes btnSheen{from{left:-140%}to{left:170%}}
 .btn-glow:hover .btn-ico{filter:drop-shadow(0 0 6px rgba(255,255,255,.6))}
-@media(prefers-reduced-motion:reduce){.btn-glow:hover::after{animation:none}}
+@media(prefers-reduced-motion:reduce){.btn-glow::after{animation:none}}
 
 /* =========================================================
    FAHRERKARTE — iRacing-Disziplinen (Sportscar/Formel/Oval)
