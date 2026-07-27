@@ -8,19 +8,19 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Saira+Condensed:wght@500;600;700;800;900&family=Barlow:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
-<meta name="description" content="Livetracking von Kreids888 — verfolge meine iRacing-Rennen in Echtzeit.">
+<meta name="description" content="Livetracking von Kreids888 — iRacing-Rennen in Echtzeit: Positionen, Abstände, Strafen.">
 <link rel="canonical" href="https://kreids888.com/live.html">
 <meta name="robots" content="index, follow">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="KREIDS888">
 <meta property="og:locale" content="de_DE">
 <meta property="og:title" content="KREIDS888 · Livetracking">
-<meta property="og:description" content="Livetracking von Kreids888 — verfolge meine iRacing-Rennen in Echtzeit.">
+<meta property="og:description" content="Livetracking von Kreids888 — iRacing-Rennen in Echtzeit.">
 <meta property="og:url" content="https://kreids888.com/live.html">
 <meta property="og:image" content="https://kreids888.com/assets/og-image.jpg">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="KREIDS888 · Livetracking">
-<meta name="twitter:description" content="Livetracking von Kreids888 — verfolge meine iRacing-Rennen in Echtzeit.">
+<meta name="twitter:description" content="Livetracking von Kreids888 — iRacing-Rennen in Echtzeit.">
 <meta name="twitter:image" content="https://kreids888.com/assets/og-image.jpg">
 <meta name="theme-color" content="#0a0a0a">
 </head>
@@ -28,17 +28,190 @@
 <nav id="site-nav"></nav>
 <main class="page">
   <div class="container">
-    <div class="lap-tag">Lap 02 — Live Timing</div>
-    <h2>Livetracking</h2>
-    <div class="frame-wrap">
-      <div class="frame-head"><span class="dot"></span><span>iRacing · Live Timing</span></div>
-      <div class="frame-body frame-full">
-        <iframe src="https://snailpaceracing.org/live/?ch=kreids888" title="iRacing Live Timing" allowfullscreen loading="lazy"></iframe>
+    <div class="lap-tag">Live Timing</div>
+    <div class="lt-head">
+      <span class="lt-live" id="ltLive"><span class="d"></span><span id="ltLiveTxt">Verbinde…</span></span>
+      <span class="lt-ch">📺 KREIDS888</span>
+    </div>
+
+    <!-- LIVE -->
+    <div id="ltApp" class="hidden">
+      <div class="lt-session">
+        <div class="lt-scell"><div class="k">Strecke</div><div class="v" id="sTrack">–</div></div>
+        <div class="lt-scell"><div class="k">Session</div><div class="v" id="sType">–</div></div>
+        <div class="lt-scell"><div class="k">Führende Runde</div><div class="v" id="sLap">–</div></div>
+        <div class="lt-scell"><div class="k">Restzeit</div><div class="v" id="sRemain">–</div></div>
       </div>
+
+      <div class="lt-flagbar" id="ltFlag"><span id="ltFlagIco">🚩</span><span id="ltFlagTxt"></span></div>
+
+      <div class="lt-panel">
+        <div class="lt-panel-h">Fahrergrid <span class="cnt" id="gridCnt"></span></div>
+        <table class="lt-table">
+          <thead><tr><th>Pos</th><th>Nr</th><th>Fahrer</th><th>Team</th><th>Rd</th><th>Letzte</th><th>Beste</th></tr></thead>
+          <tbody id="ltGrid"></tbody>
+        </table>
+      </div>
+
+      <div class="lt-panel">
+        <div class="lt-panel-h">Strafen <span class="cnt" id="penCnt"></span></div>
+        <table class="lt-table">
+          <thead><tr><th>Nr</th><th>Fahrer</th><th>Art</th><th>Runde</th><th>Status</th></tr></thead>
+          <tbody id="ltPens"></tbody>
+        </table>
+      </div>
+
+      <div class="lt-panel">
+        <div class="lt-panel-h">Ereignisse</div>
+        <div id="ltEvents"></div>
+      </div>
+    </div>
+
+    <!-- OFFLINE -->
+    <div id="ltOffline" class="lt-offline">
+      <h3>Gerade offline</h3>
+      <p id="ltOfflineMsg">Sobald ein Rennen läuft, siehst du hier Positionen, Abstände, Strafen und Ereignisse in Echtzeit — direkt aus der SPR Race Control.</p>
     </div>
   </div>
 </main>
 <footer id="site-footer"></footer>
 <script src="components.js"></script>
+<script>
+(function(){
+  var CHANNEL = (new URLSearchParams(location.search).get("ch") || "kreids888").toLowerCase().trim();
+  var SOURCES = {
+    liga:   "wss://racecontrol-api.snailpaceracing.org/rc/public",
+    einzel: "wss://spr-racecontrol-relay-einzel.sprl.workers.dev/rc/public"
+  };
+  var $ = function(id){ return document.getElementById(id); };
+  var esc = function(s){ return String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); };
+  var conns = {}, liveSource = null, activeFlags = {};
+
+  function fmtLap(sec){ sec=Number(sec)||0; if(sec<=0) return "–"; var m=Math.floor(sec/60), s=sec-m*60; return m+":"+(s<10?"0":"")+s.toFixed(3); }
+  function fmtRemain(sec){ if(sec==null) return "–"; sec=Math.max(0,Math.floor(Number(sec))); var h=Math.floor(sec/3600),m=Math.floor((sec%3600)/60),s=sec%60,p=function(n){return(n<10?"0":"")+n;}; return (h?h+":"+p(m):m)+":"+p(s); }
+
+  function setLive(on){
+    $("ltLive").className = "lt-live" + (on?" on":"");
+    $("ltLiveTxt").textContent = on ? "LIVE" : "Offline";
+    $("ltApp").classList.toggle("hidden", !on);
+    $("ltOffline").classList.toggle("hidden", !!on);
+  }
+
+  function flagClassFor(text){
+    var t=(text||"").toLowerCase();
+    if(t.indexOf("rote")>=0) return ["red","🔴"];
+    if(t.indexOf("full course yellow")>=0||t.indexOf("gelbe")>=0) return ["yellow","🟡"];
+    if(t.indexOf("zielflagge")>=0) return ["chq","🏁"];
+    if(t.indexOf("weisse")>=0||t.indexOf("weiße")>=0) return ["chq","⚪"];
+    if(t.indexOf("green")>=0||t.indexOf("grün")>=0) return ["green","🟢"];
+    return ["yellow","🚩"];
+  }
+  function trackFlags(events){
+    (events||[]).forEach(function(e){
+      if(e.type!=="flag") return;
+      var base=String(e.text||""), key=base.replace(/ (GESETZT|aufgehoben)$/,"");
+      if(/GESETZT$/.test(base)) activeFlags[key]=true;
+      else if(/aufgehoben$/.test(base)) delete activeFlags[key];
+      else if(/^Green Flag/.test(base)) activeFlags={};
+    });
+    if(activeFlags["Green Flag"]){ ["Rote Flagge","Full Course Yellow","Full Course Yellow (waving)","Gelbe Flagge"].forEach(function(k){delete activeFlags[k];}); }
+  }
+  function renderFlag(){
+    var order=["Rote Flagge","Full Course Yellow (waving)","Full Course Yellow","Gelbe Flagge","Zielflagge","Weisse Flagge (letzte Runde)","1 Runde bis Green","Green Flag"];
+    var cur=null; for(var i=0;i<order.length;i++){ if(activeFlags[order[i]]){cur=order[i];break;} }
+    var bar=$("ltFlag");
+    if(!cur){ bar.style.display="none"; return; }
+    var fc=flagClassFor(cur); bar.className="lt-flagbar "+fc[0]; bar.style.display="flex";
+    $("ltFlagIco").textContent=fc[1]; $("ltFlagTxt").textContent=cur.toUpperCase();
+  }
+
+  function render(state){
+    var live = state && state.live;
+    setLive(!!live);
+    if(!live){
+      $("ltOfflineMsg").textContent = (state && state.reason==="disabled")
+        ? "Die Live-Ansicht ist gerade deaktiviert. Schau später wieder vorbei!"
+        : "Sobald ein Rennen läuft, siehst du hier Positionen, Abstände, Strafen und Ereignisse in Echtzeit — direkt aus der SPR Race Control.";
+      return;
+    }
+    var s = state.session || {};
+    $("sTrack").textContent = s.track || "–";
+    $("sType").textContent = s.session_type || "–";
+    $("sLap").textContent = (s.leader_lap!=null ? s.leader_lap : "–");
+    $("sRemain").textContent = fmtRemain(s.time_remain);
+
+    // Grid
+    if(Array.isArray(state.drivers)){
+      var ds = state.drivers.slice().sort(function(a,b){return (a.position||999)-(b.position||999);});
+      $("gridCnt").textContent = ds.length + " Fahrzeuge";
+      $("ltGrid").innerHTML = ds.map(function(d){
+        return "<tr>"+
+          '<td class="pos">'+(d.position||"–")+"</td>"+
+          '<td class="num">#'+esc(d.number)+"</td>"+
+          '<td>'+esc(d.name)+(d.on_pit?'<span class="pit-badge">PIT</span>':"")+"</td>"+
+          '<td class="muted">'+esc(d.team||"")+"</td>"+
+          '<td class="num">'+(d.lap!=null?d.lap:"–")+"</td>"+
+          '<td class="num">'+fmtLap(d.last_lap)+"</td>"+
+          '<td class="num">'+fmtLap(d.best_lap)+"</td>"+
+        "</tr>";
+      }).join("") || '<tr><td colspan="7" class="lt-empty">Noch keine Fahrzeuge auf der Strecke.</td></tr>';
+    }
+
+    // Strafen
+    if(Array.isArray(state.penalties)){
+      $("penCnt").textContent = state.penalties.length ? state.penalties.length+"" : "";
+      $("ltPens").innerHTML = state.penalties.slice().reverse().map(function(p){
+        var cls = p.status==="offen" ? "pen-offen" : "pen-erledigt";
+        return "<tr>"+
+          '<td class="num">#'+esc(p.car)+"</td>"+
+          '<td>'+esc(p.name||"")+"</td>"+
+          "<td>"+esc(p.kind)+"</td>"+
+          '<td class="num">'+(p.given_lap!=null?p.given_lap:"–")+"</td>"+
+          '<td class="'+cls+'">'+esc(p.status)+"</td>"+
+        "</tr>";
+      }).join("") || '<tr><td colspan="5" class="lt-empty">Bisher keine Strafen — sauberes Rennen! 🐌</td></tr>';
+    }
+
+    // Flaggen + Ereignisse
+    if(Array.isArray(state.events)){
+      trackFlags(state.events); renderFlag();
+      $("ltEvents").innerHTML = state.events.slice().reverse().slice(0,25).map(function(e){
+        return '<div class="lt-ev"><span class="t">'+esc(e.wall_clock||"")+'</span><span>'+esc(e.text||"")+(e.car?' (#'+esc(e.car)+")":"")+"</span></div>";
+      }).join("") || '<div class="lt-empty">Noch keine Ereignisse.</div>';
+    }
+  }
+
+  function pickAndRender(){
+    // die zuletzt "live" meldende Quelle gewinnt; sonst offline
+    var st = liveSource && conns[liveSource] ? conns[liveSource].last : null;
+    if(st && st.live){ render(st); return; }
+    // keine Quelle live -> letzte bekannte offline-Meldung
+    var any = conns.liga && conns.liga.last || conns.einzel && conns.einzel.last;
+    render(any || {live:false});
+  }
+
+  function connect(name){
+    var url = SOURCES[name] + "?ch=" + encodeURIComponent(CHANNEL);
+    var c = conns[name] = conns[name] || {last:null};
+    try { c.ws = new WebSocket(url); } catch(e){ setTimeout(function(){connect(name);}, 4000); return; }
+    c.ws.onmessage = function(ev){
+      var m; try{ m=JSON.parse(ev.data); }catch(e){ return; }
+      if(m.type==="meta"){ return; }
+      if(m.type==="state"){
+        c.last = m;
+        if(m.live) liveSource = name;
+        else if(liveSource===name) liveSource = null;
+        pickAndRender();
+      }
+    };
+    c.ws.onclose = function(){ setTimeout(function(){connect(name);}, 4000); };
+    c.ws.onerror = function(){ try{c.ws.close();}catch(e){} };
+  }
+
+  setLive(false);
+  connect("liga");
+  connect("einzel");
+})();
+</script>
 </body>
 </html>
