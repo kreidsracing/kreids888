@@ -5,7 +5,6 @@
 const LINKS = [
   {href:"about.html",     label:"Über mich"},
   {href:"live.html",      label:"Live"},
-  {href:"events.html",    label:"Rennkalender"},
   {href:"streamkalender.html", label:"Streamkalender"},
   {href:"setup.html",     label:"Setup"},
   {href:"community.html", label:"Community"},
