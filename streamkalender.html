@@ -129,7 +129,7 @@
       if(dl!==curDay){ if(curDay) html+="</div>"; html+='<div class="sk-day"><div class="sk-day-h">'+dl+'</div>'; curDay=dl; }
       var time=e.time?esc(e.time):"–";
       var meta=[e.series,e.track].filter(Boolean).map(esc).join(" · ");
-      var img=e.image?'<img class="sk-thumb" src="'+esc(e.image)+'" alt="" loading="lazy" onerror="this.style.display=\'none\'">':'';
+      var img=e.image?'<img class="sk-thumb" src="'+esc(e.image)+'" alt="" loading="lazy" style="width:150px;height:84px;object-fit:cover" onerror="this.style.display=\'none\'">':'';
       html+='<div class="sk-item" data-type="'+esc(e.type||"Rennen")+'">'+
         '<div class="sk-time">'+time+'<small>UHR</small></div>'+
         '<div class="sk-main">'+img+
@@ -184,7 +184,7 @@
     return {lines:[t+"…"],size:minSize};
   }
 
-  function drawPoster(){
+  function drawPoster(skipImages){
     var cv=document.getElementById("skPoster"); if(!cv) return;
     var w=WEEKS[IDX]; var items=(w?w.items:[]).slice(0,7);
     var ctx=cv.getContext("2d"); var W=1080,H=1920;
@@ -218,7 +218,10 @@
         ctx.fillStyle=steel;ctx.font='600 36px "Saira Condensed", sans-serif';
         ctx.fillText(dt.getDate()+". "+MON[dt.getMonth()],195,y+ch*0.70);
         ctx.strokeStyle=line;ctx.beginPath();ctx.moveTo(310,y+26);ctx.lineTo(310,y+ch-26);ctx.stroke();
-        var tx=345, maxW=(W-90)-tx;
+        // Renn-Bild rechts (falls vorhanden und geladen)
+        var hasImg = !skipImages && s._img && s._img.naturalWidth;
+        var imgBoxW = hasImg ? 360 : 0, rightPad = 30;
+        var tx=345, maxW=(W-90)-tx-(hasImg?imgBoxW+rightPad:0);
         var fit=fitTitle(ctx,s.title||"Rennen",maxW,52,30);
         var lh=fit.size*1.02;
         var blockH=fit.lines.length*lh + 44;
@@ -227,6 +230,12 @@
         fit.lines.forEach(function(l){ctx.fillText(l,tx,ty);ty+=lh;});
         ctx.fillStyle=steel;ctx.font='600 38px "Saira Condensed", sans-serif';
         ctx.fillText(fmtTime(dt)+" Uhr",tx,ty+10);
+        if(hasImg){
+          var bw=imgBoxW, bh=ch-40, bx=(W-90)-bw, by=y+20;
+          var ir=Math.min(bw/s._img.naturalWidth, bh/s._img.naturalHeight);
+          var iw=s._img.naturalWidth*ir, ih=s._img.naturalHeight*ir;
+          ctx.drawImage(s._img, bx+(bw-iw)/2, by+(bh-ih)/2, iw, ih);
+        }
       });
     }
     // Footer: Logo (füllt das untere Band)
@@ -248,16 +257,35 @@
 
   window.downloadPoster=function(){
     if(!WEEKS.length || !WEEKS[IDX] || !WEEKS[IDX].items.length){ alert("Diese Woche gibt es keine Rennen zum Speichern."); return; }
-    var ready = document.fonts ? document.fonts.ready : Promise.resolve();
-    ready.then(function(){
-      drawPoster();
+    var items=WEEKS[IDX].items;
+    var fontsReady = document.fonts ? document.fonts.ready : Promise.resolve();
+    var imgsReady = Promise.all(items.map(function(s){
+      return new Promise(function(res){
+        if(!s.image){ s._img=null; return res(); }
+        var im=new Image(); im.crossOrigin="anonymous";
+        im.onload=function(){ s._img=im; res(); };
+        im.onerror=function(){ s._img=null; res(); };
+        im.src=s.image;
+      });
+    }));
+    Promise.all([fontsReady, imgsReady]).then(function(){
       var cv=document.getElementById("skPoster");
+      var name="kreids888-streamweek-"+WEEKS[IDX].monday.toISOString().slice(0,10)+".png";
+      // 1. Versuch: MIT Renn-Bildern
+      drawPoster(false);
       try{
         var url=cv.toDataURL("image/png");
-        var a=document.createElement("a");a.href=url;
-        a.download="kreids888-streamweek-"+WEEKS[IDX].monday.toISOString().slice(0,10)+".png";a.click();
-      }catch(e){
-        alert("Der externe Logo-Link sperrt den Bild-Download (CORS). Lösung: Logo als kreidslogo.png ins Repo legen und im Skript LOGO_SRC darauf zeigen — dann klappt der Download sicher.");
+        var a=document.createElement("a");a.href=url;a.download=name;a.click();
+        return;
+      }catch(e){}
+      // 2. Versuch: OHNE Renn-Bilder (falls ein Bild-Host CORS sperrt und das Canvas „vergiftet")
+      drawPoster(true);
+      try{
+        var url2=cv.toDataURL("image/png");
+        var a2=document.createElement("a");a2.href=url2;a2.download=name;a2.click();
+        alert("Hinweis: Mindestens ein Renn-Bild kam von einem Host, der den Bild-Download sperrt (CORS) — das Poster wurde ohne diese Bilder gespeichert. Tipp: Renn-Bilder bei i.postimg.cc hochladen, dann erscheinen sie auch im Poster.");
+      }catch(e2){
+        alert("Der externe Logo-Link sperrt den Bild-Download (CORS). Lösung: Logo als kreidslogo.png ins Repo legen und im Skript LOGO_SRC darauf zeigen.");
       }
     });
   };
