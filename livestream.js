@@ -20,7 +20,7 @@
    =========================================================== */
 
 // ⬇⬇⬇  HIER DIE WORKER-URL EINTRAGEN (leer lassen = immer offline)  ⬇⬇⬇
-const STREAM_API_URL = "";
+const STREAM_API_URL = "https://kreids888-live.kreids.workers.dev/";
 // ⬆⬆⬆  HIER DIE WORKER-URL EINTRAGEN  ⬆⬆⬆
 
 const POLL_MS = 90_000; // alle 90 Sek. neu prüfen
