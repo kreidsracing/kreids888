@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>KREIDS888 · Ergebnisse</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Saira+Condensed:wght@500;600;700;800;900&family=Barlow:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+<meta name="description" content="Renn-Ergebnisse von Kreids888 — alle iRacing-Ligarennen bei Snail Pace Racing, Platzierungen, Punkte und Historie.">
+<link rel="canonical" href="https://kreids888.com/ergebnisse.html">
+<meta name="robots" content="index, follow">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="KREIDS888">
+<meta property="og:locale" content="de_DE">
+<meta property="og:title" content="KREIDS888 · Ergebnisse">
+<meta property="og:description" content="Renn-Ergebnisse und Historie von Kreids888 — iRacing bei Snail Pace Racing.">
+<meta property="og:url" content="https://kreids888.com/ergebnisse.html">
+<meta property="og:image" content="https://kreids888.com/assets/og-image.jpg">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="theme-color" content="#0a0a0a">
+<style>
+/* ===== ERGEBNISSE · Stats-Kopf + Renn-Historie als Streifen ===== */
+.rs-stats{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin:22px 0 30px}
+.rs-stat{background:linear-gradient(180deg,var(--panel),var(--panel2));border:1px solid var(--line);border-top:3px solid var(--red);padding:16px 14px;text-align:center}
+.rs-stat .n{font-family:var(--disp);font-weight:900;font-size:34px;line-height:1;color:var(--white)}
+.rs-stat .l{font-family:var(--disp);font-weight:600;font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--steel);margin-top:6px}
+.rs-stat.hl .n{color:var(--red)}
+
+.rs-feed{border-top:1px solid var(--line)}
+.rs-row{display:grid;grid-template-columns:78px 1fr auto;align-items:center;gap:20px;
+  padding:18px 8px 18px 22px;border-bottom:1px solid var(--line);position:relative;transition:padding-left .25s cubic-bezier(.4,0,.2,1),background .2s}
+.rs-row::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--red);
+  box-shadow:0 0 14px var(--red-glow);transform:scaleY(0);transition:transform .25s}
+.rs-row:hover::before{transform:scaleY(1)}
+.rs-row:hover{padding-left:30px;background:linear-gradient(90deg,rgba(225,19,36,.05),transparent 55%)}
+
+.rs-pos{font-family:var(--disp);font-weight:900;line-height:.85;text-align:center}
+.rs-pos .p{font-size:15px;color:var(--steel);letter-spacing:.05em}
+.rs-pos .v{font-size:38px;color:var(--white)}
+.rs-pos.p1 .v{color:#f5c518}.rs-pos.p2 .v{color:#c8ced8}.rs-pos.p3 .v{color:#cd7f32}
+.rs-pos.dnf .v{font-size:26px;color:#e05252}
+
+.rs-mid{min-width:0}
+.rs-track{font-family:var(--disp);font-weight:800;text-transform:uppercase;font-size:clamp(17px,2.2vw,22px);
+  line-height:1.05;color:var(--white);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rs-meta{font-size:13px;color:var(--steel);margin-top:4px}
+.rs-meta .dot{color:var(--steel-d);margin:0 7px}
+
+.rs-right{text-align:right;flex:none;font-family:var(--disp)}
+.rs-delta{font-weight:700;font-size:14px;letter-spacing:.03em;color:var(--steel)}
+.rs-delta .up{color:#3fbf5f}.rs-delta .down{color:#e05252}
+.rs-pts{font-weight:900;font-size:22px;color:var(--white);margin-top:2px}
+.rs-pts small{font-size:11px;color:var(--steel);font-weight:600;letter-spacing:.1em;margin-left:3px}
+
+.rs-empty{color:var(--steel);padding:26px 0}
+@media(max-width:560px){
+  .rs-stats{grid-template-columns:repeat(3,1fr)}
+  .rs-stat:nth-child(4),.rs-stat:nth-child(5){grid-column:span 1}
+  .rs-row{grid-template-columns:60px 1fr;gap:12px;padding:16px 8px 16px 18px}
+  .rs-pos .v{font-size:30px}
+  .rs-right{grid-column:1 / -1;text-align:left;display:flex;align-items:baseline;gap:14px;margin-top:2px}
+  .rs-pts{margin-top:0}
+}
+</style>
+</head>
+<body>
+<nav id="site-nav"></nav>
+<main class="page">
+  <div class="container">
+    <div class="lap-tag">Results</div>
+    <h2>Ergebnisse</h2>
+    <p class="setup-intro">Meine iRacing-Ligarennen bei Snail Pace Racing — aktualisiert sich automatisch.</p>
+    <div id="rsStats" class="rs-stats" style="display:none"></div>
+    <div id="rsFeed" class="rs-feed"><p class="rs-empty">Ergebnisse werden geladen…</p></div>
+  </div>
+</main>
+<footer id="site-footer"></footer>
+<script src="components.js"></script>
+<script>
+(function(){
+  var ADMIN_API="https://kreids888-admin.kreids.workers.dev";
+  var esc=function(s){return String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");};
+  var MO=["Jan","Feb","März","Apr","Mai","Jun","Jul","Aug","Sep","Okt","Nov","Dez"];
+  function fmtDate(iso){
+    if(!iso) return "";
+    var d=new Date(iso); if(isNaN(d)) return "";
+    return d.getDate()+". "+MO[d.getMonth()]+" "+d.getFullYear();
+  }
+  function ordinal(p){ return p!=null ? "P"+p : "—"; }
+
+  function renderStats(R){
+    var fin=R.filter(function(r){return r.finish!=null;});
+    var starts=R.length;
+    var wins=fin.filter(function(r){return r.finish===1;}).length;
+    var podium=fin.filter(function(r){return r.finish<=3;}).length;
+    var pts=R.reduce(function(a,r){return a+(r.pts>0?r.pts:0);},0);
+    var best=fin.length?Math.min.apply(null,fin.map(function(r){return r.finish;})):null;
+    var cells=[
+      {n:starts,l:"Rennen"},
+      {n:wins,l:"Siege",hl:wins>0},
+      {n:podium,l:"Podien",hl:podium>0},
+      {n:best!=null?("P"+best):"—",l:"Bestes"},
+      {n:pts,l:"Punkte"}
+    ];
+    var el=document.getElementById("rsStats");
+    el.innerHTML=cells.map(function(c){
+      return '<div class="rs-stat'+(c.hl?" hl":"")+'"><div class="n">'+esc(c.n)+'</div><div class="l">'+esc(c.l)+'</div></div>';
+    }).join("");
+    el.style.display="grid";
+  }
+
+  function renderFeed(R){
+    var el=document.getElementById("rsFeed");
+    if(!R.length){ el.innerHTML='<p class="rs-empty">Noch keine gefahrenen Rennen erfasst. Schau bald wieder vorbei!</p>'; return; }
+    el.innerHTML=R.map(function(r){
+      var isFin=r.finish!=null;
+      var cls=isFin?(r.finish===1?"p1":r.finish===2?"p2":r.finish===3?"p3":""):"dnf";
+      var posBlock='<div class="rs-pos '+cls+'">'+
+        (isFin?'<div class="p">Ziel</div><div class="v">'+r.finish+'</div>'
+              :'<div class="v">'+esc(r.status||"DNF")+'</div>')+'</div>';
+      var meta=[esc(r.serie), fmtDate(r.date)].filter(Boolean).join('<span class="dot">·</span>');
+      var delta="";
+      if(isFin && r.start){
+        var d=r.start-r.finish;
+        if(d>0) delta='<span class="up">▲ '+d+' Plätze</span>';
+        else if(d<0) delta='<span class="down">▼ '+(-d)+' Plätze</span>';
+        else delta='Position gehalten';
+        delta='<span class="rs-delta">Start P'+r.start+' &nbsp;'+delta+'</span>';
+      } else if(r.start){
+        delta='<span class="rs-delta">Start P'+r.start+'</span>';
+      }
+      var pts=(r.pts>0)?'<div class="rs-pts">'+r.pts+'<small>PKT</small></div>':'';
+      return '<div class="rs-row">'+
+        posBlock+
+        '<div class="rs-mid"><div class="rs-track">'+esc(r.track||"Rennen")+'</div>'+
+          '<div class="rs-meta">'+meta+'</div></div>'+
+        '<div class="rs-right">'+delta+pts+'</div>'+
+      '</div>';
+    }).join("");
+  }
+
+  fetch(ADMIN_API+"/api/results").then(function(r){return r.json();}).then(function(d){
+    var R=Array.isArray(d.results)?d.results:[];
+    renderStats(R); renderFeed(R);
+  }).catch(function(){
+    document.getElementById("rsFeed").innerHTML='<p class="rs-empty">Ergebnisse konnten nicht geladen werden.</p>';
+  });
+})();
+</script>
+</body>
+</html>
