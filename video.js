@@ -1,33 +1,17 @@
 /* ===========================================================
    NEUESTES VIDEO — lädt automatisch das aktuellste Video vom
-   YouTube-Kanal in den Player auf der Startseite.
+   YouTube-Kanal in den Player + zeigt Titel und Link.
    ------------------------------------------------------------
-   WARUM NICHT EINFACH DIREKT VON YOUTUBE LADEN?
-   YouTube selbst blockiert per CORS einen direkten fetch() von
-   dieser Seite aus. Deshalb wird der öffentliche Kanal-RSS-Feed
-   über einen kostenlosen Umwandlungs-Dienst (rss2json.com) gelesen,
-   der CORS erlaubt. Kein eigener Server/Backend nötig.
-
-   SO AKTIVIERST DU DAS:
-   1) Trag unten bei YOUTUBE_CHANNEL_ID deine Kanal-ID ein
-      (beginnt immer mit "UC..."). So findest du sie:
-        - Eingeloggt auf https://www.youtube.com/account_advanced
-        - ODER: eigenen Kanal öffnen -> Rechtsklick -> "Seitenquelltext
-          anzeigen" -> mit Strg+F nach "channel_id" suchen.
-   2) Fertig. Ab dann lädt die Startseite automatisch dein neuestes
-      Video. Klappt der Live-Abruf mal nicht (z.B. rss2json down),
-      läuft stattdessen das FALLBACK_VIDEO_ID unten.
+   Liest den öffentlichen Kanal-RSS-Feed über rss2json.com (CORS-fähig),
+   kein eigener Server nötig. Klappt der Abruf nicht, bleibt das
+   FALLBACK_VIDEO_ID stehen.
    =========================================================== */
 
-// ⬇⬇⬇  HIER DEINE YOUTUBE-CHANNEL-ID EINTRAGEN  ⬇⬇⬇
-const YOUTUBE_CHANNEL_ID = "UCtFDX_OtRwq-z8gJBo2e96w"; // <<< z.B. "UCxxxxxxxxxxxxxxxxxxxxxx"
-// ⬆⬆⬆  HIER DEINE YOUTUBE-CHANNEL-ID EINTRAGEN  ⬆⬆⬆
+const YOUTUBE_CHANNEL_ID = "UCtFDX_OtRwq-z8gJBo2e96w";
+const FALLBACK_VIDEO_ID  = "Yvv1yh9lG0w";
 
-// Wird genutzt, solange keine Channel-ID gesetzt ist ODER der Live-Abruf fehlschlägt.
-const FALLBACK_VIDEO_ID = "Yvv1yh9lG0w";
-
-async function fetchLatestVideoId(channelId) {
-  const feedUrl = "https://www.youtube.com/feeds/videos.xml?channel_id=" + channelId;
+async function fetchLatestVideo(channelId) {
+  const feedUrl  = "https://www.youtube.com/feeds/videos.xml?channel_id=" + channelId;
   const proxyUrl = "https://api.rss2json.com/v1/api.json?rss_url=" + encodeURIComponent(feedUrl);
   const res = await fetch(proxyUrl);
   if (!res.ok) throw new Error("HTTP " + res.status);
@@ -37,7 +21,7 @@ async function fetchLatestVideoId(channelId) {
   const link = first.link || first.guid || "";
   const match = link.match(/[?&]v=([\w-]{11})/) || link.match(/video:([\w-]{11})/);
   if (!match) throw new Error("Video-ID nicht im Feed-Eintrag gefunden");
-  return match[1];
+  return { id: match[1], title: (first.title || "").trim(), link: link };
 }
 
 function setVideoSrc(id) {
@@ -48,16 +32,20 @@ function setVideoSrc(id) {
   frame.src = "https://www.youtube.com/embed/" + id + "?autoplay=1&mute=1&rel=0&playsinline=1&enablejsapi=1";
 }
 
+function setVideoMeta(video) {
+  const titleEl = document.getElementById("ytTitle");
+  const linkEl  = document.getElementById("ytLink");
+  if (titleEl && video.title) titleEl.textContent = video.title;
+  if (linkEl && video.link)   linkEl.href = video.link;
+}
+
 async function initVideo() {
   if (!document.getElementById("yt")) return; // nur auf der Startseite aktiv
-
-  if (!YOUTUBE_CHANNEL_ID) {
-    console.info("[Video] Keine YOUTUBE_CHANNEL_ID gesetzt — nutze Fallback-Video.");
-    return; // Fallback-Video steht schon als Standard-src in index.html
-  }
+  if (!YOUTUBE_CHANNEL_ID) return;
   try {
-    const id = await fetchLatestVideoId(YOUTUBE_CHANNEL_ID);
-    setVideoSrc(id);
+    const video = await fetchLatestVideo(YOUTUBE_CHANNEL_ID);
+    setVideoSrc(video.id);
+    setVideoMeta(video);
   } catch (err) {
     console.info("[Video] Neuestes Video konnte nicht geladen werden, nutze Fallback:", err.message);
   }

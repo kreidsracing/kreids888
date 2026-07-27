@@ -331,3 +331,82 @@ footer{border-top:2px solid var(--red);background:var(--panel);padding:44px 0 40
 /* Über-mich Bild */
 .about-figure{margin-top:30px;border-top:3px solid var(--red);padding-top:0;position:relative}
 .about-img{width:100%;max-height:560px;object-fit:cover;display:block;border:1px solid var(--line);border-top:0}
+
+/* =========================================================
+   BROADCAST-MODUL (Signature) — Live / Countdown / Offline
+   ========================================================= */
+.broadcast{padding:8px 0 4px}
+.bc-panel{position:relative;background:linear-gradient(180deg,#15171e,#0d0e12);
+  border:1px solid var(--line);border-left:4px solid var(--red);
+  padding:22px 22px 24px;overflow:hidden}
+.bc-panel::before{content:"";position:absolute;inset:0;pointer-events:none;
+  background:repeating-linear-gradient(90deg,transparent 0 38px,rgba(255,255,255,.015) 38px 39px)}
+.bc-head{display:flex;align-items:center;gap:12px;margin-bottom:16px;position:relative;z-index:1}
+.bc-dot{width:12px;height:12px;background:var(--steel-d);border-radius:50%;flex:none}
+.bc-panel[data-state="live"] .bc-dot{background:var(--red);box-shadow:0 0 0 0 var(--red-glow);animation:bcPulse 1.4s infinite}
+@keyframes bcPulse{0%{box-shadow:0 0 0 0 var(--red-glow)}70%{box-shadow:0 0 0 12px rgba(225,19,36,0)}100%{box-shadow:0 0 0 0 rgba(225,19,36,0)}}
+.bc-state{font-family:var(--disp);font-weight:900;font-size:clamp(15px,2.6vw,19px);
+  letter-spacing:.1em;text-transform:uppercase;color:var(--white)}
+.bc-panel[data-state="live"] .bc-state{color:var(--red)}
+.bc-tower{margin-left:auto;font-family:var(--disp);font-weight:700;font-size:11px;
+  letter-spacing:.34em;color:var(--steel-d);text-transform:uppercase}
+@media(max-width:560px){.bc-tower{display:none}}
+
+/* UPCOMING */
+.bc-next-lbl{font-family:var(--disp);font-weight:700;font-size:12px;letter-spacing:.26em;
+  text-transform:uppercase;color:var(--red);margin-bottom:6px}
+.bc-title{font-family:var(--disp);font-weight:800;font-size:clamp(18px,3.4vw,26px);
+  line-height:1.05;color:var(--white);margin-bottom:18px}
+.countdown{display:flex;align-items:flex-end;gap:6px;flex-wrap:wrap}
+.cd-cell{display:flex;flex-direction:column;align-items:center;
+  background:var(--carbon);border:1px solid var(--line);border-top:2px solid var(--red);
+  padding:10px 14px;min-width:64px;transform:skewX(-7deg)}
+.cd-cell>*{transform:skewX(7deg)}
+.cd-num{font-family:var(--disp);font-weight:900;font-size:clamp(26px,6vw,40px);
+  color:var(--white);line-height:1;font-variant-numeric:tabular-nums}
+.cd-lbl{font-family:var(--disp);font-weight:600;font-size:10px;letter-spacing:.16em;
+  text-transform:uppercase;color:var(--steel);margin-top:6px}
+.cd-sep{font-family:var(--disp);font-weight:900;font-size:clamp(22px,5vw,34px);
+  color:var(--steel-d);padding-bottom:16px}
+@media(max-width:560px){.cd-cell{min-width:52px;padding:8px 9px}.cd-sep{display:none}}
+.bc-when{margin-top:14px;font-family:var(--disp);font-weight:600;font-size:14px;
+  letter-spacing:.06em;color:var(--steel);text-transform:uppercase}
+#bcRemind{margin-top:18px}
+
+/* LIVE embed */
+.bc-live .video{border-color:var(--red)}
+.bc-panel[data-state="live"]{border-left-color:var(--red);
+  box-shadow:0 0 40px rgba(225,19,36,.14)}
+
+/* OFFLINE */
+.bc-off-text{color:var(--steel);font-size:15px;max-width:60ch;margin-bottom:16px}
+.bc-offline .cta-row{display:flex;gap:12px;flex-wrap:wrap}
+
+/* Panel im Lade-/Offline-Zustand etwas ruhiger */
+.bc-panel[data-state="loading"] .bc-state{color:var(--steel)}
+
+/* =========================================================
+   iRATING hervorheben (Hero-Kachel)
+   ========================================================= */
+.profile-stats .rating-pill--hero{flex:1.25}
+.profile-stats .rating-pill--hero .rating-val{font-size:clamp(24px,4.4vw,34px);color:var(--red);
+  text-shadow:0 0 26px var(--red-glow)}
+
+/* =========================================================
+   VIDEO-TITEL + LINK (letzter Stream)
+   ========================================================= */
+.video-caption{margin-top:16px;font-family:var(--disp);font-weight:700;
+  font-size:clamp(15px,2.6vw,18px);line-height:1.2;color:var(--white);letter-spacing:.01em}
+.video-caption:empty{display:none}
+.video-link{display:inline-block;margin-top:10px;font-family:var(--disp);font-weight:700;
+  font-size:13px;letter-spacing:.1em;text-transform:uppercase;color:var(--red);
+  text-decoration:none;transition:opacity .15s}
+.video-link:hover{opacity:.75}
+
+/* =========================================================
+   Zusätzliche Button-Varianten
+   ========================================================= */
+.btn-yt-red{background:var(--panel2);color:#fff;border:1px solid var(--line)}
+.btn-yt-red:hover{border-color:var(--red);box-shadow:0 8px 28px rgba(225,19,36,.28)}
+.btn-outline{background:transparent;color:var(--white);border:1px solid var(--steel-d)}
+.btn-outline:hover{border-color:var(--red);color:#fff}
