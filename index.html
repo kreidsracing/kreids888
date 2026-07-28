@@ -23,6 +23,29 @@
 <meta name="twitter:description" content="Kreids888 (Stefan) — Sim Racing auf iRacing. Livestreams, Highlights, Rennkalender und mein Setup an einem Ort.">
 <meta name="twitter:image" content="https://kreids888.com/assets/og-image.jpg">
 <meta name="theme-color" content="#0a0a0a">
+<style>
+/* ===== NEWS-Teaser auf der Startseite ===== */
+.news-teaser-sec{padding:6px 0}
+.nt-h{font-family:var(--disp);font-weight:900;text-transform:uppercase;font-size:clamp(24px,4vw,36px);line-height:1;margin:0 0 18px}
+.nt-card{display:grid;grid-template-columns:300px 1fr;gap:22px;align-items:center;text-decoration:none;color:inherit;
+  background:linear-gradient(180deg,var(--panel),#0e0f14);border:1px solid var(--line);border-left:3px solid var(--red);
+  padding:16px;transition:transform .18s,box-shadow .18s}
+.nt-card:hover{transform:translateY(-2px);box-shadow:0 14px 40px rgba(0,0,0,.5)}
+.nt-cover{background:#0b0c11;border:1px solid var(--line);overflow:hidden;aspect-ratio:16/10}
+.nt-cover img{width:100%;height:100%;object-fit:cover;display:block}
+.nt-card.no-cover{grid-template-columns:1fr}
+.nt-card.no-cover .nt-cover{display:none}
+.nt-meta{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+.nt-date{font-family:var(--disp);font-weight:700;letter-spacing:.1em;text-transform:uppercase;font-size:12px;color:var(--steel)}
+.nt-new{font-family:var(--disp);font-weight:800;letter-spacing:.08em;font-size:11px;background:var(--red);color:#fff;padding:2px 8px;border-radius:3px}
+.nt-title{font-family:var(--disp);font-weight:800;text-transform:uppercase;font-size:clamp(19px,2.6vw,26px);line-height:1.05;margin:0 0 8px;color:var(--white)}
+.nt-ex{font-size:14.5px;line-height:1.55;color:var(--steel);margin:0 0 12px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.nt-more{font-family:var(--disp);font-weight:800;text-transform:uppercase;letter-spacing:.05em;font-size:13px;color:var(--red)}
+.nt-all{margin-top:12px}
+.nt-all a{font-family:var(--disp);font-weight:700;text-transform:uppercase;letter-spacing:.06em;font-size:12px;color:var(--steel);text-decoration:none}
+.nt-all a:hover{color:var(--white)}
+@media(max-width:640px){.nt-card{grid-template-columns:1fr;gap:14px}}
+</style>
 </head>
 <body>
 <nav id="site-nav"></nav>
@@ -184,6 +207,24 @@
   </div>
 </section>
 
+<!-- ============ NEWS-TEASER (neuester Beitrag aus dem Dashboard) ============ -->
+<section class="news-teaser-sec" id="newsTeaser" style="display:none">
+  <div class="container">
+    <div class="lap-tag">Newsroom</div>
+    <h3 class="nt-h">Frisch aus dem <span class="r">Fahrerlager.</span></h3>
+    <a class="nt-card" id="ntCard" href="news.html">
+      <div class="nt-cover"><img id="ntImg" alt="" loading="lazy"></div>
+      <div class="nt-body">
+        <div class="nt-meta"><span class="nt-date" id="ntDate"></span><span class="nt-new" id="ntNew" hidden>NEU</span></div>
+        <h4 class="nt-title" id="ntTitle"></h4>
+        <p class="nt-ex" id="ntEx"></p>
+        <span class="nt-more">Weiterlesen →</span>
+      </div>
+    </a>
+    <div class="nt-all"><a href="news.html">Alle Beiträge →</a></div>
+  </div>
+</section>
+
 <!-- ============ LETZTER STREAM / NEUESTES VIDEO ============
      video.js lädt automatisch das aktuellste Video vom Kanal + Titel. -->
 <section class="video-section">
@@ -222,5 +263,26 @@
 <script src="video.js" defer></script>
 <script src="livestream.js" defer></script>
 <script src="shorts.js" defer></script>
+<script>
+(function(){
+  var API="https://kreids888-admin.kreids.workers.dev";
+  var MO=["Jan","Feb","März","Apr","Mai","Jun","Jul","Aug","Sep","Okt","Nov","Dez"];
+  function fmt(d){var p=String(d||"").split("-");return p.length<3?"":(+p[2])+". "+MO[(+p[1])-1]+" "+p[0];}
+  function daysAgo(d){var t=Date.parse((d||"")+"T00:00:00");return isNaN(t)?999:(Date.now()-t)/86400000;}
+  fetch(API+"/api/news").then(function(r){return r.json();}).then(function(d){
+    var posts=(d&&d.posts)||[]; if(!posts.length) return;
+    var p=posts[0];
+    var card=document.getElementById("ntCard");
+    card.href="news.html#post-"+encodeURIComponent(p.id);
+    document.getElementById("ntTitle").textContent=p.title||"(ohne Titel)";
+    document.getElementById("ntDate").textContent=fmt(p.date);
+    var ex=p.excerpt||(p.body||"").replace(/[#*>!\[\]()]/g," ").replace(/\s+/g," ").trim().slice(0,160);
+    document.getElementById("ntEx").textContent=ex;
+    if(p.cover){document.getElementById("ntImg").src=p.cover;}else{card.classList.add("no-cover");}
+    if(daysAgo(p.date)<=7){document.getElementById("ntNew").hidden=false;}
+    document.getElementById("newsTeaser").style.display="";
+  }).catch(function(){});
+})();
+</script>
 </body>
 </html>
