@@ -155,10 +155,11 @@ body::before{content:"";position:fixed;inset:0;z-index:-2;
 .portrait-frame{position:relative;width:100%;max-width:420px;aspect-ratio:4/5;
   border:2px solid var(--line);background:linear-gradient(180deg,#15171e,#0d0e12);
   box-shadow:0 20px 60px rgba(0,0,0,.65);overflow:hidden}
+
 .portrait-frame::before{content:"";position:absolute;inset:0;z-index:2;pointer-events:none;
   background:linear-gradient(180deg,transparent 60%,rgba(0,0,0,.75) 100%)}
 .portrait-frame::after{content:"";position:absolute;top:0;right:0;width:46%;height:100%;z-index:1;
-  background:linear-gradient(120deg,transparent 40%,rgba(225,19,36,.10) 40%);pointer-events:none}
+  background:none;pointer-events:none}
 .portrait-img{width:100%;height:100%;object-fit:cover;display:block;position:relative;z-index:0;transition:.3s}
 .portrait-frame:hover .portrait-img{transform:scale(1.035)}
 /* Fallback-Icon, solange kein Foto in assets/fahrer.jpg liegt */
