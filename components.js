@@ -57,8 +57,12 @@ const navHTML = `
 const footHTML = `
 <div class="container foot-in">
   <a class="foot-brand" href="index.html">KREIDS<span class="r">888</span></a>
+  <div class="foot-motto" aria-label="Mein Motto: Konstanz vor Geschwindigkeit">
+    <span class="foot-motto-lbl">Mein Motto</span>
+    <span class="foot-motto-line"><span class="fm-strong">Konstanz</span> <span class="fm-sheen">vor Geschwindigkeit</span></span>
+  </div>
 </div>
-<div class="container"><div class="foot-note">© 2026 Kreids888 · #888 · Built on GitHub Pages</div></div>`;
+<div class="container"><div class="foot-note">© 2026 Kreids888</div></div>`;
 
 const navEl=document.getElementById("site-nav");
 const footEl=document.getElementById("site-footer");

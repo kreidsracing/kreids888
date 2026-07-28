@@ -693,3 +693,49 @@ footer{border-top:2px solid var(--red);background:var(--panel);padding:44px 0 40
 .article-body .article-img{width:100%;border:1px solid var(--line);margin:6px 0 18px;display:block}
 .article-body a{color:var(--red)}
 @media(max-width:560px){.article-title{font-size:28px}}
+
+/* ============ WILLKOMMEN (warmer Intro, Startseite) ============ */
+.welcome{padding:44px 0 8px}
+.welcome-card{max-width:760px;background:linear-gradient(180deg,rgba(25,28,36,.65),rgba(19,21,27,.4));
+  border:1px solid var(--line);border-left:3px solid var(--red);border-radius:2px;
+  padding:clamp(24px,4vw,40px);box-shadow:0 20px 60px rgba(0,0,0,.35)}
+.welcome-h{font-family:var(--disp);font-weight:900;text-transform:uppercase;letter-spacing:-.005em;
+  line-height:.98;font-size:clamp(28px,5.5vw,44px);margin:6px 0 18px}
+.welcome-h .r{color:var(--red);text-shadow:0 0 34px var(--red-glow)}
+.welcome-lead{color:#d3d7de;font-size:clamp(15px,2.2vw,18px);line-height:1.7;max-width:60ch}
+.welcome-lead strong{color:var(--white)}
+.welcome-line{margin-top:18px;font-family:var(--disp);font-weight:700;text-transform:uppercase;
+  letter-spacing:.02em;font-size:clamp(16px,2.6vw,22px);color:var(--steel);line-height:1.3}
+.welcome-line .wl-strong{color:var(--white)}
+.welcome-motto{margin-top:14px;display:inline-block;font-family:var(--disp);font-weight:900;
+  text-transform:uppercase;letter-spacing:.02em;font-size:clamp(20px,3.6vw,30px);
+  color:var(--white);padding-bottom:6px;border-bottom:2px solid var(--red);box-shadow:0 2px 12px -6px var(--red-glow)}
+.welcome-motto .wm-strong{color:var(--red);text-shadow:0 0 20px var(--red-glow),0 0 46px rgba(225,19,36,.35)}
+.welcome-adfree{margin-top:24px;display:inline-flex;align-items:center;gap:12px;
+  background:rgba(225,19,36,.08);border:1px solid rgba(225,19,36,.35);border-radius:999px;
+  padding:11px 18px 11px 15px;color:#e9ebf0;font-size:clamp(13px,2vw,15px);font-weight:500}
+.welcome-adfree svg{width:22px;height:22px;flex:none;color:var(--red);filter:drop-shadow(0 0 8px var(--red-glow))}
+.welcome-adfree strong{font-family:var(--disp);font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:#fff}
+
+/* ============ FOOTER-MOTTO (mit Effekt) ============ */
+.foot-motto{display:flex;flex-direction:column;align-items:flex-end;gap:5px;text-align:right}
+.foot-motto-lbl{font-family:var(--disp);font-weight:700;font-size:11px;letter-spacing:.34em;
+  text-transform:uppercase;color:var(--red)}
+.foot-motto-line{font-family:var(--disp);font-weight:900;text-transform:uppercase;letter-spacing:.03em;
+  font-size:clamp(20px,3.4vw,32px);line-height:1;display:inline-flex;gap:.28em;flex-wrap:wrap;justify-content:flex-end}
+.foot-motto-line .fm-strong{color:var(--red);
+  animation:fmPulse 2.8s ease-in-out infinite}
+.foot-motto-line .fm-sheen{
+  background:linear-gradient(100deg,#e9ebf0 0%,#ffffff 22%,#7f8794 46%,#ffffff 70%,#e9ebf0 100%);
+  background-size:220% 100%;-webkit-background-clip:text;background-clip:text;
+  color:transparent;-webkit-text-fill-color:transparent;
+  animation:fmSheen 5.5s linear infinite}
+@keyframes fmPulse{
+  0%,100%{text-shadow:0 0 14px rgba(225,19,36,.45),0 0 34px rgba(225,19,36,.22)}
+  50%{text-shadow:0 0 26px rgba(225,19,36,.9),0 0 60px rgba(225,19,36,.5)}}
+@keyframes fmSheen{from{background-position:180% 0}to{background-position:-80% 0}}
+@media(max-width:560px){.foot-motto{align-items:flex-start;text-align:left}
+  .foot-motto-line{justify-content:flex-start}}
+@media(prefers-reduced-motion:reduce){
+  .foot-motto-line .fm-strong,.foot-motto-line .fm-sheen{animation:none}
+  .foot-motto-line .fm-strong{text-shadow:0 0 20px var(--red-glow)}}
