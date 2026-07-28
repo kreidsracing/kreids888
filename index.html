@@ -50,17 +50,25 @@
 .highlight-sec{padding:34px 0 6px}
 .hl-panel{border:1px solid var(--line);border-top:3px solid var(--red);background:linear-gradient(180deg,var(--panel),#0e0f14);padding:26px}
 .hl-badge{display:inline-block;font-family:var(--disp);font-weight:800;text-transform:uppercase;letter-spacing:.12em;font-size:12px;color:#fff;background:var(--red);padding:5px 12px;border-radius:3px;margin-bottom:14px}
-.hl-title{font-family:var(--disp);font-weight:900;text-transform:uppercase;font-size:clamp(26px,4.5vw,44px);line-height:1;margin:0 0 18px;color:var(--white)}
-.hl-media{margin:0 0 18px}
+.hl-title{font-family:var(--disp);font-weight:900;text-transform:uppercase;font-size:clamp(26px,4.5vw,44px);line-height:1;margin:0 0 20px;color:var(--white)}
+.hl-grid{display:grid;grid-template-columns:minmax(0,320px) 1fr;gap:26px;align-items:start}
+.hl-grid.one-col{grid-template-columns:1fr}
+.hl-media{margin:0}
 .hl-media .hl-video{position:relative;width:100%;aspect-ratio:16/9;border:1px solid var(--line);background:#000}
 .hl-media .hl-video iframe{position:absolute;inset:0;width:100%;height:100%;border:0}
-.hl-media .hl-img{width:100%;max-height:460px;object-fit:cover;border:1px solid var(--line);display:block}
+.hl-media .hl-img{width:100%;height:auto;display:block;border:1px solid var(--line)}
+.hl-body{min-width:0}
 .hl-text p{font-size:16px;line-height:1.7;color:#d7dbe2;margin:0 0 14px}
 .hl-text h3{font-family:var(--disp);font-weight:800;text-transform:uppercase;font-size:20px;margin:20px 0 8px;color:#fff}
 .hl-text img{width:100%;border:1px solid var(--line);margin:6px 0 14px;display:block}
 .hl-text a{color:var(--red)}
-.hl-cta{display:inline-block;font-family:var(--disp);font-weight:800;text-transform:uppercase;letter-spacing:.06em;font-size:15px;background:var(--red);color:#fff;padding:12px 22px;margin-top:4px;text-decoration:none}
+.hl-cta{display:inline-block;font-family:var(--disp);font-weight:800;text-transform:uppercase;letter-spacing:.06em;font-size:15px;background:var(--red);color:#fff;padding:12px 22px;margin-top:8px;text-decoration:none}
 .hl-cta:hover{background:#b30f1d}
+.hl-badge[hidden],.hl-cta[hidden]{display:none}
+@media(max-width:720px){
+  .hl-grid{grid-template-columns:1fr;gap:18px}
+  .hl-media .hl-img{width:auto;max-width:100%;max-height:400px;margin:0 auto}
+}
 </style>
 </head>
 <body>
@@ -126,9 +134,13 @@
     <div class="hl-panel">
       <span class="hl-badge" id="hlBadge" hidden></span>
       <h2 class="hl-title" id="hlTitle"></h2>
-      <div class="hl-media" id="hlMedia"></div>
-      <div class="hl-text" id="hlText"></div>
-      <a class="hl-cta" id="hlCta" target="_blank" rel="noopener" hidden></a>
+      <div class="hl-grid" id="hlGrid">
+        <div class="hl-media" id="hlMedia"></div>
+        <div class="hl-body">
+          <div class="hl-text" id="hlText"></div>
+          <a class="hl-cta" id="hlCta" target="_blank" rel="noopener" hidden></a>
+        </div>
+      </div>
     </div>
   </div>
 </section>
@@ -326,9 +338,10 @@
     var badge=document.getElementById("hlBadge");
     if(d.badge){badge.textContent=d.badge;badge.hidden=false;}
     document.getElementById("hlTitle").textContent=d.title||"";
-    var media=document.getElementById("hlMedia"),vid=ytId(d.video);
-    if(vid){media.innerHTML='<div class="hl-video"><iframe src="https://www.youtube.com/embed/'+vid+'?rel=0&playsinline=1" title="Highlight-Video" allow="encrypted-media; fullscreen" allowfullscreen></iframe></div>';}
-    else if(d.image){media.innerHTML='<img class="hl-img" src="'+esc(d.image)+'" alt="" loading="lazy">';}
+    var media=document.getElementById("hlMedia"),vid=ytId(d.video),hasMedia=false;
+    if(vid){media.innerHTML='<div class="hl-video"><iframe src="https://www.youtube.com/embed/'+vid+'?rel=0&playsinline=1" title="Highlight-Video" allow="encrypted-media; fullscreen" allowfullscreen></iframe></div>';hasMedia=true;}
+    else if(d.image){media.innerHTML='<img class="hl-img" src="'+esc(d.image)+'" alt="" loading="lazy">';hasMedia=true;}
+    if(!hasMedia) document.getElementById("hlGrid").classList.add("one-col");
     document.getElementById("hlText").innerHTML=mdRender(d.text||"");
     if(d.ctaLabel&&d.ctaUrl){var c=document.getElementById("hlCta");c.textContent=d.ctaLabel;c.href=d.ctaUrl;c.hidden=false;}
     document.getElementById("highlight").style.display="";
