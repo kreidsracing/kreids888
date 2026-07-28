@@ -45,6 +45,22 @@
 .nt-all a{font-family:var(--disp);font-weight:700;text-transform:uppercase;letter-spacing:.06em;font-size:12px;color:var(--steel);text-decoration:none}
 .nt-all a:hover{color:var(--white)}
 @media(max-width:640px){.nt-card{grid-template-columns:1fr;gap:14px}}
+
+/* ===== HIGHLIGHT (Charity o.ä. — nur sichtbar wenn im Dashboard aktiv) ===== */
+.highlight-sec{padding:34px 0 6px}
+.hl-panel{border:1px solid var(--line);border-top:3px solid var(--red);background:linear-gradient(180deg,var(--panel),#0e0f14);padding:26px}
+.hl-badge{display:inline-block;font-family:var(--disp);font-weight:800;text-transform:uppercase;letter-spacing:.12em;font-size:12px;color:#fff;background:var(--red);padding:5px 12px;border-radius:3px;margin-bottom:14px}
+.hl-title{font-family:var(--disp);font-weight:900;text-transform:uppercase;font-size:clamp(26px,4.5vw,44px);line-height:1;margin:0 0 18px;color:var(--white)}
+.hl-media{margin:0 0 18px}
+.hl-media .hl-video{position:relative;width:100%;aspect-ratio:16/9;border:1px solid var(--line);background:#000}
+.hl-media .hl-video iframe{position:absolute;inset:0;width:100%;height:100%;border:0}
+.hl-media .hl-img{width:100%;max-height:460px;object-fit:cover;border:1px solid var(--line);display:block}
+.hl-text p{font-size:16px;line-height:1.7;color:#d7dbe2;margin:0 0 14px}
+.hl-text h3{font-family:var(--disp);font-weight:800;text-transform:uppercase;font-size:20px;margin:20px 0 8px;color:#fff}
+.hl-text img{width:100%;border:1px solid var(--line);margin:6px 0 14px;display:block}
+.hl-text a{color:var(--red)}
+.hl-cta{display:inline-block;font-family:var(--disp);font-weight:800;text-transform:uppercase;letter-spacing:.06em;font-size:15px;background:var(--red);color:#fff;padding:12px 22px;margin-top:4px;text-decoration:none}
+.hl-cta:hover{background:#b30f1d}
 </style>
 </head>
 <body>
@@ -103,6 +119,19 @@
     </div>
   </div>
 </header>
+
+<!-- ============ HIGHLIGHT (nur sichtbar, wenn im Dashboard aktiv) ============ -->
+<section class="highlight-sec" id="highlight" style="display:none">
+  <div class="container">
+    <div class="hl-panel">
+      <span class="hl-badge" id="hlBadge" hidden></span>
+      <h2 class="hl-title" id="hlTitle"></h2>
+      <div class="hl-media" id="hlMedia"></div>
+      <div class="hl-text" id="hlText"></div>
+      <a class="hl-cta" id="hlCta" target="_blank" rel="noopener" hidden></a>
+    </div>
+  </div>
+</section>
 
 <!-- ============ WILLKOMMEN (warmer Intro — Texte per Dashboard) ============ -->
 <section class="welcome" id="welcome">
@@ -281,6 +310,28 @@
     if(p.cover){document.getElementById("ntImg").src=p.cover;}else{card.classList.add("no-cover");}
     if(daysAgo(p.date)<=7){document.getElementById("ntNew").hidden=false;}
     document.getElementById("newsTeaser").style.display="";
+  }).catch(function(){});
+})();
+</script>
+<script>
+(function(){
+  var API="https://kreids888-admin.kreids.workers.dev";
+  function esc(s){return String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");}
+  function ytId(s){s=String(s||"").trim();var m=s.match(/(?:v=|youtu\.be\/|shorts\/|embed\/)([\w-]{11})/)||s.match(/^([\w-]{11})$/);return m?m[1]:"";}
+  function mdLinkify(s){var o="",i=0;while(true){var lb=s.indexOf("[",i);if(lb<0){o+=s.slice(i);break;}var rb=s.indexOf("](",lb);var rp=rb>=0?s.indexOf(")",rb+2):-1;if(rb<0||rp<0){o+=s.slice(i);break;}o+=s.slice(i,lb);var t=s.slice(lb+1,rb),u=s.slice(rb+2,rp);if(u.indexOf("http")===0)o+='<a href="'+u+'" target="_blank" rel="noopener">'+t+'</a>';else o+=s.slice(lb,rp+1);i=rp+1;}return o;}
+  function mdInline(s){s=esc(s);var p=s.split("**"),r="";for(var i=0;i<p.length;i++){r+=(i%2?"<strong>"+p[i]+"</strong>":p[i]);}return mdLinkify(r);}
+  function mdRender(text){var NL=String.fromCharCode(10);var L=String(text||"").split(NL);var h="",para=[];function flush(){if(para.length){h+="<p>"+para.join("<br>")+"</p>";para=[];}}for(var i=0;i<L.length;i++){var t=L[i].trim();if(t===""){flush();continue;}if(t.indexOf("![")===0&&t.indexOf("](")>0&&t.charAt(t.length-1)===")"){var u=t.substring(t.indexOf("](")+2,t.length-1);flush();h+='<img src="'+esc(u)+'" alt="" loading="lazy">';continue;}if(t.substring(0,3)==="## "){flush();h+="<h3>"+mdInline(t.substring(3))+"</h3>";continue;}para.push(mdInline(t));}flush();return h;}
+  fetch(API+"/api/highlight").then(function(r){return r.json();}).then(function(d){
+    if(!d||d.active!==true) return;
+    var badge=document.getElementById("hlBadge");
+    if(d.badge){badge.textContent=d.badge;badge.hidden=false;}
+    document.getElementById("hlTitle").textContent=d.title||"";
+    var media=document.getElementById("hlMedia"),vid=ytId(d.video);
+    if(vid){media.innerHTML='<div class="hl-video"><iframe src="https://www.youtube.com/embed/'+vid+'?rel=0&playsinline=1" title="Highlight-Video" allow="encrypted-media; fullscreen" allowfullscreen></iframe></div>';}
+    else if(d.image){media.innerHTML='<img class="hl-img" src="'+esc(d.image)+'" alt="" loading="lazy">';}
+    document.getElementById("hlText").innerHTML=mdRender(d.text||"");
+    if(d.ctaLabel&&d.ctaUrl){var c=document.getElementById("hlCta");c.textContent=d.ctaLabel;c.href=d.ctaUrl;c.hidden=false;}
+    document.getElementById("highlight").style.display="";
   }).catch(function(){});
 })();
 </script>
