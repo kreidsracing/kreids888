@@ -23,18 +23,41 @@ async function fetchExcludedId() {
   } catch { return null; }
 }
 
-// komplette Video-Liste aus dem Kanal-RSS holen
-async function fetchVideoList(channelId) {
-  const feedUrl  = "https://www.youtube.com/feeds/videos.xml?channel_id=" + channelId;
+// "Videos"-Playlist (Langform) = alle Uploads OHNE Shorts.
+// YouTube legt sie automatisch an: Kanal-ID "UC..." wird zu "UULF...".
+// -> Damit landen Shorts NIE im großen "Rennen verpasst"-Player,
+//    sondern nur in der eigenen Shorts-Sektion weiter unten.
+function longformPlaylistId(channelId) {
+  return (channelId && channelId.indexOf("UC") === 0) ? "UULF" + channelId.slice(2) : "";
+}
+
+// einen RSS-Feed (Kanal oder Playlist) über rss2json holen und zu Video-Items parsen
+async function fetchFeedItems(feedUrl) {
   const proxyUrl = "https://api.rss2json.com/v1/api.json?rss_url=" + encodeURIComponent(feedUrl);
   const res = await fetch(proxyUrl);
   if (!res.ok) throw new Error("HTTP " + res.status);
   const data = await res.json();
-  const items = (data.items || []).map(it => {
+  if (data.status && data.status !== "ok") throw new Error("Feed-Status " + data.status);
+  return (data.items || []).map(it => {
     const link = it.link || it.guid || "";
     const m = link.match(/[?&]v=([\w-]{11})/) || link.match(/video:([\w-]{11})/);
     return m ? { id: m[1], title: (it.title || "").trim(), link } : null;
   }).filter(Boolean);
+}
+
+// Video-Liste: zuerst die Langform-"Videos"-Playlist (keine Shorts),
+// bei Ausfall der komplette Kanal-Feed als Sicherheitsnetz.
+async function fetchVideoList(channelId) {
+  const plId = longformPlaylistId(channelId);
+  if (plId) {
+    try {
+      const items = await fetchFeedItems("https://www.youtube.com/feeds/videos.xml?playlist_id=" + plId);
+      if (items.length) return items;
+    } catch (e) {
+      console.info("[Video] Langform-Playlist nicht ladbar, nutze Kanal-Feed:", e.message);
+    }
+  }
+  const items = await fetchFeedItems("https://www.youtube.com/feeds/videos.xml?channel_id=" + channelId);
   if (!items.length) throw new Error("Kein Video im Feed gefunden");
   return items;
 }
