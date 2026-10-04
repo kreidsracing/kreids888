@@ -143,6 +143,11 @@
   /* ================================================================
      ÖFFENTLICHE TEAMSEITE
      ================================================================ */
+  // Livery Show: Bilder nach team/bilder/liveries/ legen und hier eintragen
+  const LIVERIES = [
+    // { datei: "porsche-gt3r.webp", titel: "Porsche 911 GT3 R – Teamlivery" },
+  ];
+
   const VALUES = [
     ["target", "Konstanz", "Sauber fahren, Runde für Runde – bis ins Ziel."],
     ["people", "Teamgeist", "Gemeinsam mehr erreichen, auf und neben der Strecke."],
@@ -250,12 +255,11 @@
         </div>
       </section>
 
-      <section class="tp-sec" id="tp-autos">
-        ${secHead("Unsere Fahrzeuge", "Im Einsatz", "car")}
-        <div class="tp-cars">
-          <div class="tp-car" style="--img:url('${IMG}f2f-cars.webp')"><span class="tp-car-bg">GT3</span><div><span class="tm-badge">Main</span><b>GT3</b><small>Unsere Hauptklasse – Ligen & Endurance</small></div></div>
-          <div class="tp-car"><span class="tp-car-bg">LMP</span><div><b>Prototypen</b><small>Prototypen-Speed für Endurance-Rennen</small></div></div>
-          <div class="tp-car empty"><span class="tp-car-bg">+</span><div><b>Weitere folgen</b><small>Fahrzeuge werden ergänzt</small></div></div>
+      <section class="tp-sec" id="tp-livery">
+        ${secHead("Livery Show", "Unsere Designs", "brush")}
+        <div class="tp-livery">${LIVERIES.length
+          ? LIVERIES.map(l => `<a class="tp-liv" href="${IMG}liveries/${l.datei}" target="_blank" rel="noopener"><img src="${IMG}liveries/${l.datei}" alt="${esc(l.titel)}" loading="lazy"><span>${esc(l.titel)}</span></a>`).join("")
+          : [1, 2, 3].map(() => `<div class="tp-liv empty">${ICONS.brush}<span>Livery folgt</span></div>`).join("")}
         </div>
       </section>
 
