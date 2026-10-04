@@ -724,22 +724,34 @@
     return renderBoard();
   }
 
+  const CAT_NAME = { sports_car: "Sports Car", formula_car: "Formula", oval: "Oval", dirt_road: "Dirt Road", dirt_oval: "Dirt Oval", road: "Road (alt)" };
+  const catKey = (c) => String(c).toLowerCase().replace(/\s+/g, "_");
+  let ratingsAlle = false;
+
   async function renderRatings() {
     const box = document.getElementById("g61b");
     let d;
     try { d = await api("/g61/ratings"); } catch (e) { box.innerHTML = `<div class="tm-box tm-err">${esc(e.message)}</div>`; return; }
     if (!d.ready) { box.innerHTML = `<div class="tm-box tm-soon"><div class="big">Noch nicht verbunden</div><p>Garage 61 ist noch nicht eingerichtet.</p></div>`; return; }
+    const haupt = d.categories.filter(c => ["sports_car", "formula_car"].includes(catKey(c)));
+    const cats = ratingsAlle || !haupt.length ? d.categories.filter(c => catKey(c) !== "road" || ratingsAlle) : haupt;
     const lic = (sr) => { const c = String(sr || "").trim().charAt(0).toUpperCase(); return "ABCDR".includes(c) && c ? c : ""; };
     box.innerHTML = `
-      <p class="tm-muted" style="margin-bottom:12px">iRating und Safety Rating aller Teammitglieder aus Garage 61 · sortiert nach ${esc(d.categories[0] || "")} · Stand: ${fmtDate(d.at)}</p>
+      <div class="g6-bar">
+        <span class="tm-muted">iRating und Safety Rating aller Teammitglieder · sortiert nach ${esc(CAT_NAME[catKey(d.categories[0])] || d.categories[0] || "")} · Stand: ${fmtDate(d.at)}</span>
+        <button type="button" class="tm-btn sm" id="ir-alle"><span>${ratingsAlle ? "Nur Sports Car & Formula" : "Alle Kategorien"}</span></button>
+      </div>
       <div class="ta-list"><div class="tm-tbl-wrap"><table class="tm-tbl g6-ir">
-        <tr class="th"><td>#</td><td>Fahrer</td>${d.categories.map(c => `<td class="r-al">${esc(c)}</td>`).join("")}</tr>
+        <tr class="th"><td>#</td><td>Fahrer</td>${cats.map(c => `<td class="c-al">${esc(CAT_NAME[catKey(c)] || c)}</td>`).join("")}</tr>
         ${d.drivers.map((x, i) => `<tr>
           <td class="p">${i + 1}</td><td class="n"><b>${esc(x.name)}</b></td>
-          ${d.categories.map(c => { const r = x.r[c] || {}; const L = lic(r.sr);
-            return `<td class="r-al"><b class="g6-irv">${esc(r.ir || "–")}</b>${r.sr ? `<span class="g6-sr l${L}">${esc(r.sr)}</span>` : ""}</td>`; }).join("")}
+          ${cats.map(c => { const r = x.r[c] || {}; const L = lic(r.sr);
+            return r.ir
+              ? `<td class="c-al"><div class="g6-cell"><b class="g6-irv">${esc(r.ir)}</b>${r.sr ? `<span class="g6-sr l${L}">${esc(r.sr)}</span>` : ""}</div></td>`
+              : `<td class="c-al"><span class="g6-none">–</span></td>`; }).join("")}
         </tr>`).join("")}
       </table></div></div>`;
+    document.getElementById("ir-alle").onclick = () => { ratingsAlle = !ratingsAlle; renderRatings(); };
   }
 
   async function renderTrips(days) {

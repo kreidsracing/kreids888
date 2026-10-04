@@ -586,3 +586,11 @@ button.tm-chip.on::after{content:"✓";font-weight:800;color:var(--red);margin-l
 .g6-irv{font-family:var(--disp);font-weight:900;font-size:16px;font-variant-numeric:tabular-nums}
 .g6-sr{display:inline-block;margin-left:8px;font-family:var(--disp);font-weight:800;font-size:11px;padding:1px 6px;color:#fff;background:var(--steel-d)}
 .g6-sr.lA{background:#1f5bd6}.g6-sr.lB{background:#2e9e3e}.g6-sr.lC{background:#e8c11c;color:#111}.g6-sr.lD{background:#f07a1a}.g6-sr.lR{background:#d81f2a}
+
+.g6-ir td{padding:12px 14px}
+.g6-ir tr:not(.th):hover td{background:rgba(255,255,255,.02)}
+.g6-cell{display:inline-flex;flex-direction:column;align-items:center;gap:4px;min-width:84px}
+.g6-irv{font-size:20px!important}
+.g6-sr{margin-left:0!important;font-size:12px!important;padding:2px 8px!important;min-width:56px;text-align:center}
+.g6-none{color:var(--steel-d);font-size:18px}
+.g6-ir tr.th td.c-al{text-align:center}
