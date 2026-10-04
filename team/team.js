@@ -733,6 +733,10 @@
     let d;
     try { d = await api("/g61/ratings"); } catch (e) { box.innerHTML = `<div class="tm-box tm-err">${esc(e.message)}</div>`; return; }
     if (!d.ready) { box.innerHTML = `<div class="tm-box tm-soon"><div class="big">Noch nicht verbunden</div><p>Garage 61 ist noch nicht eingerichtet.</p></div>`; return; }
+    const ORDER = ["sports_car", "formula_car", "oval", "dirt_road", "dirt_oval", "road"];
+    d.categories.sort((x, y) => ((ORDER.indexOf(catKey(x)) + 1 || 99) - (ORDER.indexOf(catKey(y)) + 1 || 99)));
+    const sc = d.categories[0];
+    d.drivers.sort((x, y) => (Number((x.r[sc] || {}).irNum) || 0) < (Number((y.r[sc] || {}).irNum) || 0) ? 1 : -1);
     const haupt = d.categories.filter(c => ["sports_car", "formula_car"].includes(catKey(c)));
     const cats = ratingsAlle || !haupt.length ? d.categories.filter(c => catKey(c) !== "road" || ratingsAlle) : haupt;
     const lic = (sr) => { const c = String(sr || "").trim().charAt(0).toUpperCase(); return "ABCDR".includes(c) && c ? c : ""; };
