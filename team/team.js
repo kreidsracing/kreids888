@@ -54,7 +54,6 @@
   // Tools – sichtbar je nach Rolle (Admin vergibt)
   const PANELS = {
     trainer:  { title: "Kreids-Trainer", desc: "Live-Coach, Setup-Berater und Streckenberater – direkt im Dashboard.", live: true },
-    clipper:  { title: "Kreids-Clipper", desc: "Automatische Clips aus deinen Rennen und Streams.", live: false },
     garage61: { title: "Garage 61", desc: "Team-Bestenliste und Bestzeit-Posts direkt in Discord.", live: true },
   };
   const SESSION = { 1: "Training", 2: "Quali", 3: "Rennen" };
