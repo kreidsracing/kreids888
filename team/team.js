@@ -214,9 +214,19 @@
 
           <section class="tp-about" id="tp-team">
             <div class="tp-about-txt">
-              <div class="tp-label">${ICONS.people} Das Team</div>
+              <div class="tp-label">${ICONS.people} Über uns</div>
               <h4>Mehr als nur ein Rennteam.</h4>
-              <p><b>Flag to Flag Motorsport</b> ist ein iRacing-Team mit Fokus auf <b>Ligen</b> und <b>Endurance-Rennen</b> in <b>GT3</b> und <b>LMP2</b>. Bei uns zählt Konstanz, Teamgeist und der Spaß am Rennsport – wir wollen nicht nur gewinnen, sondern gemeinsam besser werden.</p>
+              <p><b>Flag to Flag Motorsport</b> ist ein engagiertes, aktives Simracing-Team auf iRacing. Gegründet wurde F2F am <b>24. September 2026</b> von Teamchef <b>Stefan Kreid</b> – die Idee eines eigenen Rennteams geht damit in die zweite Runde, diesmal komplett eigenständig und getrennt von der Community Snail Pace Racing.</p>
+              <p>Wir bleiben bewusst klein: <b>maximal 10 bis 12 Fahrer</b>, damit jeder seinen Platz im Team hat. Unser Fokus liegt klar auf <b>Gemeinschaft</b>, <b>Weiterentwicklung</b> und jeder Menge <b>Spaß</b> beim gemeinsamen Fahren.</p>
+              <p>Natürlich wollen wir gewinnen – vor allem aber wollen wir jedes Rennen ins Ziel bringen. Nicht umsonst lautet unser Teammotto: <b class="r">Konstanz bis ins Ziel.</b></p>
+            </div>
+            <div class="tp-facts">
+              <div><span>Gegründet</span><b>24.09.2026</b></div>
+              <div><span>Teamchef</span><b>Stefan Kreid</b></div>
+              <div><span>Kader</span><b>max. 10–12 Fahrer</b></div>
+              <div><span>Fokus</span><b>Ligen · Endurance</b></div>
+              <div><span>Klassen</span><b>GT3 · LMP2</b></div>
+              <div><span>Plattform</span><b>iRacing</b></div>
             </div>
             <div class="tp-values">${VALUES.map(([ic, t, d]) => `
               <div class="tp-value"><span>${ICONS[ic]}</span><b>${t}</b><small>${d}</small></div>`).join("")}
