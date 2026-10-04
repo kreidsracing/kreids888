@@ -339,7 +339,6 @@
   }
 
   function renderHome(tools) {
-    const quick = [["news", "news", "Team News"], ["fahrer", "helmet", "Fahrerbereich"], ...tools.map(p => [p, p, PANELS[p].title])];
     main().innerHTML = `
       <section class="td-welcome" style="--img:url('${IMG}f2f-cars.webp')">
         <div class="td-welcome-in">
@@ -351,9 +350,6 @@
           </div>
         </div>
       </section>
-
-      <div class="td-label">Schnellzugriff</div>
-      <div class="td-quick">${quick.map(([h, ic, t]) => `<a class="td-q" href="#${h}"><span>${ICONS[ic]}</span><b>${esc(t)}</b></a>`).join("")}</div>
 
       <div class="td-widgets">
         <div class="tp-widget" id="w-news">
@@ -427,7 +423,7 @@
         <p class="hint">Erscheint unter „Team News" und wird – wenn ein Kanal gewählt ist – vom Bot in Discord gepostet.</p>
         <div class="tm-row"><label for="n-title">Titel</label><input class="tm-input" id="n-title" maxlength="200" placeholder="z. B. Neues Team-Livery ist fertig"></div>
         <div class="tm-row"><label for="n-text">Text</label><textarea class="tm-input tm-area" id="n-text" maxlength="3800" rows="7" placeholder="Was gibt es Neues?"></textarea></div>
-        <div class="tm-row"><label for="n-img">Bild<small>optional, Link zu einem Bild</small></label><input class="tm-input" id="n-img" type="url" placeholder="https://…"></div>
+        <div class="tm-row"><label for="n-img">Bild / GIF<small>optional, direkter Link (.jpg .png .gif)</small></label><input class="tm-input" id="n-img" type="url" placeholder="https://…"></div>
         <div class="tm-row"><label for="n-ch">Discord-Kanal</label>
           <select class="tm-select" id="n-ch"><option value="">– nicht in Discord posten –</option>${meta.channels.map(c => `<option value="${c.id}" ${c.id === meta.lastChannel ? "selected" : ""}># ${esc(c.name)}</option>`).join("")}</select></div>
         <div class="tm-row"><label for="n-ping">Ping<small>optional</small></label>
