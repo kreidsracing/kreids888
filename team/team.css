@@ -619,3 +619,34 @@ button.tm-chip.on::after{content:"✓";font-weight:800;color:var(--red);margin-l
 .lk-row:first-child{border-top:0}
 .lk-row .pa-move{padding-left:0}
 @media(max-width:860px){.lk-row{grid-template-columns:auto 1fr auto}.lk-row [data-f=url],.lk-row [data-f=desc]{grid-column:2/3}}
+
+/* ---------- Teammitglied werden ---------- */
+.tp-join{position:relative;overflow:hidden;display:grid;grid-template-columns:1.5fr 1fr;gap:30px;align-items:center;padding:34px;
+  border:1px solid rgba(225,19,36,.45);
+  background:radial-gradient(circle at 85% 50%,rgba(88,101,242,.22),transparent 45%),radial-gradient(circle at 0 0,rgba(225,19,36,.25),transparent 50%),linear-gradient(135deg,#1a0d10,#0d0e14 60%,#10111c)}
+.tp-join::before{content:"";position:absolute;right:-40px;top:-40px;width:260px;height:260px;pointer-events:none;
+  background:repeating-linear-gradient(-55deg,rgba(255,255,255,.04) 0 12px,transparent 12px 26px);mask-image:radial-gradient(circle,#000 30%,transparent 70%)}
+.tp-join-txt h3{font-family:var(--disp);font-weight:900;font-size:clamp(30px,5vw,46px);text-transform:uppercase;line-height:1;margin:6px 0 14px}
+.tp-join-txt p{color:#d5d9e0;font-size:15.5px;max-width:620px}
+.tp-join-steps{list-style:none;display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:20px}
+.tp-join-steps li{display:flex;gap:10px;align-items:flex-start;padding:12px;background:rgba(10,11,14,.55);border:1px solid var(--line)}
+.tp-join-steps li>span{width:28px;height:28px;flex:none;display:grid;place-items:center;font-family:var(--disp);font-weight:900;background:var(--red);transform:skewX(-10deg)}
+.tp-join-steps b{display:block;font-family:var(--disp);font-weight:800;font-size:15px;text-transform:uppercase}
+.tp-join-steps small{color:var(--steel);font-size:12.5px;line-height:1.35}
+.tp-join-card{position:relative;display:flex;flex-direction:column;align-items:center;text-align:center;gap:10px;padding:26px 22px;
+  background:rgba(10,11,14,.7);border:1px solid rgba(88,101,242,.45);box-shadow:0 20px 50px rgba(0,0,0,.5)}
+.tp-join-card img{width:96px;height:96px;filter:drop-shadow(0 0 18px rgba(225,19,36,.5))}
+.tp-join-card>b{font-family:var(--disp);font-weight:900;font-size:22px;text-transform:uppercase}
+.tp-join-stats{display:flex;gap:16px;font-size:13.5px;color:var(--steel)}
+.tp-join-stats span{display:inline-flex;align-items:center;gap:6px}
+.tp-join-stats i{width:9px;height:9px;border-radius:50%;background:var(--steel-d)}
+.tp-join-stats i.on{background:#23a55a;box-shadow:0 0 8px rgba(35,165,90,.7)}
+.tp-join-stats em{font-style:normal;font-weight:700;color:#fff}
+.tp-join-btn{display:flex;align-items:center;justify-content:center;gap:10px;width:100%;padding:14px 18px;margin-top:4px;background:#5865f2;color:#fff;
+  font-family:var(--disp);font-weight:800;font-size:17px;letter-spacing:.08em;text-transform:uppercase;box-shadow:0 10px 30px rgba(88,101,242,.45);transition:.16s}
+.tp-join-btn:hover{background:#4752c4;transform:translateY(-2px)}
+.tp-join-btn svg{width:22px;height:22px}
+.tp-join-card small{color:var(--steel);font-size:12.5px}
+.tm-bar-nav .tm-bar-join{color:#fff}
+.tm-bar-nav .tm-bar-join:hover{color:var(--red)}
+@media(max-width:900px){.tp-join{grid-template-columns:1fr;padding:22px}.tp-join-steps{grid-template-columns:1fr}}

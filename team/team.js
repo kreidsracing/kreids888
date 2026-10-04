@@ -12,7 +12,7 @@
   const barNav = document.getElementById("tm-bar-nav");
 
   // Discord-Einladung für Bewerber – leer = Knopf wird nicht angezeigt
-  const JOIN_URL = "";
+  const JOIN_URL = "https://discord.gg/HFurqDE4q5";
 
   const I = (d, fill) => `<svg viewBox="0 0 24 24" fill="${fill ? "currentColor" : "none"}" stroke="${fill ? "none" : "currentColor"}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${d}</svg>`;
   const ICONS = {
@@ -247,6 +247,26 @@
         </aside>
       </div>
 
+      <section class="tp-sec tp-join" id="tp-join">
+        <div class="tp-join-txt">
+          <div class="tp-h-k">Teammitglied werden</div>
+          <h3>Bock auf <span class="r">Flag to Flag?</span></h3>
+          <p>Du fährst gern Ligen oder Endurance, willst als Team schneller werden und suchst Leute, mit denen Simracing richtig Spaß macht? Dann komm auf unseren Discord. Dort lernst du das Team kennen, fährst die ersten Trainings mit und wir schauen gemeinsam, ob es passt.</p>
+          <ol class="tp-join-steps">
+            <li><span>1</span><div><b>Discord beitreten</b><small>Ein Klick auf den Knopf genügt.</small></div></li>
+            <li><span>2</span><div><b>Kurz vorstellen</b><small>Wer bist du, was fährst du, wie viel Zeit hast du?</small></div></li>
+            <li><span>3</span><div><b>Mitfahren</b><small>Trainings, Setup-Abende und die ersten Rennen im F2F-Auto.</small></div></li>
+          </ol>
+        </div>
+        <div class="tp-join-card">
+          <img src="${IMG}f2f-logo.webp" alt="F2F Motorsport" width="96" height="96">
+          <b>F2F Motorsport</b>
+          <div class="tp-join-stats" id="tp-join-stats"><span><i class="on"></i><em id="tp-dc-on">…</em> online</span><span><i></i><em id="tp-dc-all">…</em> Mitglieder</span></div>
+          <a class="tp-join-btn" href="${JOIN_URL}" target="_blank" rel="noopener">${ICONS.discord}<span>Discord beitreten</span></a>
+          <small>Plätze sind begrenzt: maximal 10 bis 12 Fahrer.</small>
+        </div>
+      </section>
+
       <section class="tp-sec" id="tp-fahrer">
         ${secHead("Line-up", "Das Raceteam", "helmet")}
         <div class="tp-drivers" id="tp-drivers">${[1, 2, 3, 4].map(n => `
@@ -274,6 +294,14 @@
         </div>
         <img class="tp-poster" src="${IMG}f2f-recruiting.webp" alt="Simracing-Team sucht dich – Flag to Flag Motorsport" width="1400" height="788" loading="lazy">
       </section>`;
+
+    // Discord: Mitglieder / online
+    fetch(API + "/public/discord").then(r => r.json()).then(d => {
+      if (!d.ok) { const el = document.getElementById("tp-join-stats"); if (el) el.remove(); return; }
+      const a = document.getElementById("tp-dc-on"), b = document.getElementById("tp-dc-all");
+      if (a) a.textContent = d.online;
+      if (b) b.textContent = d.members;
+    }).catch(() => {});
 
     // Neueste Team-News (nur Titel + Bild)
     fetch(API + "/public/news").then(r => r.json()).then(d => {
