@@ -119,7 +119,7 @@
 
   function renderUser() {
     if (!ME.loggedIn) {
-      userBox.innerHTML = `<a class="tm-bar-login" href="${API}/login">${ICONS.discord}<span>Discord Login</span></a>`;
+      userBox.innerHTML = `<a class="tm-bar-login" href="${API}/login">${ICONS.discord}<span>Zum Teamdashboard</span></a>`;
       return;
     }
     userBox.innerHTML = `
