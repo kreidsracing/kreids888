@@ -174,10 +174,10 @@
         ? "Du bist angemeldet, aber dir fehlt die Team-Rolle. Melde dich bei der Teamleitung, wenn du zu F2F Motorsport gehörst."
         : "Dein Discord-Konto ist nicht auf unserem Server. Tritt zuerst bei und melde dich dann erneut an."}</p>
       ${ME.roles && ME.roles.length ? `<div class="tm-roles">${ME.roles.map(chip).join("")}</div>` : ""}`;
-    const items = [["news", "Team News"], ["garage61", "Garage 61 – Fahrtenbuch & Bestzeiten"], ["trainer", "Kreids-Trainer"], ["helmet", "Fahrerprofil & Raceteam"], ["arrow", "und vieles mehr …"]];
+    const items = [["news", "Team News"], ["garage61", "Garage 61: Fahrtenbuch & Bestzeiten"], ["trainer", "Kreids-Trainer"], ["helmet", "Fahrerprofil & Raceteam"], ["arrow", "und vieles mehr …"]];
     return `
       <div class="tp-login-h">${ICONS.discord}<b>Team Login</b></div>
-      <p class="tp-login-sub">Nur für Teammitglieder – interner Bereich.</p>
+      <p class="tp-login-sub">Nur für Teammitglieder. Interner Bereich.</p>
       <a class="tp-login-btn" href="${API}/login">${ICONS.discord}<span>Mit Discord anmelden</span></a>
       <ul class="tp-login-list">${items.map(([ic, t]) => `<li>${ICONS[ic]}<span>${t}</span></li>`).join("")}</ul>`;
   }
