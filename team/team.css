@@ -628,7 +628,7 @@ button.tm-chip.on::after{content:"✓";font-weight:800;color:var(--red);margin-l
   background:repeating-linear-gradient(-55deg,rgba(255,255,255,.04) 0 12px,transparent 12px 26px);mask-image:radial-gradient(circle,#000 30%,transparent 70%)}
 .tp-join-txt h3{font-family:var(--disp);font-weight:900;font-size:clamp(30px,5vw,46px);text-transform:uppercase;line-height:1;margin:6px 0 14px}
 .tp-join-txt p{color:#d5d9e0;font-size:15.5px;max-width:620px}
-.tp-join-steps{list-style:none;display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:20px}
+.tp-join-steps{list-style:none;display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:20px}
 .tp-join-steps li{display:flex;gap:10px;align-items:flex-start;padding:12px;background:rgba(10,11,14,.55);border:1px solid var(--line)}
 .tp-join-steps li>span{width:28px;height:28px;flex:none;display:grid;place-items:center;font-family:var(--disp);font-weight:900;background:var(--red);transform:skewX(-10deg)}
 .tp-join-steps b{display:block;font-family:var(--disp);font-weight:800;font-size:15px;text-transform:uppercase}
@@ -650,3 +650,17 @@ button.tm-chip.on::after{content:"✓";font-weight:800;color:var(--red);margin-l
 .tm-bar-nav .tm-bar-join{color:#fff}
 .tm-bar-nav .tm-bar-join:hover{color:var(--red)}
 @media(max-width:900px){.tp-join{grid-template-columns:1fr;padding:22px}.tp-join-steps{grid-template-columns:1fr}}
+
+/* ---------- Rennkalender (Admin) ---------- */
+.ka-row{display:grid;grid-template-columns:110px 1fr auto;gap:14px;align-items:center;padding:12px 16px;border-bottom:1px solid var(--line)}
+.ka-row:last-child{border-bottom:0}
+.ka-date b{display:block;font-family:var(--disp);font-weight:800;font-size:15px}
+.ka-date small,.ka-main small{color:var(--steel);font-size:12.5px}
+.ka-main{min-width:0}
+.ka-main b{display:block;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ka-act{display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end}
+.ka-act a.tm-badge{text-decoration:none}
+.ka-when{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+@media(max-width:760px){.ka-row{grid-template-columns:1fr}.ka-act{justify-content:flex-start}.ka-when{grid-template-columns:1fr}}
+
+@media(max-width:1100px){.tp-join-steps{grid-template-columns:repeat(2,1fr)}}

@@ -247,26 +247,6 @@
         </aside>
       </div>
 
-      <section class="tp-sec tp-join" id="tp-join">
-        <div class="tp-join-txt">
-          <div class="tp-h-k">Teammitglied werden</div>
-          <h3>Bock auf <span class="r">Flag to Flag?</span></h3>
-          <p>Du fährst gern Ligen oder Endurance, willst als Team schneller werden und suchst Leute, mit denen Simracing richtig Spaß macht? Dann komm auf unseren Discord. Dort lernst du das Team kennen, fährst die ersten Trainings mit und wir schauen gemeinsam, ob es passt.</p>
-          <ol class="tp-join-steps">
-            <li><span>1</span><div><b>Discord beitreten</b><small>Ein Klick auf den Knopf genügt.</small></div></li>
-            <li><span>2</span><div><b>Kurz vorstellen</b><small>Wer bist du, was fährst du, wie viel Zeit hast du?</small></div></li>
-            <li><span>3</span><div><b>Mitfahren</b><small>Trainings, Setup-Abende und die ersten Rennen im F2F-Auto.</small></div></li>
-          </ol>
-        </div>
-        <div class="tp-join-card">
-          <img src="${IMG}f2f-logo.webp" alt="F2F Motorsport" width="96" height="96">
-          <b>F2F Motorsport</b>
-          <div class="tp-join-stats" id="tp-join-stats"><span><i class="on"></i><em id="tp-dc-on">…</em> online</span><span><i></i><em id="tp-dc-all">…</em> Mitglieder</span></div>
-          <a class="tp-join-btn" href="${JOIN_URL}" target="_blank" rel="noopener">${ICONS.discord}<span>Discord beitreten</span></a>
-          <small>Plätze sind begrenzt: maximal 10 bis 12 Fahrer.</small>
-        </div>
-      </section>
-
       <section class="tp-sec" id="tp-fahrer">
         ${secHead("Line-up", "Das Raceteam", "helmet")}
         <div class="tp-drivers" id="tp-drivers">${[1, 2, 3, 4].map(n => `
@@ -293,6 +273,27 @@
           ${join}
         </div>
         <img class="tp-poster" src="${IMG}f2f-recruiting.webp" alt="Simracing-Team sucht dich – Flag to Flag Motorsport" width="1400" height="788" loading="lazy">
+      </section>
+
+      <section class="tp-sec tp-join" id="tp-join">
+        <div class="tp-join-txt">
+          <div class="tp-h-k">Teammitglied werden</div>
+          <h3>Bock auf <span class="r">Flag to Flag?</span></h3>
+          <p>Du fährst gern Ligen oder Endurance, willst als Team schneller werden und suchst Leute, mit denen Simracing richtig Spaß macht? Dann komm auf unseren Discord und bewirb dich. Dort lernst du das Team kennen, fährst die ersten Trainings mit und wir schauen gemeinsam, ob es passt.</p>
+          <ol class="tp-join-steps">
+            <li><span>1</span><div><b>Discord beitreten</b><small>Ein Klick auf den Knopf genügt.</small></div></li>
+            <li><span>2</span><div><b>Bewerben</b><small>Wer bist du, was fährst du, welches iRating, wie viel Zeit hast du?</small></div></li>
+            <li><span>3</span><div><b>Probetraining</b><small>Ein paar Runden mit dem Team, damit wir uns kennenlernen.</small></div></li>
+            <li><span>4</span><div><b>Mitfahren</b><small>Trainings, Setup-Abende und die ersten Rennen im F2F-Auto.</small></div></li>
+          </ol>
+        </div>
+        <div class="tp-join-card">
+          <img src="${IMG}f2f-logo.webp" alt="F2F Motorsport" width="96" height="96">
+          <b>F2F Motorsport</b>
+          <div class="tp-join-stats" id="tp-join-stats"><span><i class="on"></i><em id="tp-dc-on">…</em> online</span><span><i></i><em id="tp-dc-all">…</em> Mitglieder</span></div>
+          <a class="tp-join-btn" href="${JOIN_URL}" target="_blank" rel="noopener">${ICONS.discord}<span>Jetzt bewerben</span></a>
+          <small>Plätze sind begrenzt: maximal 10 bis 12 Fahrer.</small>
+        </div>
       </section>`;
 
     // Discord: Mitglieder / online
@@ -329,11 +330,10 @@
     }).catch(() => {});
 
     // Nächste Events aus dem Rennkalender (kreids888-Dashboard)
-    fetch("https://kreids888-admin.kreids.workers.dev/api/calendar").then(r => r.json()).then(d => {
+    fetch(API + "/public/kalender").then(r => r.json()).then(d => {
       const el = document.getElementById("tp-events");
       if (!el) return;
-      const heute = new Date().toISOString().slice(0, 10);
-      const next = (d.entries || []).filter(e => e.date >= heute).sort((x, y) => (x.date + (x.time || "")).localeCompare(y.date + (y.time || ""))).slice(0, 4);
+      const next = (d.entries || []).slice(0, 4);
       el.innerHTML = `<div class="tp-widget-h">${ICONS.calendar}<b>Nächste Events</b></div>` + (next.length ? next.map(e => `
         <div class="tp-row">
           <span class="tp-date">${e.date.slice(8, 10)}.${e.date.slice(5, 7)}.</span>
@@ -369,7 +369,7 @@
             ${SECTIONS.map(s => link(s.id, s.icon, s.label)).join("")}
             ${ME.panels.links ? link("links", "link", "Links") : ""}
             ${tools.length ? `<div class="td-nav-h">Tools</div>${tools.map(p => link(p, p, PANELS[p].title)).join("")}` : ""}
-            ${ME.isAdmin ? `<div class="td-nav-h">Verwaltung</div>${link("aktivitaet", "activity", "Aktivität")}${link("news-schreiben", "news", "News schreiben")}${link("fahrerprofile", "helmet", "Fahrerprofile")}${link("admin", "admin", "Admin")}` : ""}
+            ${ME.isAdmin ? `<div class="td-nav-h">Verwaltung</div>${link("aktivitaet", "activity", "Aktivität")}${link("news-schreiben", "news", "News schreiben")}${link("fahrerprofile", "helmet", "Fahrerprofile")}${link("kalender-admin", "calendar", "Rennkalender")}${link("admin", "admin", "Admin")}` : ""}
           </nav>
         </aside>
         <div class="td-main" id="td-main"></div>
@@ -379,6 +379,7 @@
     if (id === "aktivitaet" && ME.isAdmin) return renderActivity();
     if (id === "news-schreiben" && ME.isAdmin) return renderNewsAdmin();
     if (id === "fahrerprofile" && ME.isAdmin) return renderProfilesAdmin();
+    if (id === "kalender-admin" && ME.isAdmin) return renderKalenderAdmin();
     if (id === "news") return renderNews();
     if (id === "fahrer") return renderProfile();
     if (id === "links" && ME.panels.links) return renderLinks();
@@ -658,6 +659,67 @@
       catch (e) { toast(e.message); }
     });
     if (openId) { const r = box.querySelector(`.pa-row[data-id="${openId}"]`); if (r) { r.classList.remove("open"); open(r); } }
+  }
+
+  /* ---------------- Rennkalender + Discord-Events (Admin) ---------------- */
+  async function renderKalenderAdmin() {
+    main().innerHTML = panelHead("calendar", "Rennkalender", '<span class="tm-badge">Nur Admin</span>') + '<div id="ka"><div class="tm-loading"><span></span><span></span><span></span></div></div>';
+    const box = document.getElementById("ka");
+    let d;
+    try { d = await api("/admin/kalender"); } catch (e) { box.innerHTML = `<div class="tm-box tm-err">${esc(e.message)}</div>`; return; }
+    const tag = (iso) => new Date(iso).toLocaleDateString("de-DE", { weekday: "short", day: "2-digit", month: "2-digit" });
+    const heute = new Date().toISOString().slice(0, 10);
+    box.innerHTML = `
+      <p class="tm-muted" style="margin-bottom:12px">Alle kommenden Termine aus deinem Rennkalender (kreids888-Dashboard) und deine eigenen F2F-Einträge. Mit einem Klick legt der Bot daraus ein Discord-Event auf dem F2F-Server an.</p>
+      <div class="ta-list ka-list">${d.entries.length ? d.entries.map(e => `
+        <div class="ka-row" data-key="${esc(e.key)}">
+          <div class="ka-date"><b>${tag(e.at)}</b><small>${esc(e.time || "")} Uhr</small></div>
+          <div class="ka-main"><b>${esc(e.title)}</b><small>${esc([e.type, e.track, e.quelle === "eigen" ? "eigener Eintrag" : "aus dem Rennkalender"].filter(Boolean).join(" · "))}</small></div>
+          <div class="ka-act">
+            ${e.eventId
+              ? `<a class="tm-badge live" href="https://discord.com/events/${d.guild}/${e.eventId}" target="_blank" rel="noopener">✓ Discord-Event</a>${btn("Event löschen", "sm", 'data-kev="del"')}`
+              : btn(ICONS.discord + " Als Discord-Event", "sm red", 'data-kev="add"')}
+            ${e.quelle === "eigen" ? btn("✕", "sm", 'data-kdel="1" title="Eintrag löschen"') : ""}
+          </div>
+        </div>`).join("") : '<p class="tm-muted" style="padding:16px">Keine kommenden Termine.</p>'}</div>
+
+      <div class="tm-box" style="margin-top:16px">
+        <h5>Eigener Eintrag</h5>
+        <p class="hint">Für Trainings, Meetings oder Rennen, die nicht in deinem Rennkalender stehen.</p>
+        <div class="tm-row"><label for="ke-title">Titel</label><input class="tm-input" id="ke-title" maxlength="100" placeholder="z. B. Teamtraining Spa"></div>
+        <div class="tm-row"><div class="lbl">Wann</div><div class="ka-when">
+          <input class="tm-input" id="ke-date" type="date" value="${heute}">
+          <input class="tm-input" id="ke-time" type="time" value="20:00">
+          <select class="tm-select" id="ke-dauer">${[0.5, 1, 1.5, 2, 3, 4, 6, 8, 12, 24].map(h => `<option value="${h}" ${h === 2 ? "selected" : ""}>${String(h).replace(".", ",")} Std.</option>`).join("")}</select>
+        </div></div>
+        <div class="tm-row"><label for="ke-type">Typ</label><select class="tm-select" id="ke-type">${["Training", "Rennen", "Meeting", "Termin"].map(t => `<option>${t}</option>`).join("")}</select></div>
+        <div class="tm-row"><label for="ke-track">Strecke / Ort<small>optional</small></label><input class="tm-input" id="ke-track" maxlength="100" placeholder="z. B. Spa-Francorchamps"></div>
+        <div class="tm-row"><label for="ke-desc">Beschreibung<small>optional</small></label><textarea class="tm-input tm-area" id="ke-desc" maxlength="900" rows="3"></textarea></div>
+        <div class="tm-row"><div class="lbl">Discord</div><label class="tm-switch"><input type="checkbox" id="ke-dc" checked><span class="s"></span>Gleich als Discord-Event anlegen</label></div>
+        <div class="tm-actions">${btn("Eintrag speichern", "red", 'id="ke-save"')}</div>
+      </div>`;
+
+    const call = async (b, path, body) => {
+      b.disabled = true;
+      try { const r = await api(path, { method: "POST", body }); toast(r.info || "Erledigt", r.ok !== false); renderKalenderAdmin(); }
+      catch (e) { toast(e.message); b.disabled = false; }
+    };
+    box.querySelectorAll("[data-kev]").forEach(b => b.onclick = () => {
+      const key = b.closest(".ka-row").dataset.key;
+      if (b.dataset.kev === "del" && !confirm("Discord-Event wirklich löschen?")) return;
+      call(b, b.dataset.kev === "del" ? "/admin/kalender/event/delete" : "/admin/kalender/event", { key });
+    });
+    box.querySelectorAll("[data-kdel]").forEach(b => b.onclick = () => {
+      if (!confirm("Eigenen Eintrag löschen? Ein Discord-Event dazu wird mit gelöscht.")) return;
+      call(b, "/admin/kalender/eigen/delete", { key: b.closest(".ka-row").dataset.key });
+    });
+    const sv = document.getElementById("ke-save");
+    sv.onclick = () => call(sv, "/admin/kalender/eigen", {
+      title: document.getElementById("ke-title").value, date: document.getElementById("ke-date").value,
+      time: document.getElementById("ke-time").value, dauer: Number(document.getElementById("ke-dauer").value),
+      type: document.getElementById("ke-type").value, track: document.getElementById("ke-track").value,
+      desc: document.getElementById("ke-desc").value, discord: document.getElementById("ke-dc").checked,
+    });
   }
 
   /* ---------------- Links ---------------- */
