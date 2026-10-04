@@ -10,6 +10,7 @@ const LINKS = [
   {href:"news.html",      label:"News"},
   {href:"setup.html",     label:"Setup"},
   {href:"community.html", label:"Community"},
+  {href:"team/",          label:"Team"},
 ];
 const TWITCH  = "https://twitch.tv/kreids888";
 const YOUTUBE = "https://youtube.com/@Kreids888";
@@ -31,7 +32,10 @@ function escapeHtml(s){
   return String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 }
 
-const current = location.pathname.split("/").pop() || "index.html";
+// Links sind ab Stamm-Pfad (/…), damit sie auch in Unterordnern wie /team/ stimmen.
+// Aktiv-Erkennung ohne ".html" und ohne "/" am Ende (Cloudflare kürzt /about.html zu /about).
+const navKey = p => p.replace(/^\//,"").replace(/\/$/,"").replace(/\.html$/,"");
+const current = navKey(location.pathname) || "index";
 
 // ---- TICKER + NAV ----
 const tickerItems = buildTickerItems(TICKER);
@@ -44,10 +48,10 @@ const navHTML = `
 </div>
 <div class="navbar">
   <div class="container nav-in">
-    <a class="brand" href="index.html"><span class="bar"></span><span class="k">KREIDS</span><span class="n">888</span></a>
+    <a class="brand" href="/"><span class="bar"></span><span class="k">KREIDS</span><span class="n">888</span></a>
     <button class="burger" id="burger" aria-label="Menü öffnen"><span></span><span></span><span></span></button>
     <div class="nav-links" id="navlinks">
-      ${LINKS.map(l=>`<a class="${current===l.href?'active':''}" href="${l.href}">${l.label}</a>`).join("")}
+      ${LINKS.map(l=>`<a class="${current===navKey(l.href)?'active':''}" href="/${l.href}">${l.label}</a>`).join("")}
       <a class="live-pill" href="${YOUTUBE}" target="_blank" rel="noopener"><span class="live-dot"></span><span>LIVE</span></a>
     </div>
   </div>
@@ -56,7 +60,7 @@ const navHTML = `
 // ---- FOOTER ----
 const footHTML = `
 <div class="container foot-in">
-  <a class="foot-brand" href="index.html">KREIDS<span class="r">888</span></a>
+  <a class="foot-brand" href="/">KREIDS<span class="r">888</span></a>
   <div class="foot-motto" aria-label="Mein Motto: Konstanz vor Geschwindigkeit">
     <span class="foot-motto-lbl">Mein Motto</span>
     <span class="foot-motto-line"><span class="fm-strong">Konstanz</span> <span class="fm-sheen">vor Geschwindigkeit</span></span>
