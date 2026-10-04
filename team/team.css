@@ -580,3 +580,9 @@ button.tm-chip.on::after{content:"✓";font-weight:800;color:var(--red);margin-l
 .tp-liv.empty{border-style:dashed;color:var(--steel-d);align-content:center;gap:8px;font-size:13px}
 .tp-liv.empty svg{width:34px;height:34px}
 .tp-liv.empty>span{position:static;background:none;padding:0;font-family:var(--body);font-weight:500;font-size:13px;letter-spacing:0;text-transform:none}
+
+/* ---------- iRating-Übersicht ---------- */
+.g6-ir tr.th td{background:var(--panel2);font-family:var(--disp);font-weight:800;font-size:11.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--steel)}
+.g6-irv{font-family:var(--disp);font-weight:900;font-size:16px;font-variant-numeric:tabular-nums}
+.g6-sr{display:inline-block;margin-left:8px;font-family:var(--disp);font-weight:800;font-size:11px;padding:1px 6px;color:#fff;background:var(--steel-d)}
+.g6-sr.lA{background:#1f5bd6}.g6-sr.lB{background:#2e9e3e}.g6-sr.lC{background:#e8c11c;color:#111}.g6-sr.lD{background:#f07a1a}.g6-sr.lR{background:#d81f2a}

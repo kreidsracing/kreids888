@@ -714,12 +714,32 @@
         <button type="button" data-tab="fleiss" class="${tab === "fleiss" ? "on" : ""}">Trainingsfleiß</button>
         <button type="button" data-tab="trips" class="${tab === "trips" ? "on" : ""}">Fahrtenbuch</button>
         <button type="button" data-tab="board" class="${tab === "board" ? "on" : ""}">Bestenliste</button>
+        <button type="button" data-tab="ratings" class="${tab === "ratings" ? "on" : ""}">iRating</button>
       </div>
       <div id="g61b"><div class="tm-loading"><span></span><span></span><span></span></div></div>`;
     main().querySelectorAll("[data-tab]").forEach(b => b.onclick = () => renderG61(b.dataset.tab, days));
     if (tab === "fleiss") return renderFleiss(days);
     if (tab === "trips") return renderTrips(days);
+    if (tab === "ratings") return renderRatings();
     return renderBoard();
+  }
+
+  async function renderRatings() {
+    const box = document.getElementById("g61b");
+    let d;
+    try { d = await api("/g61/ratings"); } catch (e) { box.innerHTML = `<div class="tm-box tm-err">${esc(e.message)}</div>`; return; }
+    if (!d.ready) { box.innerHTML = `<div class="tm-box tm-soon"><div class="big">Noch nicht verbunden</div><p>Garage 61 ist noch nicht eingerichtet.</p></div>`; return; }
+    const lic = (sr) => { const c = String(sr || "").trim().charAt(0).toUpperCase(); return "ABCDR".includes(c) && c ? c : ""; };
+    box.innerHTML = `
+      <p class="tm-muted" style="margin-bottom:12px">iRating und Safety Rating aller Teammitglieder aus Garage 61 · sortiert nach ${esc(d.categories[0] || "")} · Stand: ${fmtDate(d.at)}</p>
+      <div class="ta-list"><div class="tm-tbl-wrap"><table class="tm-tbl g6-ir">
+        <tr class="th"><td>#</td><td>Fahrer</td>${d.categories.map(c => `<td class="r-al">${esc(c)}</td>`).join("")}</tr>
+        ${d.drivers.map((x, i) => `<tr>
+          <td class="p">${i + 1}</td><td class="n"><b>${esc(x.name)}</b></td>
+          ${d.categories.map(c => { const r = x.r[c] || {}; const L = lic(r.sr);
+            return `<td class="r-al"><b class="g6-irv">${esc(r.ir || "–")}</b>${r.sr ? `<span class="g6-sr l${L}">${esc(r.sr)}</span>` : ""}</td>`; }).join("")}
+        </tr>`).join("")}
+      </table></div></div>`;
   }
 
   async function renderTrips(days) {
@@ -879,6 +899,7 @@
           <div style="display:flex;flex-direction:column;gap:12px">
             <label class="tm-switch"><input type="checkbox" id="g61-on" ${g.enabled ? "checked" : ""}><span class="s"></span>Neue Bestzeiten posten</label>
             <label class="tm-switch"><input type="checkbox" id="g61-rec" ${g.onlyTeamRecord ? "checked" : ""}><span class="s"></span>Nur Team-Rekorde (P1)</label>
+            <label class="tm-switch"><input type="checkbox" id="g61-week" ${g.weekly ? "checked" : ""}><span class="s"></span>Wochenrückblick jeden Sonntagabend</label>
           </div></div>
         <div class="tm-row"><div class="lbl">Testen</div>
           <div>
@@ -889,6 +910,22 @@
             </div>
             <p class="tm-muted" style="margin-top:10px">Letzter Lauf: ${gi.lastRun ? fmtDate(gi.lastRun) + " – " + esc(gi.lastResult || "") : "noch keiner"}</p>
           </div></div>
+      </div>
+
+      <div class="tm-box">
+        <h5>Renn-Erinnerungen</h5>
+        <p class="hint">Der Bot erinnert in Discord an jedes Rennen aus deinem Rennkalender (kreids888-Dashboard) – 24 Stunden und 1 Stunde vorher.</p>
+        <div class="tm-row"><div class="lbl">Erinnerungen</div>
+          <div style="display:flex;flex-direction:column;gap:12px">
+            <label class="tm-switch"><input type="checkbox" id="rm-on" ${cfg.reminders.enabled ? "checked" : ""}><span class="s"></span>An</label>
+            <label class="tm-switch"><input type="checkbox" id="rm-24" ${cfg.reminders.h24 ? "checked" : ""}><span class="s"></span>24 Stunden vorher</label>
+            <label class="tm-switch"><input type="checkbox" id="rm-1" ${cfg.reminders.h1 ? "checked" : ""}><span class="s"></span>1 Stunde vorher</label>
+          </div></div>
+        <div class="tm-row"><label for="rm-ch">Discord-Kanal</label>
+          <div><select class="tm-select" id="rm-ch"><option value="">– Kanal wählen –</option>${(d.channels || []).map(c => `<option value="${c.id}" ${c.id === cfg.reminders.channel ? "selected" : ""}># ${esc(c.name)}</option>`).join("")}</select></div></div>
+        <div class="tm-row"><label for="rm-ping">Ping<small>Rolle, die erwähnt wird</small></label>
+          <div><select class="tm-select" id="rm-ping"><option value="">– niemanden pingen –</option>${d.roles.map(r => `<option value="${r.id}" ${r.id === cfg.reminders.ping ? "selected" : ""}>@${esc(r.name)}</option>`).join("")}</select></div></div>
+        <div class="tm-row"><div class="lbl">Testen</div><div class="tm-actions">${btn("Test-Erinnerung senden", "sm", 'id="rm-test"')}</div></div>
       </div>
 
       <div class="tm-savebar" id="savebar"><span>Alles gespeichert</span>${btn("Speichern", "red", 'id="tm-save"')}</div>`;
@@ -908,7 +945,7 @@
         };
       });
     });
-    box.querySelectorAll("#g61-team,#g61-ch,#g61-on,#g61-rec").forEach(el => el.addEventListener("input", markDirty));
+    box.querySelectorAll("#g61-team,#g61-ch,#g61-on,#g61-rec,#g61-week,#rm-on,#rm-24,#rm-1,#rm-ch,#rm-ping").forEach(el => el.addEventListener("input", markDirty));
     box.querySelectorAll("#g61-on,#g61-rec").forEach(el => el.addEventListener("change", markDirty));
 
     function markDirty() {
@@ -928,6 +965,14 @@
           channel: document.getElementById("g61-ch").value,
           enabled: document.getElementById("g61-on").checked,
           onlyTeamRecord: document.getElementById("g61-rec").checked,
+          weekly: document.getElementById("g61-week").checked,
+        },
+        reminders: {
+          enabled: document.getElementById("rm-on").checked,
+          channel: document.getElementById("rm-ch").value,
+          ping: document.getElementById("rm-ping").value,
+          h24: document.getElementById("rm-24").checked,
+          h1: document.getElementById("rm-1").checked,
         },
       };
       await api("/admin/config", { method: "POST", body });
@@ -956,6 +1001,7 @@
     };
     action("g61-test", "/admin/g61/test");
     action("g61-run", "/admin/g61/run");
+    action("rm-test", "/admin/reminders/test");
 
     const sb = document.getElementById("g61-stats");
     sb.onclick = async () => {
