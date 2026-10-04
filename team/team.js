@@ -369,7 +369,7 @@
             ${SECTIONS.map(s => link(s.id, s.icon, s.label)).join("")}
             ${ME.panels.links ? link("links", "link", "Links") : ""}
             ${tools.length ? `<div class="td-nav-h">Tools</div>${tools.map(p => link(p, p, PANELS[p].title)).join("")}` : ""}
-            ${ME.isAdmin ? `<div class="td-nav-h">Verwaltung</div>${link("aktivitaet", "activity", "Aktivität")}${link("news-schreiben", "news", "News schreiben")}${link("fahrerprofile", "helmet", "Fahrerprofile")}${link("kalender-admin", "calendar", "Rennkalender")}${link("admin", "admin", "Admin")}` : ""}
+            ${ME.isAdmin ? `<div class="td-nav-h">Verwaltung</div>${link("aktivitaet", "activity", "Aktivität")}${link("news-schreiben", "news", "News schreiben")}${link("fahrerprofile", "helmet", "Fahrerprofile")}${link("kalender-admin", "calendar", "Rennkalender")}${link("admin", "admin", "Admin")}<a class="td-link" href="https://kreids888-admin.kreids.workers.dev/" target="_blank" rel="noopener">${ICONS.ext}<span>kreids888-Dashboard</span></a>` : ""}
           </nav>
         </aside>
         <div class="td-main" id="td-main"></div>
@@ -670,7 +670,7 @@
     const tag = (iso) => new Date(iso).toLocaleDateString("de-DE", { weekday: "short", day: "2-digit", month: "2-digit" });
     const heute = new Date().toISOString().slice(0, 10);
     box.innerHTML = `
-      <p class="tm-muted" style="margin-bottom:12px">Alle kommenden Termine aus deinem Rennkalender (kreids888-Dashboard) und deine eigenen F2F-Einträge. Mit einem Klick legt der Bot daraus ein Discord-Event auf dem F2F-Server an.</p>
+      <p class="tm-muted" style="margin-bottom:12px">Alle kommenden Termine aus deinem Rennkalender (<a class="ka-link" href="https://kreids888-admin.kreids.workers.dev/" target="_blank" rel="noopener">kreids888-Dashboard</a>) und deine eigenen F2F-Einträge. Mit einem Klick legt der Bot daraus ein Discord-Event auf dem F2F-Server an.</p>
       <div class="ta-list ka-list">${d.entries.length ? d.entries.map(e => `
         <div class="ka-row" data-key="${esc(e.key)}">
           <div class="ka-date"><b>${tag(e.at)}</b><small>${esc(e.time || "")} Uhr</small></div>

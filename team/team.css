@@ -664,3 +664,4 @@ button.tm-chip.on::after{content:"✓";font-weight:800;color:var(--red);margin-l
 @media(max-width:760px){.ka-row{grid-template-columns:1fr}.ka-act{justify-content:flex-start}.ka-when{grid-template-columns:1fr}}
 
 @media(max-width:1100px){.tp-join-steps{grid-template-columns:repeat(2,1fr)}}
+.ka-link{color:#fff;text-decoration:underline;text-decoration-color:var(--red)}
