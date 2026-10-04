@@ -647,22 +647,89 @@
   }
 
   /* ---------------- Tools ---------------- */
-  async function renderG61() {
-    main().innerHTML = panelHead("garage61", "Garage 61") + '<div id="g61b"><div class="tm-loading"><span></span><span></span><span></span></div></div>';
+  const fmtHours = (sec) => { const h = Math.floor(sec / 3600), m = Math.round((sec % 3600) / 60); return h ? `${h} h ${String(m).padStart(2, "0")} min` : `${m} min`; };
+
+  async function renderG61(tab, days) {
+    tab = tab || "fleiss";
+    days = days || 7;
+    main().innerHTML = panelHead("garage61", "Garage 61") + `
+      <div class="g6-tabs">
+        <button type="button" data-tab="fleiss" class="${tab === "fleiss" ? "on" : ""}">Trainingsfleiß</button>
+        <button type="button" data-tab="board" class="${tab === "board" ? "on" : ""}">Bestenliste</button>
+      </div>
+      <div id="g61b"><div class="tm-loading"><span></span><span></span><span></span></div></div>`;
+    main().querySelectorAll("[data-tab]").forEach(b => b.onclick = () => renderG61(b.dataset.tab, days));
+    if (tab === "fleiss") return renderFleiss(days);
+    return renderBoard();
+  }
+
+  async function renderFleiss(days) {
     const box = document.getElementById("g61b");
     let d;
-    try { d = await api("/g61/board"); } catch (e) { box.innerHTML = `<div class="tm-box tm-err">${esc(e.message)}</div>`; return; }
+    try { d = await api("/g61/fleiss?tage=" + days); } catch (e) { box.innerHTML = `<div class="tm-box tm-err">${esc(e.message)}</div>`; return; }
     if (!d.ready) {
-      box.innerHTML = `<div class="tm-box tm-soon"><div class="big">Noch nicht verbunden</div><p>Garage 61 ist noch nicht eingerichtet.${ME.isAdmin ? " Richte es im Admin-Bereich ein." : ""}</p></div>`;
+      box.innerHTML = `<div class="tm-box tm-soon"><div class="big">Noch nicht verbunden</div><p>Garage 61 ist noch nicht eingerichtet.${ME.isAdmin ? " Im Admin-Bereich unter „Garage 61 → Discord“ das Team wählen und speichern." : ""}</p></div>`;
       return;
     }
-    const hd = main().querySelector(".td-head");
-    hd.insertAdjacentHTML("beforeend", d.autoPost ? '<span class="tm-badge live">Discord-Posts aktiv</span>' : '<span class="tm-badge grey">Discord-Posts aus</span>');
+    const t = d.totals, max = Math.max(1, ...d.drivers.map(x => x.time));
+    const pct = (a, b) => b ? Math.round(a / b * 100) + " %" : "–";
+    box.innerHTML = `
+      <div class="g6-bar">
+        <div class="g6-range">
+          <button type="button" data-days="7" class="${days === 7 ? "on" : ""}">7 Tage</button>
+          <button type="button" data-days="30" class="${days === 30 ? "on" : ""}">30 Tage</button>
+        </div>
+        <span class="tm-muted">Stand: ${fmtDate(d.at)} · aktualisiert alle 3 Std.</span>
+      </div>
+
+      <div class="g6-kpis">
+        <div><b>${fmtHours(t.time)}</b><span>auf der Strecke</span></div>
+        <div><b>${t.laps.toLocaleString("de-DE")}</b><span>Runden</span></div>
+        <div><b>${pct(t.clean, t.laps)}</b><span>saubere Runden</span></div>
+        <div><b>${t.active} / ${t.members}</b><span>Fahrer aktiv</span></div>
+      </div>
+
+      <div class="ta-list g6-list">
+        <div class="g6-row ta-head"><span>#</span><span>Fahrer</span><span>Zeit auf der Strecke</span><span class="r-al">Runden</span><span class="r-al">Sauber</span><span class="r-al">Tage</span><span>Meist gefahren</span></div>
+        ${d.drivers.map((x, i) => `
+          <div class="g6-row${x.time ? "" : " zero"}">
+            <span class="g6-pos">${x.time ? i + 1 : "–"}</span>
+            <div class="g6-name"><b>${esc(x.name)}</b>${x.irating ? `<small>iR ${esc(x.irating)}${x.sr ? " · " + esc(x.sr) : ""}</small>` : ""}</div>
+            <div class="g6-time"><div class="ta-bar"><i style="width:${Math.round(x.time / max * 100)}%"></i></div><span>${x.time ? fmtHours(x.time) : "–"}</span></div>
+            <span class="r-al g6-n">${x.laps || "–"}</span>
+            <span class="r-al g6-n">${pct(x.clean, x.laps)}</span>
+            <span class="r-al g6-n">${x.days || "–"}</span>
+            <div class="g6-fav">${x.fav ? `<b>${esc(x.fav.car)}</b><small>${esc(x.fav.track)}</small>` : '<small>–</small>'}</div>
+          </div>`).join("")}
+      </div>
+
+      <div class="g6-tops">
+        <div class="tp-widget"><div class="tp-widget-h">${ICONS.pin}<b>Top-Strecken</b></div>
+          ${d.tracks.map(x => `<div class="tp-row"><div class="tp-row-m"><b>${esc(x.name)}</b></div><span class="g6-n">${fmtHours(x.time)}</span></div>`).join("") || '<div class="tp-widget-f">Keine Daten</div>'}</div>
+        <div class="tp-widget"><div class="tp-widget-h">${ICONS.car}<b>Top-Autos</b></div>
+          ${d.cars.map(x => `<div class="tp-row"><div class="tp-row-m"><b>${esc(x.name)}</b></div><span class="g6-n">${fmtHours(x.time)}</span></div>`).join("") || '<div class="tp-widget-f">Keine Daten</div>'}</div>
+      </div>`;
+    box.querySelectorAll("[data-days]").forEach(b => b.onclick = () => renderG61("fleiss", Number(b.dataset.days)));
+  }
+
+  async function renderBoard() {
+    const box = document.getElementById("g61b");
+    let d;
+    try { d = await api("/g61/board"); } catch (e) {
+      box.innerHTML = /lehnt|403|401/.test(e.message)
+        ? `<div class="tm-box tm-soon"><div class="big">Bald verfügbar</div><p>Die Bestenliste braucht die Rundenzeiten von Garage 61. Die Freischaltung ist beantragt – sobald sie da ist, erscheint hier die Team-Bestenliste.</p></div>`
+        : `<div class="tm-box tm-err">${esc(e.message)}</div>`;
+      return;
+    }
+    if (!d.ready) {
+      box.innerHTML = `<div class="tm-box tm-soon"><div class="big">Noch nicht verbunden</div><p>Garage 61 ist noch nicht eingerichtet.</p></div>`;
+      return;
+    }
     if (!d.boards.length) {
       box.innerHTML = `<div class="tm-box tm-soon"><div class="big">Keine Runden</div><p>In den letzten 14 Tagen hat niemand aus dem Team Runden hochgeladen.</p></div>`;
       return;
     }
-    box.innerHTML = `<p class="tm-muted" style="margin-bottom:16px">Persönliche Bestzeiten pro Strecke und Auto – alles, was das Team in den letzten 14 Tagen gefahren ist. <span class="tm-new">NEU</span> = in den letzten 48 Stunden.</p>
+    box.innerHTML = `<p class="tm-muted" style="margin-bottom:16px">Persönliche Bestzeiten pro Strecke und Auto – alles, was das Team in den letzten 14 Tagen gefahren ist. <span class="tm-new">NEU</span> = in den letzten 48 Stunden. ${d.autoPost ? '<span class="tm-badge live">Discord-Posts aktiv</span>' : ""}</p>
       <div class="tm-boards">${d.boards.map(b => `
         <div class="tm-board">
           <div class="tm-board-h"><b>${esc(b.track)}</b><span>${esc(b.car)}</span></div>

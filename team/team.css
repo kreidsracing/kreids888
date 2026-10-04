@@ -407,3 +407,38 @@ button.tm-chip.on::after{content:"✓";font-weight:800;color:var(--red);margin-l
 .pa-row.open .pa-head{background:rgba(225,19,36,.08)}
 .pa-body{padding:0 16px}
 .pa-row.open .pa-body{padding:6px 16px 18px}
+
+/* ---------- Garage 61: Trainingsfleiß ---------- */
+.g6-tabs{display:flex;gap:4px;border-bottom:1px solid var(--line);margin-bottom:18px}
+.g6-tabs button,.g6-range button{background:none;border:0;cursor:pointer;color:var(--steel);font-family:var(--disp);font-weight:800;font-size:14px;letter-spacing:.1em;text-transform:uppercase;padding:10px 16px;border-bottom:3px solid transparent;margin-bottom:-1px}
+.g6-tabs button.on{color:#fff;border-bottom-color:var(--red)}
+.g6-tabs button:hover,.g6-range button:hover{color:#fff}
+.g6-bar{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:10px;margin-bottom:14px}
+.g6-range{display:flex;border:1px solid var(--line);background:var(--panel)}
+.g6-range button{border-bottom:0;margin:0;padding:8px 14px;font-size:12.5px}
+.g6-range button.on{background:var(--red);color:#fff}
+.g6-kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px}
+.g6-kpis div{padding:16px 18px;border:1px solid var(--line);background:var(--panel);border-left:3px solid var(--red)}
+.g6-kpis b{display:block;font-family:var(--disp);font-weight:900;font-size:26px;line-height:1.1}
+.g6-kpis span{color:var(--steel);font-size:13px}
+@media(max-width:760px){.g6-kpis{grid-template-columns:repeat(2,1fr)}}
+.g6-row{display:grid;grid-template-columns:30px minmax(140px,1.2fr) minmax(150px,1.3fr) 64px 64px 50px minmax(140px,1.2fr);gap:12px;align-items:center;padding:10px 16px;border-bottom:1px solid var(--line)}
+.g6-row:last-child{border-bottom:0}
+.g6-row.zero{opacity:.55}
+.g6-pos{font-family:var(--disp);font-weight:900;font-size:17px;color:var(--steel)}
+.g6-row:nth-child(2) .g6-pos{color:var(--red)}
+.g6-name b,.g6-fav b{display:block;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.g6-name small,.g6-fav small{display:block;color:var(--steel);font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.g6-fav b{font-size:13.5px;font-weight:600}
+.g6-time{display:flex;flex-direction:column;gap:5px}
+.g6-time span{font-size:13px;color:#d5d9e0}
+.g6-n{font-family:var(--disp);font-weight:800;font-size:15px;font-variant-numeric:tabular-nums}
+.g6-tops{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:16px}
+.g6-tops .tp-row-m b{font-size:14px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+@media(max-width:860px){
+  .g6-row.ta-head{display:none}
+  .g6-row{grid-template-columns:26px 1fr 60px;gap:6px 10px}
+  .g6-time{grid-column:2/-1}
+  .g6-row>.g6-n:nth-of-type(n+3),.g6-fav{display:none}
+  .g6-tops{grid-template-columns:1fr}
+}
