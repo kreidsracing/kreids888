@@ -442,3 +442,5 @@ button.tm-chip.on::after{content:"✓";font-weight:800;color:var(--red);margin-l
   .g6-row>.g6-n:nth-of-type(n+3),.g6-fav{display:none}
   .g6-tops{grid-template-columns:1fr}
 }
+
+.tm-bop{font-family:var(--disp);font-weight:800;font-size:10px;letter-spacing:.12em;color:#f1c40f;border:1px solid rgba(241,196,15,.45);padding:0 5px;margin-left:6px;vertical-align:2px}

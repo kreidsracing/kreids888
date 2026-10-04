@@ -736,7 +736,7 @@
           <div class="tm-tbl-wrap"><table class="tm-tbl">${b.laps.map(l => `
             <tr class="${l.rank === 1 ? "first" : ""}">
               <td class="p">P${l.rank}</td>
-              <td class="n">${esc(l.driver)}${isRecent(l.startTime) ? '<span class="tm-new">NEU</span>' : ""}</td>
+              <td class="n">${esc(l.driver)}${isRecent(l.startTime) ? '<span class="tm-new">NEU</span>' : ""}${l.bop && (l.bop.kg || l.bop.pct) ? '<span class="tm-bop" title="Mit BOP gefahren">BOP</span>' : ""}</td>
               <td class="t">${fmtLap(l.time)}</td>
               <td class="g">${l.gap ? "+" + l.gap.toFixed(3) : ""}</td>
               <td class="d">${SESSION[l.session] || ""}<br>${fmtDate(l.startTime)}</td>
@@ -795,10 +795,10 @@
 
       <div class="tm-box">
         <h5>Garage 61 → Discord</h5>
-        <p class="hint">Alle 30 Minuten wird geschaut, ob jemand aus dem Team eine neue persönliche Bestzeit gefahren ist – die wird dann im Discord-Kanal gepostet.</p>
+        <p class="hint">Alle 30 Minuten wird geschaut, ob jemand aus dem Team eine neue persönliche Bestzeit gefahren ist – die wird dann im gewählten Discord-Kanal gepostet, mit Angabe ob mit oder ohne BOP.</p>
         <div class="tm-row"><label for="g61-team">Garage-61-Team</label><div>${teamOpts}</div></div>
-        <div class="tm-row"><label for="g61-hook">Discord-Webhook<small>Kanal-Einstellungen → Integrationen</small></label>
-          <div><input class="tm-input" id="g61-hook" type="url" autocomplete="off" placeholder="${g.webhookSet ? "✓ hinterlegt – zum Ändern neue URL einfügen" : "https://discord.com/api/webhooks/…"}"></div></div>
+        <div class="tm-row"><label for="g61-ch">Discord-Kanal<small>für Bestzeit-Posts</small></label>
+          <div><select class="tm-select" id="g61-ch"><option value="">– Kanal wählen –</option>${(d.channels || []).map(c => `<option value="${c.id}" ${c.id === g.channel ? "selected" : ""}># ${esc(c.name)}</option>`).join("")}</select></div></div>
         <div class="tm-row"><div class="lbl">Automatisch posten</div>
           <div style="display:flex;flex-direction:column;gap:12px">
             <label class="tm-switch"><input type="checkbox" id="g61-on" ${g.enabled ? "checked" : ""}><span class="s"></span>Neue Bestzeiten posten</label>
@@ -828,7 +828,7 @@
         };
       });
     });
-    box.querySelectorAll("#g61-team,#g61-hook,#g61-on,#g61-rec").forEach(el => el.addEventListener("input", markDirty));
+    box.querySelectorAll("#g61-team,#g61-ch,#g61-on,#g61-rec").forEach(el => el.addEventListener("input", markDirty));
     box.querySelectorAll("#g61-on,#g61-rec").forEach(el => el.addEventListener("change", markDirty));
 
     function markDirty() {
@@ -845,7 +845,7 @@
         panels: Object.fromEntries(Object.entries(sel.panels).map(([k, v]) => [k, [...v]])),
         g61: {
           teamSlug: document.getElementById("g61-team").value,
-          webhook: document.getElementById("g61-hook").value,
+          channel: document.getElementById("g61-ch").value,
           enabled: document.getElementById("g61-on").checked,
           onlyTeamRecord: document.getElementById("g61-rec").checked,
         },
