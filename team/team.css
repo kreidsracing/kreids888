@@ -128,10 +128,11 @@ button.tm-chip.on::after{content:"✓";font-weight:800;color:var(--red);margin-l
 @media(max-width:900px){.tp-grid{grid-template-columns:1fr}}
 
 .tp-next{position:relative;overflow:hidden;min-height:200px;border:1px solid var(--line);background:#0a0b0e;display:flex;align-items:center}
-.tp-next-bg{position:absolute;inset:0 0 0 35%;background:30% 60%/cover no-repeat;filter:saturate(.75)}
-.tp-next-bg::after{content:"";position:absolute;inset:0;background:linear-gradient(90deg,#0a0b0e 0%,rgba(10,11,14,.55) 45%,rgba(10,11,14,.2))}
+.tp-next-bg{position:absolute;inset:0;background:center 55%/cover no-repeat;filter:saturate(.85)}
+.tp-next-bg::after{content:"";position:absolute;inset:0;background:linear-gradient(90deg,rgba(10,11,14,.92) 0%,rgba(10,11,14,.6) 45%,rgba(10,11,14,.15))}
 .tp-next-in{position:relative;padding:24px 26px}
-.tp-next h4{font-family:var(--disp);font-weight:900;font-size:clamp(26px,4vw,34px);text-transform:uppercase;line-height:1}
+.tp-next{min-height:220px}
+.tp-next h4{max-width:560px;font-family:var(--disp);font-weight:900;font-size:clamp(26px,4vw,34px);text-transform:uppercase;line-height:1}
 .tp-next-sub{font-family:var(--disp);font-weight:700;font-size:14px;letter-spacing:.12em;text-transform:uppercase;color:var(--steel);margin:6px 0 16px}
 .tp-next-meta{display:flex;flex-wrap:wrap;gap:8px 20px;font-size:14px;color:#d5d9e0;margin-bottom:16px}
 .tp-next-meta span{display:inline-flex;align-items:center;gap:7px}

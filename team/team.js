@@ -196,16 +196,13 @@
 
       <div class="tp-grid">
         <div class="tp-col">
-          <section class="tp-next">
-            <div class="tp-next-bg" style="background-image:url('${IMG}f2f-cars.webp')"></div>
+          <section class="tp-next" id="tp-news">
+            <div class="tp-next-bg" id="tp-news-bg" style="background-image:url('${IMG}f2f-cars.webp')"></div>
             <div class="tp-next-in">
-              <div class="tp-label">${ICONS.flag} Nächstes Rennen</div>
-              <h4>Wird bekanntgegeben</h4>
-              <div class="tp-next-sub">Endurance · GT3 / Prototypen</div>
-              <div class="tp-next-meta">
-                <span>${ICONS.calendar} --.--.----</span><span>${ICONS.clock} --:-- Uhr</span><span>${ICONS.pin} iRacing</span>
-              </div>
-              <span class="tp-pill">Event-Details folgen</span>
+              <div class="tp-label">${ICONS.news} Team News</div>
+              <h4 id="tp-news-t">Neuigkeiten aus dem Team</h4>
+              <div class="tp-next-sub" id="tp-news-d">Flag to Flag Motorsport</div>
+              <a class="tp-pill" href="${API}/login">Mehr im Teambereich</a>
             </div>
           </section>
 
@@ -271,6 +268,15 @@
         </div>
         <img class="tp-poster" src="${IMG}f2f-recruiting.webp" alt="Simracing-Team sucht dich – Flag to Flag Motorsport" width="1400" height="788" loading="lazy">
       </section>`;
+
+    // Neueste Team-News (nur Titel + Bild)
+    fetch(API + "/public/news").then(r => r.json()).then(d => {
+      const n = d.news;
+      if (!n || !document.getElementById("tp-news-t")) return;
+      document.getElementById("tp-news-t").textContent = n.title;
+      document.getElementById("tp-news-d").textContent = new Date(n.created).toLocaleDateString("de-DE", { day: "2-digit", month: "long", year: "numeric" });
+      if (n.image) document.getElementById("tp-news-bg").style.backgroundImage = "url('" + n.image.replace(/'/g, "%27") + "')";
+    }).catch(() => {});
 
     // Aktuelle Bestzeiten (Team-Rekorde aus Garage 61)
     fetch(API + "/public/bestzeiten").then(r => r.json()).then(d => {
