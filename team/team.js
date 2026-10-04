@@ -299,7 +299,7 @@
      ================================================================ */
   function renderShell() {
     const id = location.hash.replace("#", "");
-    const tools = Object.keys(PANELS).filter(p => ME.panels[p]);
+    const tools = Object.keys(PANELS).filter(p => ME.panels[p] && p !== "garage61");
     const link = (hid, icon, label) => `<a class="td-link${id === hid ? " on" : ""}" href="#${hid}">${ICONS[icon]}<span>${esc(label)}</span></a>`;
 
     view.innerHTML = `
@@ -307,6 +307,7 @@
         <aside class="td-side">
           <nav class="td-nav" aria-label="Team-Menü">
             ${link("", "home", "Dashboard")}
+            ${ME.panels.garage61 ? link("garage61", "garage61", "Garage 61") : ""}
             ${SECTIONS.map(s => link(s.id, s.icon, s.label)).join("")}
             ${tools.length ? `<div class="td-nav-h">Tools</div>${tools.map(p => link(p, p, PANELS[p].title)).join("")}` : ""}
             ${ME.isAdmin ? `<div class="td-nav-h">Verwaltung</div>${link("aktivitaet", "activity", "Aktivität")}${link("news-schreiben", "news", "News schreiben")}${link("fahrerprofile", "helmet", "Fahrerprofile")}${link("admin", "admin", "Admin")}` : ""}
