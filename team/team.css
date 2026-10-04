@@ -594,3 +594,10 @@ button.tm-chip.on::after{content:"✓";font-weight:800;color:var(--red);margin-l
 .g6-sr{margin-left:0!important;font-size:12px!important;padding:2px 8px!important;min-width:56px;text-align:center}
 .g6-none{color:var(--steel-d);font-size:18px}
 .g6-ir tr.th td.c-al{text-align:center}
+
+.pa-line{display:flex;align-items:stretch}
+.pa-line .pa-head{flex:1}
+.pa-move{display:flex;flex-direction:column;justify-content:center;gap:2px;padding-left:10px}
+.pa-move button{width:28px;height:20px;background:var(--panel2);border:1px solid var(--line);color:var(--steel);font-size:10px;cursor:pointer;line-height:1}
+.pa-move button:hover:not(:disabled){color:#fff;border-color:var(--red)}
+.pa-move button:disabled{opacity:.3;cursor:default}

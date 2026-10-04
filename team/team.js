@@ -565,17 +565,23 @@
     try { d = await api("/admin/profiles"); } catch (e) { box.innerHTML = `<div class="tm-box tm-err">${esc(e.message)}</div>`; return; }
     const state = (m) => !m.draft ? ["Leer", "grey"] : m.pending ? ["Wartet auf Freigabe", "wait"] : m.pub ? ["Öffentlich", "live"] : ["Ausgeblendet", "grey"];
     box.innerHTML = `
-      <p class="tm-muted" style="margin-bottom:12px">Alle Mitglieder mit Team-Rolle. Fahrer pflegen ihr Profil selbst – du gibst frei oder überschreibst alles. Was du speicherst, ist sofort freigegeben.</p>
-      <div class="pa-list">${d.members.map(m => {
+      <p class="tm-muted" style="margin-bottom:12px">Alle Mitglieder mit Team-Rolle. Fahrer pflegen ihr Profil selbst – du gibst frei oder überschreibst alles. Was du speicherst, ist sofort freigegeben. Mit ▲▼ legst du die Reihenfolge fest – so stehen sie auch öffentlich unter „Das Raceteam".</p>
+      <div class="pa-list">${d.members.map((m, i) => {
         const [lbl, cls] = state(m);
         return `
           <div class="pa-row${m.id === openId ? " open" : ""}" data-id="${m.id}">
+            <div class="pa-line">
+            <div class="pa-move">
+              <button type="button" data-mv="-1" title="Nach oben" ${i === 0 ? "disabled" : ""}>▲</button>
+              <button type="button" data-mv="1" title="Nach unten" ${i === d.members.length - 1 ? "disabled" : ""}>▼</button>
+            </div>
             <button class="pa-head" type="button">
               <img class="ta-ava" src="${esc(m.avatar)}" alt="" loading="lazy">
               <b>${esc(m.name)}</b>
               <span class="pa-nr">${m.draft && m.draft.nr ? "#" + esc(m.draft.nr) : ""}</span>
               <span class="tm-badge ${cls}">${lbl}</span>
             </button>
+            </div>
             <div class="pa-body"></div>
           </div>`;
       }).join("") || '<p class="tm-muted" style="padding:16px">Keine Mitglieder mit Team-Rolle gefunden – im Admin unter „Team-Rollen" festlegen.</p>'}</div>`;
@@ -608,7 +614,16 @@
         } catch (e) { toast(e.message); b.disabled = false; }
       });
     };
-    box.querySelectorAll(".pa-head").forEach(h => h.onclick = () => open(h.parentElement));
+    box.querySelectorAll(".pa-head").forEach(h => h.onclick = () => open(h.closest(".pa-row")));
+    box.querySelectorAll("[data-mv]").forEach(b => b.onclick = async () => {
+      const id = b.closest(".pa-row").dataset.id;
+      const i = d.members.findIndex(x => x.id === id), j = i + Number(b.dataset.mv);
+      if (j < 0 || j >= d.members.length) return;
+      const ids = d.members.map(x => x.id);
+      [ids[i], ids[j]] = [ids[j], ids[i]];
+      try { await api("/admin/profile/order", { method: "POST", body: { order: ids } }); renderProfilesAdmin(); }
+      catch (e) { toast(e.message); }
+    });
     if (openId) { const r = box.querySelector(`.pa-row[data-id="${openId}"]`); if (r) { r.classList.remove("open"); open(r); } }
   }
 
