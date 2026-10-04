@@ -106,6 +106,7 @@
   function renderLogin() {
     view.innerHTML = `
       <div class="tm-gate">
+        <img class="tm-gate-logo" src="/team/f2f-logo.webp" alt="" aria-hidden="true">
         <h3>Nur für das Team</h3>
         <p>Melde dich mit deinem Discord-Konto an. Welche Bereiche du siehst, hängt von deinen Rollen auf dem Discord-Server ab.</p>
         <a class="tm-btn red big" href="${API}/login"><span>${ICONS.discord} Mit Discord anmelden</span></a>
@@ -118,7 +119,7 @@
       <div class="tm-gate">
         <h3>${ME.inServer ? "Kein Team-Zugang" : "Nicht auf dem Server"}</h3>
         <p>${ME.inServer
-          ? "Du bist angemeldet, aber dir fehlt die Team-Rolle. Melde dich bei Kreids, wenn du ins Team gehörst."
+          ? "Du bist angemeldet, aber dir fehlt die Team-Rolle. Melde dich bei der Teamleitung, wenn du zu F2F Motorsport gehörst."
           : "Dein Discord-Konto ist nicht auf unserem Discord-Server. Tritt zuerst dem Server bei und melde dich dann erneut an."}</p>
         ${ME.roles && ME.roles.length ? `<div class="tm-muted" style="margin-bottom:8px">Deine Rollen:</div><div class="tm-roles">${ME.roles.map(chip).join("")}</div>` : ""}
       </div>`;
