@@ -10,7 +10,7 @@ const LINKS = [
   {href:"news.html",      label:"News"},
   {href:"setup.html",     label:"Setup"},
   {href:"community.html", label:"Community"},
-  {href:"team/",          label:"Team"},
+  {href:"team/",          label:"F2F"},
 ];
 const TWITCH  = "https://twitch.tv/kreids888";
 const YOUTUBE = "https://youtube.com/@Kreids888";
@@ -22,7 +22,7 @@ const TICKER = [
   "Rennen live auf Twitch & YouTube",
   "Streaming in 2K",
   "#888 · S. Kreid",
-  "Snail Pace Racing",
+  "F2F Motorsport",
 ];
 
 function buildTickerItems(list){
