@@ -9,27 +9,32 @@
 <link href="https://fonts.googleapis.com/css2?family=Saira+Condensed:wght@500;600;700;800;900&family=Barlow:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/style.css">
 <link rel="stylesheet" href="/team/team.css">
-<link rel="icon" type="image/webp" href="/team/f2f-logo.webp">
-<meta name="description" content="Team-Bereich von Flag to Flag Motorsport (F2F) – Login für Teammitglieder über Discord.">
+<link rel="icon" type="image/webp" href="/team/bilder/f2f-logo.webp">
+<meta name="description" content="Flag to Flag Motorsport (F2F) – iRacing-Team mit Fokus auf Ligen und Endurance in GT3 und LMP2. Login für Teammitglieder über Discord.">
 <meta name="robots" content="noindex, nofollow">
 <meta name="theme-color" content="#0a0a0a">
 </head>
 <body>
 <nav id="site-nav"></nav>
 
+<div class="tm-bar">
+  <div class="container tm-bar-in">
+    <a class="tm-bar-brand" href="/team/">
+      <img src="/team/bilder/f2f-logo.webp" alt="F2F Motorsport Logo" width="44" height="44">
+      <span><b>Flag to Flag</b><small>Motorsport</small></span>
+    </a>
+    <nav class="tm-bar-nav" id="tm-bar-nav" aria-label="Teamseite">
+      <button type="button" data-scroll="tp-team">Team</button>
+      <button type="button" data-scroll="tp-fahrer">Fahrer</button>
+      <button type="button" data-scroll="tp-autos">Fahrzeuge</button>
+      <button type="button" data-scroll="tp-medien">Medien</button>
+    </nav>
+    <div class="tm-bar-user" id="tm-user"></div>
+  </div>
+</div>
+
 <main class="page tm-page">
   <div class="container">
-    <div class="tm-head">
-      <div class="tm-brand">
-        <img class="tm-logo" src="/team/f2f-logo.webp" alt="F2F Motorsport Logo" width="96" height="96">
-        <div>
-          <div class="lap-tag">Pit Lane — Team Area</div>
-          <h2 class="tm-title">Team <span class="r">Flag to Flag</span> Motorsport</h2>
-        </div>
-      </div>
-      <div class="tm-head-side" id="tm-user"></div>
-    </div>
-
     <div id="tm-view" aria-live="polite">
       <div class="tm-loading"><span></span><span></span><span></span></div>
     </div>
