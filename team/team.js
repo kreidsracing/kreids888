@@ -53,7 +53,7 @@
 
   // Tools – sichtbar je nach Rolle (Admin vergibt)
   const PANELS = {
-    trainer:  { title: "Kreids-Trainer", desc: "Dein AI-Trainer für iRacing – Download, Anleitung und Updates.", live: false },
+    trainer:  { title: "Kreids-Trainer", desc: "Live-Coach, Setup-Berater und Streckenberater – direkt im Dashboard.", live: true },
     clipper:  { title: "Kreids-Clipper", desc: "Automatische Clips aus deinen Rennen und Streams.", live: false },
     garage61: { title: "Garage 61", desc: "Team-Bestenliste und Bestzeit-Posts direkt in Discord.", live: true },
   };
@@ -133,6 +133,7 @@
   }
 
   function render() {
+    if (window.F2FTrainer) window.F2FTrainer.unmount();
     const inside = ME.loggedIn && ME.access;
     barNav.hidden = inside;
     if (!inside) return renderPublic();
@@ -323,6 +324,8 @@
     if (id === "news") return renderNews();
     if (id === "fahrer") return renderProfile();
     if (id === "garage61" && ME.panels.garage61) return renderG61();
+    if (id === "trainer" && ME.panels.trainer && window.F2FTrainer)
+      return window.F2FTrainer.mount(main(), { api, esc, toast, ICONS, panelHead, btn });
     if (PANELS[id] && ME.panels[id]) return renderSoon(PANELS[id].title, id, PANELS[id].desc);
     renderHome(tools);
   }
