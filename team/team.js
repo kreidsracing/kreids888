@@ -204,7 +204,7 @@
             <div class="tp-next-in">
               <div class="tp-label">${ICONS.flag} Nächstes Rennen</div>
               <h4>Wird bekanntgegeben</h4>
-              <div class="tp-next-sub">Endurance · GT3 / LMP2</div>
+              <div class="tp-next-sub">Endurance · GT3 / Prototypen</div>
               <div class="tp-next-meta">
                 <span>${ICONS.calendar} --.--.----</span><span>${ICONS.clock} --:-- Uhr</span><span>${ICONS.pin} iRacing</span>
               </div>
@@ -225,7 +225,7 @@
               <div><span>Teamchef</span><b>Stefan Kreid</b></div>
               <div><span>Kader</span><b>max. 10–12 Fahrer</b></div>
               <div><span>Fokus</span><b>Ligen · Endurance</b></div>
-              <div><span>Klassen</span><b>GT3 · LMP2</b></div>
+              <div><span>Klassen</span><b>GT3 · Prototypen</b></div>
               <div><span>Plattform</span><b>iRacing</b></div>
             </div>
             <div class="tp-values">${VALUES.map(([ic, t, d]) => `
@@ -249,11 +249,11 @@
       </div>
 
       <section class="tp-sec" id="tp-fahrer">
-        ${secHead("Unsere Fahrer", "Das Line-up", "helmet")}
+        ${secHead("Line-up", "Das Raceteam", "helmet")}
         <div class="tp-drivers">${[1, 2, 3, 4].map(n => `
           <div class="tp-driver">
             <div class="tp-driver-img">${ICONS.helmet}<span class="tp-nr">#--</span></div>
-            <div class="tp-driver-b"><b>Fahrer ${n}</b><small>GT3 / LMP2 · iRacing</small></div>
+            <div class="tp-driver-b"><b>Fahrer ${n}</b><small>GT3 / Prototypen · iRacing</small></div>
           </div>`).join("")}
         </div>
       </section>
@@ -261,8 +261,8 @@
       <section class="tp-sec" id="tp-autos">
         ${secHead("Unsere Fahrzeuge", "Im Einsatz", "car")}
         <div class="tp-cars">
-          <div class="tp-car" style="--img:url('${IMG}f2f-cars.webp')"><span class="tp-car-bg">GT3</span><div><b>GT3</b><small>Multiclass, Ligen & Endurance</small></div></div>
-          <div class="tp-car"><span class="tp-car-bg">LMP2</span><div><b>LMP2</b><small>Dallara P217 · Prototypen-Endurance</small></div></div>
+          <div class="tp-car" style="--img:url('${IMG}f2f-cars.webp')"><span class="tp-car-bg">GT3</span><div><span class="tm-badge">Main</span><b>GT3</b><small>Unsere Hauptklasse – Ligen & Endurance</small></div></div>
+          <div class="tp-car"><span class="tp-car-bg">LMP</span><div><b>Prototypen</b><small>Prototypen-Speed für Endurance-Rennen</small></div></div>
           <div class="tp-car empty"><span class="tp-car-bg">+</span><div><b>Weitere folgen</b><small>Fahrzeuge werden ergänzt</small></div></div>
         </div>
       </section>

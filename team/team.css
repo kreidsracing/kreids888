@@ -202,6 +202,7 @@ button.tm-chip.on::after{content:"✓";font-weight:800;color:var(--red);margin-l
 .tp-car b{display:block;font-family:var(--disp);font-weight:900;font-size:22px;text-transform:uppercase}
 .tp-car small{color:var(--steel);font-size:13.5px}
 .tp-car.empty{border-style:dashed}
+.tp-car .tm-badge{margin-bottom:6px}
 
 .tp-media{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
 @media(max-width:800px){.tp-media{grid-template-columns:repeat(2,1fr)}}
