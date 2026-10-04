@@ -726,7 +726,6 @@
 
   const CAT_NAME = { sports_car: "Sports Car", formula_car: "Formula", oval: "Oval", dirt_road: "Dirt Road", dirt_oval: "Dirt Oval", road: "Road (alt)" };
   const catKey = (c) => String(c).toLowerCase().replace(/\s+/g, "_");
-  let ratingsAlle = false;
 
   async function renderRatings() {
     const box = document.getElementById("g61b");
@@ -737,13 +736,11 @@
     d.categories.sort((x, y) => ((ORDER.indexOf(catKey(x)) + 1 || 99) - (ORDER.indexOf(catKey(y)) + 1 || 99)));
     const sc = d.categories[0];
     d.drivers.sort((x, y) => (Number((x.r[sc] || {}).irNum) || 0) < (Number((y.r[sc] || {}).irNum) || 0) ? 1 : -1);
-    const haupt = d.categories.filter(c => ["sports_car", "formula_car"].includes(catKey(c)));
-    const cats = ratingsAlle || !haupt.length ? d.categories.filter(c => catKey(c) !== "road" || ratingsAlle) : haupt;
+    const cats = d.categories;
     const lic = (sr) => { const c = String(sr || "").trim().charAt(0).toUpperCase(); return "ABCDR".includes(c) && c ? c : ""; };
     box.innerHTML = `
       <div class="g6-bar">
         <span class="tm-muted">iRating und Safety Rating aller Teammitglieder · sortiert nach ${esc(CAT_NAME[catKey(d.categories[0])] || d.categories[0] || "")} · Stand: ${fmtDate(d.at)}</span>
-        <button type="button" class="tm-btn sm" id="ir-alle"><span>${ratingsAlle ? "Nur Sports Car & Formula" : "Alle Kategorien"}</span></button>
       </div>
       <div class="ta-list"><div class="tm-tbl-wrap"><table class="tm-tbl g6-ir">
         <tr class="th"><td>#</td><td>Fahrer</td>${cats.map(c => `<td class="c-al">${esc(CAT_NAME[catKey(c)] || c)}</td>`).join("")}</tr>
@@ -755,7 +752,6 @@
               : `<td class="c-al"><span class="g6-none">–</span></td>`; }).join("")}
         </tr>`).join("")}
       </table></div></div>`;
-    document.getElementById("ir-alle").onclick = () => { ratingsAlle = !ratingsAlle; renderRatings(); };
   }
 
   async function renderTrips(days) {
