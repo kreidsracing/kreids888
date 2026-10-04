@@ -102,16 +102,88 @@
     renderGrid();
   }
 
+  /* ---------------- Team-Vorstellung (öffentlich) ---------------- */
+  // Discord-Einladung für Bewerber – leer = Knopf wird nicht angezeigt
+  const JOIN_URL = "";
+
+  const FEAT_ICONS = {
+    trophy: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0z"/><path d="M17 5h3v2a3 3 0 0 1-3 3M7 5H4v2a3 3 0 0 0 3 3"/></svg>',
+    people: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.2"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6"/><circle cx="17.5" cy="9" r="2.4"/><path d="M16 14.2c2.9.2 5 2.6 5 5.8"/></svg>',
+    brush: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 3 9.5 13.5M14 4l6 6"/><path d="M9.5 13.5c-2.5-.5-4.5 1-5 3.5-.3 1.6-1 2.5-2 3 3 .8 6.5.3 8-1.5 1.3-1.6 1-3.8-1-5z"/></svg>',
+    gear: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>',
+    calendar: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="1"/><path d="M3 10h18M8 3v4M16 3v4M8 14h2M14 14h2M8 17.5h2M14 17.5h2"/></svg>',
+    ai: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="7" width="14" height="12" rx="2"/><path d="M12 7V4M9 12h.01M15 12h.01M9.5 16h5M2 12v3M22 12v3"/></svg>',
+  };
+
+  const FEATURES = [
+    ["trophy", "Team- & Endurance-Rennen", "Wir fahren aktiv Ligen und Endurance-Rennen in iRacing – als Team, mit Fahrerwechseln und Strategie."],
+    ["people", "Aktive Community", "Motivierte und hilfsbereite Teamkollegen, mit denen man gern ins Auto steigt."],
+    ["brush", "Eigene Teamliveries", "Hochwertige Designs für das Team und für Einzelevents."],
+    ["gear", "Struktur & Support", "Klare Abläufe, Hilfe bei Setups und Strategie – gemeinsam schneller werden."],
+    ["calendar", "Flexible Einsätze", "Verschiedene Serien und Endurance-Events – je nach Interesse und Zeit."],
+    ["ai", "AI-Trainer", "Ein eigener KI-Coach für jedes Teammitglied, der zeigt, wo noch Zeit liegt.", "Kommt bald"],
+  ];
+
+  function teamHero() {
+    return `
+      <section class="tm-hero">
+        <div class="tm-hero-bg" style="background-image:url('/team/f2f-cars.webp')"></div>
+        <div class="tm-hero-in">
+          <img class="tm-motto" src="/team/f2f-motto.webp" alt="Konstanz bis ins Ziel" width="1200" height="462">
+          <p class="tm-lead"><b>Flag to Flag Motorsport</b> ist ein iRacing-Team mit Fokus auf <b>Ligen</b> und <b>Endurance-Rennen</b>. Wir fahren <b>GT3</b> und <b>LMP2</b> – mit eigenen Liveries, klarer Struktur und einem Team, das sich gegenseitig schneller macht.</p>
+          <div class="tm-tags"><span>Ligen</span><span>Endurance</span><span>GT3</span><span>LMP2</span></div>
+        </div>
+      </section>`;
+  }
+
+  function teamIntro() {
+    const join = JOIN_URL
+      ? `<a class="tm-btn red big" href="${esc(JOIN_URL)}" target="_blank" rel="noopener"><span>${ICONS.discord} Zum Discord</span></a>`
+      : `<p class="tm-muted">Schreib uns einfach auf Discord an – wir melden uns.</p>`;
+    return `
+      <section class="tm-sec">
+        <div class="lap-tag">Sector 1 — Das Team</div>
+        <h3 class="tm-sec-h">Was uns ausmacht</h3>
+        <div class="tm-feats">${FEATURES.map(([ic, t, d, soon]) => `
+          <div class="tm-feat${soon ? " soon" : ""}">
+            <span class="hx">${FEAT_ICONS[ic]}</span>
+            <div><h4>${esc(t)}${soon ? ` <span class="tm-badge grey">${esc(soon)}</span>` : ""}</h4><p>${esc(d)}</p></div>
+          </div>`).join("")}
+        </div>
+      </section>
+
+      <section class="tm-sec">
+        <div class="lap-tag">Sector 2 — Fahrzeuge</div>
+        <h3 class="tm-sec-h">Unsere Klassen</h3>
+        <div class="tm-classes">
+          <div class="tm-class"><span class="bg">GT3</span>
+            <h4>GT3</h4><p>Enge Rennen im Multiclass-Feld, Ligen und lange Endurance-Stints – Porsche, Mercedes &amp; Co.</p></div>
+          <div class="tm-class"><span class="bg">LMP2</span>
+            <h4>LMP2</h4><p>Prototypen-Speed im Dallara P217: Nachtphasen, Verkehr und Strategie bis zur Zielflagge.</p></div>
+        </div>
+      </section>
+
+      <section class="tm-sec tm-recruit">
+        <img class="tm-poster" src="/team/f2f-recruiting.webp" alt="Simracing-Team sucht dich – Flag to Flag Motorsport" width="1400" height="788" loading="lazy">
+        <div class="tm-recruit-txt">
+          <div class="lap-tag">Sector 3 — Fahrer gesucht</div>
+          <h3 class="tm-sec-h">Simracing-Team <span class="r">sucht dich!</span></h3>
+          <p>Aktive Fahrer sind willkommen. Du fährst gern Ligen oder Endurance, willst als Team schneller werden und hast Lust auf GT3 oder LMP2? Dann melde dich bei uns.</p>
+          ${join}
+        </div>
+      </section>`;
+  }
+
   /* ---------------- Login ---------------- */
   function renderLogin() {
-    view.innerHTML = `
+    view.innerHTML = teamHero() + `
       <div class="tm-gate">
         <img class="tm-gate-logo" src="/team/f2f-logo.webp" alt="" aria-hidden="true">
         <h3>Nur für das Team</h3>
-        <p>Melde dich mit deinem Discord-Konto an. Welche Bereiche du siehst, hängt von deinen Rollen auf dem Discord-Server ab.</p>
+        <p>Melde dich mit deinem Discord-Konto an.</p>
         <a class="tm-btn red big" href="${API}/login"><span>${ICONS.discord} Mit Discord anmelden</span></a>
         <p class="tm-fine">Wir lesen nur deinen Discord-Namen und deine Rollen auf dem Server – sonst nichts.</p>
-      </div>`;
+      </div>` + teamIntro();
   }
 
   function renderNoAccess() {
@@ -122,7 +194,7 @@
           ? "Du bist angemeldet, aber dir fehlt die Team-Rolle. Melde dich bei der Teamleitung, wenn du zu F2F Motorsport gehörst."
           : "Dein Discord-Konto ist nicht auf unserem Discord-Server. Tritt zuerst dem Server bei und melde dich dann erneut an."}</p>
         ${ME.roles && ME.roles.length ? `<div class="tm-muted" style="margin-bottom:8px">Deine Rollen:</div><div class="tm-roles">${ME.roles.map(chip).join("")}</div>` : ""}
-      </div>`;
+      </div>` + teamIntro();
   }
 
   /* ---------------- Übersicht ---------------- */
