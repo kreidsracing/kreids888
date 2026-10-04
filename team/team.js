@@ -43,6 +43,8 @@
     logout: I('<path d="M15 4h4v16h-4M10 8l-4 4 4 4M6 12h10"/>'),
     discord: I('<path d="M20.3 4.4A19.6 19.6 0 0 0 15.4 3l-.6 1.3a18 18 0 0 0-5.5 0L8.6 3a19.6 19.6 0 0 0-4.9 1.5C.6 9.1-.3 13.6.1 18a19.8 19.8 0 0 0 6 3l1.3-2a12.8 12.8 0 0 1-2-1l.5-.4a14 14 0 0 0 12.2 0l.5.4c-.7.4-1.3.7-2 1l1.3 2a19.7 19.7 0 0 0 6-3c.5-5.1-.8-9.6-3.6-13.6zM8 15.3c-1.2 0-2.2-1.1-2.2-2.4S6.8 10.5 8 10.5s2.2 1.1 2.2 2.4-1 2.4-2.2 2.4zm8 0c-1.2 0-2.2-1.1-2.2-2.4s1-2.4 2.2-2.4 2.2 1.1 2.2 2.4-1 2.4-2.2 2.4z"/>', true),
     arrow: I('<path d="M5 12h14M13 6l6 6-6 6"/>'),
+    link: I('<path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/>'),
+    ext: I('<path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/>'),
   };
 
   // Bereiche im Dashboard (alle Teammitglieder) – vorerst Platzhalter
@@ -55,6 +57,7 @@
   const PANELS = {
     trainer:  { title: "Kreids-Trainer", desc: "Live-Coach, Setup-Berater und Streckenberater – direkt im Dashboard.", live: true },
     garage61: { title: "Garage 61", desc: "Team-Bestenliste und Bestzeit-Posts direkt in Discord.", live: true },
+    links:    { title: "Links", desc: "Wichtige Links fürs Team.", live: true },
   };
   const SESSION = { 1: "Training", 2: "Quali", 3: "Rennen" };
 
@@ -326,7 +329,7 @@
      ================================================================ */
   function renderShell() {
     const id = location.hash.replace("#", "");
-    const tools = Object.keys(PANELS).filter(p => ME.panels[p] && p !== "garage61");
+    const tools = Object.keys(PANELS).filter(p => ME.panels[p] && p !== "garage61" && p !== "links");
     const link = (hid, icon, label) => `<a class="td-link${id === hid ? " on" : ""}" href="#${hid}">${ICONS[icon]}<span>${esc(label)}</span></a>`;
 
     view.innerHTML = `
@@ -336,6 +339,7 @@
             ${link("", "home", "Dashboard")}
             ${ME.panels.garage61 ? link("garage61", "garage61", "Garage 61") : ""}
             ${SECTIONS.map(s => link(s.id, s.icon, s.label)).join("")}
+            ${ME.panels.links ? link("links", "link", "Links") : ""}
             ${tools.length ? `<div class="td-nav-h">Tools</div>${tools.map(p => link(p, p, PANELS[p].title)).join("")}` : ""}
             ${ME.isAdmin ? `<div class="td-nav-h">Verwaltung</div>${link("aktivitaet", "activity", "Aktivität")}${link("news-schreiben", "news", "News schreiben")}${link("fahrerprofile", "helmet", "Fahrerprofile")}${link("admin", "admin", "Admin")}` : ""}
           </nav>
@@ -349,6 +353,7 @@
     if (id === "fahrerprofile" && ME.isAdmin) return renderProfilesAdmin();
     if (id === "news") return renderNews();
     if (id === "fahrer") return renderProfile();
+    if (id === "links" && ME.panels.links) return renderLinks();
     if (id === "garage61" && ME.panels.garage61) return renderG61();
     if (id === "trainer" && ME.panels.trainer && window.F2FTrainer)
       return window.F2FTrainer.mount(main(), { api, esc, toast, ICONS, panelHead, btn });
@@ -625,6 +630,23 @@
       catch (e) { toast(e.message); }
     });
     if (openId) { const r = box.querySelector(`.pa-row[data-id="${openId}"]`); if (r) { r.classList.remove("open"); open(r); } }
+  }
+
+  /* ---------------- Links ---------------- */
+  const domain = (u) => { try { return new URL(u).hostname.replace(/^www\./, ""); } catch (e) { return ""; } };
+
+  async function renderLinks() {
+    main().innerHTML = panelHead("link", "Links") + '<div id="lk"><div class="tm-loading"><span></span><span></span><span></span></div></div>';
+    if (ME.isAdmin) document.querySelector(".td-head").insertAdjacentHTML("beforeend", `<a class="tm-btn sm" href="#admin"><span>Links bearbeiten</span></a>`);
+    const box = document.getElementById("lk");
+    let d;
+    try { d = await api("/links"); } catch (e) { box.innerHTML = `<div class="tm-box tm-err">${esc(e.message)}</div>`; return; }
+    box.innerHTML = d.links.length ? `<div class="lk-grid">${d.links.map(l => `
+      <a class="lk-card" href="${esc(l.url)}" target="_blank" rel="noopener">
+        <span class="lk-ic">${esc((l.title || "?").charAt(0).toUpperCase())}</span>
+        <span class="lk-txt"><b>${esc(l.title)}</b>${l.desc ? `<small>${esc(l.desc)}</small>` : ""}<em>${esc(domain(l.url))}</em></span>
+        <span class="lk-go">${ICONS.ext}</span>
+      </a>`).join("")}</div>` : '<div class="tm-box tm-soon"><div class="big">Noch leer</div><p>Hier erscheinen wichtige Links fürs Team.</p></div>';
   }
 
   /* ---------------- Discord-Aktivität (nur Admin) ---------------- */
@@ -940,6 +962,13 @@
       </div>
 
       <div class="tm-box">
+        <h5>Links</h5>
+        <p class="hint">Erscheinen im Dashboard unter „Links" für alle Teammitglieder. Mit ▲▼ sortieren.</p>
+        <div id="lk-edit"></div>
+        <div class="tm-actions" style="margin-top:10px">${btn("+ Link hinzufügen", "sm", 'id="lk-add"')}</div>
+      </div>
+
+      <div class="tm-box">
         <h5>Renn-Erinnerungen</h5>
         <p class="hint">Der Bot erinnert in Discord an jedes Rennen aus deinem Rennkalender (kreids888-Dashboard) – 24 Stunden und 1 Stunde vorher.</p>
         <div class="tm-row"><div class="lbl">Erinnerungen</div>
@@ -975,6 +1004,35 @@
     box.querySelectorAll("#g61-team,#g61-ch,#g61-on,#g61-rec,#g61-week,#rm-on,#rm-24,#rm-1,#rm-ch,#rm-ping").forEach(el => el.addEventListener("input", markDirty));
     box.querySelectorAll("#g61-on,#g61-rec").forEach(el => el.addEventListener("change", markDirty));
 
+    // ---- Links bearbeiten ----
+    let links = (d.links || []).map(l => ({ ...l }));
+    const lkSync = () => document.querySelectorAll(".lk-row").forEach((r, i) => {
+      links[i] = { title: r.querySelector("[data-f=title]").value, url: r.querySelector("[data-f=url]").value, desc: r.querySelector("[data-f=desc]").value };
+    });
+    const lkDraw = () => {
+      document.getElementById("lk-edit").innerHTML = links.map((l, i) => `
+        <div class="lk-row">
+          <div class="pa-move">
+            <button type="button" data-lmv="-1" data-i="${i}" ${i === 0 ? "disabled" : ""}>▲</button>
+            <button type="button" data-lmv="1" data-i="${i}" ${i === links.length - 1 ? "disabled" : ""}>▼</button>
+          </div>
+          <input class="tm-input" data-f="title" placeholder="Titel" maxlength="60" value="${esc(l.title)}">
+          <input class="tm-input" data-f="url" placeholder="https://…" maxlength="500" value="${esc(l.url)}">
+          <input class="tm-input" data-f="desc" placeholder="Beschreibung (optional)" maxlength="140" value="${esc(l.desc)}">
+          <button type="button" class="tm-icon-btn" data-ldel="${i}" title="Löschen">✕</button>
+        </div>`).join("") || '<p class="tm-muted">Noch keine Links.</p>';
+      document.querySelectorAll(".lk-row input").forEach(el => el.addEventListener("input", markDirty));
+      document.querySelectorAll("[data-lmv]").forEach(b => b.onclick = () => {
+        lkSync(); const i = Number(b.dataset.i), j = i + Number(b.dataset.lmv);
+        [links[i], links[j]] = [links[j], links[i]]; lkDraw(); markDirty();
+      });
+      document.querySelectorAll("[data-ldel]").forEach(b => b.onclick = () => {
+        lkSync(); links.splice(Number(b.dataset.ldel), 1); lkDraw(); markDirty();
+      });
+    };
+    lkDraw();
+    document.getElementById("lk-add").onclick = () => { lkSync(); links.push({ title: "", url: "", desc: "" }); lkDraw(); markDirty(); };
+
     function markDirty() {
       dirty = true;
       const bar = document.getElementById("savebar");
@@ -1001,6 +1059,7 @@
           h24: document.getElementById("rm-24").checked,
           h1: document.getElementById("rm-1").checked,
         },
+        links: (lkSync(), links.filter(l => l.title.trim() && l.url.trim())),
       };
       await api("/admin/config", { method: "POST", body });
       dirty = false;
