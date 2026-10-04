@@ -47,13 +47,8 @@
 
   // Bereiche im Dashboard (alle Teammitglieder) – vorerst Platzhalter
   const SECTIONS = [
-    { id: "news",       label: "Team News",     icon: "news",     desc: "Mitteilungen der Teamleitung und alles, was gerade im Team passiert." },
-    { id: "kalender",   label: "Rennkalender",  icon: "calendar", desc: "Alle kommenden Rennen und Endurance-Events des Teams auf einen Blick." },
-    { id: "termine",    label: "Teamtermine",   icon: "clock",    desc: "Trainings, Fahrerbesprechungen und Team-Meetings." },
-    { id: "ergebnisse", label: "Ergebnisse",    icon: "flag",     desc: "Die Ergebnisse aller Team-Einsätze in Ligen und Endurance-Rennen." },
-    { id: "setups",     label: "Setups",        icon: "wrench",   desc: "Setups zum Herunterladen – sortiert nach Auto und Strecke." },
-    { id: "dokumente",  label: "Dokumente",     icon: "file",     desc: "Regeln, Leitfäden und alles Wichtige zum Nachlesen." },
-    { id: "fahrer",     label: "Fahrerbereich", icon: "helmet",   desc: "Dein Fahrerprofil, deine Einsätze und deine Statistiken." },
+    { id: "news",   label: "Team News",     icon: "news" },
+    { id: "fahrer", label: "Fahrerbereich", icon: "helmet" },
   ];
 
   // Tools – sichtbar je nach Rolle (Admin vergibt)
@@ -251,7 +246,7 @@
 
       <section class="tp-sec" id="tp-fahrer">
         ${secHead("Line-up", "Das Raceteam", "helmet")}
-        <div class="tp-drivers">${[1, 2, 3, 4].map(n => `
+        <div class="tp-drivers" id="tp-drivers">${[1, 2, 3, 4].map(n => `
           <div class="tp-driver">
             <div class="tp-driver-img">${ICONS.helmet}<span class="tp-nr">#--</span></div>
             <div class="tp-driver-b"><b>Fahrer ${n}</b><small>GT3 / Prototypen · iRacing</small></div>
@@ -288,6 +283,12 @@
         <img class="tp-poster" src="${IMG}f2f-recruiting.webp" alt="Simracing-Team sucht dich – Flag to Flag Motorsport" width="1400" height="788" loading="lazy">
       </section>`;
 
+    // freigegebene Fahrerprofile statt Platzhalter
+    fetch(API + "/public/raceteam").then(r => r.json()).then(d => {
+      const el = document.getElementById("tp-drivers");
+      if (el && d.team && d.team.length) el.innerHTML = d.team.map(p => driverCard(p, p.name, p.avatar)).join("");
+    }).catch(() => {});
+
     barNav.querySelectorAll("[data-scroll]").forEach(b => {
       b.onclick = () => document.getElementById(b.dataset.scroll).scrollIntoView({ behavior: "smooth", block: "start" });
     });
@@ -308,18 +309,20 @@
             ${link("", "home", "Dashboard")}
             ${SECTIONS.map(s => link(s.id, s.icon, s.label)).join("")}
             ${tools.length ? `<div class="td-nav-h">Tools</div>${tools.map(p => link(p, p, PANELS[p].title)).join("")}` : ""}
-            ${ME.isAdmin ? `<div class="td-nav-h">Verwaltung</div>${link("aktivitaet", "activity", "Aktivität")}${link("admin", "admin", "Admin")}` : ""}
+            ${ME.isAdmin ? `<div class="td-nav-h">Verwaltung</div>${link("aktivitaet", "activity", "Aktivität")}${link("news-schreiben", "news", "News schreiben")}${link("fahrerprofile", "helmet", "Fahrerprofile")}${link("admin", "admin", "Admin")}` : ""}
           </nav>
         </aside>
         <div class="td-main" id="td-main"></div>
       </div>`;
 
-    const sec = SECTIONS.find(s => s.id === id);
     if (id === "admin" && ME.isAdmin) return renderAdmin();
     if (id === "aktivitaet" && ME.isAdmin) return renderActivity();
+    if (id === "news-schreiben" && ME.isAdmin) return renderNewsAdmin();
+    if (id === "fahrerprofile" && ME.isAdmin) return renderProfilesAdmin();
+    if (id === "news") return renderNews();
+    if (id === "fahrer") return renderProfile();
     if (id === "garage61" && ME.panels.garage61) return renderG61();
     if (PANELS[id] && ME.panels[id]) return renderSoon(PANELS[id].title, id, PANELS[id].desc);
-    if (sec) return renderSoon(sec.label, sec.icon, sec.desc);
     renderHome(tools);
   }
 
@@ -336,11 +339,7 @@
   }
 
   function renderHome(tools) {
-    const quick = [
-      ["kalender", "calendar", "Kalender"], ["termine", "clock", "Termine"], ["ergebnisse", "flag", "Ergebnisse"],
-      ["setups", "wrench", "Setups"], ["dokumente", "file", "Dokumente"], ["news", "news", "Team News"],
-      ...tools.map(p => [p, p, PANELS[p].title]),
-    ];
+    const quick = [["news", "news", "Team News"], ["fahrer", "helmet", "Fahrerbereich"], ...tools.map(p => [p, p, PANELS[p].title])];
     main().innerHTML = `
       <section class="td-welcome" style="--img:url('${IMG}f2f-cars.webp')">
         <div class="td-welcome-in">
@@ -357,17 +356,222 @@
       <div class="td-quick">${quick.map(([h, ic, t]) => `<a class="td-q" href="#${h}"><span>${ICONS[ic]}</span><b>${esc(t)}</b></a>`).join("")}</div>
 
       <div class="td-widgets">
-        <div class="tp-widget">
-          <div class="tp-widget-h">${ICONS.flag}<b>Nächstes Rennen</b></div>
-          <div class="tp-row"><span class="tp-date">--.--</span><div class="tp-row-m">${ph("60%")}${ph("35%")}</div><span class="tp-cls">GT3</span></div>
-          <div class="tp-widget-f">Wird bald eingetragen</div>
-        </div>
-        <div class="tp-widget">
+        <div class="tp-widget" id="w-news">
           <div class="tp-widget-h">${ICONS.news}<b>Neueste News</b></div>
-          ${[0, 1].map(() => `<div class="tp-row"><div class="tp-row-m">${ph("80%")}${ph("50%")}</div></div>`).join("")}
-          <div class="tp-widget-f">Noch keine Mitteilungen</div>
+          <div class="tp-widget-f">Lädt …</div>
+        </div>
+        <div class="tp-widget" id="w-prof">
+          <div class="tp-widget-h">${ICONS.helmet}<b>Mein Fahrerprofil</b></div>
+          <div class="tp-widget-f">Lädt …</div>
         </div>
       </div>`;
+
+    api("/news").then(d => {
+      const el = document.getElementById("w-news");
+      if (!el) return;
+      const top = d.news.slice(0, 3);
+      el.innerHTML = `<div class="tp-widget-h">${ICONS.news}<b>Neueste News</b></div>` + (top.length
+        ? top.map(n => `<a class="tp-row td-newsrow" href="#news"><span class="tp-date">${fmtDay(n.created)}</span><div class="tp-row-m"><b>${esc(n.title)}</b><small>${esc(n.text.slice(0, 80))}${n.text.length > 80 ? " …" : ""}</small></div></a>`).join("")
+        : `<div class="tp-widget-f">Noch keine Mitteilungen</div>`);
+    }).catch(() => {});
+
+    api("/profile/me").then(d => {
+      const el = document.getElementById("w-prof");
+      if (!el) return;
+      const st = !d.draft ? ["Noch nicht ausgefüllt", "grey"] : d.pending ? ["Wartet auf Freigabe", "wait"] : ["Öffentlich sichtbar", "live"];
+      el.innerHTML = `<div class="tp-widget-h">${ICONS.helmet}<b>Mein Fahrerprofil</b></div>
+        <div class="td-prof-w"><span class="tm-badge ${st[1]}">${st[0]}</span>
+        <p class="tm-muted">Dein Profil erscheint nach Freigabe auf der Teamseite unter „Das Raceteam".</p>
+        <a class="tm-btn sm" href="#fahrer"><span>${d.draft ? "Profil bearbeiten" : "Profil anlegen"}</span></a></div>`;
+    }).catch(() => {});
+  }
+
+  const fmtDay = (iso) => new Date(iso).toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit" });
+  const fmtLong = (iso) => new Date(iso).toLocaleDateString("de-DE", { day: "2-digit", month: "long", year: "numeric" });
+
+  /* ---------------- Team News (alle) ---------------- */
+  async function renderNews() {
+    main().innerHTML = panelHead("news", "Team News") + '<div id="nl"><div class="tm-loading"><span></span><span></span><span></span></div></div>';
+    const box = document.getElementById("nl");
+    let d;
+    try { d = await api("/news"); } catch (e) { box.innerHTML = `<div class="tm-box tm-err">${esc(e.message)}</div>`; return; }
+    if (ME.isAdmin) document.querySelector(".td-head").insertAdjacentHTML("beforeend", `<a class="tm-btn sm red" href="#news-schreiben"><span>News schreiben</span></a>`);
+    box.innerHTML = d.news.length ? d.news.map(n => newsCard(n)).join("") :
+      `<div class="tm-box tm-soon"><div class="big">Noch leer</div><p>Hier erscheinen Updates und Mitteilungen der Teamleitung.</p></div>`;
+  }
+
+  function newsCard(n, admin) {
+    return `
+      <article class="tn-card">
+        ${n.image ? `<img class="tn-img" src="${esc(n.image)}" alt="" loading="lazy">` : ""}
+        <div class="tn-body">
+          <div class="tn-meta">${fmtLong(n.created)} · ${esc(n.author && n.author.name || "")}${n.msgId ? ` · <span class="tn-dc">${ICONS.discord} in Discord gepostet</span>` : ""}</div>
+          <h4>${esc(n.title)}</h4>
+          <div class="tn-text">${esc(n.text).replace(/\n/g, "<br>")}</div>
+          ${admin ? `<div class="tm-actions" style="margin-top:12px">${btn("Löschen", "sm", `data-del="${n.id}" data-dc="${n.msgId ? 1 : 0}"`)}</div>` : ""}
+        </div>
+      </article>`;
+  }
+
+  /* ---------------- News schreiben (Admin) ---------------- */
+  async function renderNewsAdmin() {
+    main().innerHTML = panelHead("news", "News schreiben", '<span class="tm-badge">Nur Admin</span>') + '<div id="na"><div class="tm-loading"><span></span><span></span><span></span></div></div>';
+    const box = document.getElementById("na");
+    let meta, list;
+    try { [meta, list] = await Promise.all([api("/admin/news/meta"), api("/news")]); }
+    catch (e) { box.innerHTML = `<div class="tm-box tm-err">${esc(e.message)}</div>`; return; }
+
+    box.innerHTML = `
+      <div class="tm-box">
+        <h5>Neue News</h5>
+        <p class="hint">Erscheint unter „Team News" und wird – wenn ein Kanal gewählt ist – vom Bot in Discord gepostet.</p>
+        <div class="tm-row"><label for="n-title">Titel</label><input class="tm-input" id="n-title" maxlength="200" placeholder="z. B. Neues Team-Livery ist fertig"></div>
+        <div class="tm-row"><label for="n-text">Text</label><textarea class="tm-input tm-area" id="n-text" maxlength="3800" rows="7" placeholder="Was gibt es Neues?"></textarea></div>
+        <div class="tm-row"><label for="n-img">Bild<small>optional, Link zu einem Bild</small></label><input class="tm-input" id="n-img" type="url" placeholder="https://…"></div>
+        <div class="tm-row"><label for="n-ch">Discord-Kanal</label>
+          <select class="tm-select" id="n-ch"><option value="">– nicht in Discord posten –</option>${meta.channels.map(c => `<option value="${c.id}" ${c.id === meta.lastChannel ? "selected" : ""}># ${esc(c.name)}</option>`).join("")}</select></div>
+        <div class="tm-row"><label for="n-ping">Ping<small>optional</small></label>
+          <select class="tm-select" id="n-ping"><option value="">– niemanden pingen –</option>${meta.roles.map(r => `<option value="${r.id}">@${esc(r.name)}</option>`).join("")}</select></div>
+        <div class="tm-actions">${btn("Veröffentlichen", "red", 'id="n-send"')}</div>
+      </div>
+      <div class="td-label">Bisherige News</div>
+      <div id="n-list">${list.news.length ? list.news.map(n => newsCard(n, true)).join("") : '<p class="tm-muted">Noch keine News.</p>'}</div>`;
+
+    const send = document.getElementById("n-send");
+    send.onclick = async () => {
+      const body = {
+        title: document.getElementById("n-title").value, text: document.getElementById("n-text").value,
+        image: document.getElementById("n-img").value, channel: document.getElementById("n-ch").value, ping: document.getElementById("n-ping").value,
+      };
+      if (!body.title.trim() || !body.text.trim()) return toast("Titel und Text ausfüllen");
+      send.disabled = true;
+      try { const r = await api("/admin/news", { method: "POST", body }); toast(r.info, true); renderNewsAdmin(); }
+      catch (e) { toast(e.message); send.disabled = false; }
+    };
+    box.querySelectorAll("[data-del]").forEach(b => b.onclick = async () => {
+      const dc = b.dataset.dc === "1" && confirm("Auch die Nachricht in Discord löschen?");
+      if (!confirm("News wirklich löschen?")) return;
+      b.disabled = true;
+      try { const r = await api("/admin/news/delete", { method: "POST", body: { id: b.dataset.del, discord: dc } }); toast(r.info, true); renderNewsAdmin(); }
+      catch (e) { toast(e.message); b.disabled = false; }
+    });
+  }
+
+  /* ---------------- Fahrerprofil ---------------- */
+  const KLASSEN = ["", "GT3", "Prototypen", "GT3 & Prototypen"];
+
+  function driverCard(p, name, avatar) {
+    const img = p.foto || "";
+    return `
+      <div class="tp-driver">
+        <div class="tp-driver-img${img ? " photo" : ""}">${img ? `<img src="${esc(img)}" alt="" loading="lazy">` : avatar ? `<img class="ava" src="${esc(avatar)}" alt="" loading="lazy">` : ICONS.helmet}
+          <span class="tp-nr">#${esc(p.nr || "--")}</span></div>
+        <div class="tp-driver-b">
+          <b>${esc(name)}</b>
+          <small>${esc([p.klasse, p.auto].filter(Boolean).join(" · ") || "F2F Motorsport")}${p.land ? " · " + esc(p.land) : ""}</small>
+          ${p.text ? `<p class="tp-driver-t">${esc(p.text)}</p>` : ""}
+        </div>
+      </div>`;
+  }
+
+  function profileForm(p) {
+    p = p || {};
+    const f = (id, label, val, attrs = "", hint = "") => `<div class="tm-row"><label for="pf-${id}">${label}${hint ? `<small>${hint}</small>` : ""}</label><input class="tm-input" id="pf-${id}" value="${esc(val || "")}" ${attrs}></div>`;
+    return `
+      ${f("nr", "Startnummer", p.nr, 'inputmode="numeric" maxlength="4" placeholder="z. B. 888"')}
+      <div class="tm-row"><label for="pf-klasse">Klasse</label><select class="tm-select" id="pf-klasse">${KLASSEN.map(k => `<option value="${k}" ${k === (p.klasse || "") ? "selected" : ""}>${k || "– bitte wählen –"}</option>`).join("")}</select></div>
+      ${f("auto", "Lieblingsauto", p.auto, 'maxlength="60" placeholder="z. B. Porsche 911 GT3 R (992)"')}
+      ${f("land", "Land / Region", p.land, 'maxlength="40" placeholder="z. B. Saarland, DE"')}
+      ${f("iracing", "iRacing-Name", p.iracing, 'maxlength="60"')}
+      ${f("foto", "Foto", p.foto, 'type="url" maxlength="400" placeholder="https://…"', "Link zu einem Bild – leer = Discord-Bild")}
+      <div class="tm-row"><label for="pf-text">Über mich<small>max. 600 Zeichen</small></label><textarea class="tm-input tm-area" id="pf-text" maxlength="600" rows="5">${esc(p.text || "")}</textarea></div>`;
+  }
+
+  const readForm = () => Object.fromEntries(["nr", "klasse", "auto", "land", "iracing", "foto", "text"].map(k => [k, document.getElementById("pf-" + k).value]));
+
+  async function renderProfile() {
+    main().innerHTML = panelHead("helmet", "Fahrerbereich") + '<div id="pf"><div class="tm-loading"><span></span><span></span><span></span></div></div>';
+    const box = document.getElementById("pf");
+    let d;
+    try { d = await api("/profile/me"); } catch (e) { box.innerHTML = `<div class="tm-box tm-err">${esc(e.message)}</div>`; return; }
+    const st = !d.draft ? ["Noch nicht ausgefüllt", "grey"] : d.pending ? ["Änderungen warten auf Freigabe", "wait"] : ["Öffentlich sichtbar", "live"];
+    box.innerHTML = `
+      <div class="pf-grid">
+        <div class="tm-box">
+          <h5>Mein Fahrerprofil <span class="tm-badge ${st[1]}">${st[0]}</span></h5>
+          <p class="hint">Nach Freigabe durch die Teamleitung erscheint dein Profil auf der Teamseite unter „Das Raceteam". Bis dahin bleibt die zuletzt freigegebene Version sichtbar.</p>
+          ${profileForm(d.draft)}
+          <div class="tm-actions">${btn("Speichern", "red", 'id="pf-save"')}</div>
+        </div>
+        <div>
+          <div class="td-label" style="margin-top:0">Vorschau</div>
+          <div id="pf-prev" class="pf-prev"></div>
+        </div>
+      </div>`;
+    const prev = () => (document.getElementById("pf-prev").innerHTML = driverCard(readForm(), ME.user.name, ME.user.avatar));
+    prev();
+    box.querySelectorAll("input,select,textarea").forEach(el => el.addEventListener("input", prev));
+    const save = document.getElementById("pf-save");
+    save.onclick = async () => {
+      save.disabled = true;
+      try { const r = await api("/profile/me", { method: "POST", body: readForm() }); toast(r.info, true); renderProfile(); }
+      catch (e) { toast(e.message); save.disabled = false; }
+    };
+  }
+
+  /* ---------------- Fahrerprofile (Admin) ---------------- */
+  async function renderProfilesAdmin(openId) {
+    main().innerHTML = panelHead("helmet", "Fahrerprofile", '<span class="tm-badge">Nur Admin</span>') + '<div id="pa"><div class="tm-loading"><span></span><span></span><span></span></div></div>';
+    const box = document.getElementById("pa");
+    let d;
+    try { d = await api("/admin/profiles"); } catch (e) { box.innerHTML = `<div class="tm-box tm-err">${esc(e.message)}</div>`; return; }
+    const state = (m) => !m.draft ? ["Leer", "grey"] : m.pending ? ["Wartet auf Freigabe", "wait"] : m.pub ? ["Öffentlich", "live"] : ["Ausgeblendet", "grey"];
+    box.innerHTML = `
+      <p class="tm-muted" style="margin-bottom:12px">Alle Mitglieder mit Team-Rolle. Fahrer pflegen ihr Profil selbst – du gibst frei oder überschreibst alles. Was du speicherst, ist sofort freigegeben.</p>
+      <div class="pa-list">${d.members.map(m => {
+        const [lbl, cls] = state(m);
+        return `
+          <div class="pa-row${m.id === openId ? " open" : ""}" data-id="${m.id}">
+            <button class="pa-head" type="button">
+              <img class="ta-ava" src="${esc(m.avatar)}" alt="" loading="lazy">
+              <b>${esc(m.name)}</b>
+              <span class="pa-nr">${m.draft && m.draft.nr ? "#" + esc(m.draft.nr) : ""}</span>
+              <span class="tm-badge ${cls}">${lbl}</span>
+            </button>
+            <div class="pa-body"></div>
+          </div>`;
+      }).join("") || '<p class="tm-muted" style="padding:16px">Keine Mitglieder mit Team-Rolle gefunden – im Admin unter „Team-Rollen" festlegen.</p>'}</div>`;
+
+    const open = (row) => {
+      const m = d.members.find(x => x.id === row.dataset.id);
+      box.querySelectorAll(".pa-row.open").forEach(r => { if (r !== row) { r.classList.remove("open"); r.querySelector(".pa-body").innerHTML = ""; } });
+      row.classList.toggle("open");
+      const body = row.querySelector(".pa-body");
+      if (!row.classList.contains("open")) { body.innerHTML = ""; return; }
+      body.innerHTML = `
+        <div class="pf-grid">
+          <div>${m.pending ? '<p class="tm-muted" style="margin-bottom:6px">Das Formular zeigt die <b>neue, noch nicht freigegebene</b> Version des Fahrers.</p>' : ""}${profileForm(m.draft || m.pub)}
+            <div class="tm-actions">
+              ${btn("Speichern & freigeben", "red", 'data-act="save"')}
+              ${m.pending ? btn("Änderung freigeben", "sm", 'data-act="approve"') : ""}
+              ${m.pub ? btn("Öffentlich ausblenden", "sm", 'data-act="hide"') : ""}
+            </div></div>
+          <div><div class="td-label" style="margin-top:0">Vorschau</div><div class="pf-prev"></div>
+            ${m.pub && m.pending ? `<div class="td-label">Aktuell öffentlich</div><div class="pf-prev">${driverCard(m.pub, m.name, m.avatar)}</div>` : ""}</div>
+        </div>`;
+      const prev = () => (body.querySelector(".pf-prev").innerHTML = driverCard(readForm(), m.name, m.avatar));
+      prev();
+      body.querySelectorAll("input,select,textarea").forEach(el => el.addEventListener("input", prev));
+      body.querySelectorAll("[data-act]").forEach(b => b.onclick = async () => {
+        b.disabled = true;
+        try {
+          const r = await api("/admin/profile", { method: "POST", body: { uid: m.id, action: b.dataset.act, profile: readForm() } });
+          toast(r.info, true); renderProfilesAdmin(m.id);
+        } catch (e) { toast(e.message); b.disabled = false; }
+      });
+    };
+    box.querySelectorAll(".pa-head").forEach(h => h.onclick = () => open(h.parentElement));
+    if (openId) { const r = box.querySelector(`.pa-row[data-id="${openId}"]`); if (r) { r.classList.remove("open"); open(r); } }
   }
 
   /* ---------------- Discord-Aktivität (nur Admin) ---------------- */
@@ -398,7 +602,8 @@
         const days = m.last ? (Date.now() - Date.parse(m.last)) / 864e5 : Infinity;
         return days <= 7 ? ["aktiv", "Aktiv"] : days <= 21 ? ["ruhig", "Ruhig"] : ["inaktiv", "Inaktiv"];
       };
-      document.getElementById("act-list").innerHTML = rows.length ? rows.map(m => {
+      const head = `<div class="ta-row ta-head"><span></span><span>Mitglied</span><span>Anteil (30 Tage)</span><span class="r-al">Nachr. 7 Tage</span><span class="r-al">Nachr. 30 Tage</span><span class="c-al">Status</span><span class="r-al">Zuletzt aktiv</span></div>`;
+      document.getElementById("act-list").innerHTML = head + (rows.length ? rows.map(m => {
         const [cls, lbl] = state(m);
         return `
           <div class="ta-row ${cls}">
@@ -407,9 +612,10 @@
             <div class="ta-bar"><i style="width:${Math.round(m.m30 / max * 100)}%"></i></div>
             <div class="ta-num"><b>${m.m7}</b><small>7 Tage</small></div>
             <div class="ta-num"><b>${m.m30}</b><small>30 Tage</small></div>
-            <div class="ta-last"><span class="ta-st">${lbl}</span><small>${ago(m.last)}</small></div>
+            <div class="ta-stc"><span class="ta-st">${lbl}</span></div>
+            <div class="ta-last">${ago(m.last)}</div>
           </div>`;
-      }).join("") : '<p class="tm-muted" style="padding:16px">Keine Mitglieder gefunden.</p>';
+      }).join("") : '<p class="tm-muted" style="padding:16px">Keine Mitglieder gefunden.</p>');
     };
 
     box.innerHTML = `
