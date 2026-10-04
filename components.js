@@ -10,7 +10,7 @@ const LINKS = [
   {href:"news.html",      label:"News"},
   {href:"setup.html",     label:"Setup"},
   {href:"community.html", label:"Community"},
-  {href:"team/",          label:"F2F"},
+  {href:"team/",          label:"Racing Team"},
 ];
 const TWITCH  = "https://twitch.tv/kreids888";
 const YOUTUBE = "https://youtube.com/@Kreids888";

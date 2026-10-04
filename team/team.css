@@ -333,3 +333,31 @@ button.tm-chip.on::after{content:"✓";font-weight:800;color:var(--red);margin-l
 .tm-toast.ok{border-left-color:#4ee28c}
 
 @media(prefers-reduced-motion:reduce){.sk,.tm-loading span{animation:none}.tp-driver,.td-q,.tm-toast,.tp-media-i img{transition:none}}
+
+/* ---------- Discord-Aktivität (Admin) ---------- */
+.ta-top{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:14px}
+.ta-upd{font-size:15px;margin-bottom:2px}
+.ta-legend{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;font-size:13px;color:var(--steel);margin:0 0 10px}
+.ta-legend span{font-family:var(--disp);font-weight:800;font-size:11px;letter-spacing:.12em;text-transform:uppercase;padding:2px 7px;margin-left:6px}
+.ta-list{border:1px solid var(--line);background:var(--panel)}
+.ta-row{display:grid;grid-template-columns:36px minmax(120px,1.4fr) 1fr 64px 64px 110px;gap:14px;align-items:center;padding:10px 16px;border-bottom:1px solid var(--line)}
+.ta-row:last-child{border-bottom:0}
+.ta-ava{width:36px;height:36px;border-radius:50%;background:var(--panel2)}
+.ta-name{display:flex;align-items:center;gap:8px;min-width:0}
+.ta-name b{font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ta-bar{height:8px;background:var(--panel2);overflow:hidden}
+.ta-bar i{display:block;height:100%;background:linear-gradient(90deg,var(--red-deep),var(--red));box-shadow:0 0 10px var(--red-glow)}
+.ta-num{text-align:right;line-height:1.1}
+.ta-num b{display:block;font-family:var(--disp);font-weight:900;font-size:20px;font-variant-numeric:tabular-nums}
+.ta-num small,.ta-last small{color:var(--steel);font-size:11.5px}
+.ta-last{text-align:right;line-height:1.2}
+.ta-st{display:inline-block;font-family:var(--disp);font-weight:800;font-size:11px;letter-spacing:.12em;text-transform:uppercase;padding:2px 7px}
+.aktiv .ta-st,.ta-legend .aktiv{background:rgba(46,204,113,.14);color:#4ee28c;border:1px solid rgba(46,204,113,.35)}
+.ruhig .ta-st,.ta-legend .ruhig{background:rgba(241,196,15,.12);color:#f1c40f;border:1px solid rgba(241,196,15,.35)}
+.inaktiv .ta-st,.ta-legend .inaktiv{background:rgba(225,19,36,.14);color:#ff6b75;border:1px solid rgba(225,19,36,.45)}
+.ta-row.inaktiv .ta-name b{color:var(--steel)}
+@media(max-width:760px){
+  .ta-row{grid-template-columns:36px 1fr 52px 52px;gap:10px;padding:10px 12px}
+  .ta-bar{display:none}
+  .ta-last{grid-column:2/-1;text-align:left;display:flex;gap:8px;align-items:center}
+}

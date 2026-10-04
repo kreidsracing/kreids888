@@ -25,6 +25,7 @@
     file: I('<path d="M14 3H6v18h12V7z"/><path d="M14 3v4h4M9 12h6M9 16h6"/>'),
     helmet: I('<path d="M4 15a8 8 0 0 1 16-2v4H9a5 5 0 0 1-5-2z"/><path d="M12 13h8M4 15v3h16"/>'),
     trophy: I('<path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0z"/><path d="M17 5h3v2a3 3 0 0 1-3 3M7 5H4v2a3 3 0 0 0 3 3"/>'),
+    activity: I('<path d="M3 12h4l3-8 4 16 3-8h4"/>'),
     people: I('<circle cx="9" cy="8" r="3.2"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6"/><circle cx="17.5" cy="9" r="2.4"/><path d="M16 14.2c2.9.2 5 2.6 5 5.8"/>'),
     heart: I('<path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z"/>'),
     target: I('<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.2" fill="currentColor"/>'),
@@ -307,7 +308,7 @@
             ${link("", "home", "Dashboard")}
             ${SECTIONS.map(s => link(s.id, s.icon, s.label)).join("")}
             ${tools.length ? `<div class="td-nav-h">Tools</div>${tools.map(p => link(p, p, PANELS[p].title)).join("")}` : ""}
-            ${ME.isAdmin ? `<div class="td-nav-h">Verwaltung</div>${link("admin", "admin", "Admin")}` : ""}
+            ${ME.isAdmin ? `<div class="td-nav-h">Verwaltung</div>${link("aktivitaet", "activity", "Aktivität")}${link("admin", "admin", "Admin")}` : ""}
           </nav>
         </aside>
         <div class="td-main" id="td-main"></div>
@@ -315,6 +316,7 @@
 
     const sec = SECTIONS.find(s => s.id === id);
     if (id === "admin" && ME.isAdmin) return renderAdmin();
+    if (id === "aktivitaet" && ME.isAdmin) return renderActivity();
     if (id === "garage61" && ME.panels.garage61) return renderG61();
     if (PANELS[id] && ME.panels[id]) return renderSoon(PANELS[id].title, id, PANELS[id].desc);
     if (sec) return renderSoon(sec.label, sec.icon, sec.desc);
@@ -366,6 +368,80 @@
           <div class="tp-widget-f">Noch keine Mitteilungen</div>
         </div>
       </div>`;
+  }
+
+  /* ---------------- Discord-Aktivität (nur Admin) ---------------- */
+  const ago = (iso) => {
+    if (!iso) return "nie";
+    const d = Math.floor((Date.now() - Date.parse(iso)) / 864e5);
+    return d <= 0 ? "heute" : d === 1 ? "gestern" : `vor ${d} Tagen`;
+  };
+
+  async function renderActivity() {
+    main().innerHTML = panelHead("activity", "Discord-Aktivität", '<span class="tm-badge">Nur Admin</span>') + '<div id="act"><div class="tm-loading"><span></span><span></span><span></span></div></div>';
+    const box = document.getElementById("act");
+    let d;
+    try { d = await api("/admin/activity"); } catch (e) { box.innerHTML = `<div class="tm-box tm-err">${esc(e.message)}</div>`; return; }
+
+    const runBtn = btn("Jetzt aktualisieren", "sm", 'id="act-run"');
+    if (!d.ready) {
+      box.innerHTML = `<div class="tm-box tm-soon"><div class="big">Noch keine Daten</div><p>Die Auswertung läuft automatisch alle 12 Stunden. Beim ersten Mal werden die Nachrichten der letzten 30 Tage gezählt.</p><div class="tm-actions" style="justify-content:center;margin-top:18px">${runBtn}</div></div>`;
+      bindRun();
+      return;
+    }
+
+    let onlyTeam = localStorage.getItem("f2f-act-team") === "1";
+    const draw = () => {
+      const rows = d.members.filter(m => !onlyTeam || m.team).sort((a, b) => b.m30 - a.m30 || b.m7 - a.m7 || a.name.localeCompare(b.name));
+      const max = Math.max(1, ...rows.map(r => r.m30));
+      const state = (m) => {
+        const days = m.last ? (Date.now() - Date.parse(m.last)) / 864e5 : Infinity;
+        return days <= 7 ? ["aktiv", "Aktiv"] : days <= 21 ? ["ruhig", "Ruhig"] : ["inaktiv", "Inaktiv"];
+      };
+      document.getElementById("act-list").innerHTML = rows.length ? rows.map(m => {
+        const [cls, lbl] = state(m);
+        return `
+          <div class="ta-row ${cls}">
+            <img class="ta-ava" src="${esc(m.avatar)}" alt="" loading="lazy">
+            <div class="ta-name"><b>${esc(m.name)}</b>${m.team ? '<span class="tm-badge">Team</span>' : ""}</div>
+            <div class="ta-bar"><i style="width:${Math.round(m.m30 / max * 100)}%"></i></div>
+            <div class="ta-num"><b>${m.m7}</b><small>7 Tage</small></div>
+            <div class="ta-num"><b>${m.m30}</b><small>30 Tage</small></div>
+            <div class="ta-last"><span class="ta-st">${lbl}</span><small>${ago(m.last)}</small></div>
+          </div>`;
+      }).join("") : '<p class="tm-muted" style="padding:16px">Keine Mitglieder gefunden.</p>';
+    };
+
+    box.innerHTML = `
+      <div class="tm-box ta-top">
+        <div>
+          <div class="ta-upd">Letzte Aktualisierung: <b>${fmtDate(d.updated)}</b></div>
+          <div class="tm-muted">Automatisch alle 12 Stunden · ${d.channels || 0} Kanäle · gezählt werden geschriebene Nachrichten${d.complete ? "" : ' · <span class="tm-err">noch nicht alle Kanäle durch</span>'}</div>
+          ${d.membersError ? `<div class="tm-err" style="margin-top:6px">${esc(d.membersError)}</div>` : ""}
+        </div>
+        <div class="tm-actions">
+          <label class="tm-switch"><input type="checkbox" id="act-team" ${onlyTeam ? "checked" : ""}><span class="s"></span>Nur Team</label>
+          ${runBtn}
+        </div>
+      </div>
+      <div class="ta-legend"><span class="aktiv">Aktiv</span> letzte 7 Tage <span class="ruhig">Ruhig</span> 8–21 Tage <span class="inaktiv">Inaktiv</span> länger / nie</div>
+      <div class="ta-list" id="act-list"></div>`;
+    draw();
+    document.getElementById("act-team").onchange = (e) => {
+      onlyTeam = e.target.checked;
+      try { localStorage.setItem("f2f-act-team", onlyTeam ? "1" : "0"); } catch (x) { /* egal */ }
+      draw();
+    };
+    bindRun();
+
+    function bindRun() {
+      const b = document.getElementById("act-run");
+      b.onclick = async () => {
+        b.disabled = true;
+        try { const r = await api("/admin/activity/run", { method: "POST" }); toast(r.info, true); renderActivity(); }
+        catch (e) { toast(e.message); b.disabled = false; }
+      };
+    }
   }
 
   /* ---------------- Tools ---------------- */
