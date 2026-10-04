@@ -360,7 +360,19 @@
           <div class="tp-widget-h">${ICONS.helmet}<b>Mein Fahrerprofil</b></div>
           <div class="tp-widget-f">Lädt …</div>
         </div>
-      </div>`;
+      </div>
+      ${ME.panels.garage61 ? `<div class="tp-widget td-trips" id="w-trips">
+        <div class="tp-widget-h">${ICONS.car}<b>Letzte Fahrten im Team</b></div>
+        <div class="tp-widget-f">Lädt …</div>
+      </div>` : ""}`;
+
+    if (ME.panels.garage61) api("/g61/fleiss?tage=7").then(d => {
+      const el = document.getElementById("w-trips");
+      if (!el) return;
+      const head = `<div class="tp-widget-h">${ICONS.car}<b>Letzte Fahrten im Team</b><a class="td-more" href="#garage61">Alle ansehen →</a></div>`;
+      if (!d.ready) { el.innerHTML = head + '<div class="tp-widget-f">Garage 61 ist noch nicht eingerichtet</div>'; return; }
+      el.innerHTML = head + (d.trips && d.trips.length ? tripTable(d.trips.slice(0, 8)) : '<div class="tp-widget-f">In den letzten 7 Tagen keine Fahrten</div>');
+    }).catch(() => {});
 
     api("/news").then(d => {
       const el = document.getElementById("w-news");
@@ -647,6 +659,21 @@
   }
 
   /* ---------------- Tools ---------------- */
+  const TYPE_SHORT = { 1: "Training", 2: "Quali", 3: "Rennen" };
+  const tripTable = (rows) => `
+    <div class="tm-tbl-wrap"><table class="tm-tbl g6-trips">
+      <tr class="th"><td>Datum</td><td>Fahrer</td><td>Auto</td><td>Strecke</td><td class="r-al">Zeit</td><td class="r-al">Runden</td><td class="r-al">Sauber</td></tr>
+      ${rows.map(x => `<tr>
+        <td class="d0">${new Date(x.day).toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit" })}</td>
+        <td class="n"><b>${esc(x.driver)}</b>${(x.types || []).map(ty => `<span class="g6-type t${ty}">${TYPE_SHORT[ty] || ""}</span>`).join("")}</td>
+        <td>${esc(x.car)}</td>
+        <td class="g6-track">${esc(x.track)}</td>
+        <td class="r-al g6-n">${fmtHours(x.time)}</td>
+        <td class="r-al g6-n">${x.laps}</td>
+        <td class="r-al g6-n">${x.laps ? Math.round(x.clean / x.laps * 100) + " %" : "–"}</td>
+      </tr>`).join("")}
+    </table></div>`;
+
   const fmtHours = (sec) => { const h = Math.floor(sec / 3600), m = Math.round((sec % 3600) / 60); return h ? `${h} h ${String(m).padStart(2, "0")} min` : `${m} min`; };
 
   async function renderG61(tab, days) {
@@ -655,12 +682,31 @@
     main().innerHTML = panelHead("garage61", "Garage 61") + `
       <div class="g6-tabs">
         <button type="button" data-tab="fleiss" class="${tab === "fleiss" ? "on" : ""}">Trainingsfleiß</button>
+        <button type="button" data-tab="trips" class="${tab === "trips" ? "on" : ""}">Fahrtenbuch</button>
         <button type="button" data-tab="board" class="${tab === "board" ? "on" : ""}">Bestenliste</button>
       </div>
       <div id="g61b"><div class="tm-loading"><span></span><span></span><span></span></div></div>`;
     main().querySelectorAll("[data-tab]").forEach(b => b.onclick = () => renderG61(b.dataset.tab, days));
     if (tab === "fleiss") return renderFleiss(days);
+    if (tab === "trips") return renderTrips(days);
     return renderBoard();
+  }
+
+  async function renderTrips(days) {
+    const box = document.getElementById("g61b");
+    let d;
+    try { d = await api("/g61/fleiss?tage=" + days); } catch (e) { box.innerHTML = `<div class="tm-box tm-err">${esc(e.message)}</div>`; return; }
+    if (!d.ready) { box.innerHTML = `<div class="tm-box tm-soon"><div class="big">Noch nicht verbunden</div><p>Garage 61 ist noch nicht eingerichtet.</p></div>`; return; }
+    box.innerHTML = `
+      <div class="g6-bar">
+        <div class="g6-range">
+          <button type="button" data-days="7" class="${days === 7 ? "on" : ""}">7 Tage</button>
+          <button type="button" data-days="30" class="${days === 30 ? "on" : ""}">30 Tage</button>
+        </div>
+        <span class="tm-muted">Wer war mit welchem Auto auf welcher Strecke – pro Tag · Stand: ${fmtDate(d.at)}</span>
+      </div>
+      <div class="ta-list">${d.trips.length ? tripTable(d.trips) : '<p class="tm-muted" style="padding:16px">Keine Fahrten in diesem Zeitraum.</p>'}</div>`;
+    box.querySelectorAll("[data-days]").forEach(b => b.onclick = () => renderG61("trips", Number(b.dataset.days)));
   }
 
   async function renderFleiss(days) {
@@ -807,6 +853,10 @@
         <div class="tm-row"><div class="lbl">Testen</div>
           <div>
             <div class="tm-actions">${btn("Test-Post senden", "sm", 'id="g61-test"')}${btn("Jetzt prüfen", "sm", 'id="g61-run"')}</div>
+            <div class="tm-actions" style="margin-top:12px">
+              <select class="tm-select" id="g61-sdays" style="width:auto"><option value="7">Letzte 7 Tage</option><option value="30">Letzte 30 Tage</option></select>
+              ${btn("📊 Statistik an Discord senden", "sm red", 'id="g61-stats"')}
+            </div>
             <p class="tm-muted" style="margin-top:10px">Letzter Lauf: ${gi.lastRun ? fmtDate(gi.lastRun) + " – " + esc(gi.lastResult || "") : "noch keiner"}</p>
           </div></div>
       </div>
@@ -876,6 +926,17 @@
     };
     action("g61-test", "/admin/g61/test");
     action("g61-run", "/admin/g61/run");
+
+    const sb = document.getElementById("g61-stats");
+    sb.onclick = async () => {
+      sb.disabled = true;
+      try {
+        if (dirty) await save();
+        const r = await api("/admin/g61/stats", { method: "POST", body: { days: Number(document.getElementById("g61-sdays").value), channel: document.getElementById("g61-ch").value } });
+        toast(r.info, r.ok);
+      } catch (e) { toast(e.message); }
+      sb.disabled = false;
+    };
   }
 
 
