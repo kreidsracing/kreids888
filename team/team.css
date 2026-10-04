@@ -564,3 +564,7 @@ button.tm-chip.on::after{content:"✓";font-weight:800;color:var(--red);margin-l
 .kt-gi span{color:var(--steel)}
 .kt-guide p{color:#d5d9e0;font-size:14px;padding:3px 0}
 @media(max-width:700px){.kt-gi{grid-template-columns:1fr;gap:2px}}
+
+.tp-b{display:block;font-size:13.5px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tp-row-m small{color:var(--steel);font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tp-lap{font-family:var(--disp);font-weight:900;font-size:16px;font-variant-numeric:tabular-nums;color:#fff}

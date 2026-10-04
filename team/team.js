@@ -154,7 +154,7 @@
     ["brush", "Eigene Teamliveries", "Designs für das Team und für Einzelevents."],
     ["gear", "Struktur & Support", "Gemeinsam schneller werden."],
     ["calendar", "Flexible Einsätze", "Serien und Events – je nach Interesse und Zeit."],
-    ["ai", "AI-Trainer", "Eigener KI-Coach für jedes Teammitglied – kommt bald."],
+    ["ai", "AI-Trainer", "Eigener KI-Coach für jedes Teammitglied."],
   ];
 
   function loginCard() {
@@ -167,7 +167,7 @@
         ? "Du bist angemeldet, aber dir fehlt die Team-Rolle. Melde dich bei der Teamleitung, wenn du zu F2F Motorsport gehörst."
         : "Dein Discord-Konto ist nicht auf unserem Server. Tritt zuerst bei und melde dich dann erneut an."}</p>
       ${ME.roles && ME.roles.length ? `<div class="tm-roles">${ME.roles.map(chip).join("")}</div>` : ""}`;
-    const items = [["news", "Team News"], ["calendar", "Rennkalender & Termine"], ["wrench", "Setups & Dokumente"], ["flag", "Ergebnisse"], ["arrow", "und vieles mehr …"]];
+    const items = [["news", "Team News"], ["garage61", "Garage 61 – Fahrtenbuch & Bestzeiten"], ["trainer", "Kreids-Trainer"], ["helmet", "Fahrerprofil & Raceteam"], ["arrow", "und vieles mehr …"]];
     return `
       <div class="tp-login-h">${ICONS.discord}<b>Team Login</b></div>
       <p class="tp-login-sub">Nur für Teammitglieder – interner Bereich.</p>
@@ -232,15 +232,13 @@
         </div>
 
         <aside class="tp-side">
-          <div class="tp-widget">
-            <div class="tp-widget-h">${ICONS.trophy}<b>Letzte Ergebnisse</b></div>
-            ${[0, 1, 2, 3].map(() => `<div class="tp-row">${ph("44px")}<div class="tp-row-m">${ph("70%")}${ph("45%")}</div><span class="tp-pos">P–</span></div>`).join("")}
-            <div class="tp-widget-f">Ergebnisse werden bald eingetragen</div>
+          <div class="tp-widget" id="tp-best">
+            <div class="tp-widget-h">${ICONS.trophy}<b>Aktuelle Bestzeiten</b></div>
+            ${[0, 1, 2, 3].map(() => `<div class="tp-row"><div class="tp-row-m">${ph("70%")}${ph("45%")}</div><span class="tp-pos">–:––</span></div>`).join("")}
           </div>
-          <div class="tp-widget">
+          <div class="tp-widget" id="tp-events">
             <div class="tp-widget-h">${ICONS.calendar}<b>Nächste Events</b></div>
-            ${[0, 1, 2].map(() => `<div class="tp-row"><span class="tp-date">--.--</span><div class="tp-row-m">${ph("65%")}${ph("40%")}</div><span class="tp-cls">GT3</span></div>`).join("")}
-            <div class="tp-widget-f">Termine werden bald eingetragen</div>
+            ${[0, 1, 2].map(() => `<div class="tp-row"><span class="tp-date">--.--</span><div class="tp-row-m">${ph("65%")}${ph("40%")}</div></div>`).join("")}
           </div>
         </aside>
       </div>
@@ -264,16 +262,6 @@
         </div>
       </section>
 
-      <section class="tp-sec" id="tp-medien">
-        ${secHead("Medien", "Bilder & Videos", "image")}
-        <div class="tp-media">
-          <a class="tp-media-i" href="${IMG}f2f-recruiting.webp" target="_blank" rel="noopener"><img src="${IMG}f2f-recruiting.webp" alt="Flag to Flag Motorsport sucht Fahrer" loading="lazy"></a>
-          <a class="tp-media-i" href="${IMG}f2f-cars.webp" target="_blank" rel="noopener"><img src="${IMG}f2f-cars.webp" alt="F2F-Liveries auf der Strecke" loading="lazy"></a>
-          <div class="tp-media-i empty">${ICONS.image}<span>Bilder folgen</span></div>
-          <div class="tp-media-i empty">${ICONS.image}<span>Videos folgen</span></div>
-        </div>
-      </section>
-
       <section class="tp-sec tp-recruit">
         <div>
           ${secHead("Fahrer gesucht", "Simracing-Team <span class=\"r\">sucht dich!</span>", "flag")}
@@ -283,6 +271,35 @@
         </div>
         <img class="tp-poster" src="${IMG}f2f-recruiting.webp" alt="Simracing-Team sucht dich – Flag to Flag Motorsport" width="1400" height="788" loading="lazy">
       </section>`;
+
+    // Aktuelle Bestzeiten (Team-Rekorde aus Garage 61)
+    fetch(API + "/public/bestzeiten").then(r => r.json()).then(d => {
+      const el = document.getElementById("tp-best");
+      if (!el) return;
+      const head = `<div class="tp-widget-h">${ICONS.trophy}<b>Aktuelle Bestzeiten</b></div>`;
+      if (!d.ready || !d.laps.length) {
+        el.innerHTML = head + `<div class="tp-widget-f">${d.ready ? "Noch keine Bestzeiten in den letzten 30 Tagen" : "Bestzeiten erscheinen, sobald Garage 61 die Rundenzeiten freischaltet"}</div>`;
+        return;
+      }
+      el.innerHTML = head + d.laps.map(l => `
+        <div class="tp-row">
+          <div class="tp-row-m"><b class="tp-b">${esc(l.track)}</b><small>${esc(l.driver)} · ${esc(l.car)}${l.bop ? ' · <span class="tm-bop">BOP</span>' : ""}</small></div>
+          <span class="tp-lap">${fmtLap(l.time)}</span>
+        </div>`).join("");
+    }).catch(() => {});
+
+    // Nächste Events aus dem Rennkalender (kreids888-Dashboard)
+    fetch("https://kreids888-admin.kreids.workers.dev/api/calendar").then(r => r.json()).then(d => {
+      const el = document.getElementById("tp-events");
+      if (!el) return;
+      const heute = new Date().toISOString().slice(0, 10);
+      const next = (d.entries || []).filter(e => e.date >= heute).sort((x, y) => (x.date + (x.time || "")).localeCompare(y.date + (y.time || ""))).slice(0, 4);
+      el.innerHTML = `<div class="tp-widget-h">${ICONS.calendar}<b>Nächste Events</b></div>` + (next.length ? next.map(e => `
+        <div class="tp-row">
+          <span class="tp-date">${e.date.slice(8, 10)}.${e.date.slice(5, 7)}.</span>
+          <div class="tp-row-m"><b class="tp-b">${esc(e.title)}</b><small>${e.time ? esc(e.time) + " Uhr" : ""}${e.type ? " · " + esc(e.type) : ""}</small></div>
+        </div>`).join("") : '<div class="tp-widget-f">Keine Termine eingetragen</div>');
+    }).catch(() => {});
 
     // freigegebene Fahrerprofile statt Platzhalter
     fetch(API + "/public/raceteam").then(r => r.json()).then(d => {
