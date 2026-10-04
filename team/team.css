@@ -665,3 +665,15 @@ button.tm-chip.on::after{content:"✓";font-weight:800;color:var(--red);margin-l
 
 @media(max-width:1100px){.tp-join-steps{grid-template-columns:repeat(2,1fr)}}
 .ka-link{color:#fff;text-decoration:underline;text-decoration-color:var(--red)}
+
+/* ---------- Abwesenheiten ---------- */
+.ab-row{display:grid;grid-template-columns:12px 1fr auto auto;gap:14px;align-items:center;padding:12px 16px;border-bottom:1px solid var(--line)}
+.ab-row:last-child{border-bottom:0}
+.ab-dot{width:10px;height:10px;border-radius:50%;background:#ffb020}
+.ab-row.jetzt .ab-dot{background:var(--red);box-shadow:0 0 10px var(--red-glow)}
+.ab-main b{display:block;font-weight:700}
+.ab-main small{color:var(--steel);font-size:13px}
+.ab-zeit{text-align:right;font-size:13px;color:#d5d9e0;line-height:1.45}
+.ab-zeit span{color:var(--steel)}
+.ab-when{grid-template-columns:1fr 1fr}
+@media(max-width:700px){.ab-row{grid-template-columns:12px 1fr auto}.ab-zeit{grid-column:2/3;text-align:left}}

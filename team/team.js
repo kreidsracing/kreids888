@@ -368,7 +368,7 @@
             ${ME.panels.garage61 ? link("garage61", "garage61", "Garage 61") : ""}
             ${SECTIONS.map(s => link(s.id, s.icon, s.label)).join("")}
             ${ME.panels.links ? link("links", "link", "Links") : ""}
-            ${tools.length ? `<div class="td-nav-h">Tools</div>${tools.map(p => link(p, p, PANELS[p].title)).join("")}` : ""}
+            <div class="td-nav-h">Tools</div>${link("abwesend", "clock", "Abwesenheiten")}${tools.map(p => link(p, p, PANELS[p].title)).join("")}
             ${ME.isAdmin ? `<div class="td-nav-h">Verwaltung</div>${link("aktivitaet", "activity", "Aktivität")}${link("news-schreiben", "news", "News schreiben")}${link("fahrerprofile", "helmet", "Fahrerprofile")}${link("kalender-admin", "calendar", "Rennkalender")}${link("admin", "admin", "Admin")}<a class="td-link" href="https://kreids888-admin.kreids.workers.dev/" target="_blank" rel="noopener">${ICONS.ext}<span>kreids888-Dashboard</span></a>` : ""}
           </nav>
         </aside>
@@ -382,6 +382,7 @@
     if (id === "kalender-admin" && ME.isAdmin) return renderKalenderAdmin();
     if (id === "news") return renderNews();
     if (id === "fahrer") return renderProfile();
+    if (id === "abwesend") return renderAbwesend();
     if (id === "links" && ME.panels.links) return renderLinks();
     if (id === "garage61" && ME.panels.garage61) return renderG61();
     if (id === "trainer" && ME.panels.trainer && window.F2FTrainer)
@@ -579,7 +580,9 @@
           <div class="td-label" style="margin-top:0">Vorschau</div>
           <div id="pf-prev" class="pf-prev"></div>
         </div>
-      </div>`;
+      </div>
+      <div id="abw-box"></div>`;
+    abwFormular(document.getElementById("abw-box"), () => renderProfile());
     const prev = () => (document.getElementById("pf-prev").innerHTML = driverCard(readForm(), ME.user.name, ME.user.avatar));
     prev();
     box.querySelectorAll("input,select,textarea").forEach(el => el.addEventListener("input", prev));
@@ -659,6 +662,62 @@
       catch (e) { toast(e.message); }
     });
     if (openId) { const r = box.querySelector(`.pa-row[data-id="${openId}"]`); if (r) { r.classList.remove("open"); open(r); } }
+  }
+
+  /* ---------------- Abwesenheiten ---------------- */
+  const GRUENDE = { urlaub: "🏖️ Im Urlaub", nv: "⛔ Nicht verfügbar", keinezeit: "⏳ Keine Zeit", sonst: "✏️ Sonstiges", keine: "🔒 Keine Angabe" };
+  const wann = (ms) => new Date(ms).toLocaleString("de-DE", { weekday: "short", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }) + " Uhr";
+
+  function abwFormular(el, nachher) {
+    const heute = new Date().toLocaleDateString("sv-SE");
+    el.innerHTML = `
+      <div class="tm-box" style="margin-top:16px">
+        <h5>Abwesenheit eintragen</h5>
+        <p class="hint">Wird im Team-Discord gepostet und erscheint unter „Abwesenheiten". In Discord geht es auch mit <b>/abwesend</b>.</p>
+        <div class="tm-row"><label for="ab-grund">Grund</label>
+          <select class="tm-select" id="ab-grund">${Object.entries(GRUENDE).map(([k, v]) => `<option value="${k}">${v}</option>`).join("")}</select></div>
+        <div class="tm-row"><label for="ab-text">Hinweis<small>optional</small></label><input class="tm-input" id="ab-text" maxlength="120" placeholder="z. B. Familienfeier, Spätschicht …"></div>
+        <div class="tm-row"><div class="lbl">Von</div><div class="ka-when ab-when"><input class="tm-input" id="ab-vd" type="date" value="${heute}"><input class="tm-input" id="ab-vz" type="time" value="00:00"></div></div>
+        <div class="tm-row"><div class="lbl">Bis</div><div class="ka-when ab-when"><input class="tm-input" id="ab-bd" type="date" value="${heute}"><input class="tm-input" id="ab-bz" type="time" value="23:59"></div></div>
+        <div class="tm-actions">${btn("Eintragen", "red", 'id="ab-save"')}</div>
+      </div>`;
+    const b = document.getElementById("ab-save");
+    b.onclick = async () => {
+      const v = (id) => document.getElementById(id).value;
+      b.disabled = true;
+      try {
+        const r = await api("/abwesend", { method: "POST", body: { grund: v("ab-grund"), text: v("ab-text"), von: v("ab-vd") + "T" + v("ab-vz"), bis: v("ab-bd") + "T" + v("ab-bz") } });
+        toast(r.info, true); nachher();
+      } catch (e) { toast(e.message); b.disabled = false; }
+    };
+  }
+
+  async function renderAbwesend() {
+    main().innerHTML = panelHead("clock", "Abwesenheiten") + '<div id="abw"><div class="tm-loading"><span></span><span></span><span></span></div></div>';
+    const box = document.getElementById("abw");
+    let d;
+    try { d = await api("/abwesend"); } catch (e) { box.innerHTML = `<div class="tm-box tm-err">${esc(e.message)}</div>`; return; }
+    const now = Date.now();
+    const zeile = (a) => `
+      <div class="ab-row${a.von <= now ? " jetzt" : ""}">
+        <span class="ab-dot"></span>
+        <div class="ab-main"><b>${esc(a.name)}</b><small>${GRUENDE[a.grund] || ""}${a.text ? " · " + esc(a.text) : ""}</small></div>
+        <div class="ab-zeit">${wann(a.von)}<br><span>bis</span> ${wann(a.bis)}</div>
+        ${a.uid === d.me || ME.isAdmin ? btn("✕", "sm", `data-abdel="${a.id}" title="Löschen"`) : "<span></span>"}
+      </div>`;
+    const jetzt = d.list.filter(a => a.von <= now), bald = d.list.filter(a => a.von > now);
+    box.innerHTML = `
+      <div class="td-label" style="margin-top:0">Gerade abwesend</div>
+      <div class="ta-list">${jetzt.length ? jetzt.map(zeile).join("") : '<p class="tm-muted" style="padding:14px 16px">🏁 Alle an Bord!</p>'}</div>
+      <div class="td-label">Demnächst</div>
+      <div class="ta-list">${bald.length ? bald.map(zeile).join("") : '<p class="tm-muted" style="padding:14px 16px">Nichts geplant.</p>'}</div>
+      <div id="abw-form"></div>`;
+    abwFormular(document.getElementById("abw-form"), () => renderAbwesend());
+    box.querySelectorAll("[data-abdel]").forEach(b => b.onclick = async () => {
+      if (!confirm("Abwesenheit löschen?")) return;
+      try { const r = await api("/abwesend/delete", { method: "POST", body: { id: b.dataset.abdel } }); toast(r.info || "Gelöscht", r.ok !== false); renderAbwesend(); }
+      catch (e) { toast(e.message); }
+    });
   }
 
   /* ---------------- Rennkalender + Discord-Events (Admin) ---------------- */
@@ -1052,6 +1111,14 @@
       </div>
 
       <div class="tm-box">
+        <h5>Abwesenheiten</h5>
+        <p class="hint">Neue Abwesenheiten postet der Bot in diesen Kanal. Für die Discord-Befehle /abwesend, /abwesenheiten und /zurueck einmal „Befehle einrichten" klicken.</p>
+        <div class="tm-row"><label for="ab-ch">Discord-Kanal</label>
+          <div><select class="tm-select" id="ab-ch"><option value="">– nicht posten –</option>${(d.channels || []).map(c => `<option value="${c.id}" ${c.id === (cfg.absences || {}).channel ? "selected" : ""}># ${esc(c.name)}</option>`).join("")}</select></div></div>
+        <div class="tm-row"><div class="lbl">Discord-Befehle</div><div class="tm-actions">${btn("Befehle einrichten", "sm", 'id="ab-cmds"')}</div></div>
+      </div>
+
+      <div class="tm-box">
         <h5>Links</h5>
         <p class="hint">Erscheinen im Dashboard unter „Links" für alle Teammitglieder. Mit ▲▼ sortieren.</p>
         <div id="lk-edit"></div>
@@ -1091,7 +1158,7 @@
         };
       });
     });
-    box.querySelectorAll("#g61-team,#g61-ch,#g61-on,#g61-rec,#g61-week,#rm-on,#rm-24,#rm-1,#rm-ch,#rm-ping").forEach(el => el.addEventListener("input", markDirty));
+    box.querySelectorAll("#g61-team,#g61-ch,#g61-on,#g61-rec,#g61-week,#rm-on,#rm-24,#rm-1,#rm-ch,#rm-ping,#ab-ch").forEach(el => el.addEventListener("input", markDirty));
     box.querySelectorAll("#g61-on,#g61-rec").forEach(el => el.addEventListener("change", markDirty));
 
     // ---- Links bearbeiten ----
@@ -1150,6 +1217,7 @@
           h1: document.getElementById("rm-1").checked,
         },
         links: (lkSync(), links.filter(l => l.title.trim() && l.url.trim())),
+        absences: { channel: document.getElementById("ab-ch").value },
       };
       await api("/admin/config", { method: "POST", body });
       dirty = false;
@@ -1178,6 +1246,7 @@
     action("g61-test", "/admin/g61/test");
     action("g61-run", "/admin/g61/run");
     action("rm-test", "/admin/reminders/test");
+    action("ab-cmds", "/admin/discord/commands");
 
     const sb = document.getElementById("g61-stats");
     sb.onclick = async () => {
