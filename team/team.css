@@ -783,3 +783,23 @@ button.wk-col:focus-visible{outline:2px solid var(--red);outline-offset:2px}
 .wk-col:not(.now) span{color:var(--steel)}
 .wk-kw span:not(.now){color:var(--steel)}
 .tm-box h5 .tm-badge.live{margin-left:4px}
+
+/* ---------- Wochen-Post: Discord-Vorschau ---------- */
+#wp-text{width:100%;min-height:80px;resize:vertical;font:inherit;line-height:1.5}
+.dp{margin-top:18px;background:#313338;border-radius:8px;padding:16px;color:#dbdee1;font-family:"gg sans","Noto Sans",var(--body),sans-serif;font-size:15px;line-height:1.45}
+.dp-label{font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:#949ba4;margin-bottom:10px}
+.dp-ping{display:inline-block;background:rgba(88,101,242,.3);color:#c9cdfb;border-radius:3px;padding:0 3px;margin-bottom:6px;font-weight:500}
+.dp-embed{position:relative;max-width:520px;background:#2b2d31;border-left:4px solid #E11324;border-radius:4px;padding:10px 16px 14px 12px}
+.dp-thumb{position:absolute;top:12px;right:14px;width:72px;height:72px;object-fit:contain;border-radius:4px}
+.dp-author{font-size:12.5px;font-weight:600;color:#f2f3f5;margin:4px 90px 6px 0}
+.dp-title{font-size:16px;font-weight:700;color:#f2f3f5;margin:0 90px 8px 0}
+.dp-desc{font-size:14px}
+.dp-h3{font-size:17px;font-weight:700;color:#f2f3f5;margin:2px 0 4px}
+.dp blockquote{margin:2px 0 4px;padding:2px 0 2px 12px;border-left:4px solid #4e5058;color:#f2f3f5}
+.dp-gap{height:8px}
+.dp-fields{display:flex;flex-wrap:wrap;gap:8px 18px;margin-top:10px}
+.dp-field{flex:1 1 100%;font-size:14px}
+.dp-field.in{flex:1 1 40%}
+.dp-fn{font-weight:700;color:#f2f3f5;margin-bottom:2px}
+.dp-foot{margin-top:10px;font-size:12px;color:#949ba4}
+.dp b{color:#f2f3f5}

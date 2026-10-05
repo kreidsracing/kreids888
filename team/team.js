@@ -1313,6 +1313,7 @@
       : '<span class="tm-err">Keine Rollen geladen – ist der Bot auf dem Server?</span>';
 
     const g = cfg.g61, gi = d.g61;
+    const wp = cfg.wpost || {}, wpo = wp.opt || {};
     const teamOpts = gi.teams.length
       ? `<select class="tm-select" id="g61-team"><option value="">– Team wählen –</option>${gi.teams.map(t => `<option value="${esc(t.slug)}" ${t.slug === g.teamSlug ? "selected" : ""}>${esc(t.name)}</option>`).join("")}</select>`
       : `<input class="tm-input" id="g61-team" placeholder="Team-Slug aus Garage 61" value="${esc(g.teamSlug)}">`;
@@ -1346,23 +1347,43 @@
         <div class="tm-row"><label for="g61-team">Garage-61-Team</label><div>${teamOpts}</div></div>
         <div class="tm-row"><label for="g61-ch">Discord-Kanal<small>für Bestzeit-Posts</small></label>
           <div><select class="tm-select" id="g61-ch"><option value="">– Kanal wählen –</option>${(d.channels || []).map(c => `<option value="${c.id}" ${c.id === g.channel ? "selected" : ""}># ${esc(c.name)}</option>`).join("")}</select></div></div>
-        <div class="tm-row"><label for="g61-ziel">Wochenziel<small>Runden pro Woche fürs ganze Team · 0 = aus</small></label>
-          <div><input class="tm-input" id="g61-ziel" type="number" min="0" max="100000" step="50" value="${Number(g.ziel) || 0}" style="max-width:160px"></div></div>
         <div class="tm-row"><div class="lbl">Automatisch posten</div>
           <div style="display:flex;flex-direction:column;gap:12px">
             <label class="tm-switch"><input type="checkbox" id="g61-on" ${g.enabled ? "checked" : ""}><span class="s"></span>Neue Bestzeiten posten</label>
             <label class="tm-switch"><input type="checkbox" id="g61-rec" ${g.onlyTeamRecord ? "checked" : ""}><span class="s"></span>Nur Team-Rekorde (P1)</label>
-            <label class="tm-switch"><input type="checkbox" id="g61-week" ${g.weekly ? "checked" : ""}><span class="s"></span>Wochenrückblick jeden Sonntagabend</label>
           </div></div>
         <div class="tm-row"><div class="lbl">Testen</div>
           <div>
             <div class="tm-actions">${btn("Test-Post senden", "sm", 'id="g61-test"')}${btn("Jetzt prüfen", "sm", 'id="g61-run"')}</div>
-            <div class="tm-actions" style="margin-top:12px">
-              <select class="tm-select" id="g61-sdays" style="width:auto"><option value="7">Letzte 7 Tage</option><option value="30">Letzte 30 Tage</option></select>
-              ${btn("📊 Statistik an Discord senden", "sm red", 'id="g61-stats"')}
-            </div>
             <p class="tm-muted" style="margin-top:10px">Letzter Lauf: ${gi.lastRun ? fmtDate(gi.lastRun) + " – " + esc(gi.lastResult || "") : "noch keiner"}</p>
           </div></div>
+      </div>
+
+      <div class="tm-box">
+        <h5>Wochen-Post</h5>
+        <p class="hint">Trainingswoche auswählen, Inhalt festlegen, Vorschau ansehen und dann in Discord posten. Alle Zahlen kommen automatisch aus Garage 61.</p>
+        <div class="tm-row"><label for="g61-ziel">Wochenziel<small>Runden pro Woche fürs ganze Team · 0 = aus · mit „Speichern" sichern</small></label>
+          <div><input class="tm-input" id="g61-ziel" type="number" min="0" max="100000" step="50" value="${Number(g.ziel) || 0}" style="max-width:160px"> <span class="tm-muted">Runden</span></div></div>
+        <div class="tm-row"><label for="wp-w">Woche</label>
+          <div><select class="tm-select" id="wp-w" style="width:auto"><option value="">Lädt …</option></select></div></div>
+        <div class="tm-row"><label for="wp-text">Ansage vom Teamchef<small>optional · wird groß hervorgehoben</small></label>
+          <div><textarea class="tm-input" id="wp-text" rows="3" maxlength="600" placeholder="z. B. Starke Woche, Jungs! Samstag geht's nach Spa – alle nochmal auf die Strecke!"></textarea></div></div>
+        <div class="tm-row"><div class="lbl">Inhalt</div>
+          <div style="display:flex;flex-direction:column;gap:12px">
+            <label class="tm-switch"><input type="checkbox" id="wp-alle" ${wpo.alle !== false ? "checked" : ""}><span class="s"></span>Alle Fahrer zeigen (sonst nur Podium P1–P3)</label>
+            <label class="tm-switch"><input type="checkbox" id="wp-vgl" ${wpo.vgl !== false ? "checked" : ""}><span class="s"></span>Vergleich zur Vorwoche</label>
+            <label class="tm-switch"><input type="checkbox" id="wp-sprung" ${wpo.sprung !== false ? "checked" : ""}><span class="s"></span>Größter Sprung (meiste Runden mehr als in der Vorwoche)</label>
+            <label class="tm-switch"><input type="checkbox" id="wp-ziel" ${wpo.ziel !== false ? "checked" : ""}><span class="s"></span>Wochenziel</label>
+            <label class="tm-switch"><input type="checkbox" id="wp-sauber" ${wpo.sauber ? "checked" : ""}><span class="s"></span>Saubere Runden in %</label>
+            <label class="tm-switch"><input type="checkbox" id="wp-top" ${wpo.top ? "checked" : ""}><span class="s"></span>Top-Strecken &amp; Top-Autos</label>
+          </div></div>
+        <div class="tm-row"><label for="wp-ch">Discord-Kanal</label>
+          <div><select class="tm-select" id="wp-ch"><option value="">– Kanal wählen –</option>${(d.channels || []).map(c => `<option value="${c.id}" ${c.id === (wp.channel || g.channel) ? "selected" : ""}># ${esc(c.name)}</option>`).join("")}</select></div></div>
+        <div class="tm-row"><label for="wp-ping">Rolle pingen<small>z. B. Teamfahrer</small></label>
+          <div><select class="tm-select" id="wp-ping"><option value="">– niemanden pingen –</option>${d.roles.map(r => `<option value="${r.id}" ${r.id === wp.ping ? "selected" : ""}>@${esc(r.name)}</option>`).join("")}</select></div></div>
+        <div class="tm-row"><div class="lbl">Posten</div>
+          <div class="tm-actions">${btn("Vorschau", "sm", 'id="wp-prev"')}${btn("🏁 In Discord posten", "sm red", 'id="wp-send"')}</div></div>
+        <div id="wp-vorschau"></div>
       </div>
 
       <div class="tm-box">
@@ -1429,7 +1450,7 @@
         };
       });
     });
-    box.querySelectorAll("#g61-team,#g61-ziel,#g61-ch,#g61-on,#g61-rec,#g61-week,#rm-on,#rm-24,#rm-1,#rm-ch,#rm-ping,#ab-ch,#li-on,#li-90,#li-100,#li-ch,#li-ping").forEach(el => el.addEventListener("input", markDirty));
+    box.querySelectorAll("#g61-team,#g61-ziel,#g61-ch,#g61-on,#g61-rec,#rm-on,#rm-24,#rm-1,#rm-ch,#rm-ping,#ab-ch,#li-on,#li-90,#li-100,#li-ch,#li-ping").forEach(el => el.addEventListener("input", markDirty));
     box.querySelectorAll("#g61-on,#g61-rec").forEach(el => el.addEventListener("change", markDirty));
 
     // ---- Links bearbeiten ----
@@ -1478,7 +1499,6 @@
           channel: document.getElementById("g61-ch").value,
           enabled: document.getElementById("g61-on").checked,
           onlyTeamRecord: document.getElementById("g61-rec").checked,
-          weekly: document.getElementById("g61-week").checked,
           ziel: Number(document.getElementById("g61-ziel").value) || 0,
         },
         reminders: {
@@ -1528,15 +1548,76 @@
     action("ab-cmds", "/admin/discord/commands");
     action("li-test", "/admin/limits/test");
 
-    const sb = document.getElementById("g61-stats");
-    sb.onclick = async () => {
-      sb.disabled = true;
+    // ---- Wochen-Post ----
+    const wpSel = document.getElementById("wp-w");
+    api("/g61/woche").then(w => {
+      if (!w.ready) { wpSel.innerHTML = '<option value="">Garage 61 nicht eingerichtet</option>'; return; }
+      const last = w.wochen.length - 1;
+      wpSel.innerHTML = w.wochen.map((x, i) => `<option value="${i}" ${i === last - 1 ? "selected" : ""}>KW ${x.kw}${i === last ? " (läuft)" : ""} · ab ${fmtDay(x.start)} · ${Number(x.laps).toLocaleString("de-DE")} Runden</option>`).reverse().join("");
+    }).catch(() => { wpSel.innerHTML = '<option value="">Wochen nicht ladbar</option>'; });
+
+    const wpBody = (vorschau) => ({
+      w: Number(wpSel.value),
+      text: document.getElementById("wp-text").value,
+      channel: document.getElementById("wp-ch").value,
+      ping: document.getElementById("wp-ping").value,
+      vorschau,
+      opt: Object.fromEntries(["alle", "vgl", "sprung", "ziel", "sauber", "top"].map(k => [k, document.getElementById("wp-" + k).checked])),
+    });
+    const md = (t) => esc(t || "")
+      .replace(/\*\*(.+?)\*\*/g, "<b>$1</b>")
+      .replace(/\*(.+?)\*/g, "<i>$1</i>");
+    const mdBlock = (t) => {
+      let out = "", quote = [];
+      const flush = () => { if (quote.length) { out += `<blockquote>${quote.join("<br>")}</blockquote>`; quote = []; } };
+      for (const line of String(t || "").split("\n")) {
+        if (/^>\s?/.test(line)) { quote.push(md(line.replace(/^>\s?/, ""))); continue; }
+        flush();
+        if (line.startsWith("### ")) out += `<div class="dp-h3">${md(line.slice(4))}</div>`;
+        else out += line ? `<div>${md(line)}</div>` : '<div class="dp-gap"></div>';
+      }
+      flush();
+      return out;
+    };
+    const zeigeVorschau = (e, ping) => {
+      const pingName = ping ? (d.roles.find(r => r.id === ping) || {}).name : "";
+      document.getElementById("wp-vorschau").innerHTML = `
+        <div class="dp">
+          <div class="dp-label">Vorschau – so sieht der Post in Discord aus</div>
+          ${pingName ? `<div class="dp-ping">@${esc(pingName)}</div>` : ""}
+          <div class="dp-embed">
+            <img class="dp-thumb" src="${IMG}f2f-logo.webp" alt="">
+            <div class="dp-author">${esc(e.author.name)}</div>
+            <div class="dp-title">${md(e.title)}</div>
+            <div class="dp-desc">${mdBlock(e.description)}</div>
+            <div class="dp-fields">${e.fields.map(f => `<div class="dp-field${f.inline ? " in" : ""}">${f.name !== "\u200B" ? `<div class="dp-fn">${md(f.name)}</div>` : ""}<div class="dp-fv">${mdBlock(f.value)}</div></div>`).join("")}</div>
+            <div class="dp-foot">${esc(e.footer.text)}</div>
+          </div>
+        </div>`;
+    };
+    const wpPrev = document.getElementById("wp-prev");
+    wpPrev.onclick = async () => {
+      if (wpSel.value === "") return toast("Bitte eine Woche wählen");
+      wpPrev.disabled = true;
+      try {
+        const b = wpBody(true);
+        const r = await api("/admin/wochenpost", { method: "POST", body: b });
+        if (r.embed) zeigeVorschau(r.embed, b.ping); else toast(r.info || "Fehler");
+      } catch (e) { toast(e.message); }
+      wpPrev.disabled = false;
+    };
+    const wpSend = document.getElementById("wp-send");
+    wpSend.onclick = async () => {
+      if (wpSel.value === "") return toast("Bitte eine Woche wählen");
+      if (!confirm("Wochen-Post jetzt in Discord posten?")) return;
+      wpSend.disabled = true;
       try {
         if (dirty) await save();
-        const r = await api("/admin/g61/stats", { method: "POST", body: { days: Number(document.getElementById("g61-sdays").value), channel: document.getElementById("g61-ch").value } });
-        toast(r.info, r.ok);
+        const r = await api("/admin/wochenpost", { method: "POST", body: wpBody(false) });
+        toast(r.info || "Erledigt", r.ok);
+        if (r.ok) { document.getElementById("wp-text").value = ""; document.getElementById("wp-vorschau").innerHTML = ""; }
       } catch (e) { toast(e.message); }
-      sb.disabled = false;
+      wpSend.disabled = false;
     };
   }
 
