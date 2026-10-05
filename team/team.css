@@ -773,3 +773,13 @@ button.tm-chip.on::after{content:"✓";font-weight:800;color:var(--red);margin-l
   .wk-motto{margin-left:0;flex-basis:100%}
   .wk-tile b{font-size:28px}
 }
+.wk-now{margin-top:10px;padding:10px 14px;border:1px dashed var(--line);color:var(--steel);font-size:13.5px}
+.wk-now b{color:var(--white);font-weight:600}
+.wk-home .wk-now{margin:0 16px 12px}
+button.wk-col{background:none;border:0;padding:0;margin:0;cursor:pointer;color:inherit;font:inherit}
+button.wk-col:hover i{background:#4a4f5b}
+button.wk-col.now:hover i{background:var(--red)}
+button.wk-col:focus-visible{outline:2px solid var(--red);outline-offset:2px}
+.wk-col:not(.now) span{color:var(--steel)}
+.wk-kw span:not(.now){color:var(--steel)}
+.tm-box h5 .tm-badge.live{margin-left:4px}

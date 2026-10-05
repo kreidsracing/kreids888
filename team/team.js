@@ -280,7 +280,7 @@
       <section class="tp-sec" id="tp-woche" hidden>
         <div class="tp-h wk-h">
           <img class="wk-logo" src="${IMG}f2f-logo.webp" alt="F2F Motorsport" width="48" height="48">
-          <div><div class="tp-h-k">Training</div><h3>Diese Woche bei <span class="r">Flag to Flag Motorsport</span></h3></div>
+          <div><div class="tp-h-k" id="tp-woche-kw">Training</div><h3>Trainingswoche bei <span class="r">Flag to Flag Motorsport</span></h3></div>
           <span class="wk-motto">Konstanz bis ins Ziel.</span>
         </div>
         <div id="tp-woche-k"></div>
@@ -375,6 +375,7 @@
       const sec = document.getElementById("tp-woche");
       if (!sec || !d.ready || (!d.jetzt.laps && !d.vorher.laps)) return;
       document.getElementById("tp-woche-k").innerHTML = wocheKacheln(d, false);
+      document.getElementById("tp-woche-kw").textContent = "Training · KW " + d.kwVorher;
       sec.hidden = false;
     }).catch(() => {});
 
@@ -458,7 +459,7 @@
       </section>
 
       ${ME.panels.garage61 ? `<div class="tp-widget wk-home" id="w-woche">
-        <div class="tp-widget-h">${ICONS.activity}<b>Diese Woche im Team</b></div>
+        <div class="tp-widget-h">${ICONS.activity}<b>Trainingswoche</b></div>
         <div class="tp-widget-f">Lädt …</div>
       </div>` : ""}
 
@@ -482,7 +483,7 @@
       const el = document.getElementById("w-woche");
       if (!el) return;
       if (!d.ready) { el.remove(); return; }
-      el.innerHTML = `<div class="tp-widget-h">${ICONS.activity}<b>Diese Woche im Team</b><a class="td-more" href="#woche">Wochenübersicht →</a></div>`
+      el.innerHTML = `<div class="tp-widget-h">${ICONS.activity}<b>Trainingswoche · KW ${d.kwVorher}</b><a class="td-more" href="#woche">Wochenübersicht →</a></div>`
         + wocheKacheln(d, true) + wocheZiel(d);
     }).catch(() => { const el = document.getElementById("w-woche"); if (el) el.remove(); });
 
@@ -937,30 +938,28 @@
   };
   const zahlDE = (n) => Number(n || 0).toLocaleString("de-DE");
   const trend = (diff, txt) => `<span class="wk-tr ${diff > 0 ? "up" : diff < 0 ? "down" : ""}">${diff > 0 ? "▲ " : diff < 0 ? "▼ " : ""}${txt}</span>`;
-  const rundenTrend = (jetzt, vorher) => {
-    if (!vorher) return jetzt ? trend(1, "neu diese Woche") : trend(0, "noch keine Runden");
-    const p = Math.round((jetzt - vorher) / vorher * 100);
-    return trend(p, `${Math.abs(p)} % zur Vorwoche`);
-  };
   const kachel = (label, wert, unten) => `<div class="wk-tile"><small>${label}</small><b>${wert}</b>${unten}</div>`;
 
-  // Kacheln: öffentlich (3) oder intern (4)
+  // Kacheln: letzte abgeschlossene Woche – öffentlich (3) oder intern (4)
   function wocheKacheln(d, intern) {
-    const j = d.jetzt, v = d.vorher;
-    const proTag = d.tage ? j.time / d.tage : 0;
+    const j = d.vorher, v = d.vorvorher, kv = "KW " + d.kwVorvorher;
+    const rTrend = !v.laps ? trend(0, j.laps ? "–" : "keine Runden") : (() => { const p = Math.round((j.laps - v.laps) / v.laps * 100); return trend(p, `${Math.abs(p)} % zur ${kv}`); })();
+    const da = j.active - v.active;
+    const aTrend = da ? trend(da, `${da > 0 ? "+" : "−"}${Math.abs(da)} zur ${kv}`) : trend(0, `wie ${kv}`);
+    const jetzt = `<div class="wk-now"><b>Diese Woche (KW ${d.kw}) bisher:</b> ${zahlDE(d.jetzt.laps)} Runden · ${fmtH(d.jetzt.time)} · ${d.jetzt.active} Fahrer</div>`;
     if (!intern) return `<div class="wk-tiles">
-      ${kachel("Runden gefahren", zahlDE(j.laps), rundenTrend(j.laps, v.laps))}
-      ${kachel("Zeit auf der Strecke", fmtH(j.time), `<span class="wk-tr">≈ ${fmtH(proTag)} pro Tag</span>`)}
-      ${kachel("Fahrer im Training", j.active, '<span class="wk-tr">seit Montag</span>')}
-    </div>`;
-    const dt = j.time - v.time, da = j.active - v.active;
+      ${kachel("Runden gefahren", zahlDE(j.laps), rTrend)}
+      ${kachel("Zeit auf der Strecke", fmtH(j.time), `<span class="wk-tr">≈ ${fmtH(j.time / 7)} pro Tag</span>`)}
+      ${kachel("Fahrer im Training", j.active, aTrend)}
+    </div>${jetzt}`;
+    const dt = j.time - v.time;
     const sj = j.laps ? Math.round(j.clean / j.laps * 100) : 0, sv = v.laps ? Math.round(v.clean / v.laps * 100) : 0;
     return `<div class="wk-tiles">
-      ${kachel("Runden", zahlDE(j.laps), rundenTrend(j.laps, v.laps))}
-      ${kachel("Zeit auf der Strecke", fmtH(j.time), dt ? trend(dt, fmtH(Math.abs(dt))) : trend(0, "wie Vorwoche"))}
-      ${kachel("Fahrer aktiv", `${j.active} / ${d.mitglieder}`, da ? trend(da, `${da > 0 ? "+" : "−"}${Math.abs(da)} zur Vorwoche`) : trend(0, "wie Vorwoche"))}
-      ${kachel("Saubere Runden", j.laps ? sj + " %" : "–", j.laps && v.laps && sj !== sv ? trend(sj - sv, `${Math.abs(sj - sv)} %`) : trend(0, j.laps ? "wie Vorwoche" : "–"))}
-    </div>`;
+      ${kachel("Runden", zahlDE(j.laps), rTrend)}
+      ${kachel("Zeit auf der Strecke", fmtH(j.time), dt ? trend(dt, `${fmtH(Math.abs(dt))} zur ${kv}`) : trend(0, `wie ${kv}`))}
+      ${kachel("Fahrer aktiv", `${j.active} / ${d.mitglieder}`, aTrend)}
+      ${kachel("Saubere Runden", j.laps ? sj + " %" : "–", j.laps && v.laps && sj !== sv ? trend(sj - sv, `${Math.abs(sj - sv)} % zur ${kv}`) : trend(0, j.laps && v.laps ? `wie ${kv}` : "–"))}
+    </div>${jetzt}`;
   }
 
   function wocheZiel(d) {
@@ -979,36 +978,69 @@
     let d;
     try { d = await api("/g61/woche"); } catch (e) { box.innerHTML = `<div class="tm-box tm-err">${esc(e.message)}</div>`; return; }
     if (!d.ready) { box.innerHTML = '<div class="tm-box tm-soon"><div class="big">Noch nicht verbunden</div><p>Garage 61 ist noch nicht eingerichtet.</p></div>'; return; }
-    const max = Math.max(1, ...d.wochen.map(w => w.laps));
-    const letzte = d.wochen.length - 1;
-    const pfeil = (f) => {
-      const x = f.laps - f.pLaps;
-      return x > 0 ? `<span class="wk-tr up">▲ +${x}</span>` : x < 0 ? `<span class="wk-tr down">▼ −${Math.abs(x)}</span>` : '<span class="wk-tr">± 0</span>';
-    };
+    if (!d.fahrer.every(f => Array.isArray(f.w))) { box.innerHTML = '<div class="tm-box tm-err">Der Worker ist noch nicht aktualisiert – bitte die Worker-Änderungen einspielen.</div>'; return; }
+    const W = d.wochen, letzte = W.length - 1;
+    let sel = letzte - 1;
+    const max = Math.max(1, ...W.map(w => w.laps));
+
     box.innerHTML = `
       <div class="tm-box">
-        <h5>Wochenverlauf <span class="tm-muted" style="letter-spacing:0;text-transform:none;font-family:var(--body);font-weight:500">Runden pro Woche · ganzes Team</span></h5>
-        <div class="wk-chart">${d.wochen.map((w, i) => `
-          <div class="wk-col${i === letzte ? " now" : ""}" title="KW ${w.kw} · ${fmtH(w.time)}">
+        <h5>Wochenverlauf <span class="tm-muted" style="letter-spacing:0;text-transform:none;font-family:var(--body);font-weight:500">Runden pro Woche · Balken anklicken für Details</span></h5>
+        <div class="wk-chart">${W.map((w, i) => `
+          <button type="button" class="wk-col" data-w="${i}" title="KW ${w.kw} · ${zahlDE(w.laps)} Runden · ${fmtH(w.time)}">
             <span>${zahlDE(w.laps)}</span><i style="height:${Math.round(w.laps / max * 100)}%"></i>
-          </div>`).join("")}
+          </button>`).join("")}
         </div>
-        <div class="wk-kw">${d.wochen.map((w, i) => `<span class="${i === letzte ? "now" : ""}">KW ${w.kw}</span>`).join("")}</div>
+        <div class="wk-kw">${W.map((w, i) => `<span data-k="${i}">KW ${w.kw}${i === letzte ? " · läuft" : ""}</span>`).join("")}</div>
       </div>
-      <div class="tm-box" style="padding:0">
-        <h5 style="padding:18px 22px 0">Fahrer diese Woche</h5>
-        <div class="ta-list" style="border:0;margin-top:12px">
-          <div class="wk-row ta-head"><span>Fahrer</span><span class="r-al">Runden</span><span class="r-al">Vorwoche</span><span class="r-al">Zeit</span></div>
-          ${d.fahrer.length ? d.fahrer.map(f => `
-            <div class="wk-row${f.laps ? "" : " null"}">
-              <b>${esc(f.name)}</b>
-              <span class="n">${zahlDE(f.laps)}</span>
-              <span class="r-al">${pfeil(f)}</span>
-              <span class="r-al tm-muted">${f.time ? fmtH(f.time) : "–"}</span>
-            </div>`).join("") : '<p class="tm-muted" style="padding:16px">Keine Fahrer gefunden.</p>'}
-        </div>
-      </div>
+      <div id="wk-detail"></div>
       <p class="tm-muted">Woche von Montag bis Sonntag · Stand ${fmtDate(d.at)} · wird stündlich aktualisiert</p>`;
+
+    const zeige = () => {
+      box.querySelectorAll("[data-w]").forEach(b => b.classList.toggle("now", Number(b.dataset.w) === sel));
+      box.querySelectorAll("[data-k]").forEach(k => k.classList.toggle("now", Number(k.dataset.k) === sel));
+      const w = W[sel], v = sel > 0 ? W[sel - 1] : null, kv = v ? "KW " + v.kw : "";
+      const vgl = (a, b, fmt, einh) => {
+        if (!v) return '<span class="wk-tr">–</span>';
+        const x = a - b;
+        return x ? trend(x, `${fmt(Math.abs(x))}${einh} zur ${kv}`) : trend(0, `wie ${kv}`);
+      };
+      const sw = w.laps ? Math.round(w.clean / w.laps * 100) : 0, sv = v && v.laps ? Math.round(v.clean / v.laps * 100) : 0;
+      const rTrend = !v ? '<span class="wk-tr">–</span>' : !v.laps ? trend(0, w.laps ? "–" : "keine Runden") : (() => { const p = Math.round((w.laps - v.laps) / v.laps * 100); return trend(p, `${Math.abs(p)} % zur ${kv}`); })();
+      const liste = d.fahrer.filter(f => f.w[sel][0] || (sel > 0 && f.w[sel - 1][0])).sort((a, b) => b.w[sel][0] - a.w[sel][0] || (sel > 0 ? b.w[sel - 1][0] - a.w[sel - 1][0] : 0));
+      const ohne = d.fahrer.filter(f => f.m && !f.w[sel][0] && !(sel > 0 && f.w[sel - 1][0])).map(f => esc(f.name));
+      const pfeil = (f) => {
+        if (sel === 0) return '<span class="wk-tr">–</span>';
+        const x = f.w[sel][0] - f.w[sel - 1][0];
+        return x > 0 ? `<span class="wk-tr up">▲ +${x}</span>` : x < 0 ? `<span class="wk-tr down">▼ −${Math.abs(x)}</span>` : '<span class="wk-tr">± 0</span>';
+      };
+      document.getElementById("wk-detail").innerHTML = `
+        <div class="tm-box">
+          <h5>KW ${w.kw}${sel === letzte ? ' <span class="tm-badge live">läuft</span>' : ""} <span class="tm-muted" style="letter-spacing:0;text-transform:none;font-family:var(--body);font-weight:500">${fmtDay(w.start)} – ${fmtDay(new Date(Date.parse(w.start) + 6 * 864e5).toISOString())}</span></h5>
+          <div class="wk-tiles" style="margin-top:14px">
+            ${kachel("Runden", zahlDE(w.laps), rTrend)}
+            ${kachel("Zeit auf der Strecke", fmtH(w.time), vgl(w.time, v ? v.time : 0, fmtH, ""))}
+            ${kachel("Fahrer aktiv", `${w.active} / ${d.mitglieder}`, vgl(w.active, v ? v.active : 0, (n) => n, ""))}
+            ${kachel("Saubere Runden", w.laps ? sw + " %" : "–", w.laps && v && v.laps ? vgl(sw, sv, (n) => n, " %") : '<span class="wk-tr">–</span>')}
+          </div>
+        </div>
+        <div class="tm-box" style="padding:0">
+          <h5 style="padding:18px 22px 0">Fahrer in KW ${w.kw}</h5>
+          <div class="ta-list" style="border:0;margin-top:12px">
+            <div class="wk-row ta-head"><span>Fahrer</span><span class="r-al">Runden</span><span class="r-al">${v ? "zur " + kv : "Vorwoche"}</span><span class="r-al">Zeit</span></div>
+            ${liste.length ? liste.map(f => `
+              <div class="wk-row${f.w[sel][0] ? "" : " null"}">
+                <b>${esc(f.name)}</b>
+                <span class="n">${zahlDE(f.w[sel][0])}</span>
+                <span class="r-al">${pfeil(f)}</span>
+                <span class="r-al tm-muted">${f.w[sel][1] ? fmtH(f.w[sel][1]) : "–"}</span>
+              </div>`).join("") : '<p class="tm-muted" style="padding:16px 22px">In dieser Woche ist niemand gefahren.</p>'}
+          </div>
+          ${ohne.length ? `<p class="tm-muted" style="padding:12px 22px 16px;border-top:1px solid var(--line)">Nicht gefahren: ${ohne.join(", ")}</p>` : ""}
+        </div>`;
+    };
+    box.querySelectorAll("[data-w]").forEach(b => b.onclick = () => { sel = Number(b.dataset.w); zeige(); });
+    zeige();
   }
 
   /* ---------------- Nutzung (nur Admin) ---------------- */
