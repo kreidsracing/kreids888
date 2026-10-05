@@ -677,3 +677,16 @@ button.tm-chip.on::after{content:"✓";font-weight:800;color:var(--red);margin-l
 .ab-zeit span{color:var(--steel)}
 .ab-when{grid-template-columns:1fr 1fr}
 @media(max-width:700px){.ab-row{grid-template-columns:12px 1fr auto}.ab-zeit{grid-column:2/3;text-align:left}}
+
+/* ---------- Handy: Spalten dürfen nicht breiter als der Bildschirm werden ---------- */
+@media(max-width:900px){.tp-top,.tp-grid,.tp-recruit,.tp-join,.kt-off,.kt-hero,.kt-setup{grid-template-columns:minmax(0,1fr)}}
+@media(max-width:1060px){.tp-about{grid-template-columns:minmax(0,1fr)}}
+@media(max-width:860px){.td{grid-template-columns:minmax(0,1fr)}}
+@media(max-width:980px){.pf-grid{grid-template-columns:minmax(0,1fr)}}
+.tp-col,.tp-side,.td-main,.tp-about>*,.tp-join>*,.kt-cols>*,.tm-box{min-width:0}
+.td-widgets{grid-template-columns:repeat(2,minmax(0,1fr))}
+@media(max-width:700px){.td-widgets{grid-template-columns:minmax(0,1fr)}}
+.g6-tabs{overflow-x:auto;scrollbar-width:none}
+.g6-tabs::-webkit-scrollbar{display:none}
+.g6-tabs button{white-space:nowrap;flex:none}
+@media(max-width:600px){.g6-tabs button{padding:10px 10px;font-size:12.5px;letter-spacing:.06em}}
