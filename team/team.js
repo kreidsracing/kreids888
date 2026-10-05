@@ -45,6 +45,8 @@
     arrow: I('<path d="M5 12h14M13 6l6 6-6 6"/>'),
     link: I('<path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/>'),
     ext: I('<path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/>'),
+    eye: I('<path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>'),
+    gauge: I('<path d="M3.5 18a9 9 0 1 1 17 0"/><path d="M12 15l4.5-5.5"/><circle cx="12" cy="15" r="1.4" fill="currentColor"/>'),
   };
 
   // Bereiche im Dashboard (alle Teammitglieder) – vorerst Platzhalter
@@ -92,6 +94,24 @@
     clearTimeout(toastT);
     toastT = setTimeout(() => (t.className = "tm-toast"), 3800);
   }
+
+  /* ---------------- Nutzung mitzählen (für Admin-Bereich „Nutzung") ---------------- */
+  const NUTZ = { b: {}, neu: true, offen: false };
+  function merke(id) {
+    if (!ME || !ME.access || id === "nutzung" || id === "limits") return;
+    NUTZ.b[id] = (NUTZ.b[id] || 0) + 1;
+    NUTZ.offen = true;
+  }
+  function nutzungSenden() {
+    if (!NUTZ.offen) return;
+    const body = JSON.stringify({ b: NUTZ.b, neu: NUTZ.neu });
+    NUTZ.b = {}; NUTZ.neu = false; NUTZ.offen = false;
+    try {
+      fetch(API + "/usage", { method: "POST", credentials: "same-origin", keepalive: true, headers: { "Content-Type": "application/json" }, body }).catch(() => {});
+    } catch (e) { /* egal */ }
+  }
+  document.addEventListener("visibilitychange", () => { if (document.visibilityState === "hidden") nutzungSenden(); });
+  window.addEventListener("pagehide", nutzungSenden);
 
   const btn = (label, cls = "", attrs = "") => `<button class="tm-btn ${cls}" ${attrs}><span>${label}</span></button>`;
   const chip = (r) => `<span class="tm-chip"><i style="${r.color ? "background:" + hex(r.color) : ""}"></i>${esc(r.name)}</span>`;
@@ -369,12 +389,15 @@
             ${SECTIONS.map(s => link(s.id, s.icon, s.label)).join("")}
             ${ME.panels.links ? link("links", "link", "Links") : ""}
             <div class="td-nav-h">Tools</div>${link("abwesend", "clock", "Abwesenheiten")}${tools.map(p => link(p, p, PANELS[p].title)).join("")}
-            ${ME.isAdmin ? `<div class="td-nav-h">Verwaltung</div>${link("aktivitaet", "activity", "Aktivität")}${link("news-schreiben", "news", "News schreiben")}${link("fahrerprofile", "helmet", "Fahrerprofile")}${link("kalender-admin", "calendar", "Rennkalender")}${link("admin", "admin", "Admin")}<a class="td-link" href="https://kreids888-admin.kreids.workers.dev/" target="_blank" rel="noopener">${ICONS.ext}<span>kreids888-Dashboard</span></a>` : ""}
+            ${ME.isAdmin ? `<div class="td-nav-h">Verwaltung</div>${link("aktivitaet", "activity", "Aktivität")}${link("nutzung", "eye", "Nutzung")}${link("limits", "gauge", "Limits")}${link("news-schreiben", "news", "News schreiben")}${link("fahrerprofile", "helmet", "Fahrerprofile")}${link("kalender-admin", "calendar", "Rennkalender")}${link("admin", "admin", "Admin")}<a class="td-link" href="https://kreids888-admin.kreids.workers.dev/" target="_blank" rel="noopener">${ICONS.ext}<span>kreids888-Dashboard</span></a>` : ""}
           </nav>
         </aside>
         <div class="td-main" id="td-main"></div>
       </div>`;
 
+    if (id !== "garage61") merke(id || "dashboard");
+    if (id === "nutzung" && ME.isAdmin) return renderNutzung();
+    if (id === "limits" && ME.isAdmin) return renderLimits();
     if (id === "admin" && ME.isAdmin) return renderAdmin();
     if (id === "aktivitaet" && ME.isAdmin) return renderActivity();
     if (id === "news-schreiben" && ME.isAdmin) return renderNewsAdmin();
@@ -429,7 +452,8 @@
       ${ME.panels.garage61 ? `<div class="tp-widget td-trips" id="w-trips">
         <div class="tp-widget-h">${ICONS.car}<b>Letzte Fahrten im Team</b></div>
         <div class="tp-widget-f">Lädt …</div>
-      </div>` : ""}`;
+      </div>` : ""}
+      <p class="nu-hint">Hinweis: Um das Dashboard zu verbessern, wird erfasst, welche Bereiche genutzt werden und was hier eingetragen wird. Gespeichert wird das 30 Tage.</p>`;
 
     if (ME.panels.garage61) api("/g61/fleiss?tage=7").then(d => {
       const el = document.getElementById("w-trips");
@@ -874,6 +898,87 @@
     }
   }
 
+  /* ---------------- Nutzung (nur Admin) ---------------- */
+  const BEREICHE = {
+    dashboard: "Dashboard", news: "Team News", fahrer: "Fahrerprofil", abwesend: "Abwesenheiten", links: "Links", trainer: "Trainer",
+    "g61-fleiss": "Trainingsfleiß", "g61-trips": "Fahrtenbuch", "g61-board": "Bestenliste", "g61-ratings": "iRating",
+    aktivitaet: "Aktivität", "news-schreiben": "News schreiben", fahrerprofile: "Fahrerprofile", "kalender-admin": "Rennkalender", admin: "Admin",
+  };
+  const fmtWann = (ms) => {
+    const min = Math.floor((Date.now() - ms) / 6e4);
+    if (min < 1) return "gerade eben";
+    if (min < 60) return `vor ${min} Min.`;
+    if (min < 360) return `vor ${Math.floor(min / 60)} Std.`;
+    return fmtDate(new Date(ms).toISOString());
+  };
+
+  async function renderNutzung() {
+    main().innerHTML = panelHead("eye", "Dashboard-Nutzung", '<span class="tm-badge">Nur Admin</span>') + '<div id="nu"><div class="tm-loading"><span></span><span></span><span></span></div></div>';
+    const box = document.getElementById("nu");
+    let d;
+    try { d = await api("/admin/usage"); } catch (e) { box.innerHTML = `<div class="tm-box tm-err">${esc(e.message)}</div>`; return; }
+
+    const head = `<div class="nu-row ta-head"><span></span><span>Mitglied</span><span class="r-al">Besuche 7 T.</span><span class="r-al">Besuche ${d.tage} T.</span><span>Meistgenutzt</span><span class="r-al">Zuletzt</span></div>`;
+    const rows = d.leute.map(u => `
+      <div class="nu-row">
+        ${u.avatar ? `<img class="ta-ava" src="${esc(u.avatar)}" alt="" loading="lazy">` : '<span class="ta-ava"></span>'}
+        <div class="ta-name"><b>${esc(u.name)}</b></div>
+        <div class="ta-num"><b>${u.v7}</b><small>7 Tage</small></div>
+        <div class="ta-num"><b>${u.v30}</b><small>${d.tage} Tage</small></div>
+        <div class="nu-tags">${u.bereiche.length ? u.bereiche.map(b => `<span class="nu-tag">${esc(BEREICHE[b.id] || b.id)}<b>${b.n}</b></span>`).join("") : '<span class="tm-muted">–</span>'}</div>
+        <div class="ta-last">${u.last ? fmtWann(Date.parse(u.last)) : "nie"}</div>
+      </div>`).join("");
+    const log = d.verlauf.map(a => `
+      <div class="nu-log-row"><span class="t">${fmtWann(a.t)}</span><b>${esc(a.name)}</b><span>${esc(a.a)}</span></div>`).join("");
+
+    box.innerHTML = `
+      <div class="tm-box ta-top">
+        <div>
+          <div class="ta-upd">Wer nutzt das Dashboard – und wofür?</div>
+          <div class="tm-muted">Gezählt werden geöffnete Bereiche und Aktionen · gespeichert ${d.tage} Tage · ein Besuch = einmal Dashboard öffnen</div>
+        </div>
+        <div class="tm-actions">${btn("Jetzt aktualisieren", "sm", 'id="nu-run"')}</div>
+      </div>
+      <div class="ta-list">${d.leute.length ? head + rows : '<p class="tm-muted" style="padding:16px">Noch keine Daten – sobald jemand das Dashboard nutzt, erscheint er hier.</p>'}</div>
+      <div class="tm-box" style="margin-top:16px">
+        <h5>Letzte Aktionen</h5>
+        <div class="nu-log">${log || '<p class="tm-muted">Noch keine Aktionen.</p>'}</div>
+      </div>`;
+    document.getElementById("nu-run").onclick = renderNutzung;
+  }
+
+  /* ---------------- Cloudflare-Limits (nur Admin) ---------------- */
+  async function renderLimits() {
+    main().innerHTML = panelHead("gauge", "Cloudflare-Limits", '<span class="tm-badge">Nur Admin</span>') + '<div id="li"><div class="tm-loading"><span></span><span></span><span></span></div></div>';
+    const box = document.getElementById("li");
+    let d;
+    try { d = await api("/admin/limits"); } catch (e) { box.innerHTML = `<div class="tm-box tm-err">${esc(e.message)}</div>`; return; }
+    if (!d.ready) {
+      box.innerHTML = `<div class="tm-box tm-soon"><div class="big">Keine Daten</div><p class="tm-err">${esc(d.info || "Unbekannter Fehler")}</p><div class="tm-actions" style="justify-content:center;margin-top:18px">${btn("Nochmal versuchen", "sm", 'id="li-run"')}</div></div>`;
+      document.getElementById("li-run").onclick = renderLimits;
+      return;
+    }
+    const zahl = (n) => Number(n || 0).toLocaleString("de-DE");
+    const farbe = (p) => p >= 90 ? "rot" : p >= 70 ? "gelb" : "";
+    box.innerHTML = `
+      <div class="tm-box ta-top">
+        <div>
+          <div class="ta-upd">Stand: <b>${fmtDate(d.at)}</b></div>
+          <div class="tm-muted">Gilt für dein ganzes Cloudflare-Konto (alle Worker zusammen) · setzt sich täglich um <b>${esc(d.reset)} Uhr</b> zurück · Cloudflare liefert die Zahlen mit ein paar Minuten Verzögerung</div>
+        </div>
+        <div class="tm-actions">${btn("Jetzt aktualisieren", "sm", 'id="li-run"')}<a class="tm-btn sm" href="#admin"><span>Warnung einstellen</span></a></div>
+      </div>
+      <div class="ta-list">${d.metrics.map(m => `
+        <div class="li-row ${farbe(m.pct)}">
+          <b class="li-lbl">${esc(m.label)}</b>
+          <div class="li-bar"><i style="width:${Math.min(100, m.pct)}%"></i></div>
+          <div class="li-num"><b>${zahl(m.used)}</b> / ${zahl(m.limit)}</div>
+          <div class="li-pct">${String(m.pct).replace(".", ",")} %</div>
+        </div>`).join("")}</div>
+      <div class="ta-legend" style="margin-top:10px"><span class="aktiv">Grün</span> unter 70 % <span class="ruhig">Gelb</span> ab 70 % <span class="inaktiv">Rot</span> ab 90 %</div>`;
+    document.getElementById("li-run").onclick = renderLimits;
+  }
+
   /* ---------------- Tools ---------------- */
   const TYPE_SHORT = { 1: "Training", 2: "Quali", 3: "Rennen" };
   const tripTable = (rows) => `
@@ -894,6 +999,7 @@
 
   async function renderG61(tab, days) {
     tab = tab || "fleiss";
+    merke("g61-" + tab);
     days = days || 7;
     main().innerHTML = panelHead("garage61", "Garage 61") + `
       <div class="g6-tabs">
@@ -1141,6 +1247,22 @@
         <div class="tm-row"><div class="lbl">Testen</div><div class="tm-actions">${btn("Test-Erinnerung senden", "sm", 'id="rm-test"')}</div></div>
       </div>
 
+      <div class="tm-box">
+        <h5>Limit-Warnung</h5>
+        <p class="hint">Alle 30 Minuten wird geprüft, wie viel von den Cloudflare-Gratis-Limits heute schon verbraucht ist. Wird eine Schwelle erreicht, postet der Bot eine Warnung – höchstens einmal pro Tag und Schwelle. Übersicht unter „Limits".</p>
+        <div class="tm-row"><div class="lbl">Warnung</div>
+          <div style="display:flex;flex-direction:column;gap:12px">
+            <label class="tm-switch"><input type="checkbox" id="li-on" ${(cfg.limits || {}).enabled ? "checked" : ""}><span class="s"></span>An</label>
+            <label class="tm-switch"><input type="checkbox" id="li-90" ${(cfg.limits || {}).p90 ? "checked" : ""}><span class="s"></span>Ab 90 % warnen</label>
+            <label class="tm-switch"><input type="checkbox" id="li-100" ${(cfg.limits || {}).p100 ? "checked" : ""}><span class="s"></span>Bei 100 % (Limit erreicht) melden</label>
+          </div></div>
+        <div class="tm-row"><label for="li-ch">Discord-Kanal</label>
+          <div><select class="tm-select" id="li-ch"><option value="">– Kanal wählen –</option>${(d.channels || []).map(c => `<option value="${c.id}" ${c.id === (cfg.limits || {}).channel ? "selected" : ""}># ${esc(c.name)}</option>`).join("")}</select></div></div>
+        <div class="tm-row"><label for="li-ping">Ping<small>Rolle, die erwähnt wird</small></label>
+          <div><select class="tm-select" id="li-ping"><option value="">– niemanden pingen –</option>${d.roles.map(r => `<option value="${r.id}" ${r.id === (cfg.limits || {}).ping ? "selected" : ""}>@${esc(r.name)}</option>`).join("")}</select></div></div>
+        <div class="tm-row"><div class="lbl">Testen</div><div class="tm-actions">${btn("Test-Warnung senden", "sm", 'id="li-test"')}</div></div>
+      </div>
+
       <div class="tm-savebar" id="savebar"><span>Alles gespeichert</span>${btn("Speichern", "red", 'id="tm-save"')}</div>`;
 
     // Rollen-Auswahl vorbelegen + umschalten
@@ -1158,7 +1280,7 @@
         };
       });
     });
-    box.querySelectorAll("#g61-team,#g61-ch,#g61-on,#g61-rec,#g61-week,#rm-on,#rm-24,#rm-1,#rm-ch,#rm-ping,#ab-ch").forEach(el => el.addEventListener("input", markDirty));
+    box.querySelectorAll("#g61-team,#g61-ch,#g61-on,#g61-rec,#g61-week,#rm-on,#rm-24,#rm-1,#rm-ch,#rm-ping,#ab-ch,#li-on,#li-90,#li-100,#li-ch,#li-ping").forEach(el => el.addEventListener("input", markDirty));
     box.querySelectorAll("#g61-on,#g61-rec").forEach(el => el.addEventListener("change", markDirty));
 
     // ---- Links bearbeiten ----
@@ -1218,6 +1340,13 @@
         },
         links: (lkSync(), links.filter(l => l.title.trim() && l.url.trim())),
         absences: { channel: document.getElementById("ab-ch").value },
+        limits: {
+          enabled: document.getElementById("li-on").checked,
+          channel: document.getElementById("li-ch").value,
+          ping: document.getElementById("li-ping").value,
+          p90: document.getElementById("li-90").checked,
+          p100: document.getElementById("li-100").checked,
+        },
       };
       await api("/admin/config", { method: "POST", body });
       dirty = false;
@@ -1247,6 +1376,7 @@
     action("g61-run", "/admin/g61/run");
     action("rm-test", "/admin/reminders/test");
     action("ab-cmds", "/admin/discord/commands");
+    action("li-test", "/admin/limits/test");
 
     const sb = document.getElementById("g61-stats");
     sb.onclick = async () => {

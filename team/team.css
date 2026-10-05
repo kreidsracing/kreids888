@@ -690,3 +690,40 @@ button.tm-chip.on::after{content:"✓";font-weight:800;color:var(--red);margin-l
 .g6-tabs::-webkit-scrollbar{display:none}
 .g6-tabs button{white-space:nowrap;flex:none}
 @media(max-width:600px){.g6-tabs button{padding:10px 10px;font-size:12.5px;letter-spacing:.06em}}
+
+/* ---------- Nutzung (Admin) ---------- */
+.nu-row{display:grid;grid-template-columns:36px minmax(140px,1.3fr) 84px 84px minmax(170px,2fr) 110px;gap:14px;align-items:center;padding:10px 16px;border-bottom:1px solid var(--line)}
+.nu-row:last-child{border-bottom:0}
+.nu-tags{display:flex;flex-wrap:wrap;gap:5px}
+.nu-tag{font-size:12px;padding:2px 7px;background:var(--panel2);border:1px solid var(--line);color:var(--steel);white-space:nowrap}
+.nu-tag b{color:#fff;font-weight:700;margin-left:5px}
+.nu-log-row{display:grid;grid-template-columns:120px minmax(110px,1fr) 2fr;gap:12px;padding:9px 2px;border-bottom:1px solid var(--line);font-size:14px;align-items:center}
+.nu-log-row:last-child{border-bottom:0}
+.nu-log-row .t{color:var(--steel);font-size:13px;font-variant-numeric:tabular-nums}
+.nu-hint{font-size:12.5px;color:var(--steel-d);margin-top:16px}
+@media(max-width:860px){
+  .nu-row{grid-template-columns:36px 1fr 52px 52px;gap:6px 10px;padding:10px 12px}
+  .nu-tags{grid-column:2/-1}
+  .nu-row .ta-last{grid-column:2/-1;text-align:left}
+  .nu-log-row{grid-template-columns:1fr;gap:2px}
+}
+
+/* ---------- Cloudflare-Limits (Admin) ---------- */
+.li-row{display:grid;grid-template-columns:minmax(130px,1fr) minmax(140px,3fr) 160px 76px;gap:14px;align-items:center;padding:14px 16px;border-bottom:1px solid var(--line)}
+.li-row:last-child{border-bottom:0}
+.li-lbl{font-family:var(--disp);font-weight:800;font-size:15px;letter-spacing:.05em;text-transform:uppercase}
+.li-bar{height:10px;background:var(--panel2);overflow:hidden}
+.li-bar i{display:block;height:100%;background:#2ecc71;box-shadow:0 0 8px rgba(46,204,113,.4)}
+.li-row.gelb .li-bar i{background:#f1c40f;box-shadow:0 0 8px rgba(241,196,15,.4)}
+.li-row.rot .li-bar i{background:var(--red);box-shadow:0 0 10px var(--red-glow)}
+.li-num{text-align:right;color:var(--steel);font-size:14px;font-variant-numeric:tabular-nums;white-space:nowrap}
+.li-num b{color:#fff}
+.li-pct{text-align:right;font-family:var(--disp);font-weight:900;font-size:19px;font-variant-numeric:tabular-nums;color:#4ee28c}
+.li-row.gelb .li-pct{color:#f1c40f}
+.li-row.rot .li-pct{color:#ff6b75}
+@media(max-width:700px){
+  .li-row{grid-template-columns:1fr auto;gap:8px 12px}
+  .li-bar{grid-column:1/-1;grid-row:2}
+  .li-num{grid-column:1;grid-row:3;text-align:left}
+  .li-pct{grid-row:1/2;grid-column:2}
+}
