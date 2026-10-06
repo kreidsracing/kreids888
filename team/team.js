@@ -346,16 +346,30 @@
     fetch(API + "/public/bestzeiten").then(r => r.json()).then(d => {
       const el = document.getElementById("tp-best");
       if (!el) return;
-      const head = `<div class="tp-widget-h">${ICONS.trophy}<b>Aktuelle Bestzeiten</b></div>`;
+      const head = `<div class="tp-widget-h">${ICONS.trophy}<b>Teamrekorde</b>${d.ready && d.laps.length ? '<span class="tb-live">● live aus Garage 61</span>' : ""}</div>`;
       if (!d.ready || !d.laps.length) {
         el.innerHTML = head + `<div class="tp-widget-f">${d.ready ? "Noch keine Bestzeiten in den letzten 30 Tagen" : "Bestzeiten erscheinen, sobald Garage 61 die Rundenzeiten freischaltet"}</div>`;
         return;
       }
-      el.innerHTML = head + d.laps.map(l => `
-        <div class="tp-row">
-          <div class="tp-row-m"><b class="tp-b">${esc(l.track)}</b><small>${esc(l.driver)} · ${esc(l.car)}${l.bop ? ' · <span class="tm-bop">BOP</span>' : ""}</small></div>
-          <span class="tp-lap">${fmtLap(l.time)}</span>
-        </div>`).join("");
+      const vor = (iso) => {
+        const m = (Date.now() - Date.parse(iso)) / 60000;
+        if (m < 60) return "vor " + Math.max(1, Math.round(m)) + " Min.";
+        if (m < 24 * 60) return "vor " + Math.round(m / 60) + " Std.";
+        const t = Math.round(m / 1440);
+        return t === 1 ? "gestern" : "vor " + t + " Tagen";
+      };
+      const kurz = (n) => String(n || "").split(/\s+/).filter(Boolean).slice(0, 2).map(x => x[0]).join("").toUpperCase();
+      el.innerHTML = head + d.laps.map((l, i) => {
+        const m = String(l.track || "").match(/^(.*?)\s*\((.*)\)$/);
+        const name = m ? m[1] : l.track, variante = m ? m[2] : "";
+        return `
+        <div class="tb-row${i === 0 ? " neu" : ""}">
+          <div class="tb-top"><b class="tb-track">${esc(name)}</b><span class="tb-lap">${fmtLap(l.time)}</span></div>
+          ${variante ? `<div class="tb-var">${esc(variante)}</div>` : ""}
+          <div class="tb-fahrer"><span class="tb-av">${esc(kurz(l.driver))}</span><span class="tb-name">${esc(l.driver)}</span>${isRecent(l.startTime) ? '<span class="tb-tag neu">NEU</span>' : ""}${l.bop ? '<span class="tb-tag bop">BOP</span>' : ""}<span class="tb-wann">${vor(l.startTime)}</span></div>
+          <div class="tb-car">${esc(l.car)}</div>
+        </div>`;
+      }).join("");
     }).catch(() => {});
 
     // Nächste Events aus dem Rennkalender (kreids888-Dashboard)

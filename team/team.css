@@ -849,3 +849,22 @@ button.wk-col:focus-visible{outline:2px solid var(--red);outline-offset:2px}
 .gs-tog button+button{border-left:1px solid var(--line)}
 .gs-tog button.on{background:var(--red);color:#fff}
 @media(max-width:560px){.gs-ctrl .tm-input,.gs-ctrl .tm-select{max-width:none;flex-basis:100%}}
+
+/* ---------- Startseite: Teamrekorde ---------- */
+.tb-live{margin-left:auto;font-size:11.5px;color:#22e07b;white-space:nowrap}
+.tb-row{padding:14px 16px 14px 13px;border-bottom:1px solid var(--line);border-left:3px solid transparent}
+.tb-row:last-child{border-bottom:0}
+.tb-row.neu{border-left-color:var(--red);background:linear-gradient(90deg,rgba(225,19,36,.07),transparent 60%)}
+.tb-top{display:flex;justify-content:space-between;align-items:baseline;gap:10px}
+.tb-track{font-family:var(--disp);font-weight:800;font-size:16px;line-height:1.15;letter-spacing:.03em;text-transform:uppercase;overflow-wrap:anywhere;min-width:0}
+.tb-lap{font-family:var(--disp);font-weight:900;font-size:23px;line-height:1;color:#fff;font-variant-numeric:tabular-nums;white-space:nowrap}
+.tb-var{color:var(--steel);font-size:12.5px;margin-top:3px;overflow-wrap:anywhere}
+.tb-fahrer{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:10px}
+.tb-av{width:24px;height:24px;border-radius:50%;background:#3a3f4a;color:#fff;font-size:10.5px;font-weight:800;display:inline-flex;align-items:center;justify-content:center;flex:none}
+.tb-row.neu .tb-av{background:var(--red)}
+.tb-name{font-size:14px;font-weight:600;overflow-wrap:anywhere}
+.tb-tag{font-size:10.5px;font-weight:800;letter-spacing:.06em;padding:1px 6px;line-height:1.5}
+.tb-tag.neu{background:var(--red);color:#fff}
+.tb-tag.bop{border:1px solid #ffb020;color:#ffb020}
+.tb-wann{margin-left:auto;font-size:12px;color:var(--steel);white-space:nowrap}
+.tb-car{color:var(--steel);font-size:12.5px;margin-top:4px;overflow-wrap:anywhere}
