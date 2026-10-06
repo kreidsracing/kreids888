@@ -45,8 +45,6 @@
     arrow: I('<path d="M5 12h14M13 6l6 6-6 6"/>'),
     link: I('<path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/>'),
     ext: I('<path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/>'),
-    eye: I('<path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>'),
-    gauge: I('<path d="M3.5 18a9 9 0 1 1 17 0"/><path d="M12 15l4.5-5.5"/><circle cx="12" cy="15" r="1.4" fill="currentColor"/>'),
   };
 
   // Bereiche im Dashboard (alle Teammitglieder) – vorerst Platzhalter
@@ -94,24 +92,6 @@
     clearTimeout(toastT);
     toastT = setTimeout(() => (t.className = "tm-toast"), 3800);
   }
-
-  /* ---------------- Nutzung mitzählen (für Admin-Bereich „Nutzung") ---------------- */
-  const NUTZ = { b: {}, neu: true, offen: false };
-  function merke(id) {
-    if (!ME || !ME.access || id === "nutzung" || id === "limits") return;
-    NUTZ.b[id] = (NUTZ.b[id] || 0) + 1;
-    NUTZ.offen = true;
-  }
-  function nutzungSenden() {
-    if (!NUTZ.offen) return;
-    const body = JSON.stringify({ b: NUTZ.b, neu: NUTZ.neu });
-    NUTZ.b = {}; NUTZ.neu = false; NUTZ.offen = false;
-    try {
-      fetch(API + "/usage", { method: "POST", credentials: "same-origin", keepalive: true, headers: { "Content-Type": "application/json" }, body }).catch(() => {});
-    } catch (e) { /* egal */ }
-  }
-  document.addEventListener("visibilitychange", () => { if (document.visibilityState === "hidden") nutzungSenden(); });
-  window.addEventListener("pagehide", nutzungSenden);
 
   const btn = (label, cls = "", attrs = "") => `<button class="tm-btn ${cls}" ${attrs}><span>${label}</span></button>`;
   const chip = (r) => `<span class="tm-chip"><i style="${r.color ? "background:" + hex(r.color) : ""}"></i>${esc(r.name)}</span>`;
@@ -277,15 +257,6 @@
         </div>
       </section>
 
-      <section class="tp-sec" id="tp-woche" hidden>
-        <div class="tp-h wk-h">
-          <img class="wk-logo" src="${IMG}f2f-logo.webp" alt="F2F Motorsport" width="48" height="48">
-          <div><div class="tp-h-k" id="tp-woche-kw">Training</div><h3>Trainingswoche bei <span class="r">Flag to Flag Motorsport</span></h3></div>
-          <span class="wk-motto">Konstanz bis ins Ziel.</span>
-        </div>
-        <div id="tp-woche-k"></div>
-      </section>
-
       <section class="tp-sec" id="tp-livery">
         ${secHead("Livery Show", "Unsere Designs", "brush")}
         <div class="tp-livery">${LIVERIES.length
@@ -370,15 +341,6 @@
         </div>`).join("") : '<div class="tp-widget-f">Keine Termine eingetragen</div>');
     }).catch(() => {});
 
-    // Trainingswoche (nur Team-Summen aus Garage 61)
-    fetch(API + "/public/woche").then(r => r.json()).then(d => {
-      const sec = document.getElementById("tp-woche");
-      if (!sec || !d.ready || (!d.jetzt.laps && !d.vorher.laps)) return;
-      document.getElementById("tp-woche-k").innerHTML = wocheKacheln(d, false);
-      document.getElementById("tp-woche-kw").textContent = "Training · KW " + d.kwVorher;
-      sec.hidden = false;
-    }).catch(() => {});
-
     // freigegebene Fahrerprofile statt Platzhalter
     fetch(API + "/public/raceteam").then(r => r.json()).then(d => {
       const el = document.getElementById("tp-drivers");
@@ -407,16 +369,12 @@
             ${SECTIONS.map(s => link(s.id, s.icon, s.label)).join("")}
             ${ME.panels.links ? link("links", "link", "Links") : ""}
             <div class="td-nav-h">Tools</div>${link("abwesend", "clock", "Abwesenheiten")}${tools.map(p => link(p, p, PANELS[p].title)).join("")}
-            ${ME.isAdmin ? `<div class="td-nav-h">Verwaltung</div>${link("aktivitaet", "activity", "Aktivität")}${link("nutzung", "eye", "Nutzung")}${link("limits", "gauge", "Limits")}${link("news-schreiben", "news", "News schreiben")}${link("fahrerprofile", "helmet", "Fahrerprofile")}${link("kalender-admin", "calendar", "Rennkalender")}${link("admin", "admin", "Admin")}<a class="td-link" href="https://kreids888-admin.kreids.workers.dev/" target="_blank" rel="noopener">${ICONS.ext}<span>kreids888-Dashboard</span></a>` : ""}
+            ${ME.isAdmin ? `<div class="td-nav-h">Verwaltung</div>${link("aktivitaet", "activity", "Aktivität")}${link("news-schreiben", "news", "News schreiben")}${link("fahrerprofile", "helmet", "Fahrerprofile")}${link("kalender-admin", "calendar", "Rennkalender")}${link("admin", "admin", "Admin")}<a class="td-link" href="https://kreids888-admin.kreids.workers.dev/" target="_blank" rel="noopener">${ICONS.ext}<span>kreids888-Dashboard</span></a>` : ""}
           </nav>
         </aside>
         <div class="td-main" id="td-main"></div>
       </div>`;
 
-    if (id !== "garage61" && id !== "woche") merke(id || "dashboard");
-    if (id === "woche" && ME.panels.garage61) return renderG61("woche");
-    if (id === "nutzung" && ME.isAdmin) return renderNutzung();
-    if (id === "limits" && ME.isAdmin) return renderLimits();
     if (id === "admin" && ME.isAdmin) return renderAdmin();
     if (id === "aktivitaet" && ME.isAdmin) return renderActivity();
     if (id === "news-schreiben" && ME.isAdmin) return renderNewsAdmin();
@@ -458,11 +416,6 @@
         </div>
       </section>
 
-      ${ME.panels.garage61 ? `<div class="tp-widget wk-home" id="w-woche">
-        <div class="tp-widget-h">${ICONS.activity}<b>Trainingswoche</b></div>
-        <div class="tp-widget-f">Lädt …</div>
-      </div>` : ""}
-
       <div class="td-widgets">
         <div class="tp-widget" id="w-news">
           <div class="tp-widget-h">${ICONS.news}<b>Neueste News</b></div>
@@ -476,16 +429,7 @@
       ${ME.panels.garage61 ? `<div class="tp-widget td-trips" id="w-trips">
         <div class="tp-widget-h">${ICONS.car}<b>Letzte Fahrten im Team</b></div>
         <div class="tp-widget-f">Lädt …</div>
-      </div>` : ""}
-      <p class="nu-hint">Hinweis: Um das Dashboard zu verbessern, wird erfasst, welche Bereiche genutzt werden und was hier eingetragen wird. Gespeichert wird das 30 Tage.</p>`;
-
-    if (ME.panels.garage61) api("/g61/woche").then(d => {
-      const el = document.getElementById("w-woche");
-      if (!el) return;
-      if (!d.ready) { el.remove(); return; }
-      el.innerHTML = `<div class="tp-widget-h">${ICONS.activity}<b>Trainingswoche · KW ${d.kwVorher}</b><a class="td-more" href="#woche">Wochenübersicht →</a></div>`
-        + wocheKacheln(d, true) + wocheZiel(d);
-    }).catch(() => { const el = document.getElementById("w-woche"); if (el) el.remove(); });
+      </div>` : ""}`;
 
     if (ME.panels.garage61) api("/g61/fleiss?tage=7").then(d => {
       const el = document.getElementById("w-trips");
@@ -930,200 +874,6 @@
     }
   }
 
-  /* ---------------- Wochenübersicht (Garage 61) ---------------- */
-  const fmtH = (s) => {
-    s = Math.round(s || 0);
-    const H = Math.floor(s / 3600), M = Math.round((s % 3600) / 60);
-    return H ? `${H} h ${String(M).padStart(2, "0")}` : `${M} min`;
-  };
-  const zahlDE = (n) => Number(n || 0).toLocaleString("de-DE");
-  const trend = (diff, txt) => `<span class="wk-tr ${diff > 0 ? "up" : diff < 0 ? "down" : ""}">${diff > 0 ? "▲ " : diff < 0 ? "▼ " : ""}${txt}</span>`;
-  const kachel = (label, wert, unten) => `<div class="wk-tile"><small>${label}</small><b>${wert}</b>${unten}</div>`;
-
-  // Kacheln: letzte abgeschlossene Woche – öffentlich (3) oder intern (4)
-  function wocheKacheln(d, intern) {
-    const j = d.vorher, v = d.vorvorher, kv = "KW " + d.kwVorvorher;
-    const rTrend = !v.laps ? trend(0, j.laps ? "–" : "keine Runden") : (() => { const p = Math.round((j.laps - v.laps) / v.laps * 100); return trend(p, `${Math.abs(p)} % zur ${kv}`); })();
-    const da = j.active - v.active;
-    const aTrend = da ? trend(da, `${da > 0 ? "+" : "−"}${Math.abs(da)} zur ${kv}`) : trend(0, `wie ${kv}`);
-    const jetzt = `<div class="wk-now"><b>Diese Woche (KW ${d.kw}) bisher:</b> ${zahlDE(d.jetzt.laps)} Runden · ${fmtH(d.jetzt.time)} · ${d.jetzt.active} Fahrer</div>`;
-    if (!intern) return `<div class="wk-tiles">
-      ${kachel("Runden gefahren", zahlDE(j.laps), rTrend)}
-      ${kachel("Zeit auf der Strecke", fmtH(j.time), `<span class="wk-tr">≈ ${fmtH(j.time / 7)} pro Tag</span>`)}
-      ${kachel("Fahrer im Training", j.active, aTrend)}
-    </div>${jetzt}`;
-    const dt = j.time - v.time;
-    const sj = j.laps ? Math.round(j.clean / j.laps * 100) : 0, sv = v.laps ? Math.round(v.clean / v.laps * 100) : 0;
-    return `<div class="wk-tiles">
-      ${kachel("Runden", zahlDE(j.laps), rTrend)}
-      ${kachel("Zeit auf der Strecke", fmtH(j.time), dt ? trend(dt, `${fmtH(Math.abs(dt))} zur ${kv}`) : trend(0, `wie ${kv}`))}
-      ${kachel("Fahrer aktiv", `${j.active} / ${d.mitglieder}`, aTrend)}
-      ${kachel("Saubere Runden", j.laps ? sj + " %" : "–", j.laps && v.laps && sj !== sv ? trend(sj - sv, `${Math.abs(sj - sv)} % zur ${kv}`) : trend(0, j.laps && v.laps ? `wie ${kv}` : "–"))}
-    </div>${jetzt}`;
-  }
-
-  function wocheZiel(d) {
-    if (!d.ziel) return "";
-    const p = Math.min(100, Math.round(d.jetzt.laps / d.ziel * 100));
-    const rest = 7 - d.tage;
-    const info = d.jetzt.laps >= d.ziel ? "Ziel erreicht ✓" : rest > 0 ? `noch ${rest} ${rest === 1 ? "Tag" : "Tage"}` : "letzter Tag";
-    return `<div class="wk-goal${d.jetzt.laps >= d.ziel ? " done" : ""}">
-      <div class="wk-goal-t"><b>Wochenziel: ${zahlDE(d.ziel)} Runden</b><span>${zahlDE(d.jetzt.laps)} / ${zahlDE(d.ziel)} · ${info}</span></div>
-      <div class="wk-goal-bar"><i style="width:${p}%"></i></div>
-    </div>`;
-  }
-
-  async function renderWoche() {
-    const box = document.getElementById("g61b");
-    let d;
-    try { d = await api("/g61/woche"); } catch (e) { box.innerHTML = `<div class="tm-box tm-err">${esc(e.message)}</div>`; return; }
-    if (!d.ready) { box.innerHTML = '<div class="tm-box tm-soon"><div class="big">Noch nicht verbunden</div><p>Garage 61 ist noch nicht eingerichtet.</p></div>'; return; }
-    if (!d.fahrer.every(f => Array.isArray(f.w))) { box.innerHTML = '<div class="tm-box tm-err">Der Worker ist noch nicht aktualisiert – bitte die Worker-Änderungen einspielen.</div>'; return; }
-    const W = d.wochen, letzte = W.length - 1;
-    let sel = letzte - 1;
-    const max = Math.max(1, ...W.map(w => w.laps));
-
-    box.innerHTML = `
-      <div class="tm-box">
-        <h5>Wochenverlauf <span class="tm-muted" style="letter-spacing:0;text-transform:none;font-family:var(--body);font-weight:500">Runden pro Woche · Balken anklicken für Details</span></h5>
-        <div class="wk-chart">${W.map((w, i) => `
-          <button type="button" class="wk-col" data-w="${i}" title="KW ${w.kw} · ${zahlDE(w.laps)} Runden · ${fmtH(w.time)}">
-            <span>${zahlDE(w.laps)}</span><i style="height:${Math.round(w.laps / max * 100)}%"></i>
-          </button>`).join("")}
-        </div>
-        <div class="wk-kw">${W.map((w, i) => `<span data-k="${i}">KW ${w.kw}${i === letzte ? " · läuft" : ""}</span>`).join("")}</div>
-      </div>
-      <div id="wk-detail"></div>
-      <p class="tm-muted">Woche von Montag bis Sonntag · Stand ${fmtDate(d.at)} · wird stündlich aktualisiert</p>`;
-
-    const zeige = () => {
-      box.querySelectorAll("[data-w]").forEach(b => b.classList.toggle("now", Number(b.dataset.w) === sel));
-      box.querySelectorAll("[data-k]").forEach(k => k.classList.toggle("now", Number(k.dataset.k) === sel));
-      const w = W[sel], v = sel > 0 ? W[sel - 1] : null, kv = v ? "KW " + v.kw : "";
-      const vgl = (a, b, fmt, einh) => {
-        if (!v) return '<span class="wk-tr">–</span>';
-        const x = a - b;
-        return x ? trend(x, `${fmt(Math.abs(x))}${einh} zur ${kv}`) : trend(0, `wie ${kv}`);
-      };
-      const sw = w.laps ? Math.round(w.clean / w.laps * 100) : 0, sv = v && v.laps ? Math.round(v.clean / v.laps * 100) : 0;
-      const rTrend = !v ? '<span class="wk-tr">–</span>' : !v.laps ? trend(0, w.laps ? "–" : "keine Runden") : (() => { const p = Math.round((w.laps - v.laps) / v.laps * 100); return trend(p, `${Math.abs(p)} % zur ${kv}`); })();
-      const liste = d.fahrer.filter(f => f.w[sel][0] || (sel > 0 && f.w[sel - 1][0])).sort((a, b) => b.w[sel][0] - a.w[sel][0] || (sel > 0 ? b.w[sel - 1][0] - a.w[sel - 1][0] : 0));
-      const ohne = d.fahrer.filter(f => f.m && !f.w[sel][0] && !(sel > 0 && f.w[sel - 1][0])).map(f => esc(f.name));
-      const pfeil = (f) => {
-        if (sel === 0) return '<span class="wk-tr">–</span>';
-        const x = f.w[sel][0] - f.w[sel - 1][0];
-        return x > 0 ? `<span class="wk-tr up">▲ +${x}</span>` : x < 0 ? `<span class="wk-tr down">▼ −${Math.abs(x)}</span>` : '<span class="wk-tr">± 0</span>';
-      };
-      document.getElementById("wk-detail").innerHTML = `
-        <div class="tm-box">
-          <h5>KW ${w.kw}${sel === letzte ? ' <span class="tm-badge live">läuft</span>' : ""} <span class="tm-muted" style="letter-spacing:0;text-transform:none;font-family:var(--body);font-weight:500">${fmtDay(w.start)} – ${fmtDay(new Date(Date.parse(w.start) + 6 * 864e5).toISOString())}</span></h5>
-          <div class="wk-tiles" style="margin-top:14px">
-            ${kachel("Runden", zahlDE(w.laps), rTrend)}
-            ${kachel("Zeit auf der Strecke", fmtH(w.time), vgl(w.time, v ? v.time : 0, fmtH, ""))}
-            ${kachel("Fahrer aktiv", `${w.active} / ${d.mitglieder}`, vgl(w.active, v ? v.active : 0, (n) => n, ""))}
-            ${kachel("Saubere Runden", w.laps ? sw + " %" : "–", w.laps && v && v.laps ? vgl(sw, sv, (n) => n, " %") : '<span class="wk-tr">–</span>')}
-          </div>
-        </div>
-        <div class="tm-box" style="padding:0">
-          <h5 style="padding:18px 22px 0">Fahrer in KW ${w.kw}</h5>
-          <div class="ta-list" style="border:0;margin-top:12px">
-            <div class="wk-row ta-head"><span>Fahrer</span><span class="r-al">Runden</span><span class="r-al">${v ? "zur " + kv : "Vorwoche"}</span><span class="r-al">Zeit</span></div>
-            ${liste.length ? liste.map(f => `
-              <div class="wk-row${f.w[sel][0] ? "" : " null"}">
-                <b>${esc(f.name)}</b>
-                <span class="n">${zahlDE(f.w[sel][0])}</span>
-                <span class="r-al">${pfeil(f)}</span>
-                <span class="r-al tm-muted">${f.w[sel][1] ? fmtH(f.w[sel][1]) : "–"}</span>
-              </div>`).join("") : '<p class="tm-muted" style="padding:16px 22px">In dieser Woche ist niemand gefahren.</p>'}
-          </div>
-          ${ohne.length ? `<p class="tm-muted" style="padding:12px 22px 16px;border-top:1px solid var(--line)">Nicht gefahren: ${ohne.join(", ")}</p>` : ""}
-        </div>`;
-    };
-    box.querySelectorAll("[data-w]").forEach(b => b.onclick = () => { sel = Number(b.dataset.w); zeige(); });
-    zeige();
-  }
-
-  /* ---------------- Nutzung (nur Admin) ---------------- */
-  const BEREICHE = {
-    dashboard: "Dashboard", news: "Team News", fahrer: "Fahrerprofil", abwesend: "Abwesenheiten", links: "Links", trainer: "Trainer",
-    "g61-woche": "Wochenübersicht", "g61-fleiss": "Trainingsfleiß", "g61-trips": "Fahrtenbuch", "g61-board": "Bestenliste", "g61-ratings": "iRating",
-    aktivitaet: "Aktivität", "news-schreiben": "News schreiben", fahrerprofile: "Fahrerprofile", "kalender-admin": "Rennkalender", admin: "Admin",
-  };
-  const fmtWann = (ms) => {
-    const min = Math.floor((Date.now() - ms) / 6e4);
-    if (min < 1) return "gerade eben";
-    if (min < 60) return `vor ${min} Min.`;
-    if (min < 360) return `vor ${Math.floor(min / 60)} Std.`;
-    return fmtDate(new Date(ms).toISOString());
-  };
-
-  async function renderNutzung() {
-    main().innerHTML = panelHead("eye", "Dashboard-Nutzung", '<span class="tm-badge">Nur Admin</span>') + '<div id="nu"><div class="tm-loading"><span></span><span></span><span></span></div></div>';
-    const box = document.getElementById("nu");
-    let d;
-    try { d = await api("/admin/usage"); } catch (e) { box.innerHTML = `<div class="tm-box tm-err">${esc(e.message)}</div>`; return; }
-
-    const head = `<div class="nu-row ta-head"><span></span><span>Mitglied</span><span class="r-al">Besuche 7 T.</span><span class="r-al">Besuche ${d.tage} T.</span><span>Meistgenutzt</span><span class="r-al">Zuletzt</span></div>`;
-    const rows = d.leute.map(u => `
-      <div class="nu-row">
-        ${u.avatar ? `<img class="ta-ava" src="${esc(u.avatar)}" alt="" loading="lazy">` : '<span class="ta-ava"></span>'}
-        <div class="ta-name"><b>${esc(u.name)}</b></div>
-        <div class="ta-num"><b>${u.v7}</b><small>7 Tage</small></div>
-        <div class="ta-num"><b>${u.v30}</b><small>${d.tage} Tage</small></div>
-        <div class="nu-tags">${u.bereiche.length ? u.bereiche.map(b => `<span class="nu-tag">${esc(BEREICHE[b.id] || b.id)}<b>${b.n}</b></span>`).join("") : '<span class="tm-muted">–</span>'}</div>
-        <div class="ta-last">${u.last ? fmtWann(Date.parse(u.last)) : "nie"}</div>
-      </div>`).join("");
-    const log = d.verlauf.map(a => `
-      <div class="nu-log-row"><span class="t">${fmtWann(a.t)}</span><b>${esc(a.name)}</b><span>${esc(a.a)}</span></div>`).join("");
-
-    box.innerHTML = `
-      <div class="tm-box ta-top">
-        <div>
-          <div class="ta-upd">Wer nutzt das Dashboard – und wofür?</div>
-          <div class="tm-muted">Gezählt werden geöffnete Bereiche und Aktionen · gespeichert ${d.tage} Tage · ein Besuch = einmal Dashboard öffnen</div>
-        </div>
-        <div class="tm-actions">${btn("Jetzt aktualisieren", "sm", 'id="nu-run"')}</div>
-      </div>
-      <div class="ta-list">${d.leute.length ? head + rows : '<p class="tm-muted" style="padding:16px">Noch keine Daten – sobald jemand das Dashboard nutzt, erscheint er hier.</p>'}</div>
-      <div class="tm-box" style="margin-top:16px">
-        <h5>Letzte Aktionen</h5>
-        <div class="nu-log">${log || '<p class="tm-muted">Noch keine Aktionen.</p>'}</div>
-      </div>`;
-    document.getElementById("nu-run").onclick = renderNutzung;
-  }
-
-  /* ---------------- Cloudflare-Limits (nur Admin) ---------------- */
-  async function renderLimits() {
-    main().innerHTML = panelHead("gauge", "Cloudflare-Limits", '<span class="tm-badge">Nur Admin</span>') + '<div id="li"><div class="tm-loading"><span></span><span></span><span></span></div></div>';
-    const box = document.getElementById("li");
-    let d;
-    try { d = await api("/admin/limits"); } catch (e) { box.innerHTML = `<div class="tm-box tm-err">${esc(e.message)}</div>`; return; }
-    if (!d.ready) {
-      box.innerHTML = `<div class="tm-box tm-soon"><div class="big">Keine Daten</div><p class="tm-err">${esc(d.info || "Unbekannter Fehler")}</p><div class="tm-actions" style="justify-content:center;margin-top:18px">${btn("Nochmal versuchen", "sm", 'id="li-run"')}</div></div>`;
-      document.getElementById("li-run").onclick = renderLimits;
-      return;
-    }
-    const zahl = (n) => Number(n || 0).toLocaleString("de-DE");
-    const farbe = (p) => p >= 90 ? "rot" : p >= 70 ? "gelb" : "";
-    box.innerHTML = `
-      <div class="tm-box ta-top">
-        <div>
-          <div class="ta-upd">Stand: <b>${fmtDate(d.at)}</b></div>
-          <div class="tm-muted">Gilt für dein ganzes Cloudflare-Konto (alle Worker zusammen) · setzt sich täglich um <b>${esc(d.reset)} Uhr</b> zurück · Cloudflare liefert die Zahlen mit ein paar Minuten Verzögerung</div>
-        </div>
-        <div class="tm-actions">${btn("Jetzt aktualisieren", "sm", 'id="li-run"')}<a class="tm-btn sm" href="#admin"><span>Warnung einstellen</span></a></div>
-      </div>
-      <div class="ta-list">${d.metrics.map(m => `
-        <div class="li-row ${farbe(m.pct)}">
-          <b class="li-lbl">${esc(m.label)}</b>
-          <div class="li-bar"><i style="width:${Math.min(100, m.pct)}%"></i></div>
-          <div class="li-num"><b>${zahl(m.used)}</b> / ${zahl(m.limit)}</div>
-          <div class="li-pct">${String(m.pct).replace(".", ",")} %</div>
-        </div>`).join("")}</div>
-      <div class="ta-legend" style="margin-top:10px"><span class="aktiv">Grün</span> unter 70 % <span class="ruhig">Gelb</span> ab 70 % <span class="inaktiv">Rot</span> ab 90 %</div>`;
-    document.getElementById("li-run").onclick = renderLimits;
-  }
-
   /* ---------------- Tools ---------------- */
   const TYPE_SHORT = { 1: "Training", 2: "Quali", 3: "Rennen" };
   const tripTable = (rows) => `
@@ -1144,11 +894,9 @@
 
   async function renderG61(tab, days) {
     tab = tab || "fleiss";
-    merke("g61-" + tab);
     days = days || 7;
     main().innerHTML = panelHead("garage61", "Garage 61") + `
       <div class="g6-tabs">
-        <button type="button" data-tab="woche" class="${tab === "woche" ? "on" : ""}">Wochenübersicht</button>
         <button type="button" data-tab="fleiss" class="${tab === "fleiss" ? "on" : ""}">Trainingsfleiß</button>
         <button type="button" data-tab="trips" class="${tab === "trips" ? "on" : ""}">Fahrtenbuch</button>
         <button type="button" data-tab="board" class="${tab === "board" ? "on" : ""}">Bestenliste</button>
@@ -1156,7 +904,6 @@
       </div>
       <div id="g61b"><div class="tm-loading"><span></span><span></span><span></span></div></div>`;
     main().querySelectorAll("[data-tab]").forEach(b => b.onclick = () => renderG61(b.dataset.tab, days));
-    if (tab === "woche") return renderWoche();
     if (tab === "fleiss") return renderFleiss(days);
     if (tab === "trips") return renderTrips(days);
     if (tab === "ratings") return renderRatings();
@@ -1226,7 +973,7 @@
           <button type="button" data-days="7" class="${days === 7 ? "on" : ""}">7 Tage</button>
           <button type="button" data-days="30" class="${days === 30 ? "on" : ""}">30 Tage</button>
         </div>
-        <span class="tm-muted">Stand: ${fmtDate(d.at)} · aktualisiert alle 3 Std.</span>
+        <span class="tm-muted">Stand: ${fmtDate(d.at)} · aktualisiert alle 30 Min.</span>
       </div>
 
       <div class="g6-kpis">
@@ -1313,7 +1060,6 @@
       : '<span class="tm-err">Keine Rollen geladen – ist der Bot auf dem Server?</span>';
 
     const g = cfg.g61, gi = d.g61;
-    const wp = cfg.wpost || {}, wpo = wp.opt || {};
     const teamOpts = gi.teams.length
       ? `<select class="tm-select" id="g61-team"><option value="">– Team wählen –</option>${gi.teams.map(t => `<option value="${esc(t.slug)}" ${t.slug === g.teamSlug ? "selected" : ""}>${esc(t.name)}</option>`).join("")}</select>`
       : `<input class="tm-input" id="g61-team" placeholder="Team-Slug aus Garage 61" value="${esc(g.teamSlug)}">`;
@@ -1351,39 +1097,17 @@
           <div style="display:flex;flex-direction:column;gap:12px">
             <label class="tm-switch"><input type="checkbox" id="g61-on" ${g.enabled ? "checked" : ""}><span class="s"></span>Neue Bestzeiten posten</label>
             <label class="tm-switch"><input type="checkbox" id="g61-rec" ${g.onlyTeamRecord ? "checked" : ""}><span class="s"></span>Nur Team-Rekorde (P1)</label>
+            <label class="tm-switch"><input type="checkbox" id="g61-week" ${g.weekly ? "checked" : ""}><span class="s"></span>Wochenrückblick jeden Sonntagabend</label>
           </div></div>
         <div class="tm-row"><div class="lbl">Testen</div>
           <div>
             <div class="tm-actions">${btn("Test-Post senden", "sm", 'id="g61-test"')}${btn("Jetzt prüfen", "sm", 'id="g61-run"')}</div>
+            <div class="tm-actions" style="margin-top:12px">
+              <select class="tm-select" id="g61-sdays" style="width:auto"><option value="7">Letzte 7 Tage</option><option value="30">Letzte 30 Tage</option></select>
+              ${btn("📊 Statistik an Discord senden", "sm red", 'id="g61-stats"')}
+            </div>
             <p class="tm-muted" style="margin-top:10px">Letzter Lauf: ${gi.lastRun ? fmtDate(gi.lastRun) + " – " + esc(gi.lastResult || "") : "noch keiner"}</p>
           </div></div>
-      </div>
-
-      <div class="tm-box">
-        <h5>Wochen-Post</h5>
-        <p class="hint">Trainingswoche auswählen, Inhalt festlegen, Vorschau ansehen und dann in Discord posten. Alle Zahlen kommen automatisch aus Garage 61.</p>
-        <div class="tm-row"><label for="g61-ziel">Wochenziel<small>Runden pro Woche fürs ganze Team · 0 = aus · mit „Speichern" sichern</small></label>
-          <div><input class="tm-input" id="g61-ziel" type="number" min="0" max="100000" step="50" value="${Number(g.ziel) || 0}" style="max-width:160px"> <span class="tm-muted">Runden</span></div></div>
-        <div class="tm-row"><label for="wp-w">Woche</label>
-          <div><select class="tm-select" id="wp-w" style="width:auto"><option value="">Lädt …</option></select></div></div>
-        <div class="tm-row"><label for="wp-text">Ansage vom Teamchef<small>optional · wird groß hervorgehoben</small></label>
-          <div><textarea class="tm-input" id="wp-text" rows="3" maxlength="600" placeholder="z. B. Starke Woche, Jungs! Samstag geht's nach Spa – alle nochmal auf die Strecke!"></textarea></div></div>
-        <div class="tm-row"><div class="lbl">Inhalt</div>
-          <div style="display:flex;flex-direction:column;gap:12px">
-            <label class="tm-switch"><input type="checkbox" id="wp-alle" ${wpo.alle !== false ? "checked" : ""}><span class="s"></span>Alle Fahrer zeigen (sonst nur Podium P1–P3)</label>
-            <label class="tm-switch"><input type="checkbox" id="wp-vgl" ${wpo.vgl !== false ? "checked" : ""}><span class="s"></span>Vergleich zur Vorwoche</label>
-            <label class="tm-switch"><input type="checkbox" id="wp-sprung" ${wpo.sprung !== false ? "checked" : ""}><span class="s"></span>Größter Sprung (meiste Runden mehr als in der Vorwoche)</label>
-            <label class="tm-switch"><input type="checkbox" id="wp-ziel" ${wpo.ziel !== false ? "checked" : ""}><span class="s"></span>Wochenziel</label>
-            <label class="tm-switch"><input type="checkbox" id="wp-sauber" ${wpo.sauber ? "checked" : ""}><span class="s"></span>Saubere Runden in %</label>
-            <label class="tm-switch"><input type="checkbox" id="wp-top" ${wpo.top ? "checked" : ""}><span class="s"></span>Top-Strecken &amp; Top-Autos</label>
-          </div></div>
-        <div class="tm-row"><label for="wp-ch">Discord-Kanal</label>
-          <div><select class="tm-select" id="wp-ch"><option value="">– Kanal wählen –</option>${(d.channels || []).map(c => `<option value="${c.id}" ${c.id === (wp.channel || g.channel) ? "selected" : ""}># ${esc(c.name)}</option>`).join("")}</select></div></div>
-        <div class="tm-row"><label for="wp-ping">Rolle pingen<small>z. B. Teamfahrer</small></label>
-          <div><select class="tm-select" id="wp-ping"><option value="">– niemanden pingen –</option>${d.roles.map(r => `<option value="${r.id}" ${r.id === wp.ping ? "selected" : ""}>@${esc(r.name)}</option>`).join("")}</select></div></div>
-        <div class="tm-row"><div class="lbl">Posten</div>
-          <div class="tm-actions">${btn("Vorschau", "sm", 'id="wp-prev"')}${btn("🏁 In Discord posten", "sm red", 'id="wp-send"')}</div></div>
-        <div id="wp-vorschau"></div>
       </div>
 
       <div class="tm-box">
@@ -1417,22 +1141,6 @@
         <div class="tm-row"><div class="lbl">Testen</div><div class="tm-actions">${btn("Test-Erinnerung senden", "sm", 'id="rm-test"')}</div></div>
       </div>
 
-      <div class="tm-box">
-        <h5>Limit-Warnung</h5>
-        <p class="hint">Alle 30 Minuten wird geprüft, wie viel von den Cloudflare-Gratis-Limits heute schon verbraucht ist. Wird eine Schwelle erreicht, postet der Bot eine Warnung – höchstens einmal pro Tag und Schwelle. Übersicht unter „Limits".</p>
-        <div class="tm-row"><div class="lbl">Warnung</div>
-          <div style="display:flex;flex-direction:column;gap:12px">
-            <label class="tm-switch"><input type="checkbox" id="li-on" ${(cfg.limits || {}).enabled ? "checked" : ""}><span class="s"></span>An</label>
-            <label class="tm-switch"><input type="checkbox" id="li-90" ${(cfg.limits || {}).p90 ? "checked" : ""}><span class="s"></span>Ab 90 % warnen</label>
-            <label class="tm-switch"><input type="checkbox" id="li-100" ${(cfg.limits || {}).p100 ? "checked" : ""}><span class="s"></span>Bei 100 % (Limit erreicht) melden</label>
-          </div></div>
-        <div class="tm-row"><label for="li-ch">Discord-Kanal</label>
-          <div><select class="tm-select" id="li-ch"><option value="">– Kanal wählen –</option>${(d.channels || []).map(c => `<option value="${c.id}" ${c.id === (cfg.limits || {}).channel ? "selected" : ""}># ${esc(c.name)}</option>`).join("")}</select></div></div>
-        <div class="tm-row"><label for="li-ping">Ping<small>Rolle, die erwähnt wird</small></label>
-          <div><select class="tm-select" id="li-ping"><option value="">– niemanden pingen –</option>${d.roles.map(r => `<option value="${r.id}" ${r.id === (cfg.limits || {}).ping ? "selected" : ""}>@${esc(r.name)}</option>`).join("")}</select></div></div>
-        <div class="tm-row"><div class="lbl">Testen</div><div class="tm-actions">${btn("Test-Warnung senden", "sm", 'id="li-test"')}</div></div>
-      </div>
-
       <div class="tm-savebar" id="savebar"><span>Alles gespeichert</span>${btn("Speichern", "red", 'id="tm-save"')}</div>`;
 
     // Rollen-Auswahl vorbelegen + umschalten
@@ -1450,7 +1158,7 @@
         };
       });
     });
-    box.querySelectorAll("#g61-team,#g61-ziel,#g61-ch,#g61-on,#g61-rec,#rm-on,#rm-24,#rm-1,#rm-ch,#rm-ping,#ab-ch,#li-on,#li-90,#li-100,#li-ch,#li-ping").forEach(el => el.addEventListener("input", markDirty));
+    box.querySelectorAll("#g61-team,#g61-ch,#g61-on,#g61-rec,#g61-week,#rm-on,#rm-24,#rm-1,#rm-ch,#rm-ping,#ab-ch").forEach(el => el.addEventListener("input", markDirty));
     box.querySelectorAll("#g61-on,#g61-rec").forEach(el => el.addEventListener("change", markDirty));
 
     // ---- Links bearbeiten ----
@@ -1499,7 +1207,7 @@
           channel: document.getElementById("g61-ch").value,
           enabled: document.getElementById("g61-on").checked,
           onlyTeamRecord: document.getElementById("g61-rec").checked,
-          ziel: Number(document.getElementById("g61-ziel").value) || 0,
+          weekly: document.getElementById("g61-week").checked,
         },
         reminders: {
           enabled: document.getElementById("rm-on").checked,
@@ -1510,13 +1218,6 @@
         },
         links: (lkSync(), links.filter(l => l.title.trim() && l.url.trim())),
         absences: { channel: document.getElementById("ab-ch").value },
-        limits: {
-          enabled: document.getElementById("li-on").checked,
-          channel: document.getElementById("li-ch").value,
-          ping: document.getElementById("li-ping").value,
-          p90: document.getElementById("li-90").checked,
-          p100: document.getElementById("li-100").checked,
-        },
       };
       await api("/admin/config", { method: "POST", body });
       dirty = false;
@@ -1546,78 +1247,16 @@
     action("g61-run", "/admin/g61/run");
     action("rm-test", "/admin/reminders/test");
     action("ab-cmds", "/admin/discord/commands");
-    action("li-test", "/admin/limits/test");
 
-    // ---- Wochen-Post ----
-    const wpSel = document.getElementById("wp-w");
-    api("/g61/woche").then(w => {
-      if (!w.ready) { wpSel.innerHTML = '<option value="">Garage 61 nicht eingerichtet</option>'; return; }
-      const last = w.wochen.length - 1;
-      wpSel.innerHTML = w.wochen.map((x, i) => `<option value="${i}" ${i === last - 1 ? "selected" : ""}>KW ${x.kw}${i === last ? " (läuft)" : ""} · ab ${fmtDay(x.start)} · ${Number(x.laps).toLocaleString("de-DE")} Runden</option>`).reverse().join("");
-    }).catch(() => { wpSel.innerHTML = '<option value="">Wochen nicht ladbar</option>'; });
-
-    const wpBody = (vorschau) => ({
-      w: Number(wpSel.value),
-      text: document.getElementById("wp-text").value,
-      channel: document.getElementById("wp-ch").value,
-      ping: document.getElementById("wp-ping").value,
-      vorschau,
-      opt: Object.fromEntries(["alle", "vgl", "sprung", "ziel", "sauber", "top"].map(k => [k, document.getElementById("wp-" + k).checked])),
-    });
-    const md = (t) => esc(t || "")
-      .replace(/\*\*(.+?)\*\*/g, "<b>$1</b>")
-      .replace(/\*(.+?)\*/g, "<i>$1</i>");
-    const mdBlock = (t) => {
-      let out = "", quote = [];
-      const flush = () => { if (quote.length) { out += `<blockquote>${quote.join("<br>")}</blockquote>`; quote = []; } };
-      for (const line of String(t || "").split("\n")) {
-        if (/^>\s?/.test(line)) { quote.push(md(line.replace(/^>\s?/, ""))); continue; }
-        flush();
-        if (line.startsWith("### ")) out += `<div class="dp-h3">${md(line.slice(4))}</div>`;
-        else out += line ? `<div>${md(line)}</div>` : '<div class="dp-gap"></div>';
-      }
-      flush();
-      return out;
-    };
-    const zeigeVorschau = (e, ping) => {
-      const pingName = ping ? (d.roles.find(r => r.id === ping) || {}).name : "";
-      document.getElementById("wp-vorschau").innerHTML = `
-        <div class="dp">
-          <div class="dp-label">Vorschau – so sieht der Post in Discord aus</div>
-          ${pingName ? `<div class="dp-ping">@${esc(pingName)}</div>` : ""}
-          <div class="dp-embed">
-            <img class="dp-thumb" src="${IMG}f2f-logo.webp" alt="">
-            <div class="dp-author">${esc(e.author.name)}</div>
-            <div class="dp-title">${md(e.title)}</div>
-            <div class="dp-desc">${mdBlock(e.description)}</div>
-            <div class="dp-fields">${e.fields.map(f => `<div class="dp-field${f.inline ? " in" : ""}">${f.name !== "\u200B" ? `<div class="dp-fn">${md(f.name)}</div>` : ""}<div class="dp-fv">${mdBlock(f.value)}</div></div>`).join("")}</div>
-            <div class="dp-foot">${esc(e.footer.text)}</div>
-          </div>
-        </div>`;
-    };
-    const wpPrev = document.getElementById("wp-prev");
-    wpPrev.onclick = async () => {
-      if (wpSel.value === "") return toast("Bitte eine Woche wählen");
-      wpPrev.disabled = true;
-      try {
-        const b = wpBody(true);
-        const r = await api("/admin/wochenpost", { method: "POST", body: b });
-        if (r.embed) zeigeVorschau(r.embed, b.ping); else toast(r.info || "Fehler");
-      } catch (e) { toast(e.message); }
-      wpPrev.disabled = false;
-    };
-    const wpSend = document.getElementById("wp-send");
-    wpSend.onclick = async () => {
-      if (wpSel.value === "") return toast("Bitte eine Woche wählen");
-      if (!confirm("Wochen-Post jetzt in Discord posten?")) return;
-      wpSend.disabled = true;
+    const sb = document.getElementById("g61-stats");
+    sb.onclick = async () => {
+      sb.disabled = true;
       try {
         if (dirty) await save();
-        const r = await api("/admin/wochenpost", { method: "POST", body: wpBody(false) });
-        toast(r.info || "Erledigt", r.ok);
-        if (r.ok) { document.getElementById("wp-text").value = ""; document.getElementById("wp-vorschau").innerHTML = ""; }
+        const r = await api("/admin/g61/stats", { method: "POST", body: { days: Number(document.getElementById("g61-sdays").value), channel: document.getElementById("g61-ch").value } });
+        toast(r.info, r.ok);
       } catch (e) { toast(e.message); }
-      wpSend.disabled = false;
+      sb.disabled = false;
     };
   }
 
