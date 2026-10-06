@@ -1475,8 +1475,8 @@
       return;
     }
     if (!d.boards.length) {
-      box.innerHTML = `<div class="tm-box tm-soon"><div class="big">Keine Runden</div><p>In den letzten 14 Tagen hat niemand aus dem Team Runden hochgeladen.</p></div>`;
-      return;
+      box.innerHTML = `<div class="tm-box tm-soon"><div class="big">Keine Runden</div><p>In den letzten 14 Tagen hat niemand aus dem Team Runden hochgeladen.</p></div><div id="g61s"></div>`;
+      return renderStrecken();
     }
     box.innerHTML = `<p class="tm-muted" style="margin-bottom:16px">Persönliche Bestzeiten pro Strecke und Auto – alles, was das Team in den letzten 14 Tagen gefahren ist. <span class="tm-new">NEU</span> = in den letzten 48 Stunden. ${d.autoPost ? '<span class="tm-badge live">Discord-Posts aktiv</span>' : ""}</p>
       <div class="tm-boards">${d.boards.map(b => `
@@ -1492,8 +1492,74 @@
             </tr>`).join("")}
           </table></div>
         </div>`).join("")}
-      </div>`;
+      </div>
+      <div id="g61s"></div>`;
+    renderStrecken();
   }
+  /* Bestenliste pro Strecke (unter der Übersicht) */
+  async function renderStrecken() {
+    const box = document.getElementById("g61s");
+    if (!box) return;
+    box.innerHTML = '<div class="tm-loading"><span></span><span></span><span></span></div>';
+    let d;
+    try { d = await api("/g61/strecken"); } catch (e) { box.innerHTML = `<div class="tm-box tm-err">${esc(e.message)}</div>`; return; }
+    if (!d.strecken.length) { box.innerHTML = ""; return; }
+    let scope = "cur", wahl = d.vorwahl || d.strecken[0].id, daten = null;
+    box.innerHTML = `
+      <div class="gs-head">
+        <h4>Strecken</h4>
+        <p class="tm-muted">Alle Team-Bestzeiten einer Strecke, pro Auto. ${d.rennen ? "Vorausgewählt: Strecke vom nächsten Rennen (" + esc(d.rennen) + ")." : ""}</p>
+        <div class="gs-ctrl">
+          <input class="tm-input" id="gs-such" placeholder="Strecke suchen …" autocomplete="off">
+          <select class="tm-select" id="gs-sel"></select>
+          <div class="gs-tog" role="group" aria-label="Wertung">
+            <button type="button" data-sc="cur" class="on">📅 Aktuelle BoP</button><button type="button" data-sc="all">📚 Allzeit</button>
+          </div>
+        </div>
+      </div>
+      <div id="gs-out"></div>`;
+    const sel = document.getElementById("gs-sel"), such = document.getElementById("gs-such"), out = document.getElementById("gs-out");
+    const liste = () => {
+      const q = such.value.trim().toLowerCase();
+      const t = d.strecken.filter(x => !q || x.tn.toLowerCase().includes(q));
+      sel.innerHTML = t.map(x => `<option value="${x.id}" ${x.id === wahl ? "selected" : ""}>${esc(x.tn)} (${x.autos} Auto${x.autos === 1 ? "" : "s"})</option>`).join("") || '<option value="">Nichts gefunden</option>';
+      if (t.length && !t.some(x => x.id === wahl)) { wahl = t[0].id; laden(); }
+    };
+    const zeichnen = () => {
+      if (!daten) return;
+      const autos = daten.autos.map(a => ({ cn: a.cn, l: scope === "cur" ? a.cur : a.all })).filter(a => a.l.length);
+      if (!autos.length) { out.innerHTML = `<div class="tm-box tm-soon"><p>${scope === "cur" ? "In der aktuellen Season (" + esc(d.season) + ") ist hier noch niemand gefahren. Schalte auf Allzeit." : "Keine Zeiten."}</p></div>`; return; }
+      out.innerHTML = `<div class="tm-boards">${autos.map(a => `
+        <div class="tm-board">
+          <div class="tm-board-h"><b>${esc(a.cn)}</b><span>${esc(daten.tn)} · ${a.l.length} Fahrer</span></div>
+          <div class="tm-tbl-wrap"><table class="tm-tbl">${a.l.map((x, i) => `
+            <tr class="${i === 0 ? "first" : ""}">
+              <td class="p">P${i + 1}</td>
+              <td class="n">${esc(x.n)}${isRecent(x.at) ? '<span class="tm-new">NEU</span>' : ""}${x.kg || x.pct ? '<span class="tm-bop" title="Mit BOP gefahren">BOP</span>' : ""}</td>
+              <td class="t">${fmtLap(x.t)}</td>
+              <td class="g">${i ? "+" + (x.t - a.l[0].t).toFixed(3) : ""}</td>
+              <td class="d">${scope === "all" && x.se ? esc(x.se) + "<br>" : (SESSION[x.s] ? SESSION[x.s] + "<br>" : "")}${fmtDate(x.at)}</td>
+            </tr>`).join("")}
+          </table></div>
+        </div>`).join("")}</div>`;
+    };
+    const laden = async () => {
+      if (!wahl) return;
+      out.innerHTML = '<div class="tm-loading"><span></span><span></span><span></span></div>';
+      try { daten = await api("/g61/strecken?id=" + encodeURIComponent(wahl)); zeichnen(); }
+      catch (e) { out.innerHTML = `<div class="tm-box tm-err">${esc(e.message)}</div>`; }
+    };
+    such.addEventListener("input", liste);
+    sel.addEventListener("change", () => { wahl = sel.value; laden(); });
+    box.querySelectorAll("[data-sc]").forEach(b => b.onclick = () => {
+      scope = b.dataset.sc;
+      box.querySelectorAll("[data-sc]").forEach(x => x.classList.toggle("on", x === b));
+      zeichnen();
+    });
+    liste();
+    laden();
+  }
+
 
   /* ---------------- Admin ---------------- */
   async function renderAdmin() {
