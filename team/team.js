@@ -407,7 +407,7 @@
             ${SECTIONS.map(s => link(s.id, s.icon, s.label)).join("")}
             ${ME.panels.links ? link("links", "link", "Links") : ""}
             <div class="td-nav-h">Tools</div>${link("abwesend", "clock", "Abwesenheiten")}${tools.map(p => link(p, p, PANELS[p].title)).join("")}
-            ${ME.isAdmin ? `<div class="td-nav-h">Verwaltung</div>${link("aktivitaet", "activity", "Aktivität")}${link("nutzung", "eye", "Nutzung")}${link("limits", "gauge", "Limits")}${link("news-schreiben", "news", "News schreiben")}${link("fahrerprofile", "helmet", "Fahrerprofile")}${link("kalender-admin", "calendar", "Rennkalender")}${link("admin", "admin", "Admin")}<a class="td-link" href="https://kreids888-admin.kreids.workers.dev/" target="_blank" rel="noopener">${ICONS.ext}<span>kreids888-Dashboard</span></a>` : ""}
+            ${ME.isAdmin ? `<div class="td-nav-h">Verwaltung</div>${link("aktivitaet", "activity", "Aktivität")}${link("nutzung", "eye", "Nutzung")}${link("limits", "gauge", "Limits")}${link("posts", "trophy", "Discord-Posts")}${link("news-schreiben", "news", "News schreiben")}${link("fahrerprofile", "helmet", "Fahrerprofile")}${link("kalender-admin", "calendar", "Rennkalender")}${link("admin", "admin", "Admin")}<a class="td-link" href="https://kreids888-admin.kreids.workers.dev/" target="_blank" rel="noopener">${ICONS.ext}<span>kreids888-Dashboard</span></a>` : ""}
           </nav>
         </aside>
         <div class="td-main" id="td-main"></div>
@@ -418,6 +418,7 @@
     if (id === "nutzung" && ME.isAdmin) return renderNutzung();
     if (id === "limits" && ME.isAdmin) return renderLimits();
     if (id === "admin" && ME.isAdmin) return renderAdmin();
+    if (id === "posts" && ME.isAdmin) return renderPosts();
     if (id === "aktivitaet" && ME.isAdmin) return renderActivity();
     if (id === "news-schreiben" && ME.isAdmin) return renderNewsAdmin();
     if (id === "fahrerprofile" && ME.isAdmin) return renderProfilesAdmin();
@@ -773,6 +774,111 @@
       if (!confirm("Abwesenheit löschen?")) return;
       try { const r = await api("/abwesend/delete", { method: "POST", body: { id: b.dataset.abdel } }); toast(r.info || "Gelöscht", r.ok !== false); renderAbwesend(); }
       catch (e) { toast(e.message); }
+    });
+  }
+
+  /* ---------------- Discord-Posts aus Garage 61 (Admin) ---------------- */
+  const POST_INFO = {
+    rekord:   { t: "🏆 Neuer Teamrekord", h: "Wird ein Teamrekord gebrochen, kommt sofort ein Post mit alter und neuer Zeit, Abstand und BOP der Runde. Geprüft wird alle 30 Minuten.", wann: "sofort" },
+    buch:     { t: "📖 Rekordbuch", h: "Alle Teamrekorde einer Strecke, pro Auto. Automatisch einmal pro Woche für die Strecke vom nächsten Rennen.", wann: "woche" },
+    besten:   { t: "📊 Bestenliste vor dem Rennen", h: "Top 5 des Teams auf der Strecke vom nächsten Rennen, mit Abstand zur Bestzeit.", wann: "tage" },
+    karte:    { t: "👤 Fahrerkarte", h: "Bestzeiten pro Fahrer mit Abstand zum Teamrekord. Automatisch am 1. des Monats für jeden, der im Vormonat eine neue Bestzeit gefahren ist.", wann: "monat" },
+    monat:    { t: "📅 Monatsrückblick", h: "Gebrochene Rekorde, meiste Runden, größter Sprung und Fahrer des Monats. Automatisch am 1. des Monats.", wann: "monat" },
+    konstanz: { t: "🎯 Konstanz-Wertung", h: "Wer fährt die gleichmäßigsten Runden? Saubere Runden der letzten 7 Tage, mindestens 10 auf einer Kombi.", wann: "woche" },
+    vorb:     { t: "🏁 Rennvorbereitung", h: "Vor dem nächsten Rennen: wer schon auf der Strecke trainiert hat, wer noch nicht und wer am schnellsten ist.", wann: "tage" },
+  };
+  const WTAGE = ["Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag", "Sonntag"];
+
+  async function renderPosts() {
+    main().innerHTML = panelHead("trophy", "Discord-Posts", '<span class="tm-badge">Garage 61</span>') + '<div id="dp"><div class="tm-loading"><span></span><span></span><span></span></div></div>';
+    const box = document.getElementById("dp");
+    let d;
+    try { d = await api("/admin/posts"); } catch (e) { box.innerHTML = `<div class="tm-box tm-err">${esc(e.message)}</div>`; return; }
+    const P = d.posts, db = d.db;
+    const opts = (list, val) => list.map(([v, l]) => `<option value="${esc(v)}" ${String(v) === String(val) ? "selected" : ""}>${esc(l)}</option>`).join("");
+    const kanal = (k) => `<select class="tm-select" data-k="${k}" data-f="channel"><option value="">Kanal wählen</option>${opts(d.channels.map(c => [c.id, "# " + c.name]), P[k].channel)}</select>`;
+    const bopSel = (k) => `<select class="tm-select" data-k="${k}" data-f="bop">${opts([["aktuell", "📅 Aktuelle BoP (diese Season)"], ["allzeit", "📚 Allzeit (alle Seasons)"], ...(k === "karte" ? [] : [["beide", "Beides zeigen"]])], P[k].bop)}</select>`;
+    const zahl = (k, f, lo, hi, nach) => `<input class="tm-input" type="number" data-k="${k}" data-f="${f}" min="${lo}" max="${hi}" value="${P[k][f]}" style="max-width:90px"> <span class="tm-muted">${nach}</span>`;
+    const stunde = (k) => `<select class="tm-select" data-k="${k}" data-f="stunde" style="width:auto">${opts(Array.from({ length: 24 }, (_, h) => [h, String(h).padStart(2, "0") + ":00 Uhr"]), P[k].stunde)}</select>`;
+    const wann = (k) => {
+      const w = POST_INFO[k].wann;
+      if (w === "sofort") return '<span class="tm-muted">sofort, sobald ein Rekord fällt</span>';
+      if (w === "woche") return `<div style="display:flex;gap:8px;flex-wrap:wrap"><select class="tm-select" data-k="${k}" data-f="tag" style="width:auto">${opts(WTAGE.map((t, i) => [i + 1, t]), P[k].tag)}</select>${stunde(k)}</div>`;
+      if (w === "tage") return zahl(k, "tage", 1, 14, "Tage vor dem Rennen");
+      return `<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><span class="tm-muted">am 1. um</span>${stunde(k)}</div>`;
+    };
+    const strecken = `<option value="">Strecke vom nächsten Rennen</option>${opts(db.strecken.map(s => [s.id, s.tn]), "")}`;
+    const extra = (k) => {
+      if (k === "buch" || k === "besten" || k === "vorb") return `<select class="tm-select" data-x="${k}" data-f="track" style="width:auto;max-width:100%">${strecken}</select>`;
+      if (k === "karte") return `<select class="tm-select" data-x="${k}" data-f="fahrer" style="width:auto"><option value="">Alle mit neuer Bestzeit</option>${opts(db.fahrer.map(f => [f.d, f.n]), "")}</select><select class="tm-select" data-x="${k}" data-f="monat" style="width:auto">${opts([["vormonat", "Letzter Monat"], ["dieser", "Dieser Monat"]], "vormonat")}</select>`;
+      if (k === "monat") return `<select class="tm-select" data-x="${k}" data-f="monat" style="width:auto">${opts([["vormonat", "Letzter Monat"], ["dieser", "Dieser Monat bis jetzt"]], "vormonat")}</select>`;
+      return "";
+    };
+    const r = d.rennen;
+    const rennTxt = r ? `${esc(r.title)} am ${fmtDate(new Date(r.at).toISOString())}${r.track ? " · " + esc(r.track) : ""} → ${r.strecke ? "<b>" + esc(r.strecke) + "</b>" : '<span class="tm-err">noch keine Runden auf dieser Strecke</span>'}` : "kein Rennen im Kalender";
+
+    box.innerHTML = `
+      <div class="tm-box">
+        <h5>Rekord-Datenbank</h5>
+        <p class="hint">Holt die Rundenzeiten aus Garage 61 (alle 30 Minuten, nur Strecken mit neuen Runden). Alle Posts lesen daraus. Läuft nur, wenn mindestens ein Post an ist.</p>
+        <div class="tm-status" style="margin-top:14px">
+          <div class="tm-stat"><span class="tm-dot ${d.ready && !db.fehler ? "" : "off"}"></span><div><b>${db.kombis} Strecke/Auto-Kombis</b><div class="tm-muted">${db.offen ? db.offen + " warten noch" : "alles aktuell"}${db.lauf ? " · Stand " + fmtDate(db.lauf) : ""}</div></div></div>
+          <div class="tm-stat"><span class="tm-dot ${r && r.strecke ? "" : "off"}"></span><div><b>Nächstes Rennen</b><div class="tm-muted">${rennTxt}</div></div></div>
+        </div>
+        ${!d.ready ? '<p class="tm-err" style="margin-top:12px">Garage 61 ist noch nicht eingerichtet (Schlüssel und Team unter Admin).</p>' : ""}
+        ${db.fehler ? `<p class="tm-err" style="margin-top:12px">Letzter Fehler (${fmtDate(db.fehlerAt)}): ${esc(db.fehler)}</p>` : ""}
+        <div class="tm-actions" style="margin-top:12px">${btn("Daten holen", "sm", 'id="dp-scan"')}</div>
+      </div>
+      ${Object.keys(POST_INFO).map(k => `
+      <div class="tm-box">
+        <h5>${esc(POST_INFO[k].t)}</h5>
+        <p class="hint">${esc(POST_INFO[k].h)}</p>
+        <div class="tm-row"><div class="lbl">Automatisch</div><label class="tm-switch"><input type="checkbox" data-k="${k}" data-f="on" ${P[k].on ? "checked" : ""}><span class="s"></span>An</label></div>
+        <div class="tm-row"><div class="lbl">Discord-Kanal</div><div>${kanal(k)}</div></div>
+        ${"bop" in P[k] ? `<div class="tm-row"><div class="lbl">Wertung<small>wird im Post angezeigt</small></div><div>${bopSel(k)}</div></div>` : ""}
+        <div class="tm-row"><div class="lbl">Wann</div><div>${wann(k)}</div></div>
+        <div class="tm-row"><div class="lbl">Jetzt senden<small>${k === "rekord" ? "Test mit dem neuesten Rekord" : "sofort in den Kanal"}</small></div>
+          <div><div class="tm-actions" style="flex-wrap:wrap">${extra(k)}${btn("Jetzt senden", "sm red", `data-send="${k}"`)}</div>
+          <p class="tm-muted" style="margin-top:8px">Zuletzt: ${d.last[k] ? fmtDate(d.last[k].at) + " · " + esc(d.last[k].info) : "noch nie"}</p></div></div>
+      </div>`).join("")}
+      <div class="tm-savebar" id="dp-bar"><span>Alles gespeichert</span>${btn("Speichern", "red", 'id="dp-save"')}</div>`;
+
+    let dirty = false;
+    const markDirty = () => { dirty = true; const b = document.getElementById("dp-bar"); b.classList.add("dirty"); b.querySelector("span").textContent = "Ungespeicherte Änderungen"; };
+    box.querySelectorAll("[data-k]").forEach(el => { el.addEventListener("input", markDirty); el.addEventListener("change", markDirty); });
+
+    const sammeln = () => {
+      const out = JSON.parse(JSON.stringify(P));
+      box.querySelectorAll("[data-k]").forEach(el => {
+        const k = el.dataset.k, f = el.dataset.f;
+        out[k][f] = el.type === "checkbox" ? el.checked : (f === "channel" || f === "bop" ? el.value : Number(el.value));
+      });
+      return out;
+    };
+    const speichern = async () => { await api("/admin/posts", { method: "POST", body: { posts: sammeln() } }); dirty = false; };
+
+    const sb = document.getElementById("dp-save");
+    sb.onclick = async () => {
+      sb.disabled = true;
+      try { await speichern(); toast("Gespeichert", true); renderPosts(); }
+      catch (e) { toast(e.message); sb.disabled = false; }
+    };
+    const sc = document.getElementById("dp-scan");
+    sc.onclick = async () => {
+      sc.disabled = true;
+      try { const x = await api("/admin/posts/scan", { method: "POST" }); toast(x.info || "Erledigt", x.ok); renderPosts(); }
+      catch (e) { toast(e.message); sc.disabled = false; }
+    };
+    box.querySelectorAll("[data-send]").forEach(b => b.onclick = async () => {
+      const k = b.dataset.send, body = { art: k };
+      box.querySelectorAll(`[data-x="${k}"]`).forEach(el => { body[el.dataset.f] = el.value; });
+      b.disabled = true;
+      try {
+        if (dirty) await speichern();
+        const x = await api("/admin/posts/send", { method: "POST", body });
+        toast(x.info || "Erledigt", x.ok);
+        if (x.ok) renderPosts(); else b.disabled = false;
+      } catch (e) { toast(e.message); b.disabled = false; }
     });
   }
 
