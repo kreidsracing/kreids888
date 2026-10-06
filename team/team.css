@@ -690,3 +690,15 @@ button.tm-chip.on::after{content:"✓";font-weight:800;color:var(--red);margin-l
 .g6-tabs::-webkit-scrollbar{display:none}
 .g6-tabs button{white-space:nowrap;flex:none}
 @media(max-width:600px){.g6-tabs button{padding:10px 10px;font-size:12.5px;letter-spacing:.06em}}
+
+/* ---------- Nutzung (Cloudflare-Limits) ---------- */
+.nz-row{padding:10px 0;border-top:1px solid var(--line)}
+.nz-row:first-child{border-top:0;padding-top:0}
+.nz-h{display:flex;justify-content:space-between;gap:10px;margin-bottom:6px}
+.nz-h b{font-family:var(--disp);font-weight:800;font-size:15px;text-transform:uppercase;letter-spacing:.04em}
+.nz-h span{font-family:var(--disp);font-weight:800;font-variant-numeric:tabular-nums}
+.nz-bar{height:10px;background:var(--panel2);border:1px solid var(--line);overflow:hidden}
+.nz-bar i{display:block;height:100%}
+.nz-bar i.good{background:#22e07b}.nz-bar i.warn{background:#ffb020}.nz-bar i.bad{background:var(--red)}
+.nz-row small{color:var(--steel);font-size:12.5px}
+.nz-tbl tr.th td{background:var(--panel2);font-family:var(--disp);font-weight:800;font-size:11.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--steel)}

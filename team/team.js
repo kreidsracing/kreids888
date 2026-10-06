@@ -44,6 +44,7 @@
     discord: I('<path d="M20.3 4.4A19.6 19.6 0 0 0 15.4 3l-.6 1.3a18 18 0 0 0-5.5 0L8.6 3a19.6 19.6 0 0 0-4.9 1.5C.6 9.1-.3 13.6.1 18a19.8 19.8 0 0 0 6 3l1.3-2a12.8 12.8 0 0 1-2-1l.5-.4a14 14 0 0 0 12.2 0l.5.4c-.7.4-1.3.7-2 1l1.3 2a19.7 19.7 0 0 0 6-3c.5-5.1-.8-9.6-3.6-13.6zM8 15.3c-1.2 0-2.2-1.1-2.2-2.4S6.8 10.5 8 10.5s2.2 1.1 2.2 2.4-1 2.4-2.2 2.4zm8 0c-1.2 0-2.2-1.1-2.2-2.4s1-2.4 2.2-2.4 2.2 1.1 2.2 2.4-1 2.4-2.2 2.4z"/>', true),
     arrow: I('<path d="M5 12h14M13 6l6 6-6 6"/>'),
     link: I('<path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/>'),
+    gauge: I('<path d="M4 18a8 8 0 1 1 16 0"/><path d="M12 18l4-6"/><circle cx="12" cy="18" r="1.4" fill="currentColor"/>'),
     ext: I('<path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/>'),
   };
 
@@ -369,7 +370,7 @@
             ${SECTIONS.map(s => link(s.id, s.icon, s.label)).join("")}
             ${ME.panels.links ? link("links", "link", "Links") : ""}
             <div class="td-nav-h">Tools</div>${link("abwesend", "clock", "Abwesenheiten")}${tools.map(p => link(p, p, PANELS[p].title)).join("")}
-            ${ME.isAdmin ? `<div class="td-nav-h">Verwaltung</div>${link("aktivitaet", "activity", "Aktivität")}${link("news-schreiben", "news", "News schreiben")}${link("fahrerprofile", "helmet", "Fahrerprofile")}${link("kalender-admin", "calendar", "Rennkalender")}${link("admin", "admin", "Admin")}<a class="td-link" href="https://kreids888-admin.kreids.workers.dev/" target="_blank" rel="noopener">${ICONS.ext}<span>kreids888-Dashboard</span></a>` : ""}
+            ${ME.isAdmin ? `<div class="td-nav-h">Verwaltung</div>${link("aktivitaet", "activity", "Aktivität")}${link("news-schreiben", "news", "News schreiben")}${link("fahrerprofile", "helmet", "Fahrerprofile")}${link("kalender-admin", "calendar", "Rennkalender")}${link("nutzung", "gauge", "Nutzung")}${link("admin", "admin", "Admin")}<a class="td-link" href="https://kreids888-admin.kreids.workers.dev/" target="_blank" rel="noopener">${ICONS.ext}<span>kreids888-Dashboard</span></a>` : ""}
           </nav>
         </aside>
         <div class="td-main" id="td-main"></div>
@@ -380,6 +381,7 @@
     if (id === "news-schreiben" && ME.isAdmin) return renderNewsAdmin();
     if (id === "fahrerprofile" && ME.isAdmin) return renderProfilesAdmin();
     if (id === "kalender-admin" && ME.isAdmin) return renderKalenderAdmin();
+    if (id === "nutzung" && ME.isAdmin) return renderNutzung();
     if (id === "news") return renderNews();
     if (id === "fahrer") return renderProfile();
     if (id === "abwesend") return renderAbwesend();
@@ -718,6 +720,41 @@
       try { const r = await api("/abwesend/delete", { method: "POST", body: { id: b.dataset.abdel } }); toast(r.info || "Gelöscht", r.ok !== false); renderAbwesend(); }
       catch (e) { toast(e.message); }
     });
+  }
+
+  /* ---------------- Cloudflare-Nutzung (Admin) ---------------- */
+  async function renderNutzung() {
+    main().innerHTML = panelHead("gauge", "Nutzung", '<span class="tm-badge">Nur Admin</span>') + '<div id="nz"><div class="tm-loading"><span></span><span></span><span></span></div></div>';
+    const box = document.getElementById("nz");
+    let d;
+    try { d = await api("/admin/nutzung"); } catch (e) { box.innerHTML = `<div class="tm-box tm-err">${esc(e.message)}</div>`; return; }
+    if (!d.ready) {
+      box.innerHTML = `<div class="tm-box tm-soon"><div class="big">Noch nicht verbunden</div><p>Für die Übersicht braucht der Worker einen Lese-Schlüssel für die Cloudflare-Statistik (Secret <b>CF_API_TOKEN</b>).</p></div>`;
+      return;
+    }
+    if (d.fehler) { box.innerHTML = `<div class="tm-box tm-err">${esc(d.fehler)}</div>`; return; }
+    const reset = new Date(Date.UTC(...d.tag.split("-").map((x, i) => i === 1 ? x - 1 : +x)) + 864e5);
+    const bar = (name, wert, max, hint) => {
+      const p = Math.min(100, wert / max * 100);
+      const cls = p >= 80 ? "bad" : p >= 50 ? "warn" : "good";
+      return `<div class="nz-row"><div class="nz-h"><b>${name}</b><span>${wert.toLocaleString("de-DE")} / ${max.toLocaleString("de-DE")}</span></div>
+        <div class="nz-bar"><i class="${cls}" style="width:${Math.max(p, 0.6)}%"></i></div><small>${p.toFixed(p < 1 ? 2 : 1)} % · ${hint}</small></div>`;
+    };
+    const L = d.limits;
+    box.innerHTML = `
+      <p class="tm-muted" style="margin-bottom:12px">Gratis-Kontingent von Cloudflare für <b>heute</b> (alle Worker zusammen). Zurückgesetzt um ${reset.toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" })} Uhr · Stand: ${fmtDate(d.stand)} · aktualisiert alle 5 Min.</p>
+      <div class="tm-box">
+        ${bar("Worker-Aufrufe", d.requests, L.requests, "Seitenaufrufe, Bot, Zeitpläne")}
+        ${bar("Speicher lesen", d.kv.read, L.read, "Einstellungen, Profile, News …")}
+        ${bar("Speicher schreiben", d.kv.write, L.write, "Speichern, Aktivität, Bestzeit-Stand")}
+        ${bar("Speicher löschen", d.kv.delete, L.delete, "")}
+        ${bar("Speicher auflisten", d.kv.list, L.list, "")}
+      </div>
+      <div class="td-label">Pro Worker (heute)</div>
+      <div class="ta-list"><div class="tm-tbl-wrap"><table class="tm-tbl nz-tbl">
+        <tr class="th"><td>Worker</td><td class="r-al">Aufrufe</td><td class="r-al">Fehler</td><td class="r-al">Unteranfragen</td></tr>
+        ${Object.entries(d.worker).sort((a, b) => b[1].requests - a[1].requests).map(([n, x]) => `<tr><td class="n"><b>${esc(n)}</b></td><td class="r-al g6-n">${x.requests.toLocaleString("de-DE")}</td><td class="r-al g6-n">${x.errors}</td><td class="r-al g6-n">${x.subrequests.toLocaleString("de-DE")}</td></tr>`).join("") || '<tr><td colspan="4" class="tm-muted">Heute noch keine Aufrufe</td></tr>'}
+      </table></div></div>`;
   }
 
   /* ---------------- Rennkalender + Discord-Events (Admin) ---------------- */
