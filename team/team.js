@@ -788,6 +788,7 @@
     vorb:     { t: "🏁 Rennvorbereitung", h: "Vor dem nächsten Rennen: wer schon auf der Strecke trainiert hat, wer noch nicht und wer am schnellsten ist.", wann: "tage" },
   };
   const WTAGE = ["Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag", "Sonntag"];
+  const ANZAHL = { buch: ["Fahrer pro Auto", "1 = nur Rekordhalter"], besten: ["Fahrer pro Auto", ""], karte: ["Strecken pro Karte", ""], monat: ["Fahrer pro Liste", "Rekorde, meiste Runden"], konstanz: ["Anzahl Fahrer", ""], vorb: ["Namen bei „schon trainiert“", "Rest als „+X weitere“"] };
   const PLATZHALTER = { rekord: "{strecke} {auto} {fahrer}", buch: "{strecke}", besten: "{strecke}", karte: "{fahrer}", monat: "{monat}", konstanz: "", vorb: "{strecke} {rennen}" };
 
   // Discord-Markdown (das Nötigste) für die Vorschau
@@ -868,7 +869,7 @@
             <input type="color" class="dp-farbe" data-k="${k}" data-f="farbe" value="${esc(x.farbe || "#e11324")}"></div></div>
         <div class="tm-row"><div class="lbl">Rolle pingen</div>
           <div><select class="tm-select" data-k="${k}" data-f="ping"><option value="">niemanden pingen</option>${opts(roles.map(r => [r.id, "@" + r.name]), x.ping)}</select></div></div>
-        ${i.plaetze ? `<div class="tm-row"><div class="lbl">Plätze</div><div><select class="tm-select" data-k="${k}" data-f="plaetze" style="width:auto">${opts([[3, "Top 3"], [5, "Top 5"], [10, "Top 10"]], x.plaetze)}</select></div></div>` : ""}
+        ${ANZAHL[k] ? `<div class="tm-row"><div class="lbl">${esc(ANZAHL[k][0])}${ANZAHL[k][1] ? `<small>${esc(ANZAHL[k][1])}</small>` : ""}</div><div><input class="tm-input" type="number" data-k="${k}" data-f="plaetze" min="1" max="15" value="${x.plaetze}" style="max-width:90px"> <span class="tm-muted">1 bis 15</span></div></div>` : ""}
         <div class="tm-row"><div class="lbl">Bausteine</div>
           <div style="display:flex;flex-direction:column;gap:12px">
             ${sw(k, "t:bop", "BOP-Angaben (⚖️)", t.bop !== false)}
