@@ -793,8 +793,8 @@
 
   /* ---------------- Discord-Posts aus Garage 61 (Admin) ---------------- */
   const POST_INFO = {
-    rekord:   { t: "🏆 Neuer Teamrekord", h: "Wird ein Teamrekord gebrochen, kommt sofort ein Post mit alter und neuer Zeit, Abstand und BOP der Runde. Geprüft wird alle 10 Minuten (nachts Mo–Fr von 1 bis 6 Uhr alle 20).", wann: "sofort", abstand: true },
-    buch:     { t: "📖 Rekordbuch", h: "Alle Teamrekorde einer Strecke, pro Auto. Automatisch einmal pro Woche für die Strecke vom nächsten Rennen.", wann: "woche" },
+    rekord:   { t: "🏆 Neuer Teamrekord", h: "Wird ein Teamrekord gebrochen, kommt sofort ein Post mit alter und neuer Zeit und Abstand. Runden mit und ohne BoP werden getrennt gewertet und getrennt gepostet. Geprüft wird alle 10 Minuten (nachts Mo–Fr von 1 bis 6 Uhr alle 20).", wann: "sofort", abstand: true },
+    buch:     { t: "📖 Rekordbuch", h: "Alle Teamrekorde der Rennstrecke, pro Auto und getrennt mit und ohne BoP. Kommt automatisch vor jedem Rennen aus dem Kalender, für die Strecke genau dieses Rennens.", wann: "rennen", abstand: true },
     besten:   { t: "📊 Bestenliste vor dem Rennen", h: "Die Besten des Teams auf der Strecke vom nächsten Rennen, mit Abstand zur Bestzeit.", wann: "tage", abstand: true, plaetze: true },
     karte:    { t: "👤 Fahrerkarte", h: "Bestzeiten pro Fahrer mit Abstand zum Teamrekord. Automatisch am 1. des Monats für jeden, der im Vormonat eine neue Bestzeit gefahren ist.", wann: "monat", abstand: true },
     monat:    { t: "📅 Monatsrückblick", h: "Gebrochene Rekorde, meiste Runden, größter Sprung und Fahrer des Monats. Automatisch am 1. des Monats.", wann: "monat" },
@@ -861,6 +861,7 @@
       if (w === "sofort") return '<span class="tm-muted">sofort, sobald ein Rekord fällt</span>';
       if (w === "woche") return `<div style="display:flex;gap:8px;flex-wrap:wrap"><select class="tm-select" data-k="${k}" data-f="tag" style="width:auto">${opts(WTAGE.map((t, i) => [i + 1, t]), P[k].tag)}</select>${stunde(k)}</div>`;
       if (w === "tage") return zahl(k, "tage", 1, 14, "Tage vor dem Rennen");
+      if (w === "rennen") return `<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">${zahl(k, "tage", 1, 14, "Tag(e) vor jedem Rennen um")}${stunde(k)}</div>`;
       return `<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><span class="tm-muted">am 1. um</span>${stunde(k)}</div>`;
     };
     const strecken = `<option value="">Strecke vom nächsten Rennen</option>${opts(db.strecken.map(s => [s.id, s.tn]), "")}`;
@@ -907,6 +908,9 @@
         ${!d.ready ? '<p class="tm-err" style="margin-top:12px">Garage 61 ist noch nicht eingerichtet (Schlüssel und Team unter Admin).</p>' : ""}
         ${db.fehler ? `<p class="tm-err" style="margin-top:12px">Letzter Fehler (${fmtDate(db.fehlerAt)}): ${esc(db.fehler)}</p>` : ""}
         ${db.bremse ? `<p class="tm-muted" style="margin-top:8px">Letzte Bremse von Garage 61 (${fmtDate(db.bremse.at)} · ${esc(db.bremse.path)}): ${esc(db.bremse.hdr || "keine Limit-Angaben mitgeschickt")}</p>` : ""}
+        ${db.umbau ? `<p class="tm-muted" style="margin-top:8px">🔄 Datenbank wird neu aufgebaut (mit und ohne BoP getrennt) – noch ${db.offen} Kombis offen. Bis dahin keine Rekord-Posts.</p>` : ""}
+        ${db.voll ? `<p class="tm-muted" style="margin-top:8px">Hinweis (${fmtDate(db.voll)}): Garage 61 hat bei einer Kombi das Maximum von 1000 Runden geliefert – ältere Runden könnten fehlen.</p>` : ""}
+        ${db.kontingent ? `<p class="tm-muted" style="margin-top:8px">laps-Kontingent: <b>${esc(String(db.kontingent.rest))}</b> übrig (Stand ${fmtDate(db.kontingent.at)})${db.kontingent.hdr ? " · " + esc(db.kontingent.hdr) : ""}</p>` : ""}
         <div class="tm-actions" style="margin-top:12px">${btn("Daten holen", "sm", 'id="dp-scan"')}</div>
       </div>
       ${Object.keys(POST_INFO).map(k => `
