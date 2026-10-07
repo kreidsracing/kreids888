@@ -793,7 +793,7 @@
 
   /* ---------------- Discord-Posts aus Garage 61 (Admin) ---------------- */
   const POST_INFO = {
-    rekord:   { t: "🏆 Neuer Teamrekord", h: "Wird ein Teamrekord gebrochen, kommt sofort ein Post mit alter und neuer Zeit, Abstand und BOP der Runde. Geprüft wird alle 30 Minuten.", wann: "sofort", abstand: true },
+    rekord:   { t: "🏆 Neuer Teamrekord", h: "Wird ein Teamrekord gebrochen, kommt sofort ein Post mit alter und neuer Zeit, Abstand und BOP der Runde. Geprüft wird alle 10 Minuten (nachts Mo–Fr von 1 bis 6 Uhr alle 20).", wann: "sofort", abstand: true },
     buch:     { t: "📖 Rekordbuch", h: "Alle Teamrekorde einer Strecke, pro Auto. Automatisch einmal pro Woche für die Strecke vom nächsten Rennen.", wann: "woche" },
     besten:   { t: "📊 Bestenliste vor dem Rennen", h: "Die Besten des Teams auf der Strecke vom nächsten Rennen, mit Abstand zur Bestzeit.", wann: "tage", abstand: true, plaetze: true },
     karte:    { t: "👤 Fahrerkarte", h: "Bestzeiten pro Fahrer mit Abstand zum Teamrekord. Automatisch am 1. des Monats für jeden, der im Vormonat eine neue Bestzeit gefahren ist.", wann: "monat", abstand: true },
@@ -899,13 +899,14 @@
     box.innerHTML = `
       <div class="tm-box">
         <h5>Rekord-Datenbank</h5>
-        <p class="hint">Holt die Rundenzeiten aus Garage 61 (alle 30 Minuten, nur Strecken mit neuen Runden). Alle Posts, die Bestenliste und die Startseite lesen daraus.</p>
+        <p class="hint">Holt die Rundenzeiten aus Garage 61 (alle 10 Minuten, nachts Mo–Fr von 1 bis 6 Uhr alle 20 · nur Strecken mit neuen Runden). Alle Posts, die Bestenliste und die Startseite lesen daraus.</p>
         <div class="tm-status" style="margin-top:14px">
           <div class="tm-stat"><span class="tm-dot ${d.ready && !db.fehler ? "" : "off"}"></span><div><b>${db.kombis} Strecke/Auto-Kombis</b><div class="tm-muted">${db.offen ? db.offen + " warten noch" : "alles aktuell"}${db.lauf ? " · Stand " + fmtDate(db.lauf) : ""}</div></div></div>
           <div class="tm-stat"><span class="tm-dot ${r && r.strecke ? "" : "off"}"></span><div><b>Nächstes Rennen</b><div class="tm-muted">${rennTxt}</div></div></div>
         </div>
         ${!d.ready ? '<p class="tm-err" style="margin-top:12px">Garage 61 ist noch nicht eingerichtet (Schlüssel und Team unter Admin).</p>' : ""}
         ${db.fehler ? `<p class="tm-err" style="margin-top:12px">Letzter Fehler (${fmtDate(db.fehlerAt)}): ${esc(db.fehler)}</p>` : ""}
+        ${db.bremse ? `<p class="tm-muted" style="margin-top:8px">Letzte Bremse von Garage 61 (${fmtDate(db.bremse.at)} · ${esc(db.bremse.path)}): ${esc(db.bremse.hdr || "keine Limit-Angaben mitgeschickt")}</p>` : ""}
         <div class="tm-actions" style="margin-top:12px">${btn("Daten holen", "sm", 'id="dp-scan"')}</div>
       </div>
       ${Object.keys(POST_INFO).map(k => `
@@ -1626,7 +1627,7 @@
 
       <div class="tm-box">
         <h5>Garage 61 → Discord</h5>
-        <p class="hint">Alle 30 Minuten wird geschaut, ob jemand aus dem Team eine neue persönliche Bestzeit gefahren ist – die wird dann im gewählten Discord-Kanal gepostet, mit Angabe ob mit oder ohne BOP.</p>
+        <p class="hint">Alle 10 Minuten (nachts Mo–Fr von 1 bis 6 Uhr alle 20) wird geschaut, ob jemand aus dem Team eine neue persönliche Bestzeit gefahren ist – die wird dann im gewählten Discord-Kanal gepostet, mit Angabe ob mit oder ohne BOP.</p>
         <div class="tm-row"><label for="g61-team">Garage-61-Team</label><div>${teamOpts}</div></div>
         <div class="tm-row"><label for="g61-ch">Discord-Kanal<small>für Bestzeit-Posts</small></label>
           <div><select class="tm-select" id="g61-ch"><option value="">– Kanal wählen –</option>${(d.channels || []).map(c => `<option value="${c.id}" ${c.id === g.channel ? "selected" : ""}># ${esc(c.name)}</option>`).join("")}</select></div></div>
@@ -1702,7 +1703,7 @@
 
       <div class="tm-box">
         <h5>Limit-Warnung</h5>
-        <p class="hint">Alle 30 Minuten wird geprüft, wie viel von den Cloudflare-Gratis-Limits heute schon verbraucht ist. Wird eine Schwelle erreicht, postet der Bot eine Warnung – höchstens einmal pro Tag und Schwelle. Übersicht unter „Limits".</p>
+        <p class="hint">Alle 10 Minuten wird geprüft, wie viel von den Cloudflare-Gratis-Limits heute schon verbraucht ist. Wird eine Schwelle erreicht, postet der Bot eine Warnung – höchstens einmal pro Tag und Schwelle. Übersicht unter „Limits".</p>
         <div class="tm-row"><div class="lbl">Warnung</div>
           <div style="display:flex;flex-direction:column;gap:12px">
             <label class="tm-switch"><input type="checkbox" id="li-on" ${(cfg.limits || {}).enabled ? "checked" : ""}><span class="s"></span>An</label>
