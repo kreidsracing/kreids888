@@ -346,16 +346,30 @@
     fetch(API + "/public/bestzeiten").then(r => r.json()).then(d => {
       const el = document.getElementById("tp-best");
       if (!el) return;
-      const head = `<div class="tp-widget-h">${ICONS.trophy}<b>Aktuelle Bestzeiten</b></div>`;
+      const head = `<div class="tp-widget-h">${ICONS.trophy}<b>Teamrekorde</b>${d.ready && d.laps.length ? '<span class="tb-live">● live aus Garage 61</span>' : ""}</div>`;
       if (!d.ready || !d.laps.length) {
         el.innerHTML = head + `<div class="tp-widget-f">${d.ready ? "Noch keine Bestzeiten in den letzten 30 Tagen" : "Bestzeiten erscheinen, sobald Garage 61 die Rundenzeiten freischaltet"}</div>`;
         return;
       }
-      el.innerHTML = head + d.laps.map(l => `
-        <div class="tp-row">
-          <div class="tp-row-m"><b class="tp-b">${esc(l.track)}</b><small>${esc(l.driver)} · ${esc(l.car)}${l.bop ? ' · <span class="tm-bop">BOP</span>' : ""}</small></div>
-          <span class="tp-lap">${fmtLap(l.time)}</span>
-        </div>`).join("");
+      const vor = (iso) => {
+        const m = (Date.now() - Date.parse(iso)) / 60000;
+        if (m < 60) return "vor " + Math.max(1, Math.round(m)) + " Min.";
+        if (m < 24 * 60) return "vor " + Math.round(m / 60) + " Std.";
+        const t = Math.round(m / 1440);
+        return t === 1 ? "gestern" : "vor " + t + " Tagen";
+      };
+      const kurz = (n) => String(n || "").split(/\s+/).filter(Boolean).slice(0, 2).map(x => x[0]).join("").toUpperCase();
+      el.innerHTML = head + d.laps.map((l, i) => {
+        const m = String(l.track || "").match(/^(.*?)\s*\((.*)\)$/);
+        const name = m ? m[1] : l.track, variante = m ? m[2] : "";
+        return `
+        <div class="tb-row${i === 0 ? " neu" : ""}">
+          <div class="tb-top"><b class="tb-track">${esc(name)}</b><span class="tb-lap">${fmtLap(l.time)}</span></div>
+          ${variante ? `<div class="tb-var">${esc(variante)}</div>` : ""}
+          <div class="tb-fahrer"><span class="tb-av">${esc(kurz(l.driver))}</span><span class="tb-name">${esc(l.driver)}</span>${isRecent(l.startTime) ? '<span class="tb-tag neu">NEU</span>' : ""}${l.bop ? '<span class="tb-tag bop">BOP</span>' : ""}<span class="tb-wann">${vor(l.startTime)}</span></div>
+          <div class="tb-car">${esc(l.car)}</div>
+        </div>`;
+      }).join("");
     }).catch(() => {});
 
     // Nächste Events aus dem Rennkalender (kreids888-Dashboard)
@@ -407,7 +421,7 @@
             ${SECTIONS.map(s => link(s.id, s.icon, s.label)).join("")}
             ${ME.panels.links ? link("links", "link", "Links") : ""}
             <div class="td-nav-h">Tools</div>${link("abwesend", "clock", "Abwesenheiten")}${tools.map(p => link(p, p, PANELS[p].title)).join("")}
-            ${ME.isAdmin ? `<div class="td-nav-h">Verwaltung</div>${link("aktivitaet", "activity", "Aktivität")}${link("nutzung", "eye", "Nutzung")}${link("limits", "gauge", "Limits")}${link("news-schreiben", "news", "News schreiben")}${link("fahrerprofile", "helmet", "Fahrerprofile")}${link("kalender-admin", "calendar", "Rennkalender")}${link("admin", "admin", "Admin")}<a class="td-link" href="https://kreids888-admin.kreids.workers.dev/" target="_blank" rel="noopener">${ICONS.ext}<span>kreids888-Dashboard</span></a>` : ""}
+            ${ME.isAdmin ? `<div class="td-nav-h">Verwaltung</div>${link("aktivitaet", "activity", "Aktivität")}${link("nutzung", "eye", "Nutzung")}${link("limits", "gauge", "Limits")}${link("posts", "trophy", "Discord-Posts")}${link("news-schreiben", "news", "News schreiben")}${link("fahrerprofile", "helmet", "Fahrerprofile")}${link("kalender-admin", "calendar", "Rennkalender")}${link("admin", "admin", "Admin")}<a class="td-link" href="https://kreids888-admin.kreids.workers.dev/" target="_blank" rel="noopener">${ICONS.ext}<span>kreids888-Dashboard</span></a>` : ""}
           </nav>
         </aside>
         <div class="td-main" id="td-main"></div>
@@ -418,6 +432,7 @@
     if (id === "nutzung" && ME.isAdmin) return renderNutzung();
     if (id === "limits" && ME.isAdmin) return renderLimits();
     if (id === "admin" && ME.isAdmin) return renderAdmin();
+    if (id === "posts" && ME.isAdmin) return renderPosts();
     if (id === "aktivitaet" && ME.isAdmin) return renderActivity();
     if (id === "news-schreiben" && ME.isAdmin) return renderNewsAdmin();
     if (id === "fahrerprofile" && ME.isAdmin) return renderProfilesAdmin();
@@ -776,6 +791,212 @@
     });
   }
 
+  /* ---------------- Discord-Posts aus Garage 61 (Admin) ---------------- */
+  const POST_INFO = {
+    rekord:   { t: "🏆 Neuer Teamrekord", h: "Wird ein Teamrekord gebrochen, kommt sofort ein Post mit alter und neuer Zeit und Abstand. Runden mit und ohne BoP werden getrennt gewertet und getrennt gepostet. Geprüft wird alle 10 Minuten (nachts Mo–Fr von 1 bis 6 Uhr alle 20).", wann: "sofort", abstand: true },
+    buch:     { t: "📖 Rekordbuch", h: "Alle Teamrekorde einer Strecke, pro Auto. Automatisch einmal pro Woche für die Strecke vom nächsten Rennen.", wann: "woche", abstand: true },
+    besten:   { t: "📊 Bestenliste vor dem Rennen", h: "Die Besten des Teams auf der Strecke vom nächsten Rennen, mit Abstand zur Bestzeit.", wann: "tage", abstand: true, plaetze: true },
+    karte:    { t: "👤 Fahrerkarte", h: "Bestzeiten pro Fahrer mit Abstand zum Teamrekord. Automatisch am 1. des Monats für jeden, der im Vormonat eine neue Bestzeit gefahren ist.", wann: "monat", abstand: true },
+    monat:    { t: "📅 Monatsrückblick", h: "Gebrochene Rekorde, meiste Runden, größter Sprung und Fahrer des Monats. Automatisch am 1. des Monats.", wann: "monat" },
+    konstanz: { t: "🎯 Konstanz-Wertung", h: "Wer fährt die gleichmäßigsten Runden? Saubere Runden der letzten 7 Tage, mindestens 10 auf einer Kombi.", wann: "woche", plaetze: true },
+    vorb:     { t: "🏁 Rennvorbereitung", h: "Vor dem nächsten Rennen: wer schon auf der Strecke trainiert hat, wer noch nicht und wer am schnellsten ist.", wann: "tage" },
+  };
+  const WTAGE = ["Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag", "Sonntag"];
+  const ANZAHL = { buch: ["Fahrer pro Auto", "1 = nur Rekordhalter"], besten: ["Fahrer pro Auto", ""], karte: ["Strecken pro Karte", ""], monat: ["Fahrer pro Liste", "Rekorde, meiste Runden"], konstanz: ["Anzahl Fahrer", ""], vorb: ["Namen bei „schon trainiert“", "Rest als „+X weitere“"] };
+  const PLATZHALTER = { rekord: "{strecke} {auto} {fahrer}", buch: "{strecke}", besten: "{strecke}", karte: "{fahrer}", monat: "{monat}", konstanz: "", vorb: "{strecke} {rennen}" };
+
+  // Discord-Markdown (das Nötigste) für die Vorschau
+  function dcMd(t) {
+    let s = esc(t || "");
+    s = s.replace(/`([^`]+)`/g, "<code>$1</code>")
+      .replace(/\*\*(.+?)\*\*/g, "<b>$1</b>")
+      .replace(/\[([^\]]+)\]\((https?:[^)\s]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
+    const out = [];
+    let q = [];
+    for (const z of s.split("\n")) {
+      if (z.startsWith("&gt; ")) { q.push(z.slice(5)); continue; }
+      if (q.length) { out.push(`<div class="dc-q">${q.join("<br>")}</div>`); q = []; }
+      out.push(z);
+    }
+    if (q.length) out.push(`<div class="dc-q">${q.join("<br>")}</div>`);
+    return out.join("<br>").replace(/<\/div><br>/g, "</div>");
+  }
+
+  function dcRender(r, roles) {
+    if (!r.ok) return `<div class="dc-leer">${esc(r.info || "Keine Vorschau")}</div>`;
+    const rolle = (id) => (roles.find(x => x.id === id) || {}).name || "Rolle";
+    const content = r.content ? `<div class="dc-txt">${r.content.replace(/<@&(\d+)>/g, (_, id) => `<span class="dc-ping">@${esc(rolle(id))}</span>`)}</div>` : "";
+    const embeds = (r.embeds || []).map(e => {
+      const farbe = e.color != null ? "#" + Number(e.color).toString(16).padStart(6, "0") : "#1e1f22";
+      const felder = (e.fields || []).map(f => `<div class="dc-f${f.inline ? " in" : ""}"><b>${dcMd(f.name === "​" ? "" : f.name)}</b><div>${dcMd(f.value)}</div></div>`).join("");
+      const zeitTxt = e.timestamp ? new Date(e.timestamp).toLocaleString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "";
+      return `<div class="dc-emb" style="border-left-color:${farbe}">
+        <div class="dc-in">
+          ${e.author ? `<div class="dc-au">${e.author.icon_url ? `<img src="${esc(e.author.icon_url)}" alt="">` : ""}${esc(e.author.name)}</div>` : ""}
+          ${e.title ? `<div class="dc-ti">${dcMd(e.title)}</div>` : ""}
+          ${e.description ? `<div class="dc-de">${dcMd(e.description)}</div>` : ""}
+          ${felder ? `<div class="dc-fs">${felder}</div>` : ""}
+          ${e.footer || zeitTxt ? `<div class="dc-fu">${e.footer ? esc(e.footer.text) : ""}${e.footer && zeitTxt ? " • " : ""}${zeitTxt}</div>` : ""}
+        </div>
+        ${e.thumbnail ? `<img class="dc-th" src="${esc(e.thumbnail.url)}" alt="">` : ""}
+      </div>`;
+    }).join("");
+    return `<div class="dc-msg"><img class="dc-av" src="/team/bilder/f2f-logo.png" alt=""><div class="dc-body"><div class="dc-name">F2F Bot <span>APP</span> <i>Heute</i></div>${content}${embeds}</div></div>`;
+  }
+
+  async function renderPosts() {
+    main().innerHTML = panelHead("trophy", "Discord-Posts", '<span class="tm-badge">Garage 61</span>') + '<div id="dp"><div class="tm-loading"><span></span><span></span><span></span></div></div>';
+    const box = document.getElementById("dp");
+    let d;
+    try { d = await api("/admin/posts"); } catch (e) { box.innerHTML = `<div class="tm-box tm-err">${esc(e.message)}</div>`; return; }
+    const P = d.posts, db = d.db, roles = d.roles || [];
+    const opts = (list, val) => list.map(([v, l]) => `<option value="${esc(v)}" ${String(v) === String(val) ? "selected" : ""}>${esc(l)}</option>`).join("");
+    const kanal = (k) => `<select class="tm-select" data-k="${k}" data-f="channel"><option value="">Kanal wählen</option>${opts(d.channels.map(c => [c.id, "# " + c.name]), P[k].channel)}</select>`;
+    const bopSel = (k) => `<select class="tm-select" data-k="${k}" data-f="bop">${opts([["aktuell", "📅 Aktuelle BoP (diese Season)"], ["allzeit", "📚 Allzeit (alle Seasons)"], ...(k === "karte" ? [] : [["beide", "Beides zeigen"]])], P[k].bop)}</select>`;
+    const zahl = (k, f, lo, hi, nach) => `<input class="tm-input" type="number" data-k="${k}" data-f="${f}" min="${lo}" max="${hi}" value="${P[k][f]}" style="max-width:90px"> <span class="tm-muted">${nach}</span>`;
+    const stunde = (k) => `<select class="tm-select" data-k="${k}" data-f="stunde" style="width:auto">${opts(Array.from({ length: 24 }, (_, h) => [h, String(h).padStart(2, "0") + ":00 Uhr"]), P[k].stunde)}</select>`;
+    const sw = (k, f, label, an) => `<label class="tm-switch"><input type="checkbox" data-k="${k}" data-f="${f}" ${an ? "checked" : ""}><span class="s"></span>${label}</label>`;
+    const wann = (k) => {
+      const w = POST_INFO[k].wann;
+      if (w === "sofort") return '<span class="tm-muted">sofort, sobald ein Rekord fällt</span>';
+      if (w === "woche") return `<div style="display:flex;gap:8px;flex-wrap:wrap"><select class="tm-select" data-k="${k}" data-f="tag" style="width:auto">${opts(WTAGE.map((t, i) => [i + 1, t]), P[k].tag)}</select>${stunde(k)}</div>`;
+      if (w === "tage") return zahl(k, "tage", 1, 14, "Tage vor dem Rennen");
+      return `<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><span class="tm-muted">am 1. um</span>${stunde(k)}</div>`;
+    };
+    const strecken = `<option value="">Strecke vom nächsten Rennen</option>${opts(db.strecken.map(s => [s.id, s.tn]), "")}`;
+    const extra = (k) => {
+      if (k === "buch" || k === "besten" || k === "vorb") return `<select class="tm-select" data-x="${k}" data-f="track" style="width:auto;max-width:100%">${strecken}</select>`;
+      if (k === "karte") return `<select class="tm-select" data-x="${k}" data-f="fahrer" style="width:auto"><option value="">Alle mit neuer Bestzeit</option>${opts(db.fahrer.map(f => [f.d, f.n]), "")}</select><select class="tm-select" data-x="${k}" data-f="monat" style="width:auto">${opts([["vormonat", "Letzter Monat"], ["dieser", "Dieser Monat"]], "vormonat")}</select>`;
+      if (k === "monat") return `<select class="tm-select" data-x="${k}" data-f="monat" style="width:auto">${opts([["vormonat", "Letzter Monat"], ["dieser", "Dieser Monat bis jetzt"]], "vormonat")}</select>`;
+      return "";
+    };
+    const aussehen = (k) => {
+      const x = P[k], t = x.teile || {}, i = POST_INFO[k];
+      return `<details class="dp-anp"><summary>🎨 Aussehen anpassen</summary>
+        <div class="tm-row"><label>Titel<small>leer = Standard${PLATZHALTER[k] ? " · Platzhalter: " + esc(PLATZHALTER[k]) : ""}</small></label>
+          <div><input class="tm-input" data-k="${k}" data-f="titel" maxlength="120" value="${esc(x.titel)}" placeholder="Standard-Titel"></div></div>
+        <div class="tm-row"><label>Ansage<small>optional, steht oben im Post</small></label>
+          <div><textarea class="tm-input" data-k="${k}" data-f="text" rows="2" maxlength="600" placeholder="z. B. Starke Leistung, Jungs!">${esc(x.text)}</textarea></div></div>
+        <div class="tm-row"><div class="lbl">Farbe<small>Balken links</small></div>
+          <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
+            <label class="tm-switch"><input type="checkbox" data-k="${k}" data-f="eigenfarbe" ${x.farbe ? "checked" : ""}><span class="s"></span>Eigene Farbe</label>
+            <input type="color" class="dp-farbe" data-k="${k}" data-f="farbe" value="${esc(x.farbe || "#e11324")}"></div></div>
+        <div class="tm-row"><div class="lbl">Rolle pingen</div>
+          <div><select class="tm-select" data-k="${k}" data-f="ping"><option value="">niemanden pingen</option>${opts(roles.map(r => [r.id, "@" + r.name]), x.ping)}</select></div></div>
+        ${ANZAHL[k] ? `<div class="tm-row"><div class="lbl">${esc(ANZAHL[k][0])}${ANZAHL[k][1] ? `<small>${esc(ANZAHL[k][1])}</small>` : ""}</div><div><input class="tm-input" type="number" data-k="${k}" data-f="plaetze" min="1" max="15" value="${x.plaetze}" style="max-width:90px"> <span class="tm-muted">1 bis 15</span></div></div>` : ""}
+        <div class="tm-row"><div class="lbl">Bausteine</div>
+          <div style="display:flex;flex-direction:column;gap:12px">
+            ${sw(k, "t:bop", "BOP-Angaben (⚖️)", t.bop !== false)}
+            ${i.abstand ? sw(k, "t:abstand", "Abstand zur Bestzeit", t.abstand !== false) : ""}
+            ${sw(k, "t:link", "Link zu Garage 61", t.link !== false)}
+            ${sw(k, "t:fuss", "Fußzeile mit Datum", t.fuss !== false)}
+          </div></div>
+      </details>`;
+    };
+    const r = d.rennen;
+    const rennTxt = r ? `${esc(r.title)} am ${fmtDate(new Date(r.at).toISOString())}${r.track ? " · " + esc(r.track) : ""} → ${r.strecke ? "<b>" + esc(r.strecke) + "</b>" : '<span class="tm-err">noch keine Runden auf dieser Strecke</span>'}` : "kein Rennen im Kalender";
+
+    box.innerHTML = `
+      <div class="tm-box">
+        <h5>Rekord-Datenbank</h5>
+        <p class="hint">Holt die Rundenzeiten aus Garage 61 (alle 10 Minuten, nachts Mo–Fr von 1 bis 6 Uhr alle 20 · nur Strecken mit neuen Runden). Alle Posts, die Bestenliste und die Startseite lesen daraus.</p>
+        <div class="tm-status" style="margin-top:14px">
+          <div class="tm-stat"><span class="tm-dot ${d.ready && !db.fehler ? "" : "off"}"></span><div><b>${db.kombis} Strecke/Auto-Kombis</b><div class="tm-muted">${db.offen ? db.offen + " warten noch" : "alles aktuell"}${db.lauf ? " · Stand " + fmtDate(db.lauf) : ""}</div></div></div>
+          <div class="tm-stat"><span class="tm-dot ${r && r.strecke ? "" : "off"}"></span><div><b>Nächstes Rennen</b><div class="tm-muted">${rennTxt}</div></div></div>
+        </div>
+        ${!d.ready ? '<p class="tm-err" style="margin-top:12px">Garage 61 ist noch nicht eingerichtet (Schlüssel und Team unter Admin).</p>' : ""}
+        ${db.fehler ? `<p class="tm-err" style="margin-top:12px">Letzter Fehler (${fmtDate(db.fehlerAt)}): ${esc(db.fehler)}</p>` : ""}
+        ${db.bremse ? `<p class="tm-muted" style="margin-top:8px">Letzte Bremse von Garage 61 (${fmtDate(db.bremse.at)} · ${esc(db.bremse.path)}): ${esc(db.bremse.hdr || "keine Limit-Angaben mitgeschickt")}</p>` : ""}
+        ${db.umbau ? `<p class="tm-muted" style="margin-top:8px">🔄 Datenbank wird neu aufgebaut (mit und ohne BoP getrennt) – noch ${db.offen} Kombis offen. Bis dahin keine Rekord-Posts.</p>` : ""}
+        ${db.voll ? `<p class="tm-muted" style="margin-top:8px">Hinweis (${fmtDate(db.voll)}): Garage 61 hat bei einer Kombi das Maximum von 1000 Runden geliefert – ältere Runden könnten fehlen.</p>` : ""}
+        ${db.kontingent ? `<p class="tm-muted" style="margin-top:8px">laps-Kontingent: <b>${esc(String(db.kontingent.rest))}</b> übrig (Stand ${fmtDate(db.kontingent.at)})${db.kontingent.hdr ? " · " + esc(db.kontingent.hdr) : ""}</p>` : ""}
+        <div class="tm-actions" style="margin-top:12px">${btn("Daten holen", "sm", 'id="dp-scan"')}</div>
+      </div>
+      ${Object.keys(POST_INFO).map(k => `
+      <div class="tm-box" id="dp-${k}">
+        <h5>${esc(POST_INFO[k].t)}</h5>
+        <p class="hint">${esc(POST_INFO[k].h)}</p>
+        <div class="tm-row"><div class="lbl">Automatisch</div>${sw(k, "on", "An", P[k].on)}</div>
+        <div class="tm-row"><div class="lbl">Discord-Kanal</div><div>${kanal(k)}</div></div>
+        ${"bop" in P[k] ? `<div class="tm-row"><div class="lbl">Wertung<small>wird im Post angezeigt</small></div><div>${bopSel(k)}</div></div>` : ""}
+        <div class="tm-row"><div class="lbl">Wann</div><div>${wann(k)}</div></div>
+        ${aussehen(k)}
+        <div class="tm-row"><div class="lbl">Vorschau<small>live, wird nicht gepostet</small></div>
+          <div><div class="tm-actions" style="flex-wrap:wrap;margin-bottom:10px">${extra(k)}${btn("Jetzt senden", "sm red", `data-send="${k}"`)}</div>
+          <div class="dc-wrap" data-prev="${k}"><div class="dc-leer">Lädt …</div></div>
+          <p class="tm-muted" style="margin-top:8px">Zuletzt gesendet: ${d.last[k] ? fmtDate(d.last[k].at) + " · " + esc(d.last[k].info) : "noch nie"}</p></div></div>
+      </div>`).join("")}
+      <div class="tm-savebar" id="dp-bar"><span>Alles gespeichert</span>${btn("Speichern", "red", 'id="dp-save"')}</div>`;
+
+    let dirty = false;
+    const markDirty = () => { dirty = true; const b = document.getElementById("dp-bar"); b.classList.add("dirty"); b.querySelector("span").textContent = "Ungespeicherte Änderungen"; };
+
+    // Einstellungen eines Posts aus dem Formular lesen
+    const lesen = (k) => {
+      const o = JSON.parse(JSON.stringify(P[k]));
+      o.teile = { ...(o.teile || {}) };
+      let eigen = false, farbe = "";
+      box.querySelectorAll(`[data-k="${k}"]`).forEach(el => {
+        const f = el.dataset.f;
+        if (f === "eigenfarbe") { eigen = el.checked; return; }
+        if (f === "farbe") { farbe = el.value; return; }
+        if (f.startsWith("t:")) { o.teile[f.slice(2)] = el.checked; return; }
+        o[f] = el.type === "checkbox" ? el.checked : (["channel", "bop", "titel", "text", "ping"].includes(f) ? el.value : Number(el.value));
+      });
+      o.farbe = eigen ? farbe : "";
+      return o;
+    };
+    const sammeln = () => Object.fromEntries(Object.keys(POST_INFO).map(k => [k, lesen(k)]));
+    const speichern = async () => { await api("/admin/posts", { method: "POST", body: { posts: sammeln() } }); dirty = false; };
+
+    // Live-Vorschau (nacheinander laden, damit Garage 61 nicht überrannt wird)
+    const prevT = {}, prevNr = {};
+    const vorschau = async (k) => {
+      const ziel = box.querySelector(`[data-prev="${k}"]`);
+      const body = { art: k, pc: lesen(k) };
+      box.querySelectorAll(`[data-x="${k}"]`).forEach(el => { body[el.dataset.f] = el.value; });
+      const nr = (prevNr[k] || 0) + 1; prevNr[k] = nr;
+      ziel.classList.add("laedt");
+      try {
+        const x = await api("/admin/posts/vorschau", { method: "POST", body });
+        if (prevNr[k] === nr) ziel.innerHTML = dcRender(x, roles);
+      } catch (e) { if (prevNr[k] === nr) ziel.innerHTML = `<div class="dc-leer">${esc(e.message)}</div>`; }
+      ziel.classList.remove("laedt");
+    };
+    const spaeter = (k) => { clearTimeout(prevT[k]); prevT[k] = setTimeout(() => vorschau(k), 500); };
+    box.querySelectorAll("[data-k]").forEach(el => {
+      const k = el.dataset.k;
+      el.addEventListener("input", () => { markDirty(); spaeter(k); });
+      el.addEventListener("change", () => { markDirty(); spaeter(k); });
+    });
+    box.querySelectorAll("[data-x]").forEach(el => el.addEventListener("change", () => spaeter(el.dataset.x)));
+    (async () => { for (const k of Object.keys(POST_INFO)) await vorschau(k); })();
+
+    const sb = document.getElementById("dp-save");
+    sb.onclick = async () => {
+      sb.disabled = true;
+      try { await speichern(); toast("Gespeichert", true); renderPosts(); }
+      catch (e) { toast(e.message); sb.disabled = false; }
+    };
+    const sc = document.getElementById("dp-scan");
+    sc.onclick = async () => {
+      sc.disabled = true;
+      try { const x = await api("/admin/posts/scan", { method: "POST" }); toast(x.info || "Erledigt", x.ok); renderPosts(); }
+      catch (e) { toast(e.message); sc.disabled = false; }
+    };
+    box.querySelectorAll("[data-send]").forEach(b => b.onclick = async () => {
+      const k = b.dataset.send, body = { art: k };
+      box.querySelectorAll(`[data-x="${k}"]`).forEach(el => { body[el.dataset.f] = el.value; });
+      b.disabled = true;
+      try {
+        if (dirty) await speichern();
+        const x = await api("/admin/posts/send", { method: "POST", body });
+        toast(x.info || "Erledigt", x.ok);
+        b.disabled = false;
+      } catch (e) { toast(e.message); b.disabled = false; }
+    });
+  }
+
   /* ---------------- Rennkalender + Discord-Events (Admin) ---------------- */
   async function renderKalenderAdmin() {
     main().innerHTML = panelHead("calendar", "Rennkalender", '<span class="tm-badge">Nur Admin</span>') + '<div id="ka"><div class="tm-loading"><span></span><span></span><span></span></div></div>';
@@ -978,36 +1199,69 @@
     let d;
     try { d = await api("/g61/woche"); } catch (e) { box.innerHTML = `<div class="tm-box tm-err">${esc(e.message)}</div>`; return; }
     if (!d.ready) { box.innerHTML = '<div class="tm-box tm-soon"><div class="big">Noch nicht verbunden</div><p>Garage 61 ist noch nicht eingerichtet.</p></div>'; return; }
-    const max = Math.max(1, ...d.wochen.map(w => w.laps));
-    const letzte = d.wochen.length - 1;
-    const pfeil = (f) => {
-      const x = f.laps - f.pLaps;
-      return x > 0 ? `<span class="wk-tr up">▲ +${x}</span>` : x < 0 ? `<span class="wk-tr down">▼ −${Math.abs(x)}</span>` : '<span class="wk-tr">± 0</span>';
-    };
+    if (!d.fahrer.every(f => Array.isArray(f.w))) { box.innerHTML = '<div class="tm-box tm-err">Der Worker ist noch nicht aktualisiert – bitte die Worker-Änderungen einspielen.</div>'; return; }
+    const W = d.wochen, letzte = W.length - 1;
+    let sel = letzte - 1;
+    const max = Math.max(1, ...W.map(w => w.laps));
+
     box.innerHTML = `
       <div class="tm-box">
-        <h5>Wochenverlauf <span class="tm-muted" style="letter-spacing:0;text-transform:none;font-family:var(--body);font-weight:500">Runden pro Woche · ganzes Team</span></h5>
-        <div class="wk-chart">${d.wochen.map((w, i) => `
-          <div class="wk-col${i === letzte ? " now" : ""}" title="KW ${w.kw} · ${fmtH(w.time)}">
+        <h5>Wochenverlauf <span class="tm-muted" style="letter-spacing:0;text-transform:none;font-family:var(--body);font-weight:500">Runden pro Woche · Balken anklicken für Details</span></h5>
+        <div class="wk-chart">${W.map((w, i) => `
+          <button type="button" class="wk-col" data-w="${i}" title="KW ${w.kw} · ${zahlDE(w.laps)} Runden · ${fmtH(w.time)}">
             <span>${zahlDE(w.laps)}</span><i style="height:${Math.round(w.laps / max * 100)}%"></i>
-          </div>`).join("")}
+          </button>`).join("")}
         </div>
-        <div class="wk-kw">${d.wochen.map((w, i) => `<span class="${i === letzte ? "now" : ""}">KW ${w.kw}</span>`).join("")}</div>
+        <div class="wk-kw">${W.map((w, i) => `<span data-k="${i}">KW ${w.kw}${i === letzte ? " · läuft" : ""}</span>`).join("")}</div>
       </div>
-      <div class="tm-box" style="padding:0">
-        <h5 style="padding:18px 22px 0">Fahrer diese Woche</h5>
-        <div class="ta-list" style="border:0;margin-top:12px">
-          <div class="wk-row ta-head"><span>Fahrer</span><span class="r-al">Runden</span><span class="r-al">Vorwoche</span><span class="r-al">Zeit</span></div>
-          ${d.fahrer.length ? d.fahrer.map(f => `
-            <div class="wk-row${f.laps ? "" : " null"}">
-              <b>${esc(f.name)}</b>
-              <span class="n">${zahlDE(f.laps)}</span>
-              <span class="r-al">${pfeil(f)}</span>
-              <span class="r-al tm-muted">${f.time ? fmtH(f.time) : "–"}</span>
-            </div>`).join("") : '<p class="tm-muted" style="padding:16px">Keine Fahrer gefunden.</p>'}
-        </div>
-      </div>
+      <div id="wk-detail"></div>
       <p class="tm-muted">Woche von Montag bis Sonntag · Stand ${fmtDate(d.at)} · wird stündlich aktualisiert</p>`;
+
+    const zeige = () => {
+      box.querySelectorAll("[data-w]").forEach(b => b.classList.toggle("now", Number(b.dataset.w) === sel));
+      box.querySelectorAll("[data-k]").forEach(k => k.classList.toggle("now", Number(k.dataset.k) === sel));
+      const w = W[sel], v = sel > 0 ? W[sel - 1] : null, kv = v ? "KW " + v.kw : "";
+      const vgl = (a, b, fmt, einh) => {
+        if (!v) return '<span class="wk-tr">–</span>';
+        const x = a - b;
+        return x ? trend(x, `${fmt(Math.abs(x))}${einh} zur ${kv}`) : trend(0, `wie ${kv}`);
+      };
+      const sw = w.laps ? Math.round(w.clean / w.laps * 100) : 0, sv = v && v.laps ? Math.round(v.clean / v.laps * 100) : 0;
+      const rTrend = !v ? '<span class="wk-tr">–</span>' : !v.laps ? trend(0, w.laps ? "–" : "keine Runden") : (() => { const p = Math.round((w.laps - v.laps) / v.laps * 100); return trend(p, `${Math.abs(p)} % zur ${kv}`); })();
+      const liste = d.fahrer.filter(f => f.w[sel][0] || (sel > 0 && f.w[sel - 1][0])).sort((a, b) => b.w[sel][0] - a.w[sel][0] || (sel > 0 ? b.w[sel - 1][0] - a.w[sel - 1][0] : 0));
+      const ohne = d.fahrer.filter(f => f.m && !f.w[sel][0] && !(sel > 0 && f.w[sel - 1][0])).map(f => esc(f.name));
+      const pfeil = (f) => {
+        if (sel === 0) return '<span class="wk-tr">–</span>';
+        const x = f.w[sel][0] - f.w[sel - 1][0];
+        return x > 0 ? `<span class="wk-tr up">▲ +${x}</span>` : x < 0 ? `<span class="wk-tr down">▼ −${Math.abs(x)}</span>` : '<span class="wk-tr">± 0</span>';
+      };
+      document.getElementById("wk-detail").innerHTML = `
+        <div class="tm-box">
+          <h5>KW ${w.kw}${sel === letzte ? ' <span class="tm-badge live">läuft</span>' : ""} <span class="tm-muted" style="letter-spacing:0;text-transform:none;font-family:var(--body);font-weight:500">${fmtDay(w.start)} – ${fmtDay(new Date(Date.parse(w.start) + 6 * 864e5).toISOString())}</span></h5>
+          <div class="wk-tiles" style="margin-top:14px">
+            ${kachel("Runden", zahlDE(w.laps), rTrend)}
+            ${kachel("Zeit auf der Strecke", fmtH(w.time), vgl(w.time, v ? v.time : 0, fmtH, ""))}
+            ${kachel("Fahrer aktiv", `${w.active} / ${d.mitglieder}`, vgl(w.active, v ? v.active : 0, (n) => n, ""))}
+            ${kachel("Saubere Runden", w.laps ? sw + " %" : "–", w.laps && v && v.laps ? vgl(sw, sv, (n) => n, " %") : '<span class="wk-tr">–</span>')}
+          </div>
+        </div>
+        <div class="tm-box" style="padding:0">
+          <h5 style="padding:18px 22px 0">Fahrer in KW ${w.kw}</h5>
+          <div class="ta-list" style="border:0;margin-top:12px">
+            <div class="wk-row ta-head"><span>Fahrer</span><span class="r-al">Runden</span><span class="r-al">${v ? "zur " + kv : "Vorwoche"}</span><span class="r-al">Zeit</span></div>
+            ${liste.length ? liste.map(f => `
+              <div class="wk-row${f.w[sel][0] ? "" : " null"}">
+                <b>${esc(f.name)}</b>
+                <span class="n">${zahlDE(f.w[sel][0])}</span>
+                <span class="r-al">${pfeil(f)}</span>
+                <span class="r-al tm-muted">${f.w[sel][1] ? fmtH(f.w[sel][1]) : "–"}</span>
+              </div>`).join("") : '<p class="tm-muted" style="padding:16px 22px">In dieser Woche ist niemand gefahren.</p>'}
+          </div>
+          ${ohne.length ? `<p class="tm-muted" style="padding:12px 22px 16px;border-top:1px solid var(--line)">Nicht gefahren: ${ohne.join(", ")}</p>` : ""}
+        </div>`;
+    };
+    box.querySelectorAll("[data-w]").forEach(b => b.onclick = () => { sel = Number(b.dataset.w); zeige(); });
+    zeige();
   }
 
   /* ---------------- Nutzung (nur Admin) ---------------- */
@@ -1193,7 +1447,7 @@
           <button type="button" data-days="7" class="${days === 7 ? "on" : ""}">7 Tage</button>
           <button type="button" data-days="30" class="${days === 30 ? "on" : ""}">30 Tage</button>
         </div>
-        <span class="tm-muted">Stand: ${fmtDate(d.at)} · aktualisiert alle 3 Std.</span>
+        <span class="tm-muted">Stand: ${fmtDate(d.at)} · aktualisiert alle 30 Min.</span>
       </div>
 
       <div class="g6-kpis">
@@ -1240,8 +1494,8 @@
       return;
     }
     if (!d.boards.length) {
-      box.innerHTML = `<div class="tm-box tm-soon"><div class="big">Keine Runden</div><p>In den letzten 14 Tagen hat niemand aus dem Team Runden hochgeladen.</p></div>`;
-      return;
+      box.innerHTML = `<div class="tm-box tm-soon"><div class="big">Keine Runden</div><p>In den letzten 14 Tagen hat niemand aus dem Team Runden hochgeladen.</p></div><div id="g61s"></div>`;
+      return renderStrecken();
     }
     box.innerHTML = `<p class="tm-muted" style="margin-bottom:16px">Persönliche Bestzeiten pro Strecke und Auto – alles, was das Team in den letzten 14 Tagen gefahren ist. <span class="tm-new">NEU</span> = in den letzten 48 Stunden. ${d.autoPost ? '<span class="tm-badge live">Discord-Posts aktiv</span>' : ""}</p>
       <div class="tm-boards">${d.boards.map(b => `
@@ -1257,8 +1511,74 @@
             </tr>`).join("")}
           </table></div>
         </div>`).join("")}
-      </div>`;
+      </div>
+      <div id="g61s"></div>`;
+    renderStrecken();
   }
+  /* Bestenliste pro Strecke (unter der Übersicht) */
+  async function renderStrecken() {
+    const box = document.getElementById("g61s");
+    if (!box) return;
+    box.innerHTML = '<div class="tm-loading"><span></span><span></span><span></span></div>';
+    let d;
+    try { d = await api("/g61/strecken"); } catch (e) { box.innerHTML = `<div class="tm-box tm-err">${esc(e.message)}</div>`; return; }
+    if (!d.strecken.length) { box.innerHTML = ""; return; }
+    let scope = "cur", wahl = d.vorwahl || d.strecken[0].id, daten = null;
+    box.innerHTML = `
+      <div class="gs-head">
+        <h4>Strecken</h4>
+        <p class="tm-muted">Alle Team-Bestzeiten einer Strecke, pro Auto. ${d.rennen ? "Vorausgewählt: Strecke vom nächsten Rennen (" + esc(d.rennen) + ")." : ""}</p>
+        <div class="gs-ctrl">
+          <input class="tm-input" id="gs-such" placeholder="Strecke suchen …" autocomplete="off">
+          <select class="tm-select" id="gs-sel"></select>
+          <div class="gs-tog" role="group" aria-label="Wertung">
+            <button type="button" data-sc="cur" class="on">📅 Aktuelle BoP</button><button type="button" data-sc="all">📚 Allzeit</button>
+          </div>
+        </div>
+      </div>
+      <div id="gs-out"></div>`;
+    const sel = document.getElementById("gs-sel"), such = document.getElementById("gs-such"), out = document.getElementById("gs-out");
+    const liste = () => {
+      const q = such.value.trim().toLowerCase();
+      const t = d.strecken.filter(x => !q || x.tn.toLowerCase().includes(q));
+      sel.innerHTML = t.map(x => `<option value="${x.id}" ${x.id === wahl ? "selected" : ""}>${esc(x.tn)} (${x.autos} Auto${x.autos === 1 ? "" : "s"})</option>`).join("") || '<option value="">Nichts gefunden</option>';
+      if (t.length && !t.some(x => x.id === wahl)) { wahl = t[0].id; laden(); }
+    };
+    const zeichnen = () => {
+      if (!daten) return;
+      const autos = daten.autos.map(a => ({ cn: a.cn, l: scope === "cur" ? a.cur : a.all })).filter(a => a.l.length);
+      if (!autos.length) { out.innerHTML = `<div class="tm-box tm-soon"><p>${scope === "cur" ? "In der aktuellen Season (" + esc(d.season) + ") ist hier noch niemand gefahren. Schalte auf Allzeit." : "Keine Zeiten."}</p></div>`; return; }
+      out.innerHTML = `<div class="tm-boards">${autos.map(a => `
+        <div class="tm-board">
+          <div class="tm-board-h"><b>${esc(a.cn)}</b><span>${esc(daten.tn)} · ${a.l.length} Fahrer</span></div>
+          <div class="tm-tbl-wrap"><table class="tm-tbl">${a.l.map((x, i) => `
+            <tr class="${i === 0 ? "first" : ""}">
+              <td class="p">P${i + 1}</td>
+              <td class="n">${esc(x.n)}${isRecent(x.at) ? '<span class="tm-new">NEU</span>' : ""}${x.kg || x.pct ? '<span class="tm-bop" title="Mit BOP gefahren">BOP</span>' : ""}</td>
+              <td class="t">${fmtLap(x.t)}</td>
+              <td class="g">${i ? "+" + (x.t - a.l[0].t).toFixed(3) : ""}</td>
+              <td class="d">${scope === "all" && x.se ? esc(x.se) + "<br>" : (SESSION[x.s] ? SESSION[x.s] + "<br>" : "")}${fmtDate(x.at)}</td>
+            </tr>`).join("")}
+          </table></div>
+        </div>`).join("")}</div>`;
+    };
+    const laden = async () => {
+      if (!wahl) return;
+      out.innerHTML = '<div class="tm-loading"><span></span><span></span><span></span></div>';
+      try { daten = await api("/g61/strecken?id=" + encodeURIComponent(wahl)); zeichnen(); }
+      catch (e) { out.innerHTML = `<div class="tm-box tm-err">${esc(e.message)}</div>`; }
+    };
+    such.addEventListener("input", liste);
+    sel.addEventListener("change", () => { wahl = sel.value; laden(); });
+    box.querySelectorAll("[data-sc]").forEach(b => b.onclick = () => {
+      scope = b.dataset.sc;
+      box.querySelectorAll("[data-sc]").forEach(x => x.classList.toggle("on", x === b));
+      zeichnen();
+    });
+    liste();
+    laden();
+  }
+
 
   /* ---------------- Admin ---------------- */
   async function renderAdmin() {
@@ -1280,6 +1600,7 @@
       : '<span class="tm-err">Keine Rollen geladen – ist der Bot auf dem Server?</span>';
 
     const g = cfg.g61, gi = d.g61;
+    const wp = cfg.wpost || {}, wpo = wp.opt || {};
     const teamOpts = gi.teams.length
       ? `<select class="tm-select" id="g61-team"><option value="">– Team wählen –</option>${gi.teams.map(t => `<option value="${esc(t.slug)}" ${t.slug === g.teamSlug ? "selected" : ""}>${esc(t.name)}</option>`).join("")}</select>`
       : `<input class="tm-input" id="g61-team" placeholder="Team-Slug aus Garage 61" value="${esc(g.teamSlug)}">`;
@@ -1309,27 +1630,47 @@
 
       <div class="tm-box">
         <h5>Garage 61 → Discord</h5>
-        <p class="hint">Alle 30 Minuten wird geschaut, ob jemand aus dem Team eine neue persönliche Bestzeit gefahren ist – die wird dann im gewählten Discord-Kanal gepostet, mit Angabe ob mit oder ohne BOP.</p>
+        <p class="hint">Alle 10 Minuten (nachts Mo–Fr von 1 bis 6 Uhr alle 20) wird geschaut, ob jemand aus dem Team eine neue persönliche Bestzeit gefahren ist – die wird dann im gewählten Discord-Kanal gepostet, mit Angabe ob mit oder ohne BOP.</p>
         <div class="tm-row"><label for="g61-team">Garage-61-Team</label><div>${teamOpts}</div></div>
         <div class="tm-row"><label for="g61-ch">Discord-Kanal<small>für Bestzeit-Posts</small></label>
           <div><select class="tm-select" id="g61-ch"><option value="">– Kanal wählen –</option>${(d.channels || []).map(c => `<option value="${c.id}" ${c.id === g.channel ? "selected" : ""}># ${esc(c.name)}</option>`).join("")}</select></div></div>
-        <div class="tm-row"><label for="g61-ziel">Wochenziel<small>Runden pro Woche fürs ganze Team · 0 = aus</small></label>
-          <div><input class="tm-input" id="g61-ziel" type="number" min="0" max="100000" step="50" value="${Number(g.ziel) || 0}" style="max-width:160px"></div></div>
         <div class="tm-row"><div class="lbl">Automatisch posten</div>
           <div style="display:flex;flex-direction:column;gap:12px">
             <label class="tm-switch"><input type="checkbox" id="g61-on" ${g.enabled ? "checked" : ""}><span class="s"></span>Neue Bestzeiten posten</label>
             <label class="tm-switch"><input type="checkbox" id="g61-rec" ${g.onlyTeamRecord ? "checked" : ""}><span class="s"></span>Nur Team-Rekorde (P1)</label>
-            <label class="tm-switch"><input type="checkbox" id="g61-week" ${g.weekly ? "checked" : ""}><span class="s"></span>Wochenrückblick jeden Sonntagabend</label>
           </div></div>
         <div class="tm-row"><div class="lbl">Testen</div>
           <div>
             <div class="tm-actions">${btn("Test-Post senden", "sm", 'id="g61-test"')}${btn("Jetzt prüfen", "sm", 'id="g61-run"')}</div>
-            <div class="tm-actions" style="margin-top:12px">
-              <select class="tm-select" id="g61-sdays" style="width:auto"><option value="7">Letzte 7 Tage</option><option value="30">Letzte 30 Tage</option></select>
-              ${btn("📊 Statistik an Discord senden", "sm red", 'id="g61-stats"')}
-            </div>
             <p class="tm-muted" style="margin-top:10px">Letzter Lauf: ${gi.lastRun ? fmtDate(gi.lastRun) + " – " + esc(gi.lastResult || "") : "noch keiner"}</p>
           </div></div>
+      </div>
+
+      <div class="tm-box">
+        <h5>Wochen-Post</h5>
+        <p class="hint">Trainingswoche auswählen, Inhalt festlegen, Vorschau ansehen und dann in Discord posten. Alle Zahlen kommen automatisch aus Garage 61.</p>
+        <div class="tm-row"><label for="g61-ziel">Wochenziel<small>Runden pro Woche fürs ganze Team · 0 = aus · mit „Speichern" sichern</small></label>
+          <div><input class="tm-input" id="g61-ziel" type="number" min="0" max="100000" step="50" value="${Number(g.ziel) || 0}" style="max-width:160px"> <span class="tm-muted">Runden</span></div></div>
+        <div class="tm-row"><label for="wp-w">Woche</label>
+          <div><select class="tm-select" id="wp-w" style="width:auto"><option value="">Lädt …</option></select></div></div>
+        <div class="tm-row"><label for="wp-text">Ansage vom Teamchef<small>optional · wird groß hervorgehoben</small></label>
+          <div><textarea class="tm-input" id="wp-text" rows="3" maxlength="600" placeholder="z. B. Starke Woche, Jungs! Samstag geht's nach Spa – alle nochmal auf die Strecke!"></textarea></div></div>
+        <div class="tm-row"><div class="lbl">Inhalt</div>
+          <div style="display:flex;flex-direction:column;gap:12px">
+            <label class="tm-switch"><input type="checkbox" id="wp-alle" ${wpo.alle !== false ? "checked" : ""}><span class="s"></span>Alle Fahrer zeigen (sonst nur Podium P1–P3)</label>
+            <label class="tm-switch"><input type="checkbox" id="wp-vgl" ${wpo.vgl !== false ? "checked" : ""}><span class="s"></span>Vergleich zur Vorwoche</label>
+            <label class="tm-switch"><input type="checkbox" id="wp-sprung" ${wpo.sprung !== false ? "checked" : ""}><span class="s"></span>Größter Sprung (meiste Runden mehr als in der Vorwoche)</label>
+            <label class="tm-switch"><input type="checkbox" id="wp-ziel" ${wpo.ziel !== false ? "checked" : ""}><span class="s"></span>Wochenziel</label>
+            <label class="tm-switch"><input type="checkbox" id="wp-sauber" ${wpo.sauber ? "checked" : ""}><span class="s"></span>Saubere Runden in %</label>
+            <label class="tm-switch"><input type="checkbox" id="wp-top" ${wpo.top ? "checked" : ""}><span class="s"></span>Top-Strecken &amp; Top-Autos</label>
+          </div></div>
+        <div class="tm-row"><label for="wp-ch">Discord-Kanal</label>
+          <div><select class="tm-select" id="wp-ch"><option value="">– Kanal wählen –</option>${(d.channels || []).map(c => `<option value="${c.id}" ${c.id === (wp.channel || g.channel) ? "selected" : ""}># ${esc(c.name)}</option>`).join("")}</select></div></div>
+        <div class="tm-row"><label for="wp-ping">Rolle pingen<small>z. B. Teamfahrer</small></label>
+          <div><select class="tm-select" id="wp-ping"><option value="">– niemanden pingen –</option>${d.roles.map(r => `<option value="${r.id}" ${r.id === wp.ping ? "selected" : ""}>@${esc(r.name)}</option>`).join("")}</select></div></div>
+        <div class="tm-row"><div class="lbl">Posten</div>
+          <div class="tm-actions">${btn("Vorschau", "sm", 'id="wp-prev"')}${btn("🏁 In Discord posten", "sm red", 'id="wp-send"')}</div></div>
+        <div id="wp-vorschau"></div>
       </div>
 
       <div class="tm-box">
@@ -1365,7 +1706,7 @@
 
       <div class="tm-box">
         <h5>Limit-Warnung</h5>
-        <p class="hint">Alle 30 Minuten wird geprüft, wie viel von den Cloudflare-Gratis-Limits heute schon verbraucht ist. Wird eine Schwelle erreicht, postet der Bot eine Warnung – höchstens einmal pro Tag und Schwelle. Übersicht unter „Limits".</p>
+        <p class="hint">Alle 10 Minuten wird geprüft, wie viel von den Cloudflare-Gratis-Limits heute schon verbraucht ist. Wird eine Schwelle erreicht, postet der Bot eine Warnung – höchstens einmal pro Tag und Schwelle. Übersicht unter „Limits".</p>
         <div class="tm-row"><div class="lbl">Warnung</div>
           <div style="display:flex;flex-direction:column;gap:12px">
             <label class="tm-switch"><input type="checkbox" id="li-on" ${(cfg.limits || {}).enabled ? "checked" : ""}><span class="s"></span>An</label>
@@ -1396,7 +1737,7 @@
         };
       });
     });
-    box.querySelectorAll("#g61-team,#g61-ziel,#g61-ch,#g61-on,#g61-rec,#g61-week,#rm-on,#rm-24,#rm-1,#rm-ch,#rm-ping,#ab-ch,#li-on,#li-90,#li-100,#li-ch,#li-ping").forEach(el => el.addEventListener("input", markDirty));
+    box.querySelectorAll("#g61-team,#g61-ziel,#g61-ch,#g61-on,#g61-rec,#rm-on,#rm-24,#rm-1,#rm-ch,#rm-ping,#ab-ch,#li-on,#li-90,#li-100,#li-ch,#li-ping").forEach(el => el.addEventListener("input", markDirty));
     box.querySelectorAll("#g61-on,#g61-rec").forEach(el => el.addEventListener("change", markDirty));
 
     // ---- Links bearbeiten ----
@@ -1445,7 +1786,6 @@
           channel: document.getElementById("g61-ch").value,
           enabled: document.getElementById("g61-on").checked,
           onlyTeamRecord: document.getElementById("g61-rec").checked,
-          weekly: document.getElementById("g61-week").checked,
           ziel: Number(document.getElementById("g61-ziel").value) || 0,
         },
         reminders: {
@@ -1495,15 +1835,76 @@
     action("ab-cmds", "/admin/discord/commands");
     action("li-test", "/admin/limits/test");
 
-    const sb = document.getElementById("g61-stats");
-    sb.onclick = async () => {
-      sb.disabled = true;
+    // ---- Wochen-Post ----
+    const wpSel = document.getElementById("wp-w");
+    api("/g61/woche").then(w => {
+      if (!w.ready) { wpSel.innerHTML = '<option value="">Garage 61 nicht eingerichtet</option>'; return; }
+      const last = w.wochen.length - 1;
+      wpSel.innerHTML = w.wochen.map((x, i) => `<option value="${i}" ${i === last - 1 ? "selected" : ""}>KW ${x.kw}${i === last ? " (läuft)" : ""} · ab ${fmtDay(x.start)} · ${Number(x.laps).toLocaleString("de-DE")} Runden</option>`).reverse().join("");
+    }).catch(() => { wpSel.innerHTML = '<option value="">Wochen nicht ladbar</option>'; });
+
+    const wpBody = (vorschau) => ({
+      w: Number(wpSel.value),
+      text: document.getElementById("wp-text").value,
+      channel: document.getElementById("wp-ch").value,
+      ping: document.getElementById("wp-ping").value,
+      vorschau,
+      opt: Object.fromEntries(["alle", "vgl", "sprung", "ziel", "sauber", "top"].map(k => [k, document.getElementById("wp-" + k).checked])),
+    });
+    const md = (t) => esc(t || "")
+      .replace(/\*\*(.+?)\*\*/g, "<b>$1</b>")
+      .replace(/\*(.+?)\*/g, "<i>$1</i>");
+    const mdBlock = (t) => {
+      let out = "", quote = [];
+      const flush = () => { if (quote.length) { out += `<blockquote>${quote.join("<br>")}</blockquote>`; quote = []; } };
+      for (const line of String(t || "").split("\n")) {
+        if (/^>\s?/.test(line)) { quote.push(md(line.replace(/^>\s?/, ""))); continue; }
+        flush();
+        if (line.startsWith("### ")) out += `<div class="dp-h3">${md(line.slice(4))}</div>`;
+        else out += line ? `<div>${md(line)}</div>` : '<div class="dp-gap"></div>';
+      }
+      flush();
+      return out;
+    };
+    const zeigeVorschau = (e, ping) => {
+      const pingName = ping ? (d.roles.find(r => r.id === ping) || {}).name : "";
+      document.getElementById("wp-vorschau").innerHTML = `
+        <div class="dp">
+          <div class="dp-label">Vorschau – so sieht der Post in Discord aus</div>
+          ${pingName ? `<div class="dp-ping">@${esc(pingName)}</div>` : ""}
+          <div class="dp-embed">
+            <img class="dp-thumb" src="${IMG}f2f-logo.webp" alt="">
+            <div class="dp-author">${esc(e.author.name)}</div>
+            <div class="dp-title">${md(e.title)}</div>
+            <div class="dp-desc">${mdBlock(e.description)}</div>
+            <div class="dp-fields">${e.fields.map(f => `<div class="dp-field${f.inline ? " in" : ""}">${f.name !== "\u200B" ? `<div class="dp-fn">${md(f.name)}</div>` : ""}<div class="dp-fv">${mdBlock(f.value)}</div></div>`).join("")}</div>
+            <div class="dp-foot">${esc(e.footer.text)}</div>
+          </div>
+        </div>`;
+    };
+    const wpPrev = document.getElementById("wp-prev");
+    wpPrev.onclick = async () => {
+      if (wpSel.value === "") return toast("Bitte eine Woche wählen");
+      wpPrev.disabled = true;
+      try {
+        const b = wpBody(true);
+        const r = await api("/admin/wochenpost", { method: "POST", body: b });
+        if (r.embed) zeigeVorschau(r.embed, b.ping); else toast(r.info || "Fehler");
+      } catch (e) { toast(e.message); }
+      wpPrev.disabled = false;
+    };
+    const wpSend = document.getElementById("wp-send");
+    wpSend.onclick = async () => {
+      if (wpSel.value === "") return toast("Bitte eine Woche wählen");
+      if (!confirm("Wochen-Post jetzt in Discord posten?")) return;
+      wpSend.disabled = true;
       try {
         if (dirty) await save();
-        const r = await api("/admin/g61/stats", { method: "POST", body: { days: Number(document.getElementById("g61-sdays").value), channel: document.getElementById("g61-ch").value } });
-        toast(r.info, r.ok);
+        const r = await api("/admin/wochenpost", { method: "POST", body: wpBody(false) });
+        toast(r.info || "Erledigt", r.ok);
+        if (r.ok) { document.getElementById("wp-text").value = ""; document.getElementById("wp-vorschau").innerHTML = ""; }
       } catch (e) { toast(e.message); }
-      sb.disabled = false;
+      wpSend.disabled = false;
     };
   }
 
