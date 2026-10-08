@@ -86,8 +86,18 @@
     // Thumbnail: zuerst YouTube (vom Worker), sonst Bild aus dem Kalendereintrag
     const thumb = (stream && stream.thumbnail) ? stream.thumbnail : (entry.image || "");
     const thumbLink = $("bcThumbLink"), thumbImg = $("bcThumb");
-    if (thumbLink && thumbImg && thumb){ thumbImg.src = thumb; thumbLink.hidden = false; }
-    else if (thumbLink){ thumbLink.hidden = true; }
+    if (thumbLink && thumbImg){
+      if (!thumb){ thumbLink.hidden = true; delete thumbImg.dataset.src; }
+      else if (thumbImg.dataset.src !== thumb){
+        thumbImg.dataset.src = thumb;
+        thumbLink.hidden = true;
+        // erst zeigen, wenn wirklich ein Bild kommt (YouTube liefert sonst Fehler
+        // oder ein graues 120x90-Platzhalterbild)
+        thumbImg.onload  = () => { thumbLink.hidden = thumbImg.naturalWidth <= 120; };
+        thumbImg.onerror = () => { thumbLink.hidden = true; };
+        thumbImg.src = thumb;
+      }
+    }
 
     const videoId = (stream && stream.videoId) ? stream.videoId : "";
     const remind = $("bcRemind");
