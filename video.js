@@ -23,12 +23,13 @@ async function fetchExcludedId() {
   } catch { return null; }
 }
 
-// "Videos"-Playlist (Langform) = alle Uploads OHNE Shorts.
-// YouTube legt sie automatisch an: Kanal-ID "UC..." wird zu "UULF...".
+// Automatische Kanal-Playlists: Kanal-ID "UC..." wird zu
+//   "UULV..." = "Live streams" (alle vergangenen + angekündigten Streams)
+//   "UULF..." = "Videos" (Langform-Uploads OHNE Shorts)
 // -> Damit landen Shorts NIE im großen "Rennen verpasst"-Player,
 //    sondern nur in der eigenen Shorts-Sektion weiter unten.
-function longformPlaylistId(channelId) {
-  return (channelId && channelId.indexOf("UC") === 0) ? "UULF" + channelId.slice(2) : "";
+function channelPlaylistId(channelId, prefix) {
+  return (channelId && channelId.indexOf("UC") === 0) ? prefix + channelId.slice(2) : "";
 }
 
 // einen RSS-Feed (Kanal oder Playlist) über rss2json holen und zu Video-Items parsen
@@ -45,16 +46,17 @@ async function fetchFeedItems(feedUrl) {
   }).filter(Boolean);
 }
 
-// Video-Liste: zuerst die Langform-"Videos"-Playlist (keine Shorts),
-// bei Ausfall der komplette Kanal-Feed als Sicherheitsnetz.
+// Video-Liste: zuerst die "Live streams"-Playlist (letzter Stream),
+// dann die "Videos"-Playlist, zuletzt der komplette Kanal-Feed als Sicherheitsnetz.
 async function fetchVideoList(channelId) {
-  const plId = longformPlaylistId(channelId);
-  if (plId) {
+  for (const prefix of ["UULV", "UULF"]) {
+    const plId = channelPlaylistId(channelId, prefix);
+    if (!plId) continue;
     try {
       const items = await fetchFeedItems("https://www.youtube.com/feeds/videos.xml?playlist_id=" + plId);
       if (items.length) return items;
     } catch (e) {
-      console.info("[Video] Langform-Playlist nicht ladbar, nutze Kanal-Feed:", e.message);
+      console.info("[Video] Playlist " + prefix + " nicht ladbar:", e.message);
     }
   }
   const items = await fetchFeedItems("https://www.youtube.com/feeds/videos.xml?channel_id=" + channelId);
