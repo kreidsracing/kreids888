@@ -1397,70 +1397,139 @@
     zeige();
   }
 
-  /* ---------------- Garage 61: Training (Woche + Fleiß + Fahrten) ---------------- */
-  const tripMini = (rows) => `<div class="tm-tbl-wrap"><table class="tm-tbl g6-trips">
-      ${rows.map(x => `<tr>
-        <td class="d0">${fmtDay(x.day)}</td>
-        <td class="g6-track">${esc(x.track)}</td>
-        <td>${esc(x.car)}${(x.types || []).map(ty => ` <span class="g6-type t${ty}">${TYPE_SHORT[ty] || ""}</span>`).join("")}</td>
-        <td class="r-al g6-n">${x.laps} Rd.</td>
-        <td class="r-al g6-n">${fmtHours(x.time)}</td>
-      </tr>`).join("")}</table></div>`;
+  /* ---------------- Garage 61: Training ---------------- */
+  const TR = { art: "t", ansicht: "strecke" };
+  const istRennen = (s) => s === 2 || s === 3;
+  const fahrten = (rows) => {
+    const m = new Map();
+    for (const r of rows) {
+      const k = r.d + "|" + r.u + "|" + r.t + "|" + r.c;
+      const x = m.get(k) || { d: r.d, u: r.u, t: r.t, c: r.c, l: 0, z: 0, s: [] };
+      x.l += r.l; x.z += r.z;
+      if (!x.s.includes(r.s)) x.s.push(r.s);
+      m.set(k, x);
+    }
+    return [...m.values()].sort((a, b) => a.d < b.d ? 1 : a.d > b.d ? -1 : b.z - a.z);
+  };
 
   async function renderTraining(days) {
     const box = document.getElementById("g61b");
     let w, d;
-    try { [w, d] = await Promise.all([api("/g61/woche").catch(() => null), api("/g61/fleiss?tage=" + days)]); } catch (e) { return g61Fehler(box, e); }
+    try { [w, d] = await Promise.all([api("/g61/woche").catch(() => null), api("/g61/training?tage=" + days)]); } catch (e) { return g61Fehler(box, e); }
     if (!d.ready) return g61Leer(box);
-    const t = d.totals, max = Math.max(1, ...d.drivers.map(x => x.time));
-    const pct = (a, b) => b ? Math.round(a / b * 100) + " %" : "–";
+    const F = new Map(d.fahrer.map(f => [f.u, f]));
+    const name = (u) => (F.get(u) || {}).n || u;
     const W = w && w.ready && Array.isArray(w.wochen) ? w.wochen : [];
-    const wmax = Math.max(1, ...W.map(x => x.laps)), L = W.length - 1;
-    box.innerHTML = `
-      ${W.length ? `<div class="tm-box">
-        <h5>Wochenverlauf <span class="tm-muted" style="letter-spacing:0;text-transform:none;font-family:var(--body);font-weight:500">Runden pro Woche</span></h5>
-        <div class="wk-chart">${W.map((x, i) => `<div class="wk-col${i === L ? " now" : ""}" title="KW ${x.kw} · ${zahlDE(x.laps)} Runden · ${fmtH(x.time)}"><span>${zahlDE(x.laps)}</span><i style="height:${Math.round(x.laps / wmax * 100)}%"></i></div>`).join("")}</div>
-        <div class="wk-kw">${W.map((x, i) => `<span class="${i === L ? "now" : ""}">KW ${x.kw}${i === L ? " · läuft" : ""}</span>`).join("")}</div>
+    const wmax = Math.max(1, ...W.map(x => x.laps)), L0 = W.length - 1;
+    const chart = W.length ? `<div class="tm-box">
+        <h5>Wochenverlauf <span class="tm-muted" style="letter-spacing:0;text-transform:none;font-family:var(--body);font-weight:500">Runden pro Woche, alle Fahrten</span></h5>
+        <div class="wk-chart">${W.map((x, i) => `<div class="wk-col${i === L0 ? " now" : ""}" title="KW ${x.kw} · ${zahlDE(x.laps)} Runden · ${fmtH(x.time)}"><span>${zahlDE(x.laps)}</span><i style="height:${Math.round(x.laps / wmax * 100)}%"></i></div>`).join("")}</div>
+        <div class="wk-kw">${W.map((x, i) => `<span class="${i === L0 ? "now" : ""}">KW ${x.kw}${i === L0 ? " · läuft" : ""}</span>`).join("")}</div>
         ${wocheZiel(w)}
-      </div>` : ""}
-      <div class="g6-bar">
-        <div class="g6-range">
-          <button type="button" data-days="7" class="${days === 7 ? "on" : ""}">7 Tage</button>
-          <button type="button" data-days="30" class="${days === 30 ? "on" : ""}">30 Tage</button>
-        </div>
-        <span class="tm-muted">Fahrer anklicken für seine Fahrten · Stand: ${fmtDate(d.at)}</span>
-      </div>
-      <div class="g6-kpis">
-        <div><b>${fmtHours(t.time)}</b><span>auf der Strecke</span></div>
-        <div><b>${t.laps.toLocaleString("de-DE")}</b><span>Runden</span></div>
-        <div><b>${pct(t.clean, t.laps)}</b><span>saubere Runden</span></div>
-        <div><b>${t.active} / ${t.members}</b><span>Fahrer aktiv</span></div>
-      </div>
-      <div class="ta-list g6-list">
-        <div class="g6-row ta-head"><span>#</span><span>Fahrer</span><span>Zeit auf der Strecke</span><span class="r-al">Runden</span><span class="r-al">Sauber</span><span class="r-al">Tage</span><span>Meist gefahren</span></div>
-        ${d.drivers.map((x, i) => `
-          <div class="g6-row${x.time ? " gr-klick" : " zero"}" data-f="${i}">
-            <span class="g6-pos">${x.time ? i + 1 : "–"}</span>
-            <div class="g6-name"><b>${x.time ? '<span class="gr-pf">▸</span>' : ""}${esc(x.name)}</b>${x.irating ? `<small>iR ${esc(x.irating)}${x.sr ? " · " + esc(x.sr) : ""}</small>` : ""}</div>
-            <div class="g6-time"><div class="ta-bar"><i style="width:${Math.round(x.time / max * 100)}%"></i></div><span>${x.time ? fmtHours(x.time) : "–"}</span></div>
-            <span class="r-al g6-n">${x.laps || "–"}</span>
-            <span class="r-al g6-n">${pct(x.clean, x.laps)}</span>
-            <span class="r-al g6-n">${x.days || "–"}</span>
-            <div class="g6-fav">${x.fav ? `<b>${esc(x.fav.car)}</b><small>${esc(x.fav.track)}</small>` : "<small>–</small>"}</div>
-          </div>
-          <div class="gr-trips" data-t="${i}" hidden></div>`).join("")}
-      </div>`;
-    box.querySelectorAll("[data-days]").forEach(b => b.onclick = () => renderG61("training", Number(b.dataset.days)));
-    box.querySelectorAll(".gr-klick").forEach(row => row.onclick = () => {
-      const i = row.dataset.f, el = box.querySelector(`[data-t="${i}"]`);
-      const auf = el.hidden;
-      el.hidden = !auf;
-      row.classList.toggle("auf", auf);
-      if (auf && !el.innerHTML) {
-        const rows = (d.trips || []).filter(x => x.driver === d.drivers[i].name);
-        el.innerHTML = rows.length ? tripMini(rows) : '<p class="tm-muted" style="padding:10px 16px">Keine Einzelfahrten gefunden.</p>';
+      </div>` : "";
+    const knopf = (attr, wert, aktiv, text) => `<button type="button" ${attr}="${wert}" class="${aktiv ? "on" : ""}">${text}</button>`;
+    const pct = (a, b) => b ? Math.round(a / b * 100) + " %" : "–";
+    const fahrtTab = (liste, mitFahrer) => `<div class="tm-tbl-wrap"><table class="tm-tbl g6-trips">${liste.map(x => `<tr>
+        <td class="d0">${fmtDay(x.d)}</td>
+        <td class="${mitFahrer ? "n" : "g6-track"}">${mitFahrer ? `<b>${esc(name(x.u))}</b>` : `${esc(d.strecken[x.t])} · ${esc(d.autos[x.c])}`}</td>
+        <td>${x.s.sort().map(ty => `<span class="g6-type t${ty}">${TYPE_SHORT[ty] || "Training"}</span>`).join("")}</td>
+        <td class="r-al g6-n">${x.l} Rd.</td>
+        <td class="r-al g6-n">${fmtHours(x.z)}</td></tr>`).join("")}</table></div>`;
+
+    const zeichne = () => {
+      const rows = d.rows.filter(r => TR.art === "a" || (TR.art === "r" ? istRennen(r.s) : !istRennen(r.s)));
+      const sum = rows.reduce((a, r) => (a.l += r.l, a.cl += r.cl, a.z += r.z, a), { l: 0, cl: 0, z: 0 });
+      const aktiv = new Set(rows.filter(r => r.z > 0).map(r => r.u)).size;
+      const alle = new Set([...F.keys(), ...d.rows.map(r => r.u)]).size;
+      const wort = TR.art === "t" ? "Trainingsfahrten" : TR.art === "r" ? "Rennen oder Qualis" : "Fahrten";
+      let inhalt = "";
+      if (!rows.length) inhalt = `<div class="tm-box tm-soon"><p>Keine ${wort} in den letzten ${days} Tagen.</p></div>`;
+      else if (TR.ansicht === "strecke") {
+        const K = new Map();
+        for (const r of rows) {
+          const k = r.t + "|" + r.c;
+          const x = K.get(k) || { k, t: r.t, c: r.c, l: 0, z: 0, last: "", u: {} };
+          x.l += r.l; x.z += r.z;
+          if (r.d > x.last) x.last = r.d;
+          x.u[r.u] = (x.u[r.u] || 0) + r.l;
+          K.set(k, x);
+        }
+        const L = [...K.values()].sort((a, b) => b.l - a.l || b.z - a.z);
+        inhalt = L.map((x, i) => {
+          const b = d.best[x.k];
+          const leute = Object.entries(x.u).sort((a, c) => c[1] - a[1]).map(([u, l]) => `${esc(name(u))} ${l} Rd.`).join(" · ");
+          return `<div class="gt-k" data-k="${i}">
+            <div class="gt-h"><span><span class="gr-pf">▸</span><b>${esc(d.strecken[x.t])}</b> · ${esc(d.autos[x.c])}${d.tags[x.t] ? `<span class="gt-tag">${esc(d.tags[x.t])}</span>` : ""}</span><span class="gt-sum">${zahlDE(x.l)} Runden · ${fmtHours(x.z)}</span></div>
+            <div class="gt-ppl">${leute} · zuletzt ${vorTagen(x.last)}</div>
+            <div class="gt-best">${b ? `Teambestzeit: ${esc(b.n)} <span class="t">${fmtLap(b.t)}</span>${bopTag(b.bop)}${b.saison ? "" : " · ältere Season"}` : "Teambestzeit: noch keine gespeichert"}</div>
+            <div class="gt-trips" hidden></div>
+          </div>`;
+        }).join("");
+        zeichne.L = L;
+      } else {
+        const P = new Map();
+        const neu = (u) => ({ u, l: 0, cl: 0, z: 0, tage: new Set(), k: {} });
+        for (const f of d.fahrer) P.set(f.u, neu(f.u));
+        for (const r of rows) {
+          if (!P.has(r.u)) P.set(r.u, neu(r.u));
+          const x = P.get(r.u);
+          x.l += r.l; x.cl += r.cl; x.z += r.z;
+          if (r.z > 0) x.tage.add(r.d);
+          x.k[r.t + "|" + r.c] = (x.k[r.t + "|" + r.c] || 0) + r.z;
+        }
+        const L = [...P.values()].sort((a, b) => b.z - a.z || name(a.u).localeCompare(name(b.u)));
+        const max = Math.max(1, ...L.map(x => x.z));
+        inhalt = `<div class="ta-list g6-list">
+          <div class="g6-row ta-head"><span>#</span><span>Fahrer</span><span>Zeit auf der Strecke</span><span class="r-al">Runden</span><span class="r-al">Sauber</span><span class="r-al">Tage</span><span>Meist gefahren</span></div>
+          ${L.map((x, i) => {
+            const f = F.get(x.u) || {};
+            const fav = Object.entries(x.k).sort((a, b) => b[1] - a[1])[0];
+            const [ft, fc] = fav ? fav[0].split("|") : [];
+            return `<div class="g6-row${x.z ? " gr-klick" : " zero"}" data-f="${i}">
+              <span class="g6-pos">${x.z ? i + 1 : "–"}</span>
+              <div class="g6-name"><b>${x.z ? '<span class="gr-pf">▸</span>' : ""}${esc(name(x.u))}</b>${f.ir ? `<small>iR ${esc(f.ir)}${f.sr ? " · " + esc(f.sr) : ""}</small>` : ""}</div>
+              <div class="g6-time"><div class="ta-bar"><i style="width:${Math.round(x.z / max * 100)}%"></i></div><span>${x.z ? fmtHours(x.z) : "–"}</span></div>
+              <span class="r-al g6-n">${x.l || "–"}</span>
+              <span class="r-al g6-n">${pct(x.cl, x.l)}</span>
+              <span class="r-al g6-n">${x.tage.size || "–"}</span>
+              <div class="g6-fav">${fav ? `<b>${esc(d.autos[fc])}</b><small>${esc(d.strecken[ft])}</small>` : "<small>–</small>"}</div>
+            </div>
+            <div class="gr-trips" data-t="${i}" hidden></div>`;
+          }).join("")}
+        </div>`;
+        zeichne.L = L;
       }
-    });
+      box.innerHTML = `${chart}
+        <div class="g6-bar"><div class="gt-filter">
+          <div class="g6-range">${knopf("data-art", "t", TR.art === "t", "Training")}${knopf("data-art", "r", TR.art === "r", "Rennen")}${knopf("data-art", "a", TR.art === "a", "Alles")}</div>
+          <div class="g6-range">${knopf("data-days", 7, days === 7, "7 Tage")}${knopf("data-days", 30, days === 30, "30 Tage")}</div>
+          <div class="g6-range">${knopf("data-ans", "strecke", TR.ansicht === "strecke", "Nach Strecke")}${knopf("data-ans", "fahrer", TR.ansicht === "fahrer", "Nach Fahrer")}</div>
+        </div></div>
+        <div class="g6-kpis">
+          <div><b>${fmtHours(sum.z)}</b><span>auf der Strecke</span></div>
+          <div><b>${zahlDE(sum.l)}</b><span>Runden</span></div>
+          <div><b>${pct(sum.cl, sum.l)}</b><span>saubere Runden</span></div>
+          <div><b>${aktiv} / ${alle}</b><span>Fahrer aktiv</span></div>
+        </div>
+        ${inhalt}
+        <p class="tm-muted" style="margin-top:12px">${TR.art === "r" ? "Rennen und Qualis" : TR.art === "t" ? "Nur Trainingsfahrten (ohne Rennen und Quali)" : "Alle Fahrten"} · letzte ${days} Tage · zum Aufklappen anklicken · Stand: ${fmtDate(d.at)}</p>`;
+      box.querySelectorAll("[data-art]").forEach(b => b.onclick = () => { TR.art = b.dataset.art; zeichne(); });
+      box.querySelectorAll("[data-ans]").forEach(b => b.onclick = () => { TR.ansicht = b.dataset.ans; zeichne(); });
+      box.querySelectorAll("[data-days]").forEach(b => b.onclick = () => renderG61("training", Number(b.dataset.days)));
+      box.querySelectorAll(".gt-k").forEach(k => k.querySelector(".gt-h").onclick = () => {
+        const el = k.querySelector(".gt-trips"), auf = el.hidden, x = zeichne.L[k.dataset.k];
+        el.hidden = !auf;
+        k.classList.toggle("auf", auf);
+        if (auf && !el.innerHTML) el.innerHTML = fahrtTab(fahrten(rows.filter(r => r.t === x.t && r.c === x.c)), true);
+      });
+      box.querySelectorAll(".gr-klick").forEach(row => row.onclick = () => {
+        const el = box.querySelector(`[data-t="${row.dataset.f}"]`), auf = el.hidden, x = zeichne.L[row.dataset.f];
+        el.hidden = !auf;
+        row.classList.toggle("auf", auf);
+        if (auf && !el.innerHTML) el.innerHTML = fahrtTab(fahrten(rows.filter(r => r.u === x.u)), false);
+      });
+    };
+    zeichne();
   }
 
   /* ---------------- Garage 61: Bestzeiten ---------------- */
