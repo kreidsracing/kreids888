@@ -908,8 +908,8 @@
         ${!d.ready ? '<p class="tm-err" style="margin-top:12px">Garage 61 ist noch nicht eingerichtet (Schlüssel und Team unter Admin).</p>' : ""}
         ${db.fehler ? `<p class="tm-err" style="margin-top:12px">Letzter Fehler (${fmtDate(db.fehlerAt)}): ${esc(db.fehler)}</p>` : ""}
         ${db.bremse ? `<p class="tm-muted" style="margin-top:8px">Letzte Bremse von Garage 61 (${fmtDate(db.bremse.at)} · ${esc(db.bremse.path)}): ${esc(db.bremse.hdr || "keine Limit-Angaben mitgeschickt")}</p>` : ""}
-        ${db.umbau ? `<p class="tm-muted" style="margin-top:8px">🔄 Datenbank wird neu aufgebaut (mit und ohne BoP getrennt) – noch ${db.offen} Kombis offen. Bis dahin keine Rekord-Posts.</p>` : ""}
-        ${db.voll ? `<p class="tm-muted" style="margin-top:8px">Hinweis (${fmtDate(db.voll)}): Garage 61 hat bei einer Kombi das Maximum von 1000 Runden geliefert – ältere Runden könnten fehlen.</p>` : ""}
+        ${db.umbau ? `<p class="tm-muted" style="margin-top:8px">🔄 Bestzeiten werden neu geprüft – noch ${db.offen} Kombis offen. Bis dahin keine Rekord-Posts.</p>` : ""}
+        ${db.voll ? `<p class="tm-muted" style="margin-top:8px">Hinweis (${fmtDate(db.voll)}): Garage 61 hat bei einer Kombi das Maximum von 300 Runden geliefert – ältere Runden könnten fehlen.</p>` : ""}
         ${db.kontingent ? `<p class="tm-muted" style="margin-top:8px">laps-Kontingent: <b>${esc(String(db.kontingent.rest))}</b> übrig (Stand ${fmtDate(db.kontingent.at)})${db.kontingent.hdr ? " · " + esc(db.kontingent.hdr) : ""}</p>` : ""}
         <div class="tm-actions" style="margin-top:12px">${btn("Daten holen", "sm", 'id="dp-scan"')}</div>
       </div>
@@ -1195,80 +1195,11 @@
     </div>`;
   }
 
-  async function renderWoche() {
-    const box = document.getElementById("g61b");
-    let d;
-    try { d = await api("/g61/woche"); } catch (e) { box.innerHTML = `<div class="tm-box tm-err">${esc(e.message)}</div>`; return; }
-    if (!d.ready) { box.innerHTML = '<div class="tm-box tm-soon"><div class="big">Noch nicht verbunden</div><p>Garage 61 ist noch nicht eingerichtet.</p></div>'; return; }
-    if (!d.fahrer.every(f => Array.isArray(f.w))) { box.innerHTML = '<div class="tm-box tm-err">Der Worker ist noch nicht aktualisiert – bitte die Worker-Änderungen einspielen.</div>'; return; }
-    const W = d.wochen, letzte = W.length - 1;
-    let sel = letzte - 1;
-    const max = Math.max(1, ...W.map(w => w.laps));
-
-    box.innerHTML = `
-      <div class="tm-box">
-        <h5>Wochenverlauf <span class="tm-muted" style="letter-spacing:0;text-transform:none;font-family:var(--body);font-weight:500">Runden pro Woche · Balken anklicken für Details</span></h5>
-        <div class="wk-chart">${W.map((w, i) => `
-          <button type="button" class="wk-col" data-w="${i}" title="KW ${w.kw} · ${zahlDE(w.laps)} Runden · ${fmtH(w.time)}">
-            <span>${zahlDE(w.laps)}</span><i style="height:${Math.round(w.laps / max * 100)}%"></i>
-          </button>`).join("")}
-        </div>
-        <div class="wk-kw">${W.map((w, i) => `<span data-k="${i}">KW ${w.kw}${i === letzte ? " · läuft" : ""}</span>`).join("")}</div>
-      </div>
-      <div id="wk-detail"></div>
-      <p class="tm-muted">Woche von Montag bis Sonntag · Stand ${fmtDate(d.at)} · wird stündlich aktualisiert</p>`;
-
-    const zeige = () => {
-      box.querySelectorAll("[data-w]").forEach(b => b.classList.toggle("now", Number(b.dataset.w) === sel));
-      box.querySelectorAll("[data-k]").forEach(k => k.classList.toggle("now", Number(k.dataset.k) === sel));
-      const w = W[sel], v = sel > 0 ? W[sel - 1] : null, kv = v ? "KW " + v.kw : "";
-      const vgl = (a, b, fmt, einh) => {
-        if (!v) return '<span class="wk-tr">–</span>';
-        const x = a - b;
-        return x ? trend(x, `${fmt(Math.abs(x))}${einh} zur ${kv}`) : trend(0, `wie ${kv}`);
-      };
-      const sw = w.laps ? Math.round(w.clean / w.laps * 100) : 0, sv = v && v.laps ? Math.round(v.clean / v.laps * 100) : 0;
-      const rTrend = !v ? '<span class="wk-tr">–</span>' : !v.laps ? trend(0, w.laps ? "–" : "keine Runden") : (() => { const p = Math.round((w.laps - v.laps) / v.laps * 100); return trend(p, `${Math.abs(p)} % zur ${kv}`); })();
-      const liste = d.fahrer.filter(f => f.w[sel][0] || (sel > 0 && f.w[sel - 1][0])).sort((a, b) => b.w[sel][0] - a.w[sel][0] || (sel > 0 ? b.w[sel - 1][0] - a.w[sel - 1][0] : 0));
-      const ohne = d.fahrer.filter(f => f.m && !f.w[sel][0] && !(sel > 0 && f.w[sel - 1][0])).map(f => esc(f.name));
-      const pfeil = (f) => {
-        if (sel === 0) return '<span class="wk-tr">–</span>';
-        const x = f.w[sel][0] - f.w[sel - 1][0];
-        return x > 0 ? `<span class="wk-tr up">▲ +${x}</span>` : x < 0 ? `<span class="wk-tr down">▼ −${Math.abs(x)}</span>` : '<span class="wk-tr">± 0</span>';
-      };
-      document.getElementById("wk-detail").innerHTML = `
-        <div class="tm-box">
-          <h5>KW ${w.kw}${sel === letzte ? ' <span class="tm-badge live">läuft</span>' : ""} <span class="tm-muted" style="letter-spacing:0;text-transform:none;font-family:var(--body);font-weight:500">${fmtDay(w.start)} – ${fmtDay(new Date(Date.parse(w.start) + 6 * 864e5).toISOString())}</span></h5>
-          <div class="wk-tiles" style="margin-top:14px">
-            ${kachel("Runden", zahlDE(w.laps), rTrend)}
-            ${kachel("Zeit auf der Strecke", fmtH(w.time), vgl(w.time, v ? v.time : 0, fmtH, ""))}
-            ${kachel("Fahrer aktiv", `${w.active} / ${d.mitglieder}`, vgl(w.active, v ? v.active : 0, (n) => n, ""))}
-            ${kachel("Saubere Runden", w.laps ? sw + " %" : "–", w.laps && v && v.laps ? vgl(sw, sv, (n) => n, " %") : '<span class="wk-tr">–</span>')}
-          </div>
-        </div>
-        <div class="tm-box" style="padding:0">
-          <h5 style="padding:18px 22px 0">Fahrer in KW ${w.kw}</h5>
-          <div class="ta-list" style="border:0;margin-top:12px">
-            <div class="wk-row ta-head"><span>Fahrer</span><span class="r-al">Runden</span><span class="r-al">${v ? "zur " + kv : "Vorwoche"}</span><span class="r-al">Zeit</span></div>
-            ${liste.length ? liste.map(f => `
-              <div class="wk-row${f.w[sel][0] ? "" : " null"}">
-                <b>${esc(f.name)}</b>
-                <span class="n">${zahlDE(f.w[sel][0])}</span>
-                <span class="r-al">${pfeil(f)}</span>
-                <span class="r-al tm-muted">${f.w[sel][1] ? fmtH(f.w[sel][1]) : "–"}</span>
-              </div>`).join("") : '<p class="tm-muted" style="padding:16px 22px">In dieser Woche ist niemand gefahren.</p>'}
-          </div>
-          ${ohne.length ? `<p class="tm-muted" style="padding:12px 22px 16px;border-top:1px solid var(--line)">Nicht gefahren: ${ohne.join(", ")}</p>` : ""}
-        </div>`;
-    };
-    box.querySelectorAll("[data-w]").forEach(b => b.onclick = () => { sel = Number(b.dataset.w); zeige(); });
-    zeige();
-  }
 
   /* ---------------- Nutzung (nur Admin) ---------------- */
   const BEREICHE = {
     dashboard: "Dashboard", news: "Team News", fahrer: "Fahrerprofil", abwesend: "Abwesenheiten", links: "Links", trainer: "Trainer",
-    "g61-woche": "Wochenübersicht", "g61-fleiss": "Trainingsfleiß", "g61-trips": "Fahrtenbuch", "g61-board": "Bestenliste", "g61-ratings": "iRating",
+    "g61-woche": "Wochenübersicht", "g61-fleiss": "Trainingsfleiß", "g61-trips": "Fahrtenbuch", "g61-board": "Bestenliste", "g61-ratings": "iRating", "g61-rennen": "Nächstes Rennen", "g61-training": "Training", "g61-bestzeiten": "Bestzeiten",
     aktivitaet: "Aktivität", "news-schreiben": "News schreiben", fahrerprofile: "Fahrerprofile", "kalender-admin": "Rennkalender", admin: "Admin",
   };
   const fmtWann = (ms) => {
@@ -1364,25 +1295,19 @@
 
   const fmtHours = (sec) => { const h = Math.floor(sec / 3600), m = Math.round((sec % 3600) / 60); return h ? `${h} h ${String(m).padStart(2, "0")} min` : `${m} min`; };
 
+  const G61_ALT = { woche: "training", fleiss: "training", trips: "training", board: "bestzeiten" };
   async function renderG61(tab, days) {
-    tab = tab || "fleiss";
+    tab = G61_ALT[tab] || tab || "rennen";
     merke("g61-" + tab);
     days = days || 7;
     main().innerHTML = panelHead("garage61", "Garage 61") + `
-      <div class="g6-tabs">
-        <button type="button" data-tab="woche" class="${tab === "woche" ? "on" : ""}">Wochenübersicht</button>
-        <button type="button" data-tab="fleiss" class="${tab === "fleiss" ? "on" : ""}">Trainingsfleiß</button>
-        <button type="button" data-tab="trips" class="${tab === "trips" ? "on" : ""}">Fahrtenbuch</button>
-        <button type="button" data-tab="board" class="${tab === "board" ? "on" : ""}">Bestenliste</button>
-        <button type="button" data-tab="ratings" class="${tab === "ratings" ? "on" : ""}">iRating</button>
-      </div>
+      <div class="g6-tabs">${[["rennen", "Nächstes Rennen"], ["training", "Training"], ["bestzeiten", "Bestzeiten"], ["ratings", "iRating"]].map(([k, t]) => `<button type="button" data-tab="${k}" class="${tab === k ? "on" : ""}">${t}</button>`).join("")}</div>
       <div id="g61b"><div class="tm-loading"><span></span><span></span><span></span></div></div>`;
     main().querySelectorAll("[data-tab]").forEach(b => b.onclick = () => renderG61(b.dataset.tab, days));
-    if (tab === "woche") return renderWoche();
-    if (tab === "fleiss") return renderFleiss(days);
-    if (tab === "trips") return renderTrips(days);
+    if (tab === "training") return renderTraining(days);
+    if (tab === "bestzeiten") return renderBestzeiten();
     if (tab === "ratings") return renderRatings();
-    return renderBoard();
+    return renderRennen();
   }
 
   const CAT_NAME = { sports_car: "Sports Car", formula_car: "Formula", oval: "Oval", dirt_road: "Dirt Road", dirt_oval: "Dirt Oval", road: "Road (alt)" };
@@ -1415,147 +1340,173 @@
       </table></div></div>`;
   }
 
-  async function renderTrips(days) {
+  /* ---------------- Garage 61: Hilfen ---------------- */
+  const vorTagen = (day) => {
+    if (!day) return "–";
+    const j = new Date(), h = Date.UTC(j.getFullYear(), j.getMonth(), j.getDate());
+    const t = Math.round((h - Date.parse(String(day).slice(0, 10))) / 864e5);
+    return t <= 0 ? "heute" : t === 1 ? "gestern" : `vor ${t} Tagen`;
+  };
+  const kurzStrecke = (s) => String(s || "").split(" (")[0].replace(/ – .*/, "");
+  const bopTag = (g) => g === "m" ? '<span class="tm-bop" title="Mit BoP gefahren">BOP</span>' : '<span class="gr-ohne" title="Ohne BoP gefahren">ohne BoP</span>';
+  const g61Fehler = (box, e) => { box.innerHTML = `<div class="tm-box tm-err">${esc(e.message)}${/404/.test(e.message) ? " – ist der Worker schon aktualisiert?" : ""}</div>`; };
+  const g61Leer = (box) => { box.innerHTML = '<div class="tm-box tm-soon"><div class="big">Noch nicht verbunden</div><p>Garage 61 ist noch nicht eingerichtet.</p></div>'; };
+
+  /* ---------------- Garage 61: Nächstes Rennen ---------------- */
+  async function renderRennen() {
     const box = document.getElementById("g61b");
     let d;
-    try { d = await api("/g61/fleiss?tage=" + days); } catch (e) { box.innerHTML = `<div class="tm-box tm-err">${esc(e.message)}</div>`; return; }
-    if (!d.ready) { box.innerHTML = `<div class="tm-box tm-soon"><div class="big">Noch nicht verbunden</div><p>Garage 61 ist noch nicht eingerichtet.</p></div>`; return; }
-    box.innerHTML = `
-      <div class="g6-bar">
-        <div class="g6-range">
-          <button type="button" data-days="7" class="${days === 7 ? "on" : ""}">7 Tage</button>
-          <button type="button" data-days="30" class="${days === 30 ? "on" : ""}">30 Tage</button>
+    try { d = await api("/g61/rennen"); } catch (e) { return g61Fehler(box, e); }
+    if (!d.ready) return g61Leer(box);
+    if (!d.rennen.length) { box.innerHTML = '<div class="tm-box tm-soon"><div class="big">Kein Rennen geplant</div><p>Im Rennkalender steht gerade kein kommendes Rennen.</p></div>'; return; }
+    let sel = 0;
+    const zeige = () => {
+      const r = d.rennen[sel];
+      const wann = new Date(r.at).toLocaleString("de-DE", { weekday: "long", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
+      const tage = Math.round((r.at - Date.now()) / 864e5);
+      const zeilen = r.fahrer.map(f => f.zeilen.map((z, i) => `
+          <tr class="${i ? "sub" : ""}">
+            <td class="n">${i ? "" : `<b>${esc(f.n)}</b>`}</td>
+            <td>${esc(z.car)}${r.mehrere ? `<small>${esc(z.tn)}</small>` : ""}</td>
+            <td class="r-al g6-n">${z.laps}</td>
+            <td class="gr-wann">${vorTagen(z.last)}</td>
+            <td class="r-al">${z.best ? `<span class="t">${fmtLap(z.best.t)}</span>${bopTag(z.best.bop)}${z.best.saison ? "" : "<small>ältere Season</small>"}` : '<span class="tm-muted">noch keine Zeit</span>'}</td>
+            <td class="r-al g">${z.best ? (z.gap ? "+" + z.gap.toFixed(3) : '<span class="gr-top">schnellste</span>') : ""}</td>
+          </tr>`).join("")).join("");
+      box.innerHTML = `
+        ${d.rennen.length > 1 ? `<div class="g6-bar"><div class="g6-range">${d.rennen.map((x, i) => `<button type="button" data-r="${i}" class="${i === sel ? "on" : ""}">${new Date(x.at).toLocaleDateString("de-DE", { weekday: "short", day: "2-digit", month: "2-digit" })} · ${esc(kurzStrecke(x.strecken[0] || x.track || x.title))}</button>`).join("")}</div></div>` : ""}
+        <div class="tm-box">
+          <h5>${esc(r.title)}</h5>
+          <p class="tm-muted">${esc(r.strecken.join(" · ") || r.track || "Strecke nicht gefunden")} · ${wann} Uhr · ${tage <= 0 ? "heute" : "in " + tage + (tage === 1 ? " Tag" : " Tagen")}</p>
+          <div class="g6-kpis gr-kpis">
+            <div><b>${r.fahrer.length} / ${r.mitglieder}</b><span>schon trainiert</span></div>
+            <div><b>${zahlDE(r.laps)}</b><span>Runden auf der Strecke</span></div>
+            <div><b>${r.schnell ? fmtLap(r.schnell.t) : "–"}</b><span>${r.schnell ? "Schnellster: " + esc(r.schnell.n) + (r.schnell.bop === "m" ? " · mit BoP" : " · ohne BoP") : "noch keine Zeit"}</span></div>
+          </div>
         </div>
-        <span class="tm-muted">Wer war mit welchem Auto auf welcher Strecke – pro Tag · Stand: ${fmtDate(d.at)}</span>
-      </div>
-      <div class="ta-list">${d.trips.length ? tripTable(d.trips) : '<p class="tm-muted" style="padding:16px">Keine Fahrten in diesem Zeitraum.</p>'}</div>`;
-    box.querySelectorAll("[data-days]").forEach(b => b.onclick = () => renderG61("trips", Number(b.dataset.days)));
+        ${r.fahrer.length ? `<div class="tm-board"><div class="tm-tbl-wrap"><table class="tm-tbl gr-tbl">
+          <tr class="th"><td>Fahrer</td><td>Auto</td><td class="r-al">Runden</td><td>Zuletzt</td><td class="r-al">Bestzeit</td><td class="r-al">Abstand</td></tr>
+          ${zeilen}
+        </table></div></div>` : '<div class="tm-box tm-soon"><p>Auf dieser Strecke ist in den letzten 30 Tagen noch niemand gefahren.</p></div>'}
+        ${r.nicht.length ? `<div class="tm-box gr-nicht"><h5>Noch nicht für dieses Rennen gefahren</h5>
+          ${r.nicht.map(x => `<div class="gr-n-row"><b>${esc(x.n)}</b><span>${x.zuletzt ? `fährt: ${esc(kurzStrecke(x.zuletzt.tn))} · ${esc(x.zuletzt.car)} · ${vorTagen(x.zuletzt.day)}` : "seit 30 Tagen nichts gefahren"}</span></div>`).join("")}
+        </div>` : ""}
+        <p class="tm-muted">Runden der letzten 30 Tage · Bestzeit aus der aktuellen Season · Abstand zum Schnellsten mit gleicher Wertung (mit/ohne BoP) · Stand ${fmtDate(d.at)}${d.umbau ? " · Bestzeiten werden gerade neu geprüft, einzelne Zeiten können noch fehlen" : ""}</p>`;
+      box.querySelectorAll("[data-r]").forEach(b => b.onclick = () => { sel = Number(b.dataset.r); zeige(); });
+    };
+    zeige();
   }
 
-  async function renderFleiss(days) {
+  /* ---------------- Garage 61: Training (Woche + Fleiß + Fahrten) ---------------- */
+  const tripMini = (rows) => `<div class="tm-tbl-wrap"><table class="tm-tbl g6-trips">
+      ${rows.map(x => `<tr>
+        <td class="d0">${fmtDay(x.day)}</td>
+        <td class="g6-track">${esc(x.track)}</td>
+        <td>${esc(x.car)}${(x.types || []).map(ty => ` <span class="g6-type t${ty}">${TYPE_SHORT[ty] || ""}</span>`).join("")}</td>
+        <td class="r-al g6-n">${x.laps} Rd.</td>
+        <td class="r-al g6-n">${fmtHours(x.time)}</td>
+      </tr>`).join("")}</table></div>`;
+
+  async function renderTraining(days) {
     const box = document.getElementById("g61b");
-    let d;
-    try { d = await api("/g61/fleiss?tage=" + days); } catch (e) { box.innerHTML = `<div class="tm-box tm-err">${esc(e.message)}</div>`; return; }
-    if (!d.ready) {
-      box.innerHTML = `<div class="tm-box tm-soon"><div class="big">Noch nicht verbunden</div><p>Garage 61 ist noch nicht eingerichtet.${ME.isAdmin ? " Im Admin-Bereich unter „Garage 61 → Discord“ das Team wählen und speichern." : ""}</p></div>`;
-      return;
-    }
+    let w, d;
+    try { [w, d] = await Promise.all([api("/g61/woche").catch(() => null), api("/g61/fleiss?tage=" + days)]); } catch (e) { return g61Fehler(box, e); }
+    if (!d.ready) return g61Leer(box);
     const t = d.totals, max = Math.max(1, ...d.drivers.map(x => x.time));
     const pct = (a, b) => b ? Math.round(a / b * 100) + " %" : "–";
+    const W = w && w.ready && Array.isArray(w.wochen) ? w.wochen : [];
+    const wmax = Math.max(1, ...W.map(x => x.laps)), L = W.length - 1;
     box.innerHTML = `
+      ${W.length ? `<div class="tm-box">
+        <h5>Wochenverlauf <span class="tm-muted" style="letter-spacing:0;text-transform:none;font-family:var(--body);font-weight:500">Runden pro Woche</span></h5>
+        <div class="wk-chart">${W.map((x, i) => `<div class="wk-col${i === L ? " now" : ""}" title="KW ${x.kw} · ${zahlDE(x.laps)} Runden · ${fmtH(x.time)}"><span>${zahlDE(x.laps)}</span><i style="height:${Math.round(x.laps / wmax * 100)}%"></i></div>`).join("")}</div>
+        <div class="wk-kw">${W.map((x, i) => `<span class="${i === L ? "now" : ""}">KW ${x.kw}${i === L ? " · läuft" : ""}</span>`).join("")}</div>
+        ${wocheZiel(w)}
+      </div>` : ""}
       <div class="g6-bar">
         <div class="g6-range">
           <button type="button" data-days="7" class="${days === 7 ? "on" : ""}">7 Tage</button>
           <button type="button" data-days="30" class="${days === 30 ? "on" : ""}">30 Tage</button>
         </div>
-        <span class="tm-muted">Stand: ${fmtDate(d.at)} · aktualisiert alle 30 Min.</span>
+        <span class="tm-muted">Fahrer anklicken für seine Fahrten · Stand: ${fmtDate(d.at)}</span>
       </div>
-
       <div class="g6-kpis">
         <div><b>${fmtHours(t.time)}</b><span>auf der Strecke</span></div>
         <div><b>${t.laps.toLocaleString("de-DE")}</b><span>Runden</span></div>
         <div><b>${pct(t.clean, t.laps)}</b><span>saubere Runden</span></div>
         <div><b>${t.active} / ${t.members}</b><span>Fahrer aktiv</span></div>
       </div>
-
       <div class="ta-list g6-list">
         <div class="g6-row ta-head"><span>#</span><span>Fahrer</span><span>Zeit auf der Strecke</span><span class="r-al">Runden</span><span class="r-al">Sauber</span><span class="r-al">Tage</span><span>Meist gefahren</span></div>
         ${d.drivers.map((x, i) => `
-          <div class="g6-row${x.time ? "" : " zero"}">
+          <div class="g6-row${x.time ? " gr-klick" : " zero"}" data-f="${i}">
             <span class="g6-pos">${x.time ? i + 1 : "–"}</span>
-            <div class="g6-name"><b>${esc(x.name)}</b>${x.irating ? `<small>iR ${esc(x.irating)}${x.sr ? " · " + esc(x.sr) : ""}</small>` : ""}</div>
+            <div class="g6-name"><b>${x.time ? '<span class="gr-pf">▸</span>' : ""}${esc(x.name)}</b>${x.irating ? `<small>iR ${esc(x.irating)}${x.sr ? " · " + esc(x.sr) : ""}</small>` : ""}</div>
             <div class="g6-time"><div class="ta-bar"><i style="width:${Math.round(x.time / max * 100)}%"></i></div><span>${x.time ? fmtHours(x.time) : "–"}</span></div>
             <span class="r-al g6-n">${x.laps || "–"}</span>
             <span class="r-al g6-n">${pct(x.clean, x.laps)}</span>
             <span class="r-al g6-n">${x.days || "–"}</span>
-            <div class="g6-fav">${x.fav ? `<b>${esc(x.fav.car)}</b><small>${esc(x.fav.track)}</small>` : '<small>–</small>'}</div>
-          </div>`).join("")}
-      </div>
-
-      <div class="g6-tops">
-        <div class="tp-widget"><div class="tp-widget-h">${ICONS.pin}<b>Top-Strecken</b></div>
-          ${d.tracks.map(x => `<div class="tp-row"><div class="tp-row-m"><b>${esc(x.name)}</b></div><span class="g6-n">${fmtHours(x.time)}</span></div>`).join("") || '<div class="tp-widget-f">Keine Daten</div>'}</div>
-        <div class="tp-widget"><div class="tp-widget-h">${ICONS.car}<b>Top-Autos</b></div>
-          ${d.cars.map(x => `<div class="tp-row"><div class="tp-row-m"><b>${esc(x.name)}</b></div><span class="g6-n">${fmtHours(x.time)}</span></div>`).join("") || '<div class="tp-widget-f">Keine Daten</div>'}</div>
+            <div class="g6-fav">${x.fav ? `<b>${esc(x.fav.car)}</b><small>${esc(x.fav.track)}</small>` : "<small>–</small>"}</div>
+          </div>
+          <div class="gr-trips" data-t="${i}" hidden></div>`).join("")}
       </div>`;
-    box.querySelectorAll("[data-days]").forEach(b => b.onclick = () => renderG61("fleiss", Number(b.dataset.days)));
+    box.querySelectorAll("[data-days]").forEach(b => b.onclick = () => renderG61("training", Number(b.dataset.days)));
+    box.querySelectorAll(".gr-klick").forEach(row => row.onclick = () => {
+      const i = row.dataset.f, el = box.querySelector(`[data-t="${i}"]`);
+      const auf = el.hidden;
+      el.hidden = !auf;
+      row.classList.toggle("auf", auf);
+      if (auf && !el.innerHTML) {
+        const rows = (d.trips || []).filter(x => x.driver === d.drivers[i].name);
+        el.innerHTML = rows.length ? tripMini(rows) : '<p class="tm-muted" style="padding:10px 16px">Keine Einzelfahrten gefunden.</p>';
+      }
+    });
   }
 
-  async function renderBoard() {
+  /* ---------------- Garage 61: Bestzeiten ---------------- */
+  async function renderBestzeiten() {
     const box = document.getElementById("g61b");
     let d;
-    try { d = await api("/g61/board"); } catch (e) {
-      box.innerHTML = /lehnt|403|401/.test(e.message)
-        ? `<div class="tm-box tm-soon"><div class="big">Bald verfügbar</div><p>Die Bestenliste braucht die Rundenzeiten von Garage 61. Die Freischaltung ist beantragt – sobald sie da ist, erscheint hier die Team-Bestenliste.</p></div>`
-        : `<div class="tm-box tm-err">${esc(e.message)}</div>`;
-      return;
-    }
-    if (!d.ready) {
-      box.innerHTML = `<div class="tm-box tm-soon"><div class="big">Noch nicht verbunden</div><p>Garage 61 ist noch nicht eingerichtet.</p></div>`;
-      return;
-    }
-    if (!d.boards.length) {
-      box.innerHTML = `<div class="tm-box tm-soon"><div class="big">Keine Runden</div><p>In den letzten 14 Tagen hat niemand aus dem Team Runden hochgeladen.</p></div><div id="g61s"></div>`;
-      return renderStrecken();
-    }
-    box.innerHTML = `<p class="tm-muted" style="margin-bottom:16px">Persönliche Bestzeiten pro Strecke und Auto – alles, was das Team in den letzten 14 Tagen gefahren ist. <span class="tm-new">NEU</span> = in den letzten 48 Stunden. ${d.autoPost ? '<span class="tm-badge live">Discord-Posts aktiv</span>' : ""}</p>
-      <div class="tm-boards">${d.boards.map(b => `
-        <div class="tm-board">
-          <div class="tm-board-h"><b>${esc(b.track)}</b><span>${esc(b.car)}</span></div>
-          <div class="tm-tbl-wrap"><table class="tm-tbl">${b.laps.map(l => `
-            <tr class="${l.rank === 1 ? "first" : ""}">
-              <td class="p">P${l.rank}</td>
-              <td class="n">${esc(l.driver)}${isRecent(l.startTime) ? '<span class="tm-new">NEU</span>' : ""}${l.bop && (l.bop.kg || l.bop.pct) ? '<span class="tm-bop" title="Mit BOP gefahren">BOP</span>' : ""}</td>
-              <td class="t">${fmtLap(l.time)}</td>
-              <td class="g">${l.gap ? "+" + l.gap.toFixed(3) : ""}</td>
-              <td class="d">${SESSION[l.session] || ""}<br>${fmtDate(l.startTime)}</td>
-            </tr>`).join("")}
-          </table></div>
-        </div>`).join("")}
-      </div>
-      <div id="g61s"></div>`;
-    renderStrecken();
-  }
-  /* Bestenliste pro Strecke (unter der Übersicht) */
-  async function renderStrecken() {
-    const box = document.getElementById("g61s");
-    if (!box) return;
-    box.innerHTML = '<div class="tm-loading"><span></span><span></span><span></span></div>';
-    let d;
-    try { d = await api("/g61/strecken"); } catch (e) { box.innerHTML = `<div class="tm-box tm-err">${esc(e.message)}</div>`; return; }
-    if (!d.strecken.length) { box.innerHTML = ""; return; }
-    let scope = "cur", wahl = d.vorwahl || d.strecken[0].id, daten = null;
+    try { d = await api("/g61/strecken"); } catch (e) { return g61Fehler(box, e); }
+    if (!d.strecken || !d.strecken.length) { box.innerHTML = '<div class="tm-box tm-soon"><div class="big">Noch keine Zeiten</div><p>Die Rekord-Datenbank ist noch leer. Sie füllt sich automatisch.</p></div>'; return; }
+    const neu = d.neu || [];
+    let scope = "cur", grp = "m", wahl = d.vorwahl || d.strecken[0].id, daten = null;
     box.innerHTML = `
-      <div class="gs-head">
-        <h4>Strecken</h4>
-        <p class="tm-muted">Alle Team-Bestzeiten einer Strecke, pro Auto. ${d.rennen ? "Vorausgewählt: Strecke vom nächsten Rennen (" + esc(d.rennen) + ")." : ""}</p>
-        <div class="gs-ctrl">
-          <input class="tm-input" id="gs-such" placeholder="Strecke suchen …" autocomplete="off">
-          <select class="tm-select" id="gs-sel"></select>
-          <div class="gs-tog" role="group" aria-label="Wertung">
-            <button type="button" data-sc="cur" class="on">📅 Aktuelle BoP</button><button type="button" data-sc="all">📚 Allzeit</button>
-          </div>
-        </div>
+      <div class="tm-box">
+        <h5>Neue Bestzeiten <span class="tm-muted" style="letter-spacing:0;text-transform:none;font-family:var(--body);font-weight:500">letzte 7 Tage</span></h5>
+        ${neu.length ? `<div class="tm-tbl-wrap"><table class="tm-tbl gr-tbl">${neu.map(x => `<tr>
+          <td class="n"><b>${esc(x.n)}</b>${isRecent(x.at) ? '<span class="tm-new">NEU</span>' : ""}</td>
+          <td>${esc(kurzStrecke(x.tn))}<small>${esc(x.car)}</small></td>
+          <td class="r-al"><span class="t">${fmtLap(x.t)}</span>${bopTag(x.bop)}</td>
+          <td class="r-al gr-p${x.p === 1 ? " p1" : ""}">P${x.p}</td>
+          <td class="r-al g">${x.delta ? "−" + x.delta.toFixed(3) : ""}</td>
+          <td class="d">${fmtDate(x.at)}</td></tr>`).join("")}</table></div>` : '<p class="tm-muted">In den letzten 7 Tagen keine neue Bestzeit.</p>'}
       </div>
+      <div class="gs-ctrl gr-ctrl">
+        <input class="tm-input" id="gs-such" placeholder="Strecke suchen …" autocomplete="off">
+        <select class="tm-select" id="gs-sel"></select>
+        <div class="gs-tog" role="group" aria-label="Wertung"><button type="button" data-sc="cur" class="on">📅 Season</button><button type="button" data-sc="all">📚 Allzeit</button></div>
+        <div class="gs-tog" role="group" aria-label="BoP"><button type="button" data-bp="m" class="on">⚖️ Mit BoP</button><button type="button" data-bp="o">Ohne BoP</button></div>
+      </div>
+      <p class="tm-muted" style="margin:8px 0 14px">${d.rennen ? "Vorausgewählt: Strecke vom nächsten Rennen (" + esc(d.rennen) + "). " : ""}Verglichen wird immer nur mit gleicher Wertung.${d.umbau ? " Bestzeiten werden gerade neu geprüft, einzelne Zeiten können noch fehlen." : ""}</p>
       <div id="gs-out"></div>`;
     const sel = document.getElementById("gs-sel"), such = document.getElementById("gs-such"), out = document.getElementById("gs-out");
-    const liste = () => {
-      const q = such.value.trim().toLowerCase();
-      const t = d.strecken.filter(x => !q || x.tn.toLowerCase().includes(q));
-      sel.innerHTML = t.map(x => `<option value="${x.id}" ${x.id === wahl ? "selected" : ""}>${esc(x.tn)} (${x.autos} Auto${x.autos === 1 ? "" : "s"})</option>`).join("") || '<option value="">Nichts gefunden</option>';
-      if (t.length && !t.some(x => x.id === wahl)) { wahl = t[0].id; laden(); }
-    };
     const zeichnen = () => {
       if (!daten) return;
-      const autos = daten.autos.map(a => ({ cn: a.cn, l: scope === "cur" ? a.cur : a.all })).filter(a => a.l.length);
-      if (!autos.length) { out.innerHTML = `<div class="tm-box tm-soon"><p>${scope === "cur" ? "In der aktuellen Season (" + esc(d.season) + ") ist hier noch niemand gefahren. Schalte auf Allzeit." : "Keine Zeiten."}</p></div>`; return; }
-      out.innerHTML = `<div class="tm-boards">${autos.map(a => `
+      const autos = daten.autos.map(a => ({ cn: String(a.cn).replace(/ · .*BoP$/, ""), bop: a.bop || (/mit BoP/.test(a.cn) ? "m" : "o"), l: (scope === "cur" ? a.cur : a.all) || [] }));
+      const da = autos.filter(a => a.bop === grp && a.l.length);
+      if (!da.length) {
+        const anders = autos.some(a => a.bop !== grp && a.l.length);
+        out.innerHTML = `<div class="tm-box tm-soon"><p>${scope === "cur" ? "In der aktuellen Season (" + esc(d.season) + ")" : "Allzeit"} gibt es hier keine Zeiten ${grp === "m" ? "mit" : "ohne"} BoP.${anders ? " Schalte auf „" + (grp === "m" ? "Ohne" : "Mit") + " BoP“ um." : scope === "cur" ? " Schalte auf Allzeit um." : ""}</p></div>`;
+        return;
+      }
+      out.innerHTML = `<div class="tm-boards">${da.map(a => `
         <div class="tm-board">
-          <div class="tm-board-h"><b>${esc(a.cn)}</b><span>${esc(daten.tn)} · ${a.l.length} Fahrer</span></div>
+          <div class="tm-board-h"><b>${esc(a.cn)}</b><span>${esc(daten.tn)} · ${a.l.length} Fahrer · ${grp === "m" ? "mit" : "ohne"} BoP</span></div>
           <div class="tm-tbl-wrap"><table class="tm-tbl">${a.l.map((x, i) => `
             <tr class="${i === 0 ? "first" : ""}">
               <td class="p">P${i + 1}</td>
-              <td class="n">${esc(x.n)}${isRecent(x.at) ? '<span class="tm-new">NEU</span>' : ""}${x.kg || x.pct ? '<span class="tm-bop" title="Mit BOP gefahren">BOP</span>' : ""}</td>
+              <td class="n">${esc(x.n)}${isRecent(x.at) ? '<span class="tm-new">NEU</span>' : ""}</td>
               <td class="t">${fmtLap(x.t)}</td>
               <td class="g">${i ? "+" + (x.t - a.l[0].t).toFixed(3) : ""}</td>
               <td class="d">${scope === "all" && x.se ? esc(x.se) + "<br>" : (SESSION[x.s] ? SESSION[x.s] + "<br>" : "")}${fmtDate(x.at)}</td>
@@ -1569,11 +1520,22 @@
       try { daten = await api("/g61/strecken?id=" + encodeURIComponent(wahl)); zeichnen(); }
       catch (e) { out.innerHTML = `<div class="tm-box tm-err">${esc(e.message)}</div>`; }
     };
+    const liste = () => {
+      const q = such.value.trim().toLowerCase();
+      const t = d.strecken.filter(x => !q || x.tn.toLowerCase().includes(q));
+      sel.innerHTML = t.map(x => `<option value="${x.id}" ${x.id === wahl ? "selected" : ""}>${esc(x.tn)}</option>`).join("") || '<option value="">Nichts gefunden</option>';
+      if (t.length && !t.some(x => x.id === wahl)) { wahl = t[0].id; laden(); }
+    };
     such.addEventListener("input", liste);
     sel.addEventListener("change", () => { wahl = sel.value; laden(); });
     box.querySelectorAll("[data-sc]").forEach(b => b.onclick = () => {
       scope = b.dataset.sc;
       box.querySelectorAll("[data-sc]").forEach(x => x.classList.toggle("on", x === b));
+      zeichnen();
+    });
+    box.querySelectorAll("[data-bp]").forEach(b => b.onclick = () => {
+      grp = b.dataset.bp;
+      box.querySelectorAll("[data-bp]").forEach(x => x.classList.toggle("on", x === b));
       zeichnen();
     });
     liste();
