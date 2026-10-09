@@ -45,6 +45,11 @@ body{background:var(--carbon)}
 .sb-btn{font-family:var(--disp);font-weight:900;text-transform:uppercase;letter-spacing:.08em;font-size:16px;background:var(--red);color:#fff;border:0;padding:14px 26px;cursor:pointer;box-shadow:0 8px 26px var(--red-glow);transform:skewX(-10deg)}
 .sb-btn span{display:inline-block;transform:skewX(10deg)}
 .sb-btn.ghost{background:#13151b;border:1px solid var(--line);box-shadow:none}
+.sb-gal{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:12px}
+.sb-gal button{padding:0;border:2px solid var(--line);background:#000;cursor:pointer;aspect-ratio:1/1;overflow:hidden}
+.sb-gal button img{width:100%;height:100%;object-fit:cover;display:block}
+.sb-gal button.on{border-color:var(--red)}
+.sb-feld[hidden]{display:none}
 @media(max-width:900px){.sb-grid{grid-template-columns:1fr}.sb-prev{position:static;order:-1}}
 </style>
 </head>
@@ -67,6 +72,7 @@ body{background:var(--carbon)}
       </div>
       <div class="sb-panel">
         <div class="sb-h">2 · Hintergrund</div>
+        <div class="sb-gal" id="gal"></div>
         <div class="sb-row">
           <label class="sb-file">Bild vom PC wählen<input type="file" id="file" accept="image/*"></label>
           <button type="button" class="sb-mini" id="useCover" hidden>Cover der News nehmen</button>
@@ -84,8 +90,25 @@ body{background:var(--carbon)}
         <input type="text" id="title" maxlength="120" placeholder="Überschrift der News">
         <label for="text">Text</label>
         <textarea id="text" maxlength="400" placeholder="Kurzer Text – was ist passiert?"></textarea>
+        <div class="sb-feld" data-feld="platz" hidden><label for="platz">Platzierung</label>
+        <input type="text" id="platz" maxlength="4" placeholder="3"></div>
+        <div class="sb-feld" data-feld="strecke" hidden><label for="strecke">Strecke</label>
+        <input type="text" id="strecke" maxlength="40" placeholder="Bathurst"></div>
+        <div class="sb-feld" data-feld="wann" hidden><label for="wann">Tag / Uhrzeit</label>
+        <input type="text" id="wann" maxlength="40" placeholder="Montag · 20:00 Uhr"></div>
         <label for="footer">Fußzeile</label>
         <input type="text" id="footer" value="kreids888.com · Link in Bio" maxlength="60">
+      </div>
+      <div class="sb-panel">
+        <div class="sb-h">4 · QR-Code (optional)</div>
+        <label for="qr">Link zum Scannen</label>
+        <input type="text" id="qr" maxlength="300" placeholder="https://kreids888.com">
+        <p class="sb-hint">Leer lassen = kein QR-Code. Der Link steckt direkt im Code, er läuft nie ab.</p>
+        <div class="sb-row" style="margin-top:10px">
+          <button type="button" class="sb-file" id="qrDl">QR-Code einzeln herunterladen</button>
+          <button type="button" class="sb-mini" data-qr="https://kreids888.com">Webseite</button>
+          <button type="button" class="sb-mini" data-qr="https://youtube.com/@Kreids888">YouTube</button>
+        </div>
       </div>
     </div>
     <div class="sb-prev">
@@ -99,6 +122,7 @@ body{background:var(--carbon)}
   </div>
 </main>
 
+<script src="overlays/qrcode.js"></script>
 <script src="overlays/overlays.js"></script>
 <script>
 (function(){
@@ -192,6 +216,21 @@ body{background:var(--carbon)}
         h.text(c, z, x, y + t.groesse * 0.82 + i * t.groesse * t.lh, h.f(t.w, t.groesse, t.fam), color, align || "left", spacing ? spacing * 0.02 : 0);
       });
     },
+    qrMatrix: function(text){
+      try { var q = qrcode(0, "M"); q.addData(text); q.make(); return q; } catch (e) { return null; }
+    },
+    qr: function(c, d, x, y, size){
+      if (!d.qr) return false;
+      var q = h.qrMatrix(d.qr); if (!q) return false;
+      var n = q.getModuleCount(), pad = Math.round(size * 0.08), cell = (size - 2 * pad) / n;
+      c.save();
+      c.fillStyle = "#fff"; c.fillRect(x, y, size, size);
+      c.fillStyle = "#0a0b0e";
+      for (var r = 0; r < n; r++) for (var k = 0; k < n; k++) if (q.isDark(r, k)) c.fillRect(Math.floor(x + pad + k * cell), Math.floor(y + pad + r * cell), Math.ceil(cell), Math.ceil(cell));
+      c.fillStyle = ROT; c.fillRect(x, y + size, size, 34);
+      c.font = h.f(900, 24); c.fillStyle = "#fff"; c.textAlign = "center"; c.fillText("SCANNEN", x + size / 2, y + size + 25);
+      c.restore(); return true;
+    },
     bild: function(c, d, x, y, w, hh){
       c.save(); c.beginPath(); c.rect(x, y, w, hh); c.clip();
       if (d.img) {
@@ -212,7 +251,7 @@ body{background:var(--carbon)}
   };
 
   function daten(){
-    return { kicker: ($("kicker").value || "NEWS").toUpperCase(), title: $("title").value || "Deine Überschrift", text: $("text").value || "", footer: $("footer").value || "", img: S.img, view: S.view };
+    return { kicker: ($("kicker").value || "NEWS").toUpperCase(), title: $("title").value || "Deine Überschrift", text: $("text").value || "", footer: $("footer").value || "", platz: $("platz").value.trim(), strecke: $("strecke").value.trim(), wann: $("wann").value.trim(), qr: $("qr").value.trim(), img: S.img, view: S.view };
   }
   function zeichne(c, ov, W, H, skala){
     c.setTransform(skala, 0, 0, skala, 0, 0);
@@ -235,14 +274,19 @@ body{background:var(--carbon)}
   $("ovList").innerHTML = OV.map(function(o, i){ return '<button type="button" data-i="' + i + '"' + (i === 0 ? ' class="on"' : '') + '><canvas></canvas>' + o.name + '</button>'; }).join("");
   thumbs = [].slice.call(document.querySelectorAll("#ovList canvas"));
   document.querySelectorAll("#ovList button").forEach(function(b){
-    b.onclick = function(){ S.ov = +b.dataset.i; document.querySelectorAll("#ovList button").forEach(function(x){ x.classList.toggle("on", x === b); }); render(); };
+    b.onclick = function(){ S.ov = +b.dataset.i; document.querySelectorAll("#ovList button").forEach(function(x){ x.classList.toggle("on", x === b); }); felderZeigen(); render(); };
   });
   // Format
   document.querySelectorAll("#fmt button").forEach(function(b){
     b.onclick = function(){ S.H = +b.dataset.h; document.querySelectorAll("#fmt button").forEach(function(x){ x.classList.toggle("on", x === b); }); alles(); };
   });
   // Texte
-  ["kicker", "title", "text", "footer"].forEach(function(id){ $(id).addEventListener("input", alles); });
+  function felderZeigen(){
+    var f = OV[S.ov].felder || [];
+    document.querySelectorAll(".sb-feld").forEach(function(el){ el.hidden = f.indexOf(el.dataset.feld) < 0; });
+  }
+  felderZeigen();
+  ["kicker", "title", "text", "footer", "platz", "strecke", "wann", "qr"].forEach(function(id){ $(id).addEventListener("input", alles); });
   // Hintergrund
   function setzeBild(img){ S.img = img; S.view = { zoom: 1, ox: 0, oy: 0 }; $("zoom").value = 1; alles(); }
   $("file").onchange = function(){
@@ -289,6 +333,26 @@ body{background:var(--carbon)}
       alsBlob(function(b){ if (b) navigator.share({ files: [new File([b], dateiname(), { type: "image/jpeg" })] }).catch(function(){}); });
     };
   }
+  document.querySelectorAll("[data-qr]").forEach(function(b){ b.onclick = function(){ $("qr").value = b.dataset.qr; alles(); }; });
+  $("qrDl").onclick = function(){
+    var q = h.qrMatrix($("qr").value.trim());
+    if (!$("qr").value.trim() || !q) { $("dlMsg").textContent = "Bitte zuerst einen Link für den QR-Code eintragen."; $("dlMsg").className = "sb-hint sb-err"; return; }
+    var n = q.getModuleCount(), cell = Math.floor(1000 / (n + 8)), size = cell * (n + 8);
+    var k = document.createElement("canvas"); k.width = k.height = size;
+    var x = k.getContext("2d"); x.fillStyle = "#fff"; x.fillRect(0, 0, size, size); x.fillStyle = "#000";
+    for (var r = 0; r < n; r++) for (var cc = 0; cc < n; cc++) if (q.isDark(r, cc)) x.fillRect((cc + 4) * cell, (r + 4) * cell, cell, cell);
+    k.toBlob(function(b){ var a = document.createElement("a"); a.href = URL.createObjectURL(b); a.download = "qr-code.png"; document.body.appendChild(a); a.click(); a.remove(); });
+  };
+  // Bildergalerie aus overlays/bilder/
+  fetch("overlays/bilder/bilder.json").then(function(r){ return r.json(); }).then(function(list){
+    $("gal").innerHTML = list.map(function(b, i){ return '<button type="button" title="' + b.name + '" data-src="overlays/bilder/' + b.datei + '"><img src="overlays/bilder/' + b.datei + '" alt="' + b.name + '" loading="lazy"></button>'; }).join("");
+    document.querySelectorAll("#gal button").forEach(function(b){
+      b.onclick = function(){
+        var img = new Image(); img.onload = function(){ setzeBild(img); document.querySelectorAll("#gal button").forEach(function(x){ x.classList.toggle("on", x === b); }); };
+        img.src = b.dataset.src;
+      };
+    });
+  }).catch(function(){});
   // News-Daten aus dem Dashboard (#...)
   try {
     var d = JSON.parse(decodeURIComponent(location.hash.slice(1) || "{}"));
