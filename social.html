@@ -50,6 +50,8 @@ body{background:var(--carbon)}
 .sb-gal button img{width:100%;height:100%;object-fit:cover;display:block}
 .sb-gal button.on{border-color:var(--red)}
 .sb-feld[hidden]{display:none}
+.sb .sb-chk{display:inline-flex;align-items:center;gap:6px;margin:4px 12px 4px 0;font-family:var(--body);font-weight:600;font-size:14px;letter-spacing:0;text-transform:none;color:var(--white);cursor:pointer}
+.sb-chk input{accent-color:var(--red);width:16px;height:16px}
 @media(max-width:900px){.sb-grid{grid-template-columns:1fr}.sb-prev{position:static;order:-1}}
 </style>
 </head>
@@ -97,18 +99,40 @@ body{background:var(--carbon)}
         <div class="sb-feld" data-feld="wann" hidden><label for="wann">Tag / Uhrzeit</label>
         <input type="text" id="wann" maxlength="40" placeholder="Montag · 20:00 Uhr"></div>
         <label for="footer">Fußzeile</label>
-        <input type="text" id="footer" value="kreids888.com · Link in Bio" maxlength="60">
+        <input type="text" id="footer" value="Konstanz schlägt Geschwindigkeit" maxlength="60">
       </div>
       <div class="sb-panel">
         <div class="sb-h">4 · QR-Code (optional)</div>
         <label for="qr">Link zum Scannen</label>
         <input type="text" id="qr" maxlength="300" placeholder="https://kreids888.com">
-        <p class="sb-hint">Leer lassen = kein QR-Code. Der Link steckt direkt im Code, er läuft nie ab.</p>
-        <div class="sb-row" style="margin-top:10px">
-          <button type="button" class="sb-file" id="qrDl">QR-Code einzeln herunterladen</button>
+        <div class="sb-row" style="margin-top:8px">
           <button type="button" class="sb-mini" data-qr="https://kreids888.com">Webseite</button>
           <button type="button" class="sb-mini" data-qr="https://youtube.com/@Kreids888">YouTube</button>
+          <button type="button" class="sb-mini" data-qr="https://www.tiktok.com/@kreids_">TikTok</button>
+          <button type="button" class="sb-mini" data-qr="https://instagram.com/kreids888">Instagram</button>
+          <button type="button" class="sb-mini" data-qr="https://discord.gg/T3XsTd9Bx6">Discord</button>
         </div>
+        <p class="sb-hint">Leer lassen = kein QR-Code. Der Link steckt direkt im Code, er läuft nie ab. Im Bild mit der Maus verschieben.</p>
+        <label>Größe QR-Code</label>
+        <input type="range" id="qrSize" min="130" max="340" step="1" value="200">
+        <div class="sb-row" style="margin-top:10px"><button type="button" class="sb-file" id="qrDl">QR-Code einzeln herunterladen</button></div>
+      </div>
+      <div class="sb-panel">
+        <div class="sb-h">5 · Social-Media-Leiste (optional)</div>
+        <div class="sb-row" id="soz">
+          <label class="sb-chk"><input type="checkbox" value="youtube"> YouTube</label>
+          <label class="sb-chk"><input type="checkbox" value="tiktok"> TikTok</label>
+          <label class="sb-chk"><input type="checkbox" value="instagram"> Instagram</label>
+          <label class="sb-chk"><input type="checkbox" value="discord"> Discord</label>
+        </div>
+        <label>Anordnung</label>
+        <div class="sb-seg" id="sozDir">
+          <button type="button" data-d="h" class="on">Nebeneinander</button>
+          <button type="button" data-d="v">Untereinander</button>
+        </div>
+        <label>Größe Leiste</label>
+        <input type="range" id="sozSize" min="0.6" max="1.6" step="0.01" value="1">
+        <p class="sb-hint">Im Bild mit der Maus verschieben.</p>
       </div>
     </div>
     <div class="sb-prev">
@@ -133,8 +157,23 @@ body{background:var(--carbon)}
   var S = { ov: 0, H: 1350, img: null, cover: "", view: { zoom: 1, ox: 0, oy: 0 } };
 
   /* ---------- Zeichen-Hilfen für die Overlays ---------- */
+  var ICON = {"youtube": "M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12z", "tiktok": "M12.525.02c1.31-.02 2.61-.01 3.91-.02.08 1.53.63 3.09 1.75 4.17 1.12 1.11 2.7 1.62 4.24 1.79v4.03c-1.44-.05-2.89-.35-4.2-.97-.57-.26-1.1-.59-1.62-.93-.01 2.92.01 5.84-.02 8.75-.08 1.4-.54 2.79-1.35 3.94-1.31 1.92-3.58 3.17-5.91 3.21-1.43.08-2.86-.31-4.08-1.03-2.02-1.19-3.44-3.37-3.65-5.71-.02-.5-.03-1-.01-1.49.18-1.9 1.12-3.72 2.58-4.96 1.66-1.44 3.98-2.13 6.15-1.72.02 1.48-.04 2.96-.04 4.44-.99-.32-2.15-.23-3.02.37-.63.41-1.11 1.04-1.36 1.75-.21.51-.15 1.07-.14 1.61.24 1.64 1.82 3.02 3.5 2.87 1.12-.01 2.19-.66 2.77-1.61.19-.33.4-.67.41-1.06.1-1.79.06-3.57.07-5.36.01-4.03-.01-8.05.02-12.07z", "instagram": "M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zM12 0C8.741 0 8.333.014 7.053.072 2.695.272.273 2.69.073 7.052.014 8.333 0 8.741 0 12c0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98C8.333 23.986 8.741 24 12 24c3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98C15.668.014 15.259 0 12 0zm0 5.838a6.162 6.162 0 100 12.324 6.162 6.162 0 000-12.324zM12 16a4 4 0 110-8 4 4 0 010 8zm6.406-11.845a1.44 1.44 0 100 2.881 1.44 1.44 0 000-2.881z", "discord": "M20 5.5A17.6 17.6 0 0 0 15.6 4l-.3.6a13 13 0 0 1 3.7 1.4 15.6 15.6 0 0 0-13.9 0A13 13 0 0 1 8.8 4.6L8.5 4A17.6 17.6 0 0 0 4.1 5.5C1.7 9 1 12.4 1.3 15.7A17.7 17.7 0 0 0 6.7 18.4l.9-1.3a11.4 11.4 0 0 1-1.8-.9l.4-.3a12.7 12.7 0 0 0 11.6 0l.4.3a11.4 11.4 0 0 1-1.8.9l.9 1.3a17.6 17.6 0 0 0 5.4-2.7c.4-3.8-.6-7.1-2.7-10.2zM8.9 14c-.9 0-1.6-.8-1.6-1.8S8 10.4 8.9 10.4s1.7.8 1.6 1.8-.7 1.8-1.6 1.8zm6.2 0c-.9 0-1.6-.8-1.6-1.8s.7-1.8 1.6-1.8 1.7.8 1.6 1.8-.7 1.8-1.6 1.8z"};
+  var SOZ = { youtube: { name: "YOUTUBE", handle: "@Kreids888", farbe: "#ff0033" }, tiktok: { name: "TIKTOK", handle: "@kreids_", farbe: "#25f4ee" }, instagram: { name: "INSTAGRAM", handle: "kreids888", farbe: "#e1306c" }, discord: { name: "DISCORD", handle: "discord.gg/T3XsTd9Bx6", farbe: "#5865f2" } };
   var h = {
     ROT: ROT,
+    icon: function(c, name, x, y, size, color){
+      if (!ICON[name]) return;
+      c.save(); c.translate(x, y); c.scale(size / 24, size / 24); c.fillStyle = color || "#fff";
+      c.fill(new Path2D(ICON[name]), "evenodd"); c.restore();
+    },
+    motto: function(c, s, x, y, size, align){
+      s = String(s || "").toUpperCase(); var i = s.indexOf(" ");
+      var a = i > 0 ? s.slice(0, i) : s, b = i > 0 ? s.slice(i) : "";
+      c.save(); c.font = h.f(900, size); if ("letterSpacing" in c) c.letterSpacing = Math.round(size * 0.03) + "px";
+      var wa = c.measureText(a).width, wb = c.measureText(b).width, x0 = align === "right" ? x - wa - wb : x;
+      c.textAlign = "left"; c.fillStyle = ROT; c.fillText(a, x0, y); c.fillStyle = "#fff"; c.fillText(b, x0 + wa, y);
+      c.restore();
+    },
     f: function(w, size, fam){ return w + " " + size + "px \"" + (fam || "Saira Condensed") + "\""; },
     text: function(c, s, x, y, font, color, align, spacing){
       c.save(); c.font = font; c.fillStyle = color; c.textAlign = align || "left";
@@ -177,7 +216,7 @@ body{background:var(--carbon)}
       c.fillStyle = "rgba(255,255,255,.16)"; c.fillRect(x1, y - 76, x2 - x1, 2);
       c.fillStyle = ROT; c.fillRect(x1, y - 76, 140, 4);
       h.logo(c, x1, y - 8, 46);
-      h.text(c, footer, x2, y - 14, h.f(700, 30), "#c9ced6", "right", 0.06);
+      h.motto(c, footer, x2, y - 10, 38, "right");
     },
     umbruch: function(c, s, maxW){
       var out = [];
@@ -219,17 +258,44 @@ body{background:var(--carbon)}
     qrMatrix: function(text){
       try { var q = qrcode(0, "M"); q.addData(text); q.make(); return q; } catch (e) { return null; }
     },
-    qr: function(c, d, x, y, size){
-      if (!d.qr) return false;
-      var q = h.qrMatrix(d.qr); if (!q) return false;
+    qr: function(c, d, x, y, size){ h._qr = { x: x, y: y }; return true; },
+    qrZeichnen: function(c, text, x, y, size){
+      var q = h.qrMatrix(text); if (!q) return null;
       var n = q.getModuleCount(), pad = Math.round(size * 0.08), cell = (size - 2 * pad) / n;
+      var u = text.toLowerCase(), z = /youtu/.test(u) ? "youtube" : /tiktok/.test(u) ? "tiktok" : /instagram/.test(u) ? "instagram" : /discord/.test(u) ? "discord" : "";
+      var lh = Math.round(size * 0.2), label = z ? SOZ[z].name : (/kreids888\.com/.test(u) ? "KREIDS888.COM" : "WEBSEITE");
       c.save();
       c.fillStyle = "#fff"; c.fillRect(x, y, size, size);
       c.fillStyle = "#0a0b0e";
       for (var r = 0; r < n; r++) for (var k = 0; k < n; k++) if (q.isDark(r, k)) c.fillRect(Math.floor(x + pad + k * cell), Math.floor(y + pad + r * cell), Math.ceil(cell), Math.ceil(cell));
-      c.fillStyle = ROT; c.fillRect(x, y + size, size, 34);
-      c.font = h.f(900, 24); c.fillStyle = "#fff"; c.textAlign = "center"; c.fillText("SCANNEN", x + size / 2, y + size + 25);
-      c.restore(); return true;
+      c.fillStyle = z ? SOZ[z].farbe === "#25f4ee" ? "#0a0b0e" : SOZ[z].farbe : ROT; c.fillRect(x, y + size, size, lh);
+      var fs = Math.round(lh * 0.56), is = Math.round(lh * 0.62);
+      c.font = h.f(900, fs); var tw = c.measureText(label).width, gw = z ? is + 8 : 0;
+      while (tw + gw > size - 12 && fs > 10) { fs--; c.font = h.f(900, fs); tw = c.measureText(label).width; }
+      var x0 = x + (size - tw - gw) / 2;
+      if (z) h.icon(c, z, x0, y + size + (lh - is) / 2, is, z === "tiktok" ? "#25f4ee" : "#fff");
+      c.fillStyle = "#fff"; c.textAlign = "left"; c.fillText(label, x0 + gw, y + size + lh * 0.7);
+      c.restore();
+      return { x: x, y: y, w: size, h: size + lh };
+    },
+    sozialZeichnen: function(c, liste, x, y, k, dir){
+      if (!liste.length) return null;
+      var is = Math.round(46 * k), fs = Math.round(30 * k), pad = Math.round(18 * k), gap = Math.round(30 * k), zh = Math.round(64 * k);
+      c.save(); c.font = h.f(700, fs);
+      var items = liste.map(function(n){ return { n: n, w: is + Math.round(12 * k) + c.measureText(SOZ[n].handle).width }; });
+      var bw, bh;
+      if (dir === "v") { bw = Math.max.apply(null, items.map(function(i){ return i.w; })) + 2 * pad; bh = items.length * zh + 2 * pad - Math.round(12 * k); }
+      else { bw = items.reduce(function(a, i){ return a + i.w; }, 0) + gap * (items.length - 1) + 2 * pad; bh = zh + 2 * pad - Math.round(12 * k); }
+      c.fillStyle = "rgba(10,11,14,.82)"; c.fillRect(x, y, bw, bh);
+      c.fillStyle = ROT; c.fillRect(x, y, Math.max(4, Math.round(6 * k)), bh);
+      var cx = x + pad + Math.round(6 * k), cy = y + pad;
+      items.forEach(function(i){
+        h.icon(c, i.n, cx, cy + (zh - Math.round(12 * k) - is) / 2, is, i.n === "tiktok" ? "#fff" : SOZ[i.n].farbe);
+        c.fillStyle = "#fff"; c.textAlign = "left"; c.fillText(SOZ[i.n].handle, cx + is + Math.round(12 * k), cy + (zh - Math.round(12 * k)) / 2 + fs * 0.36);
+        if (dir === "v") cy += zh; else cx += i.w + gap;
+      });
+      c.restore();
+      return { x: x, y: y, w: bw, h: bh };
     },
     bild: function(c, d, x, y, w, hh){
       c.save(); c.beginPath(); c.rect(x, y, w, hh); c.clip();
@@ -253,15 +319,27 @@ body{background:var(--carbon)}
   function daten(){
     return { kicker: ($("kicker").value || "NEWS").toUpperCase(), title: $("title").value || "Deine Überschrift", text: $("text").value || "", footer: $("footer").value || "", platz: $("platz").value.trim(), strecke: $("strecke").value.trim(), wann: $("wann").value.trim(), qr: $("qr").value.trim(), img: S.img, view: S.view };
   }
-  function zeichne(c, ov, W, H, skala){
+  S.qrPos = null; S.sozPos = null; S.hit = {}; S.sozDir = "h";
+  function sozListe(){ return [].slice.call(document.querySelectorAll("#soz input:checked")).map(function(i){ return i.value; }); }
+  function zeichne(c, ov, W, H, skala, haupt){
     c.setTransform(skala, 0, 0, skala, 0, 0);
     c.clearRect(0, 0, W, H);
-    try { ov.draw(c, W, H, daten(), h); } catch (e) { console.error(e); }
+    var d = daten(); h._qr = null;
+    try { ov.draw(c, W, H, d, h); } catch (e) { console.error(e); }
+    var sp = S.sozPos || { x: 72, y: Math.round(H * 0.42) };
+    var bs = h.sozialZeichnen(c, sozListe(), sp.x, sp.y, +$("sozSize").value, S.sozDir);
+    if (haupt) S.hit.soz = bs;
+    var qs = +$("qrSize").value;
+    if (d.qr) {
+      var qp = S.qrPos || h._qr || { x: W - 72 - qs, y: 72 };
+      var bq = h.qrZeichnen(c, d.qr, Math.round(Math.min(Math.max(0, qp.x), W - qs)), Math.round(Math.min(Math.max(0, qp.y), H - qs * 1.2)), qs);
+      if (haupt) S.hit.qr = bq;
+    } else if (haupt) S.hit.qr = null;
     c.setTransform(1, 0, 0, 1, 0, 0);
   }
   function render(){
     cv.width = 1080; cv.height = S.H;
-    zeichne(ctx, OV[S.ov], 1080, S.H, 1);
+    zeichne(ctx, OV[S.ov], 1080, S.H, 1, true);
   }
   var thumbs = [];
   function renderThumbs(){
@@ -274,11 +352,11 @@ body{background:var(--carbon)}
   $("ovList").innerHTML = OV.map(function(o, i){ return '<button type="button" data-i="' + i + '"' + (i === 0 ? ' class="on"' : '') + '><canvas></canvas>' + o.name + '</button>'; }).join("");
   thumbs = [].slice.call(document.querySelectorAll("#ovList canvas"));
   document.querySelectorAll("#ovList button").forEach(function(b){
-    b.onclick = function(){ S.ov = +b.dataset.i; document.querySelectorAll("#ovList button").forEach(function(x){ x.classList.toggle("on", x === b); }); felderZeigen(); render(); };
+    b.onclick = function(){ S.ov = +b.dataset.i; document.querySelectorAll("#ovList button").forEach(function(x){ x.classList.toggle("on", x === b); }); S.qrPos = null; felderZeigen(); render(); };
   });
   // Format
   document.querySelectorAll("#fmt button").forEach(function(b){
-    b.onclick = function(){ S.H = +b.dataset.h; document.querySelectorAll("#fmt button").forEach(function(x){ x.classList.toggle("on", x === b); }); alles(); };
+    b.onclick = function(){ S.H = +b.dataset.h; S.qrPos = null; S.sozPos = null; document.querySelectorAll("#fmt button").forEach(function(x){ x.classList.toggle("on", x === b); }); alles(); };
   });
   // Texte
   function felderZeigen(){
@@ -286,6 +364,9 @@ body{background:var(--carbon)}
     document.querySelectorAll(".sb-feld").forEach(function(el){ el.hidden = f.indexOf(el.dataset.feld) < 0; });
   }
   felderZeigen();
+  document.querySelectorAll("#soz input").forEach(function(i){ i.addEventListener("change", alles); });
+  document.querySelectorAll("#sozDir button").forEach(function(b){ b.onclick = function(){ S.sozDir = b.dataset.d; document.querySelectorAll("#sozDir button").forEach(function(x){ x.classList.toggle("on", x === b); }); alles(); }; });
+  ["qrSize", "sozSize"].forEach(function(id){ $(id).addEventListener("input", render); $(id).addEventListener("change", renderThumbs); });
   ["kicker", "title", "text", "footer", "platz", "strecke", "wann", "qr"].forEach(function(id){ $(id).addEventListener("input", alles); });
   // Hintergrund
   function setzeBild(img){ S.img = img; S.view = { zoom: 1, ox: 0, oy: 0 }; $("zoom").value = 1; alles(); }
@@ -305,10 +386,22 @@ body{background:var(--carbon)}
   $("zoom").oninput = function(){ S.view.zoom = +this.value; alles(); };
   // Bild verschieben
   var zieh = null;
-  cv.addEventListener("pointerdown", function(e){ if (!S.img) return; zieh = { x: e.clientX, y: e.clientY, ox: S.view.ox, oy: S.view.oy }; cv.setPointerCapture(e.pointerId); });
+  function inBox(b, x, y){ return b && x >= b.x && x <= b.x + b.w && y >= b.y && y <= b.y + b.h; }
+  function punkt(e){ var r = cv.getBoundingClientRect(), k = cv.width / r.width; return { x: (e.clientX - r.left) * k, y: (e.clientY - r.top) * k, k: k }; }
+  cv.addEventListener("pointerdown", function(e){
+    var p = punkt(e), was = inBox(S.hit.qr, p.x, p.y) ? "qr" : inBox(S.hit.soz, p.x, p.y) ? "soz" : (S.img ? "bild" : null);
+    if (!was) return;
+    var start = was === "qr" ? { a: S.hit.qr.x, b: S.hit.qr.y } : was === "soz" ? { a: S.hit.soz.x, b: S.hit.soz.y } : { a: S.view.ox, b: S.view.oy };
+    zieh = { was: was, x: e.clientX, y: e.clientY, a: start.a, b: start.b }; cv.setPointerCapture(e.pointerId);
+  });
   cv.addEventListener("pointermove", function(e){
-    if (!zieh) return; var k = cv.width / cv.getBoundingClientRect().width;
-    S.view.ox = zieh.ox + (e.clientX - zieh.x) * k; S.view.oy = zieh.oy + (e.clientY - zieh.y) * k; render();
+    var k = cv.width / cv.getBoundingClientRect().width;
+    if (!zieh) { var p = punkt(e); cv.style.cursor = (inBox(S.hit.qr, p.x, p.y) || inBox(S.hit.soz, p.x, p.y)) ? "move" : (S.img ? "grab" : "default"); return; }
+    var nx = zieh.a + (e.clientX - zieh.x) * k, ny = zieh.b + (e.clientY - zieh.y) * k;
+    if (zieh.was === "qr") S.qrPos = { x: nx, y: ny };
+    else if (zieh.was === "soz") S.sozPos = { x: Math.max(0, Math.min(cv.width - S.hit.soz.w, nx)), y: Math.max(0, Math.min(cv.height - S.hit.soz.h, ny)) };
+    else { S.view.ox = nx; S.view.oy = ny; }
+    render();
   });
   cv.addEventListener("pointerup", function(){ if (zieh) { zieh = null; renderThumbs(); } });
   // Download / Teilen
