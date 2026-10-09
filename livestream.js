@@ -73,9 +73,10 @@
 
   /* ---------- Render ---------- */
   function renderLive(stream){
-    const frame = $("liveFrame");
-    if (frame && stream.videoId){
-      frame.src = "https://www.youtube.com/embed/" + stream.videoId + "?autoplay=1&mute=1&rel=0&playsinline=1";
+    const wrap = $("liveWrap");
+    if (wrap && stream.videoId && wrap.dataset.id !== stream.videoId){
+      wrap.dataset.id = stream.videoId;
+      ytKlick(wrap, stream.videoId, { label:"Livestream ansehen", title:"Kreids888 Livestream" });
     }
     showState("live");
   }
@@ -84,7 +85,7 @@
     const t = $("bcTitle"); if (t) t.textContent = entry.title || "Stream";
 
     // Thumbnail: zuerst YouTube (vom Worker), sonst Bild aus dem Kalendereintrag
-    const thumb = (stream && stream.thumbnail) ? stream.thumbnail : (entry.image || "");
+    const thumb = (stream && stream.videoId) ? ytThumb(stream.videoId) : (entry.image || "");
     const thumbLink = $("bcThumbLink"), thumbImg = $("bcThumb");
     if (thumbLink && thumbImg){
       if (!thumb){ thumbLink.hidden = true; delete thumbImg.dataset.src; }
@@ -144,7 +145,7 @@
     // Sicherheitsnetz: kein Kalender-Eintrag, aber Worker kennt einen Upcoming
     if (!entry && stream && stream.state === "upcoming" && stream.scheduledStart){
       const w = new Date(stream.scheduledStart);
-      if (!isNaN(w.getTime())) entry = { title: stream.title || "Nächster Stream", when: w, image: stream.thumbnail || "" };
+      if (!isNaN(w.getTime())) entry = { title: stream.title || "Nächster Stream", when: w, image: stream.videoId ? ytThumb(stream.videoId) : "" };
     }
     if (entry){ renderUpcoming(entry, stream); return; }
 

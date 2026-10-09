@@ -66,7 +66,7 @@ const footHTML = `
     <span class="foot-motto-line"><span class="fm-strong">Konstanz</span> <span class="fm-sheen">vor Geschwindigkeit</span></span>
   </div>
 </div>
-<div class="container"><div class="foot-note">© 2026 Kreids888</div></div>`;
+<div class="container"><div class="foot-note">© 2026 Kreids888 · Privates Hobbyprojekt<span class="foot-legal"><a href="/impressum.html">Impressum</a><a href="/impressum.html#datenschutz">Datenschutz</a></span></div></div>`;
 
 const navEl=document.getElementById("site-nav");
 const footEl=document.getElementById("site-footer");
@@ -97,22 +97,20 @@ if(burger&&navlinks){
   });
 }
 
-// ---- Video: läuft automatisch (stumm) — Ton lässt sich dazuschalten ----
-// Browser erlauben Autoplay mit Ton grundsätzlich nicht; daher startet das
-// Video stumm und der Nutzer kann per Button den Ton aktivieren (steuert
-// den YouTube-Player über die postMessage-API, dafür braucht die iframe-URL
-// den Parameter "enablejsapi=1").
-const soundToggle=document.getElementById("soundToggle");
-const ytFrame=document.getElementById("ytFrame");
-if(soundToggle&&ytFrame){
-  let muted=true;
-  soundToggle.addEventListener("click",()=>{
-    muted=!muted;
-    ytFrame.contentWindow.postMessage(JSON.stringify({
-      event:"command",
-      func: muted?"mute":"unMute",
-      args:[]
-    }),"*");
-    soundToggle.textContent = muted ? "🔇 Ton an" : "🔊 Ton aus";
+// ---- YouTube erst nach Klick laden (Datenschutz) ----
+// Vorher wird nur ein Vorschaubild über den eigenen Worker gezeigt,
+// es gibt also keine Verbindung zu YouTube/Google, bis man auf Play drückt.
+// Danach läuft das Video über youtube-nocookie.com (erweiterter Datenschutzmodus).
+function ytThumb(id, art){ return ADMIN_API + "/api/thumb/" + encodeURIComponent(id) + (art === "short" ? "?f=short" : ""); }
+function ytKlick(box, id, o){
+  o = o || {};
+  if(!box || !id) return;
+  box.classList.add("yt-klick");
+  box.innerHTML = '<button type="button" class="ytk-btn" aria-label="'+escapeHtml(o.label||"Video abspielen")+'">'
+    + '<img src="'+ytThumb(id,o.art)+'" alt="" loading="lazy" onerror="this.style.opacity=0">'
+    + '<span class="ytk-play" aria-hidden="true"></span></button>'
+    + '<span class="ytk-hint">Beim Abspielen werden Daten an YouTube übertragen · <a href="/impressum.html#datenschutz">Datenschutz</a></span>';
+  box.querySelector(".ytk-btn").addEventListener("click", function(){
+    box.innerHTML = '<iframe src="https://www.youtube-nocookie.com/embed/'+encodeURIComponent(id)+'?autoplay=1&rel=0&playsinline=1" title="'+escapeHtml(o.title||"YouTube-Video")+'" allow="autoplay; encrypted-media; fullscreen; picture-in-picture" allowfullscreen></iframe>';
   });
 }

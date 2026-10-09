@@ -1,98 +1,35 @@
 /* ===========================================================
-   LETZTER STREAM — lädt das aktuellste BEREITS VERÖFFENTLICHTE
-   Video vom YouTube-Kanal in den Player + Titel + Link.
+   LETZTER STREAM — zeigt das neueste veröffentlichte Video vom
+   Kanal mit Titel + Link. Das Video startet erst nach Klick
+   (Datenschutz: vorher keine Verbindung zu YouTube).
    ------------------------------------------------------------
-   WICHTIG: Ein angekündigter/laufender Stream taucht im RSS-Feed
-   ganz oben auf. Der wird hier ausgelassen (er läuft schon oben
-   im Broadcast-Block). Dafür fragt dieses Script kurz den Worker,
-   welches Video "live"/"upcoming" ist, und überspringt genau das.
+   Die Video-Liste holt der Dashboard-Worker (/api/video) direkt
+   von YouTube. Ein angekündigter/laufender Stream wird ausgelassen,
+   der läuft schon oben im Broadcast-Block.
    =========================================================== */
+(function(){
+  var STATUS_URL = "https://kreids888-live.kreids.workers.dev/";
+  var FALLBACK_VIDEO_ID = "Yvv1yh9lG0w";
+  var box = document.getElementById("yt");
+  if (!box) return;
 
-const YOUTUBE_CHANNEL_ID = "UCtFDX_OtRwq-z8gJBo2e96w";
-const STATUS_URL         = "https://kreids888-live.kreids.workers.dev/";
-const FALLBACK_VIDEO_ID  = "Yvv1yh9lG0w";
+  function zeige(id, title){ ytKlick(box, id, { label:"Video abspielen", title: title || "Kreids888 Video" }); }
 
-// videoId, das oben im Broadcast schon gezeigt wird -> hier auslassen
-async function fetchExcludedId() {
-  try {
-    const r = await fetch(STATUS_URL, { cache: "no-store" });
-    if (!r.ok) return null;
-    const d = await r.json();
-    if (d && (d.state === "live" || d.state === "upcoming")) return d.videoId || null;
-    return null;
-  } catch { return null; }
-}
-
-// Automatische Kanal-Playlists: Kanal-ID "UC..." wird zu
-//   "UULV..." = "Live streams" (alle vergangenen + angekündigten Streams)
-//   "UULF..." = "Videos" (Langform-Uploads OHNE Shorts)
-// -> Damit landen Shorts NIE im großen "Rennen verpasst"-Player,
-//    sondern nur in der eigenen Shorts-Sektion weiter unten.
-function channelPlaylistId(channelId, prefix) {
-  return (channelId && channelId.indexOf("UC") === 0) ? prefix + channelId.slice(2) : "";
-}
-
-// einen RSS-Feed (Kanal oder Playlist) über rss2json holen und zu Video-Items parsen
-async function fetchFeedItems(feedUrl) {
-  const proxyUrl = "https://api.rss2json.com/v1/api.json?rss_url=" + encodeURIComponent(feedUrl);
-  const res = await fetch(proxyUrl);
-  if (!res.ok) throw new Error("HTTP " + res.status);
-  const data = await res.json();
-  if (data.status && data.status !== "ok") throw new Error("Feed-Status " + data.status);
-  return (data.items || []).map(it => {
-    const link = it.link || it.guid || "";
-    const m = link.match(/[?&]v=([\w-]{11})/) || link.match(/video:([\w-]{11})/);
-    return m ? { id: m[1], title: (it.title || "").trim(), link } : null;
-  }).filter(Boolean);
-}
-
-// Video-Liste: zuerst die "Live streams"-Playlist (letzter Stream),
-// dann die "Videos"-Playlist, zuletzt der komplette Kanal-Feed als Sicherheitsnetz.
-async function fetchVideoList(channelId) {
-  for (const prefix of ["UULV", "UULF"]) {
-    const plId = channelPlaylistId(channelId, prefix);
-    if (!plId) continue;
-    try {
-      const items = await fetchFeedItems("https://www.youtube.com/feeds/videos.xml?playlist_id=" + plId);
-      if (items.length) return items;
-    } catch (e) {
-      console.info("[Video] Playlist " + prefix + " nicht ladbar:", e.message);
-    }
+  function ausgelassen(){
+    return fetch(STATUS_URL, { cache:"no-store" }).then(function(r){ return r.ok ? r.json() : null; })
+      .then(function(d){ return d && (d.state === "live" || d.state === "upcoming") ? (d.videoId || "") : ""; })
+      .catch(function(){ return ""; });
   }
-  const items = await fetchFeedItems("https://www.youtube.com/feeds/videos.xml?channel_id=" + channelId);
-  if (!items.length) throw new Error("Kein Video im Feed gefunden");
-  return items;
-}
 
-function setVideoSrc(id) {
-  const el = document.getElementById("yt");
-  const frame = document.getElementById("ytFrame");
-  if (!el || !frame) return;
-  el.dataset.id = id;
-  frame.src = "https://www.youtube.com/embed/" + id + "?autoplay=1&mute=1&rel=0&playsinline=1&enablejsapi=1";
-}
-
-function setVideoMeta(v) {
-  const t = document.getElementById("ytTitle");
-  const l = document.getElementById("ytLink");
-  if (t && v.title) t.textContent = v.title;
-  if (l && v.link)  l.href = v.link;
-}
-
-async function initVideo() {
-  if (!document.getElementById("yt")) return;
-  if (!YOUTUBE_CHANNEL_ID) return;
-  try {
-    const [list, excludeId] = await Promise.all([
-      fetchVideoList(YOUTUBE_CHANNEL_ID),
-      fetchExcludedId(),
-    ]);
-    // erstes Video, das NICHT der laufende/angekündigte Stream ist
-    const pick = list.find(v => v.id !== excludeId) || list[0];
-    setVideoSrc(pick.id);
-    setVideoMeta(pick);
-  } catch (err) {
-    console.info("[Video] Letztes Video nicht ladbar, nutze Fallback:", err.message);
-  }
-}
-initVideo();
+  zeige(FALLBACK_VIDEO_ID);
+  ausgelassen().then(function(ohne){
+    return fetch(ADMIN_API + "/api/video?ohne=" + encodeURIComponent(ohne)).then(function(r){ return r.json(); });
+  }).then(function(d){
+    var v = d && d.video;
+    if (!v || !v.id) return;
+    zeige(v.id, v.title);
+    var t = document.getElementById("ytTitle"), l = document.getElementById("ytLink");
+    if (t && v.title) t.textContent = v.title;
+    if (l && v.link) l.href = v.link;
+  }).catch(function(e){ console.info("[Video] Letztes Video nicht ladbar, nutze Fallback:", e.message); });
+})();
