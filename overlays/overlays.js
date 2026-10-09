@@ -20,6 +20,7 @@ window.K888_OVERLAYS = [
     h.schraeg(c, M - 20, 84, kw, 84, 22, h.ROT);
     h.text(c, d.kicker, M + 14, 144, h.f(900, 54), "#fff");
     h.startnummer(c, W - M, 84, 84, "right");
+    h.qr(c, d, W - M - 190, 200, 190);
     // Block unten, von unten nach oben
     var fy = H - M;
     h.fuss(c, M, W - M, fy, d.footer);
@@ -44,6 +45,7 @@ window.K888_OVERLAYS = [
     h.text(c, "P1", M + 52, y + 56, h.f(900, 50), "#fff", "center");
     h.text(c, d.kicker, M + 130, y + 56, h.f(900, 44), "#fff");
     c.fillStyle = h.ROT; c.fillRect(M + 560, y, 8, 78);
+    h.qr(c, d, W - M - 190, 92, 190);
     // Titel: jede Zeile eine Box
     var ti = h.passend(c, d.title.toUpperCase(), W - 2 * M - 60, 4, 104, 64, 900, "Saira Condensed", 1);
     y += 120;
@@ -81,6 +83,7 @@ window.K888_OVERLAYS = [
     var kw = c.measureText(d.kicker).width + 48;
     h.schraeg(c, W - M - 60 - kw, M + 48, kw, 60, 12, h.ROT);
     h.text(c, d.kicker, W - M - 60 - kw / 2, M + 92, h.f(900, 38), "#fff", "center", 0.1);
+    h.qr(c, d, W - M - 60 - 180, M + 140, 180);
     // Mitte unten: Titel groß mit Glow
     var t = h.passend(c, d.text, W - 2 * M - 120, 4, 40, 32, 500, "Barlow", 1.38);
     var ti = h.passend(c, d.title.toUpperCase(), W - 2 * M - 120, 3, 132, 72, 900, "Saira Condensed", 0.95);
@@ -109,6 +112,7 @@ window.K888_OVERLAYS = [
     // Rennstreifen oben rechts
     c.save(); c.translate(W - 250, -40); c.rotate(Math.PI / 4);
     c.fillStyle = h.ROT; c.fillRect(0, 0, 420, 34); c.fillStyle = "#fff"; c.fillRect(0, 50, 420, 14); c.restore();
+    h.qr(c, d, M, 84, 190);
     var fy = H - M;
     h.fuss(c, M, W - M, fy, d.footer);
     var t = h.passend(c, d.text, W - 2 * M, 4, 40, 32, 500, "Barlow", 1.38);
@@ -135,10 +139,134 @@ window.K888_OVERLAYS = [
     var ti = h.passend(c, d.title.toUpperCase(), W - 2 * M, 3, 104, 64, 900, "Saira Condensed", 0.98);
     h.zeilen(c, ti, M, teil + 110, "#fff", 0.6);
     var ty = teil + 110 + ti.hoehe + 30;
-    var platz = H - M - 120 - ty;
-    var t = h.passend(c, d.text, W - 2 * M, Math.max(2, Math.min(6, Math.floor(platz / 54))), 40, 32, 500, "Barlow", 1.4);
+    var platz = H - M - 100 - ty;
+    var t = h.passend(c, d.text, W - 2 * M, Math.max(1, Math.min(6, Math.floor((platz - 40) / 56) + 1)), 40, 32, 500, "Barlow", 1.4);
     h.zeilen(c, t, M, ty, "#c9ced6");
     h.fuss(c, M, W - M, H - M, d.footer);
     h.startnummer(c, W - M, 70, 76, "right");
+    h.qr(c, d, M, 70, 180);
+  } },
+
+  /* ---------- 6) NACHTSCHICHT: dunkel, rote Leuchtlinie wie das Rücklicht ---------- */
+  { id: "nacht", name: "Nachtschicht", felder: ["strecke", "wann"], draw: function (c, W, H, d, h) {
+    var M = 72;
+    h.bild(c, d, 0, 0, W, H);
+    h.verlauf(c, 0, 0, 0, H, [[0, "rgba(5,6,9,.7)"], [0.3, "rgba(5,6,9,.2)"], [0.55, "rgba(5,6,9,.65)"], [1, "rgba(5,6,9,.97)"]]);
+    h.text(c, (d.wann || "NACHT").toUpperCase(), M, 130, h.f(900, 64), "#fff", "left", 0.04);
+    h.text(c, (d.strecke || "").toUpperCase(), M, 182, h.f(700, 34), "#9aa1ab", "left", 0.2);
+    h.qr(c, d, W - M - 180, 70, 180);
+    var fy = H - M;
+    h.fuss(c, M, W - M, fy, d.footer);
+    var t = h.passend(c, d.text, W - 2 * M, 4, 40, 32, 500, "Barlow", 1.38);
+    var ty = fy - 110 - t.hoehe;
+    h.zeilen(c, t, M, ty, "#cfd3da");
+    var ti = h.passend(c, d.title.toUpperCase(), W - 2 * M, 3, 120, 70, 900, "Saira Condensed", 0.95);
+    var tiy = ty - 60 - ti.hoehe;
+    // Leuchtlinie
+    c.save(); c.shadowColor = "rgba(255,30,40,.95)"; c.shadowBlur = 40; c.fillStyle = "#ff2a35";
+    c.fillRect(M, tiy - 46, W - 2 * M, 8); c.restore();
+    h.text(c, d.kicker, M, tiy - 70, h.f(800, 34), "#ff4b55", "left", 0.22);
+    h.zeilen(c, ti, M, tiy, "#fff", 0.6);
+  } },
+
+  /* ---------- 7) ERGEBNIS: riesige Platzierung ---------- */
+  { id: "ergebnis", name: "Ergebnis", felder: ["platz", "strecke"], draw: function (c, W, H, d, h) {
+    var M = 72;
+    h.bild(c, d, 0, 0, W, H);
+    h.verlauf(c, 0, 0, 0, H, [[0, "rgba(10,11,14,.15)"], [0.4, "rgba(10,11,14,.5)"], [1, "rgba(10,11,14,.97)"]]);
+    var platz = String(d.platz || "1").replace(/^p/i, "");
+    var fy = H - M;
+    h.fuss(c, M, W - M, fy, d.footer);
+    var t = h.passend(c, d.text, W - 2 * M, 3, 38, 30, 500, "Barlow", 1.38);
+    var ty = fy - 110 - t.hoehe;
+    h.zeilen(c, t, M, ty, "#d5d9e0");
+    var ti = h.passend(c, d.title.toUpperCase(), W - 2 * M, 2, 84, 56, 900, "Saira Condensed", 0.98);
+    var tiy = ty - 30 - ti.hoehe;
+    h.zeilen(c, ti, M, tiy, "#fff", 0.6);
+    // P + Zahl
+    var gy = tiy - 40;
+    c.save(); c.font = h.f(900, 380);
+    c.shadowColor = "rgba(225,19,36,.6)"; c.shadowBlur = 50;
+    c.fillStyle = "#fff"; c.textAlign = "left"; c.fillText(platz, M + 150, gy);
+    c.restore();
+    h.text(c, "P", M, gy - 20, h.f(900, 200), h.ROT);
+    var strecke = (d.strecke || "").toUpperCase();
+    c.font = h.f(900, 40);
+    var kw = Math.max(c.measureText(d.kicker).width, 10) + 56;
+    h.schraeg(c, M, gy - 400, kw, 62, 16, h.ROT);
+    h.text(c, d.kicker, M + 28, gy - 354, h.f(900, 40), "#fff");
+    if (strecke) h.text(c, strecke, M + kw + 30, gy - 354, h.f(800, 36), "#fff", "left", 0.14);
+    h.qr(c, d, W - M - 180, 70, 180);
+  } },
+
+  /* ---------- 8) MOTTO: Konstanz schlägt Geschwindigkeit ---------- */
+  { id: "motto", name: "Motto", draw: function (c, W, H, d, h) {
+    var M = 72;
+    h.bild(c, d, 0, 0, W, H);
+    h.verlauf(c, 0, 0, 0, H, [[0, "rgba(10,11,14,.35)"], [0.5, "rgba(10,11,14,.72)"], [1, "rgba(10,11,14,.97)"]]);
+    var fy = H - M;
+    h.fuss(c, M, W - M, fy, d.footer);
+    var t = h.passend(c, d.text, W - 2 * M, 3, 38, 30, 500, "Barlow", 1.38);
+    var ty = fy - 110 - t.hoehe;
+    h.zeilen(c, t, M, ty, "#cfd3da");
+    var y = ty - 70;
+    h.text(c, "GESCHWINDIGKEIT", M, y, h.f(900, 132), "#fff");
+    c.save(); c.font = h.f(900, 132); c.lineWidth = 3; c.strokeStyle = "rgba(255,255,255,.5)"; c.restore();
+    h.text(c, "SCHLÄGT", M, y - 130, h.f(900, 132), "#9aa1ab");
+    c.save(); c.shadowColor = "rgba(225,19,36,.7)"; c.shadowBlur = 50;
+    h.text(c, "KONSTANZ", M, y - 260, h.f(900, 178), h.ROT); c.restore();
+    h.text(c, "MEIN MOTTO", M, y - 440, h.f(800, 34), "#fff", "left", 0.3);
+    h.startnummer(c, W - M, 84, 84, "right");
+    h.qr(c, d, M, 84, 180);
+  } },
+
+  /* ---------- 9) STREAM: Ankündigung mit Tag und Uhrzeit ---------- */
+  { id: "stream", name: "Stream", felder: ["wann"], draw: function (c, W, H, d, h) {
+    var M = 72;
+    h.bild(c, d, 0, 0, W, H);
+    h.verlauf(c, 0, 0, 0, H, [[0, "rgba(10,11,14,.55)"], [0.35, "rgba(10,11,14,.25)"], [1, "rgba(10,11,14,.96)"]]);
+    // LIVE-Plakette
+    c.save(); c.shadowColor = "rgba(225,19,36,.8)"; c.shadowBlur = 36;
+    h.schraeg(c, M, 84, 250, 96, 22, h.ROT); c.restore();
+    c.fillStyle = "#fff"; c.beginPath(); c.arc(M + 52, 132, 14, 0, Math.PI * 2); c.fill();
+    h.text(c, "LIVE", M + 80, 158, h.f(900, 72), "#fff", "left", 0.04);
+    h.qr(c, d, W - M - 190, 84, 190);
+    var fy = H - M;
+    h.fuss(c, M, W - M, fy, d.footer || "youtube.com/@Kreids888");
+    var t = h.passend(c, d.text, W - 2 * M, 3, 38, 30, 500, "Barlow", 1.38);
+    var ty = fy - 110 - t.hoehe;
+    h.zeilen(c, t, M, ty, "#d5d9e0");
+    var ti = h.passend(c, d.title.toUpperCase(), W - 2 * M, 2, 96, 60, 900, "Saira Condensed", 0.96);
+    var tiy = ty - 30 - ti.hoehe;
+    h.zeilen(c, ti, M, tiy, "#fff", 0.6);
+    var wann = (d.wann || "MONTAG · 20:00 UHR").toUpperCase();
+    var w = h.passend(c, wann, W - 2 * M, 1, 130, 70, 900, "Saira Condensed", 1);
+    var wy = tiy - 40 - w.hoehe;
+    h.zeilen(c, w, M, wy, h.ROT);
+    h.text(c, d.kicker, M, wy - 26, h.f(800, 34), "#fff", "left", 0.22);
+  } },
+
+  /* ---------- 10) BATTLE: Kampf um eine Position ---------- */
+  { id: "battle", name: "Battle", felder: ["platz", "strecke"], draw: function (c, W, H, d, h) {
+    var M = 72;
+    h.bild(c, d, 0, 0, W, H);
+    h.verlauf(c, 0, 0, 0, H, [[0, "rgba(10,11,14,.6)"], [0.3, "rgba(10,11,14,.1)"], [0.6, "rgba(10,11,14,.5)"], [1, "rgba(10,11,14,.97)"]]);
+    // diagonales Band oben
+    c.save(); c.translate(W / 2, 170); c.rotate(-0.06);
+    c.fillStyle = h.ROT; c.fillRect(-W, -62, W * 2, 124);
+    c.fillStyle = "#fff"; c.fillRect(-W, 70, W * 2, 10);
+    c.font = h.f(900, 96); c.textAlign = "center"; c.fillStyle = "#fff";
+    c.fillText("KAMPF UM P" + String(d.platz || "1").replace(/^p/i, ""), 0, 34);
+    c.restore();
+    if (d.strecke) h.text(c, d.strecke.toUpperCase(), W / 2, 300, h.f(800, 36), "#fff", "center", 0.2);
+    var fy = H - M;
+    h.fuss(c, M, W - M, fy, d.footer);
+    var t = h.passend(c, d.text, W - 2 * M - 220, 4, 38, 30, 500, "Barlow", 1.38);
+    var ty = fy - 110 - t.hoehe;
+    h.zeilen(c, t, M, ty, "#d5d9e0");
+    var ti = h.passend(c, d.title.toUpperCase(), W - 2 * M - 220, 3, 104, 64, 900, "Saira Condensed", 0.95);
+    var tiy = ty - 30 - ti.hoehe;
+    h.zeilen(c, ti, M, tiy, "#fff", 0.6);
+    h.qr(c, d, W - M - 190, fy - 100 - 190, 190);
   } }
 ];
