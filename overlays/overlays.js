@@ -67,7 +67,7 @@ window.K888_OVERLAYS = [
     c.fillStyle = "rgba(10,11,14,.94)"; c.fillRect(0, fy, W, 72 + M);
     c.fillStyle = h.ROT; c.fillRect(0, fy, W, 4);
     h.logo(c, M, fy + 60, 46);
-    h.text(c, d.footer, W - M, fy + 54, h.f(700, 30), "#c9ced6", "right", 0.06);
+    h.motto(c, d.footer, W - M, fy + 56, 34, "right");
   } },
 
   /* ---------- 3) ONBOARD: HUD-Ecken wie eine Cockpit-Kamera ---------- */
@@ -97,7 +97,7 @@ window.K888_OVERLAYS = [
     // Datenzeile
     c.fillStyle = "rgba(255,255,255,.18)"; c.fillRect(M + 60, H - M - 108, W - 2 * M - 120, 2);
     h.logo(c, M + 60, H - M - 46, 42);
-    h.text(c, d.footer, W - M - 60, H - M - 52, h.f(700, 28), "#c9ced6", "right", 0.06);
+    h.motto(c, d.footer, W - M - 60, H - M - 50, 32, "right");
   } },
 
   /* ---------- 4) STARTNUMMER: riesige 888 im Hintergrund ---------- */
@@ -232,7 +232,7 @@ window.K888_OVERLAYS = [
     h.text(c, "LIVE", M + 80, 158, h.f(900, 72), "#fff", "left", 0.04);
     h.qr(c, d, W - M - 190, 84, 190);
     var fy = H - M;
-    h.fuss(c, M, W - M, fy, d.footer || "youtube.com/@Kreids888");
+    h.fuss(c, M, W - M, fy, d.footer);
     var t = h.passend(c, d.text, W - 2 * M, 3, 38, 30, 500, "Barlow", 1.38);
     var ty = fy - 110 - t.hoehe;
     h.zeilen(c, t, M, ty, "#d5d9e0");
