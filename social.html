@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>KREIDS888 · Social-Bild</title>
+<meta name="robots" content="noindex, nofollow">
+<meta name="theme-color" content="#0a0a0a">
+<link rel="stylesheet" href="style.css">
+<style>
+body{background:var(--carbon)}
+.sb{max-width:1280px;margin:0 auto;padding:26px 20px 60px}
+.sb-top{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:22px;flex-wrap:wrap}
+.sb-top h1{font-family:var(--disp);font-weight:900;text-transform:uppercase;font-size:34px;margin:0;letter-spacing:.02em}
+.sb-top h1 .r{color:var(--red)}
+.sb-top small{color:var(--steel);font-size:14px}
+.sb-grid{display:grid;grid-template-columns:400px 1fr;gap:26px;align-items:start}
+.sb-panel{background:var(--panel);border:1px solid var(--line);padding:18px}
+.sb-panel+.sb-panel{margin-top:14px}
+.sb-h{font-family:var(--disp);font-weight:800;font-size:13px;letter-spacing:.2em;text-transform:uppercase;color:var(--red);margin:0 0 12px}
+.sb label{display:block;font-family:var(--disp);font-weight:700;font-size:13px;letter-spacing:.08em;text-transform:uppercase;color:var(--steel);margin:12px 0 6px}
+.sb input[type=text],.sb textarea{width:100%;box-sizing:border-box;background:#0d0e12;border:1px solid var(--line);color:var(--white);font:inherit;font-size:15px;padding:10px 12px}
+.sb textarea{resize:vertical;min-height:96px;line-height:1.45}
+.sb input[type=text]:focus,.sb textarea:focus{outline:none;border-color:var(--red)}
+.sb-ov{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.sb-ov button{background:#0d0e12;border:2px solid var(--line);padding:4px 4px 6px;cursor:pointer;color:var(--steel);font-family:var(--disp);font-weight:700;font-size:12px;letter-spacing:.06em;text-transform:uppercase}
+.sb-ov button canvas{display:block;width:100%;height:auto;margin-bottom:5px;background:#000}
+.sb-ov button.on{border-color:var(--red);color:#fff;box-shadow:0 0 18px var(--red-glow)}
+.sb-seg{display:flex;border:1px solid var(--line)}
+.sb-seg button{flex:1;background:transparent;border:0;color:var(--steel);font-family:var(--disp);font-weight:800;font-size:13px;letter-spacing:.08em;text-transform:uppercase;padding:10px 6px;cursor:pointer}
+.sb-seg button+button{border-left:1px solid var(--line)}
+.sb-seg button.on{background:var(--red);color:#fff}
+.sb-row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.sb-file{display:inline-block;background:#0d0e12;border:1px solid var(--line);color:#fff;font-family:var(--disp);font-weight:800;font-size:13px;letter-spacing:.06em;text-transform:uppercase;padding:10px 14px;cursor:pointer}
+.sb-file:hover{border-color:var(--red)}
+.sb-file input{display:none}
+.sb-mini{background:none;border:0;color:var(--steel);font-size:13px;text-decoration:underline;cursor:pointer;padding:0}
+.sb-hint{color:var(--steel);font-size:13px;line-height:1.5;margin:8px 0 0}
+.sb-err{color:#ff6b75}
+.sb input[type=range]{width:100%;accent-color:var(--red)}
+.sb-prev{position:sticky;top:16px;display:flex;flex-direction:column;align-items:center;gap:14px}
+.sb-prev canvas{max-width:100%;max-height:78vh;width:auto;height:auto;border:1px solid var(--line);box-shadow:0 20px 60px rgba(0,0,0,.6);cursor:grab;touch-action:none;background:#000}
+.sb-prev canvas:active{cursor:grabbing}
+.sb-go{display:flex;gap:10px;flex-wrap:wrap;justify-content:center}
+.sb-btn{font-family:var(--disp);font-weight:900;text-transform:uppercase;letter-spacing:.08em;font-size:16px;background:var(--red);color:#fff;border:0;padding:14px 26px;cursor:pointer;box-shadow:0 8px 26px var(--red-glow);transform:skewX(-10deg)}
+.sb-btn span{display:inline-block;transform:skewX(10deg)}
+.sb-btn.ghost{background:#13151b;border:1px solid var(--line);box-shadow:none}
+@media(max-width:900px){.sb-grid{grid-template-columns:1fr}.sb-prev{position:static;order:-1}}
+</style>
+</head>
+<body>
+<main class="sb">
+  <div class="sb-top">
+    <h1>Social-<span class="r">Bild</span></h1>
+    <small>Bild für Instagram &amp; TikTok – alles bleibt in deinem Browser, nichts wird hochgeladen.</small>
+  </div>
+  <div class="sb-grid">
+    <div>
+      <div class="sb-panel">
+        <div class="sb-h">1 · Design</div>
+        <div class="sb-ov" id="ovList"></div>
+        <label>Format (hochkant)</label>
+        <div class="sb-seg" id="fmt">
+          <button type="button" data-h="1350" class="on">4:5 · Feed</button>
+          <button type="button" data-h="1920">9:16 · Story / TikTok</button>
+        </div>
+      </div>
+      <div class="sb-panel">
+        <div class="sb-h">2 · Hintergrund</div>
+        <div class="sb-row">
+          <label class="sb-file">Bild vom PC wählen<input type="file" id="file" accept="image/*"></label>
+          <button type="button" class="sb-mini" id="useCover" hidden>Cover der News nehmen</button>
+          <button type="button" class="sb-mini" id="noImg">ohne Bild</button>
+        </div>
+        <p class="sb-hint" id="imgHint">Bild in der Vorschau mit der Maus verschieben.</p>
+        <label>Zoom</label>
+        <input type="range" id="zoom" min="1" max="3" step="0.01" value="1">
+      </div>
+      <div class="sb-panel">
+        <div class="sb-h">3 · Texte</div>
+        <label for="kicker">Kategorie</label>
+        <input type="text" id="kicker" value="NEWS" maxlength="22">
+        <label for="title">Überschrift</label>
+        <input type="text" id="title" maxlength="120" placeholder="Überschrift der News">
+        <label for="text">Text</label>
+        <textarea id="text" maxlength="400" placeholder="Kurzer Text – was ist passiert?"></textarea>
+        <label for="footer">Fußzeile</label>
+        <input type="text" id="footer" value="kreids888.com · Link in Bio" maxlength="60">
+      </div>
+    </div>
+    <div class="sb-prev">
+      <canvas id="cv" width="1080" height="1350" aria-label="Vorschau des Social-Bilds"></canvas>
+      <div class="sb-go">
+        <button type="button" class="sb-btn" id="dl"><span>Bild herunterladen</span></button>
+        <button type="button" class="sb-btn ghost" id="share" hidden><span>Teilen</span></button>
+      </div>
+      <p class="sb-hint" id="dlMsg"></p>
+    </div>
+  </div>
+</main>
+
+<script src="overlays/overlays.js"></script>
+<script>
+(function(){
+  var ROT = "#e11324";
+  var $ = function(id){ return document.getElementById(id); };
+  var cv = $("cv"), ctx = cv.getContext("2d");
+  var OV = window.K888_OVERLAYS || [];
+  var S = { ov: 0, H: 1350, img: null, cover: "", view: { zoom: 1, ox: 0, oy: 0 } };
+
+  /* ---------- Zeichen-Hilfen für die Overlays ---------- */
+  var h = {
+    ROT: ROT,
+    f: function(w, size, fam){ return w + " " + size + "px \"" + (fam || "Saira Condensed") + "\""; },
+    text: function(c, s, x, y, font, color, align, spacing){
+      c.save(); c.font = font; c.fillStyle = color; c.textAlign = align || "left";
+      var px = +(font.match(/(\d+)px/) || [0, 0])[1];
+      if ("letterSpacing" in c) c.letterSpacing = Math.round(px * (spacing || 0)) + "px";
+      c.fillText(s, x, y); c.restore();
+    },
+    verlauf: function(c, x0, y0, x1, y1, stops){
+      var g = c.createLinearGradient(x0, y0, x1, y1);
+      stops.forEach(function(s){ g.addColorStop(s[0], s[1]); });
+      c.fillStyle = g; c.fillRect(0, 0, c.canvas.width, c.canvas.height);
+    },
+    schraeg: function(c, x, y, w, hh, sk, color){
+      c.fillStyle = color; c.beginPath();
+      c.moveTo(x + sk, y); c.lineTo(x + w + sk, y); c.lineTo(x + w - sk, y + hh); c.lineTo(x - sk, y + hh); c.closePath(); c.fill();
+    },
+    ecken: function(c, x, y, w, hh, len, th, color){
+      c.fillStyle = color;
+      [[x, y, 1, 1], [x + w, y, -1, 1], [x, y + hh, 1, -1], [x + w, y + hh, -1, -1]].forEach(function(e){
+        c.fillRect(e[2] > 0 ? e[0] : e[0] - len, e[3] > 0 ? e[1] : e[1] - th, len, th);
+        c.fillRect(e[2] > 0 ? e[0] : e[0] - th, e[3] > 0 ? e[1] : e[1] - len, th, len);
+      });
+    },
+    logo: function(c, x, y, size){
+      c.save(); c.font = h.f(900, size); c.textAlign = "left";
+      c.fillStyle = "#fff"; c.fillText("KREIDS", x, y);
+      var w = c.measureText("KREIDS").width;
+      c.fillStyle = ROT; c.fillText("888", x + w, y); c.restore();
+    },
+    startnummer: function(c, x, y, hh, align){
+      c.save(); c.font = h.f(900, Math.round(hh * 0.62));
+      var w = c.measureText("#888").width + hh * 0.7;
+      var x0 = align === "right" ? x - w : x;
+      c.fillStyle = "rgba(10,11,14,.85)"; c.fillRect(x0, y, w, hh);
+      c.fillStyle = ROT; c.fillRect(x0, y, 8, hh);
+      c.fillStyle = "#fff"; c.textAlign = "center"; c.fillText("#888", x0 + w / 2 + 4, y + hh * 0.74);
+      c.restore();
+    },
+    fuss: function(c, x1, x2, y, footer){
+      c.fillStyle = "rgba(255,255,255,.16)"; c.fillRect(x1, y - 76, x2 - x1, 2);
+      c.fillStyle = ROT; c.fillRect(x1, y - 76, 140, 4);
+      h.logo(c, x1, y - 8, 46);
+      h.text(c, footer, x2, y - 14, h.f(700, 30), "#c9ced6", "right", 0.06);
+    },
+    umbruch: function(c, s, maxW){
+      var out = [];
+      String(s || "").split(/\n+/).forEach(function(abs){
+        var zeile = "";
+        abs.split(/\s+/).filter(Boolean).forEach(function(wort){
+          var test = zeile ? zeile + " " + wort : wort;
+          if (c.measureText(test).width <= maxW) { zeile = test; return; }
+          if (zeile) out.push(zeile);
+          while (c.measureText(wort).width > maxW && wort.length > 1) {
+            var n = wort.length; while (n > 1 && c.measureText(wort.slice(0, n)).width > maxW) n--;
+            out.push(wort.slice(0, n)); wort = wort.slice(n);
+          }
+          zeile = wort;
+        });
+        if (zeile) out.push(zeile);
+      });
+      return out;
+    },
+    passend: function(c, s, maxW, maxZ, start, min, w, fam, lh){
+      var size = start, z;
+      for (; size >= min; size -= 2) {
+        c.font = h.f(w, size, fam); z = h.umbruch(c, s, maxW);
+        if (z.length <= maxZ) break;
+      }
+      size = Math.max(size, min); c.font = h.f(w, size, fam); z = h.umbruch(c, s, maxW);
+      if (z.length > maxZ) {
+        z = z.slice(0, maxZ); var l = z[maxZ - 1];
+        while (l.length && c.measureText(l + "…").width > maxW) l = l.slice(0, -1);
+        z[maxZ - 1] = l.replace(/[\s,.;:–-]+$/, "") + "…";
+      }
+      return { zeilen: z, groesse: size, lh: lh, w: w, fam: fam, hoehe: z.length ? size * (1 + (z.length - 1) * lh) : 0 };
+    },
+    zeilen: function(c, t, x, y, color, spacing, align){
+      t.zeilen.forEach(function(z, i){
+        h.text(c, z, x, y + t.groesse * 0.82 + i * t.groesse * t.lh, h.f(t.w, t.groesse, t.fam), color, align || "left", spacing ? spacing * 0.02 : 0);
+      });
+    },
+    bild: function(c, d, x, y, w, hh){
+      c.save(); c.beginPath(); c.rect(x, y, w, hh); c.clip();
+      if (d.img) {
+        var iw = d.img.naturalWidth, ih = d.img.naturalHeight;
+        var s = Math.max(w / iw, hh / ih) * d.view.zoom, dw = iw * s, dh = ih * s;
+        var mx = (dw - w) / 2, my = (dh - hh) / 2;
+        d.view.ox = Math.max(-mx, Math.min(mx, d.view.ox)); d.view.oy = Math.max(-my, Math.min(my, d.view.oy));
+        c.drawImage(d.img, x + (w - dw) / 2 + d.view.ox, y + (hh - dh) / 2 + d.view.oy, dw, dh);
+      } else {
+        var g = c.createRadialGradient(x + w * 0.75, y + hh * 0.2, 20, x + w * 0.6, y + hh * 0.3, Math.max(w, hh));
+        g.addColorStop(0, "#3a0a10"); g.addColorStop(0.45, "#14161d"); g.addColorStop(1, "#0a0b0e");
+        c.fillStyle = g; c.fillRect(x, y, w, hh);
+        c.strokeStyle = "rgba(255,255,255,.035)"; c.lineWidth = 2;
+        for (var i = -hh; i < w; i += 28) { c.beginPath(); c.moveTo(x + i, y); c.lineTo(x + i + hh, y + hh); c.stroke(); }
+      }
+      c.restore();
+    }
+  };
+
+  function daten(){
+    return { kicker: ($("kicker").value || "NEWS").toUpperCase(), title: $("title").value || "Deine Überschrift", text: $("text").value || "", footer: $("footer").value || "", img: S.img, view: S.view };
+  }
+  function zeichne(c, ov, W, H, skala){
+    c.setTransform(skala, 0, 0, skala, 0, 0);
+    c.clearRect(0, 0, W, H);
+    try { ov.draw(c, W, H, daten(), h); } catch (e) { console.error(e); }
+    c.setTransform(1, 0, 0, 1, 0, 0);
+  }
+  function render(){
+    cv.width = 1080; cv.height = S.H;
+    zeichne(ctx, OV[S.ov], 1080, S.H, 1);
+  }
+  var thumbs = [];
+  function renderThumbs(){
+    thumbs.forEach(function(t, i){ t.width = 216; t.height = Math.round(S.H / 5); zeichne(t.getContext("2d"), OV[i], 1080, S.H, 0.2); });
+  }
+  var zeitThumb = null;
+  function alles(){ render(); clearTimeout(zeitThumb); zeitThumb = setTimeout(renderThumbs, 150); }
+
+  // Design-Auswahl
+  $("ovList").innerHTML = OV.map(function(o, i){ return '<button type="button" data-i="' + i + '"' + (i === 0 ? ' class="on"' : '') + '><canvas></canvas>' + o.name + '</button>'; }).join("");
+  thumbs = [].slice.call(document.querySelectorAll("#ovList canvas"));
+  document.querySelectorAll("#ovList button").forEach(function(b){
+    b.onclick = function(){ S.ov = +b.dataset.i; document.querySelectorAll("#ovList button").forEach(function(x){ x.classList.toggle("on", x === b); }); render(); };
+  });
+  // Format
+  document.querySelectorAll("#fmt button").forEach(function(b){
+    b.onclick = function(){ S.H = +b.dataset.h; document.querySelectorAll("#fmt button").forEach(function(x){ x.classList.toggle("on", x === b); }); alles(); };
+  });
+  // Texte
+  ["kicker", "title", "text", "footer"].forEach(function(id){ $(id).addEventListener("input", alles); });
+  // Hintergrund
+  function setzeBild(img){ S.img = img; S.view = { zoom: 1, ox: 0, oy: 0 }; $("zoom").value = 1; alles(); }
+  $("file").onchange = function(){
+    var f = this.files && this.files[0]; if (!f) return;
+    var img = new Image(); img.onload = function(){ setzeBild(img); $("imgHint").textContent = "Bild in der Vorschau mit der Maus verschieben."; $("imgHint").className = "sb-hint"; };
+    img.src = URL.createObjectURL(f);
+  };
+  $("noImg").onclick = function(){ setzeBild(null); };
+  function ladeCover(url){
+    var img = new Image(); img.crossOrigin = "anonymous";
+    img.onload = function(){ setzeBild(img); };
+    img.onerror = function(){ $("imgHint").textContent = "Das Cover-Bild lässt sich nicht verwenden. Bitte ein Bild vom PC wählen."; $("imgHint").className = "sb-hint sb-err"; };
+    img.src = url;
+  }
+  $("useCover").onclick = function(){ if (S.cover) ladeCover(S.cover); };
+  $("zoom").oninput = function(){ S.view.zoom = +this.value; alles(); };
+  // Bild verschieben
+  var zieh = null;
+  cv.addEventListener("pointerdown", function(e){ if (!S.img) return; zieh = { x: e.clientX, y: e.clientY, ox: S.view.ox, oy: S.view.oy }; cv.setPointerCapture(e.pointerId); });
+  cv.addEventListener("pointermove", function(e){
+    if (!zieh) return; var k = cv.width / cv.getBoundingClientRect().width;
+    S.view.ox = zieh.ox + (e.clientX - zieh.x) * k; S.view.oy = zieh.oy + (e.clientY - zieh.y) * k; render();
+  });
+  cv.addEventListener("pointerup", function(){ if (zieh) { zieh = null; renderThumbs(); } });
+  // Download / Teilen
+  function dateiname(){ return "kreids888-" + ($("title").value || "news").toLowerCase().replace(/ä/g, "ae").replace(/ö/g, "oe").replace(/ü/g, "ue").replace(/ß/g, "ss").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 40) + ".jpg"; }
+  function alsBlob(fn){
+    try { cv.toBlob(function(b){ fn(b); }, "image/jpeg", 0.92); }
+    catch (e) { $("dlMsg").textContent = "Speichern nicht möglich – bitte das Hintergrundbild vom PC wählen."; $("dlMsg").className = "sb-hint sb-err"; }
+  }
+  $("dl").onclick = function(){
+    render();
+    alsBlob(function(b){
+      if (!b) return;
+      var a = document.createElement("a"); a.href = URL.createObjectURL(b); a.download = dateiname();
+      document.body.appendChild(a); a.click(); a.remove();
+      $("dlMsg").textContent = "Gespeichert: " + a.download; $("dlMsg").className = "sb-hint";
+    });
+  };
+  if (navigator.canShare && navigator.canShare({ files: [new File([""], "x.jpg", { type: "image/jpeg" })] })) {
+    $("share").hidden = false;
+    $("share").onclick = function(){
+      render();
+      alsBlob(function(b){ if (b) navigator.share({ files: [new File([b], dateiname(), { type: "image/jpeg" })] }).catch(function(){}); });
+    };
+  }
+  // News-Daten aus dem Dashboard (#...)
+  try {
+    var d = JSON.parse(decodeURIComponent(location.hash.slice(1) || "{}"));
+    if (d.t) $("title").value = d.t;
+    var txt = d.e || String(d.b || "").replace(/!\[[^\]]*\]\([^)]*\)/g, " ").replace(/\[([^\]]+)\]\([^)]*\)/g, "$1").replace(/[#*>]/g, "").replace(/\s+/g, " ").trim().slice(0, 240);
+    if (txt) $("text").value = txt;
+    if (d.c) { S.cover = d.c; $("useCover").hidden = false; ladeCover(d.c); }
+  } catch (e) {}
+  // erst zeichnen, wenn die Schriften da sind
+  Promise.all([document.fonts.load(h.f(900, 80)), document.fonts.load(h.f(800, 40)), document.fonts.load(h.f(700, 30)), document.fonts.load(h.f(500, 40, "Barlow"))])
+    .catch(function(){}).then(alles);
+  alles();
+})();
+</script>
+</body>
+</html>
