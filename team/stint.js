@@ -250,13 +250,22 @@
     return best === 2 ? "ja" : best === 1 ? "evtl" : best === 0 ? "nein" : "fehlt";
   }
   const AVTXT = { ja: "Verfügbar", evtl: "Vielleicht", nein: "Nicht verfügbar", fehlt: "Verfügbarkeit fehlt" };
+  // Status + Liste, was fehlt und bei wem
   function carStatus(c, r) {
-    if (!c.drivers.length) return ["fehlt", "Fahrer fehlen"];
-    if (!c.carId) return ["fehlt", "Fahrzeugmodell fehlt"];
-    if (c.drivers.some(d => fahrerAv(d.uid, c) === "fehlt") || r.fehler.length) return ["fehlt", "Angaben fehlen"];
-    const konflikt = r.rows.some(x => !x.real && x.uid && verfuegbar(x.uid, x.von, x.bis, c) !== 2);
-    return konflikt ? ["arbeit", "In Arbeit"] : ["ok", "Plan vollständig"];
+    const was = [];
+    if (!c.carId) was.push("Fahrzeugmodell fehlt");
+    if (!S.plan.trackId) was.push("Strecke beim Event fehlt");
+    if (!c.drivers.length) was.push("Noch keine Fahrer");
+    const ohneAv = c.drivers.filter(d => fahrerAv(d.uid, c) === "fehlt").map(d => memberName(d.uid));
+    if (ohneAv.length) was.push("Verfügbarkeit fehlt: " + ohneAv.join(", "));
+    const ohneWerte = c.drivers.filter(d => !(d.pace > 0 && d.fuel > 0)).map(d => memberName(d.uid));
+    if (ohneWerte.length) was.push("Pace/Sprit fehlt: " + ohneWerte.join(", "));
+    if (was.length) return ["fehlt", "Angaben fehlen", was];
+    const konflikte = r.rows.filter(x => !x.real && x.uid && verfuegbar(x.uid, x.von, x.bis, c) !== 2)
+      .map(x => { const v = verfuegbar(x.uid, x.von, x.bis, c); return "Stint " + (x.i + 1) + " (" + uhr(x.von) + "): " + memberName(x.uid) + " " + (v === 0 ? "nicht verfügbar" : v === 1 ? "nur vielleicht" : "teils nichts eingetragen"); });
+    return konflikte.length ? ["arbeit", "In Arbeit", konflikte] : ["ok", "Plan vollständig", []];
   }
+  const statusListe = (st) => st[2] && st[2].length ? `<ul class="sp-was">${st[2].slice(0, 6).map(x => `<li>${esc(x)}</li>`).join("")}${st[2].length > 6 ? `<li>… und ${st[2].length - 6} weitere</li>` : ""}</ul>` : "";
   const liveFuer = (c) => S.live && S.live.status === "live" && S.live.autos ? S.live.autos[c.key] : null;
 
   /* ---------------- Mount / Laden ---------------- */
@@ -284,6 +293,7 @@
     if (S.nextStep) { S.step = S.nextStep; S.nextStep = null; }
     S.key = car.key;
     renderCar();
+    autoG61(S.draft);
   }
   async function ladePlan(id, mine) {
     let d;
@@ -420,7 +430,7 @@
         <div class="sp-vcard-drv"><div class="sp-mini-h">Fahrer (${c.drivers.length})</div>
           ${c.drivers.map(d => { const a = fahrerAv(d.uid, c); return `<div class="sp-drvline ${d.uid === S.me ? "ich" : ""}"><i class="sp-av-dot ${a}"></i><span>${esc(memberName(d.uid))}</span><em class="${a}">${AVTXT[a]}</em></div>`; }).join("") || '<div class="tm-muted">Noch niemand eingetragen</div>'}
         </div>
-        <div class="sp-vcard-st"><span class="sp-st ${st[0]}">${st[1]}</span>
+        <div class="sp-vcard-st"><span class="sp-st ${st[0]}">${st[1]}</span>${statusListe(st)}
           ${nx ? `<div class="sp-mini-h">Nächster Stint</div><div class="sp-nx">${C.ICONS.clock}<span>Stint ${nx.i + 1} · ${uhr(nx.von)} Uhr<br><small>Fahrer: <b>${esc(nx.name || "–")}</b></small></span></div>` : ""}
           ${ich ? "" : `<button type="button" class="tm-btn sm" data-join="${esc(c.key)}"><span>Mitfahren</span></button>`}
         </div>
@@ -585,7 +595,7 @@
         <div class="sp-chead-in">
           <div class="sp-chead-pic">${silhouette(c.name)}</div>
           <div class="sp-title"><h3>${esc(c.name)}</h3><small>${esc(c.carName || "Fahrzeug offen")} · Start ${tagUhr(carStart(c))} · ${esc(p.trackName || "")}</small></div>
-          <span class="sp-st ${st[0]}">${st[1]}</span>
+          <div class="sp-chead-st"><span class="sp-st ${st[0]}">${st[1]}</span>${statusListe(st)}</div>
         </div>
         <div class="sp-actions">
           <span class="sp-dirty" id="sp-dirty" ${S.dirty ? "" : "hidden"}>Nicht gespeichert</span>
@@ -714,13 +724,13 @@
     const c = S.draft;
     body.innerHTML = `
       <div class="tm-box"><h5>Fahrer, Rundenzeit und Sprit</h5>
-        <p class="hint">„Werte aus Garage 61" füllt Pace (Ø saubere Runden, bevorzugt Rennrunden) und Sprit pro Runde, dazu Tank, Boxengasse und Tankrate (Schritt 3). Alles lässt sich von Hand ändern.</p>
+        <p class="hint">Pace und Sprit kommen automatisch aus Garage 61 und werden zweimal täglich und beim Öffnen aufgefrischt. Fehlen Runden auf genau dieser Strecke mit diesem Auto, nimmt er die letzten Daten von einer anderen Streckenvariante oder einem ähnlichen Auto (Hinweis unter der Zeit). Von Hand geänderte Werte bleiben stehen. „Werte aus Garage 61" holt alles neu, auch über deine eigenen Werte.</p>
         <div class="sp-drv-wrap"><table class="sp-drv">
           <thead><tr><th>Fahrer</th><th>Garage-61-Fahrer</th><th>Pace<small>Ø Runde</small></th><th>Sprit<small>L pro Runde</small></th><th></th></tr></thead>
           <tbody>${c.drivers.map((d, di) => `<tr data-d="${di}">
             <td><b>${esc(memberName(d.uid))}</b><small class="${fahrerAv(d.uid, c)}">${AVTXT[fahrerAv(d.uid, c)]}</small></td>
             <td><select class="tm-select" data-g="g61"><option value="">Nicht verknüpft</option>${META.g61drivers.map(g => `<option value="${esc(g.slug)}" ${g.slug === d.g61 ? "selected" : ""}>${esc(g.name)}</option>`).join("")}</select></td>
-            <td><input class="tm-input" data-g="pace" placeholder="1:58.500" value="${fmtLap(d.pace)}"></td>
+            <td><input class="tm-input" data-g="pace" placeholder="1:58.500" value="${fmtLap(d.pace)}">${d.quelle ? `<small class="sp-quelle-d ${d.src === "hand" ? "hand" : /^Ältere/.test(d.quelle) ? "alt" : ""}">${esc(d.quelle)}</small>` : ""}</td>
             <td><input class="tm-input" data-g="fuel" type="number" step="0.01" min="0" placeholder="3.20" value="${d.fuel || ""}"></td>
             <td><button type="button" class="sp-x" data-rmd="${di}" title="Aus dem Fahrzeug nehmen">✕</button></td></tr>`).join("") || '<tr><td colspan="5" class="tm-muted">Noch keine Fahrer.</td></tr>'}</tbody></table></div>
         <div class="sp-inline" style="margin-top:12px">
@@ -735,15 +745,15 @@
       const uid = add.value;
       if (!uid) return;
       const name = memberName(uid);
-      const d = { uid, name, g61: g61Vorschlag(uid, name), pace: 0, fuel: 0 };
+      const d = { uid, name, g61: g61Vorschlag(uid, name), pace: 0, fuel: 0, src: "", quelle: "" };
       uebernimmG61(c, d);
       c.drivers.push(d); dirty(); stepWerte(body);
     };
     $$("tr[data-d]").forEach(tr => {
       const d = c.drivers[Number(tr.dataset.d)];
-      tr.querySelector("[data-g=g61]").onchange = (e) => { d.g61 = e.target.value; uebernimmG61(c, d, true); dirty(); stepWerte(body); };
-      tr.querySelector("[data-g=pace]").onchange = (e) => { d.pace = parseLap(e.target.value); e.target.value = fmtLap(d.pace); dirty(); };
-      tr.querySelector("[data-g=fuel]").onchange = (e) => { d.fuel = Math.max(0, num(e.target.value)); dirty(); };
+      tr.querySelector("[data-g=g61]").onchange = (e) => { d.g61 = e.target.value; if (d.src !== "hand") { d.src = ""; uebernimmG61(c, d, false); } dirty(); stepWerte(body); autoG61(c); };
+      tr.querySelector("[data-g=pace]").onchange = (e) => { d.pace = parseLap(e.target.value); d.src = "hand"; d.quelle = "Von Hand"; dirty(); stepWerte(body); };
+      tr.querySelector("[data-g=fuel]").onchange = (e) => { d.fuel = Math.max(0, num(e.target.value)); d.src = "hand"; d.quelle = "Von Hand"; dirty(); stepWerte(body); };
       tr.querySelector("[data-rmd]").onclick = () => {
         c.drivers.splice(Number(tr.dataset.d), 1);
         c.stints.forEach(s => { if (s.d === d.uid) s.d = ""; });
@@ -767,17 +777,36 @@
   function uebernimmG61(c, d, force) {
     const g = S.g61[S.plan.trackId + "/" + c.carId];
     const x = g && d.g61 && g.drivers[d.g61];
-    if (!x) return false;
-    if (force || !d.pace) d.pace = x.pace;
-    if (force || !d.fuel) d.fuel = x.fuel;
-    return true;
+    if (!x || (!force && d.src === "hand")) return false;
+    const neu = d.pace !== x.pace || d.fuel !== x.fuel || d.quelle !== (x.quelle || "") || d.src !== "g61";
+    d.pace = x.pace; d.fuel = x.fuel; d.quelle = x.quelle || ""; d.src = "g61";
+    return neu || force;
   }
-  function uebernimmPit(c, g) {
+  // beim Öffnen eines Fahrzeugs: G61-Werte still nachziehen (Server-Cache 6 Std.), von Hand geänderte bleiben
+  async function autoG61(c) {
+    if (!META.g61Ready || !S.plan.trackId || !c.carId || !c.drivers.some(d => d.g61 && d.src !== "hand")) return;
+    const k = S.plan.trackId + "/" + c.carId;
+    try { if (!S.g61[k]) S.g61[k] = await C.api(`/stint/g61?track=${S.plan.trackId}&car=${c.carId}`); } catch (e) { return; }
+    if (S.draft !== c) return;
+    let neu = false;
+    for (const d of c.drivers) if (uebernimmG61(c, d, false)) neu = true;
+    if (!c.pitHand && uebernimmPit(c, S.g61[k], true)) neu = true;
+    if (!neu) { if (S.step === "werte") zeigeStep(); return; }
+    if (S.dirty) { dirty(); zeigeStep(); return; }
+    try {
+      c.schedule = rechne(c, null).rows.filter(x => !x.real).map(x => ({ i: x.i, u: x.uid, v: Math.round(x.von) }));
+      await C.api("/stint/car", { method: "POST", body: { id: S.id, crev: c.crev || 0, car: c } });
+      C.toast("Werte aus Garage 61 aktualisiert", true);
+      await neuLaden();
+    } catch (e) { /* still: dann eben beim nächsten Mal */ }
+  }
+  function uebernimmPit(c, g, nurAenderung) {
     const pt = g.pit || {};
     let n = 0;
-    if (pt.tank > 5) { c.pit.tank = pt.tank; n++; }
-    if (pt.rate > 0 && pt.lane > 0) { c.pit.rate = pt.rate; c.pit.lane = pt.lane; n += 2; }
-    else if (pt.stopps && pt.verlust > 0) { c.pit.lane = Math.max(5, Math.round(pt.verlust - pt.rein / (c.pit.rate || 2.5))); n++; }
+    const set = (k, v) => { if (c.pit[k] !== v) { c.pit[k] = v; n++; } else if (!nurAenderung) n++; };
+    if (pt.tank > 5) set("tank", pt.tank);
+    if (pt.rate > 0 && pt.lane > 0) { set("rate", pt.rate); set("lane", pt.lane); }
+    else if (pt.stopps && pt.verlust > 0) set("lane", Math.max(5, Math.round(pt.verlust - pt.rein / (c.pit.rate || 2.5))));
     return n;
   }
   async function holeG61(c, b, body) {
@@ -789,6 +818,7 @@
       S.g61[S.plan.trackId + "/" + c.carId] = g;
       let n = 0;
       for (const d of c.drivers) if (uebernimmG61(c, d, true)) n++;
+      c.pitHand = false;
       const np = uebernimmPit(c, g);
       if (n || np) dirty();
       const teile = [n ? `Pace und Sprit für ${n} Fahrer` : "", np ? "Boxenstopp-Werte" : ""].filter(Boolean);
@@ -818,7 +848,7 @@
       ${stintTabelle(c, r, false)}
       ${r.rows.length ? `<div class="tm-actions" style="margin-top:14px">${C.btn("Fahrer reihum verteilen", "sm", 'id="sp-rot"')}${C.btn("Runden zurücksetzen", "sm", 'id="sp-reset"')}</div>
         <p class="tm-muted" style="margin-top:10px">Runden leer lassen = so weit wie der Tank reicht. Änderungen rechnen sofort neu, gespeichert wird mit „Speichern" oben. Gespeicherte Startzeiten nutzt der Bot für die Stint-Pings.</p>` : ""}`;
-    $$("[data-pit]").forEach(i => i.onchange = () => { c.pit[i.dataset.pit] = Math.max(0, num(i.value, c.pit[i.dataset.pit])); dirty(); stepPlan(body); $(".sp-pitbox").open = true; });
+    $$("[data-pit]").forEach(i => i.onchange = () => { c.pit[i.dataset.pit] = Math.max(0, num(i.value, c.pit[i.dataset.pit])); c.pitHand = true; dirty(); stepPlan(body); $(".sp-pitbox").open = true; });
     $("#sp-par").onchange = (e) => { c.pit.parallel = e.target.checked; dirty(); stepPlan(body); $(".sp-pitbox").open = true; };
     bindStintEdit(body, c, stepPlan);
     const rot = $("#sp-rot");
