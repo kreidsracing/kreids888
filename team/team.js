@@ -1729,6 +1729,8 @@
           </div></div>
         <div class="tm-row"><label for="sp-vor">Vorlauf Stint-Ping<small>wird alle 10 Min. geprüft</small></label>
           <div><select class="tm-select" id="sp-vor">${[10, 15, 20, 30, 45, 60].map(m => `<option value="${m}" ${m === ((cfg.stint || {}).vorlauf || 15) ? "selected" : ""}>${m} Minuten vorher</option>`).join("")}</select></div></div>
+        <div class="tm-row"><div class="lbl">Teams<small>zur Auswahl bei jedem Auto</small></div>
+          <div><div id="sp-teams"></div><div class="tm-actions" style="margin-top:8px">${btn("+ Team", "sm", 'id="sp-team-add"')}</div></div></div>
       </div>
 
       <div class="tm-box">
@@ -1789,6 +1791,16 @@
     });
     box.querySelectorAll("#g61-team,#g61-ziel,#g61-ch,#g61-on,#g61-rec,#rm-on,#rm-24,#rm-1,#rm-ch,#rm-ping,#ab-ch,#li-on,#li-90,#li-100,#li-ch,#li-ping,#sp-ch,#sp-vor").forEach(el => el.addEventListener("input", markDirty));
     box.querySelectorAll("#sp-ping,#sp-av24").forEach(el => el.addEventListener("change", markDirty));
+    // Stintplaner-Teams: Liste mit Eingabefeldern, ✕ zum Entfernen
+    let spTeams = [...((cfg.stint || {}).teams || [])];
+    const spTeamsSync = () => { spTeams = [...document.querySelectorAll("#sp-teams input")].map(i => i.value); };
+    const spTeamsDraw = () => {
+      document.getElementById("sp-teams").innerHTML = spTeams.map((t, i) => `<div class="sp-inline" style="margin-bottom:6px"><input class="tm-input" maxlength="40" value="${esc(t)}" style="flex:1 1 200px;width:auto"><button type="button" class="tm-btn sm" data-tdel="${i}"><span>✕</span></button></div>`).join("") || '<p class="tm-muted">Keine Teams angelegt.</p>';
+      document.querySelectorAll("#sp-teams input").forEach(el => el.addEventListener("input", markDirty));
+      document.querySelectorAll("#sp-teams [data-tdel]").forEach(b => b.onclick = () => { spTeamsSync(); spTeams.splice(Number(b.dataset.tdel), 1); spTeamsDraw(); markDirty(); });
+    };
+    spTeamsDraw();
+    document.getElementById("sp-team-add").onclick = () => { spTeamsSync(); spTeams.push(""); spTeamsDraw(); markDirty(); const l = [...document.querySelectorAll("#sp-teams input")].pop(); if (l) l.focus(); };
     box.querySelectorAll("#g61-on,#g61-rec").forEach(el => el.addEventListener("change", markDirty));
 
     // ---- Links bearbeiten ----
@@ -1853,6 +1865,7 @@
           vorlauf: Number(document.getElementById("sp-vor").value) || 15,
           stintPing: document.getElementById("sp-ping").checked,
           avPing: document.getElementById("sp-av24").checked,
+          teams: (spTeamsSync(), spTeams.map(t => t.trim()).filter(Boolean)),
         },
         limits: {
           enabled: document.getElementById("li-on").checked,

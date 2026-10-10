@@ -53,7 +53,8 @@
     const d = new Date(); d.setDate(d.getDate() + 7); d.setHours(14, 0, 0, 0);
     return { name: "", trackId: 0, trackName: "", start: d.getTime(), mode: "zeit", dauerMin: 360, runden: 100, notiz: "", cars: [neuesAuto(0, d.getTime())] };
   }
-  function neuesAuto(i, start, pit) { return { key: keyNeu(), name: "Auto #" + (i + 1), carId: 0, carName: "", start, pit: { ...(pit || PIT_STD) }, drivers: [], stints: [] }; }
+  function freiesTeam(cars) { const t = (META && META.teams || []).find(n => !(cars || []).some(c => c.name === n)); return t || ""; }
+  function neuesAuto(i, start, pit, cars) { return { key: keyNeu(), name: freiesTeam(cars) || "Auto #" + (i + 1), carId: 0, carName: "", start, pit: { ...(pit || PIT_STD) }, drivers: [], stints: [] }; }
   // ältere Pläne: Startzeit und Boxenstopp-Werte lagen beim Rennen, jetzt pro Auto
   function normalisiere(p) {
     for (const c of p.cars) {
@@ -384,7 +385,7 @@
     const benutzt = (uid, car) => p.cars.find(c => c !== car && c.drivers.some(d => d.uid === uid));
     body.innerHTML = p.cars.map((c, ci) => `
       <div class="tm-box sp-car" data-car="${ci}">
-        <div class="sp-car-h"><input class="tm-input sp-carname" data-f="name" maxlength="40" value="${esc(c.name)}" aria-label="Name des Autos">
+        <div class="sp-car-h"><select class="tm-select sp-carname" data-f="name" aria-label="Team">${teamAuswahl(c, p.cars)}</select>
           ${p.cars.length > 1 ? C.btn("Auto entfernen", "sm", `data-rmcar="${ci}"`) : ""}</div>
         <div class="tm-row"><label>Fahrzeug<small>aus Garage 61</small></label>
           <div>${autoAuswahl(c)}</div></div>
@@ -422,7 +423,7 @@
 
     $$(".sp-car").forEach(box => {
       const c = p.cars[Number(box.dataset.car)];
-      box.querySelector("[data-f=name]").addEventListener("input", (e) => { c.name = e.target.value; dirty(); });
+      box.querySelector("[data-f=name]").addEventListener("change", (e) => { c.name = e.target.value; dirty(); tabAutos(body); });
       box.querySelector("[data-f=car]").addEventListener("change", (e) => {
         const id = Number(e.target.value) || 0;
         const t = (META.teamCars || []).find(x => x.id === id) || META.cars.find(x => x.id === id);
@@ -462,7 +463,7 @@
       gb.onclick = () => holeG61(c, gb, body);
     });
     const add = $("#sp-addcar");
-    if (add) add.onclick = () => { const v = p.cars[p.cars.length - 1]; p.cars.push(neuesAuto(p.cars.length, v ? v.start : p.start, v && v.pit)); dirty(); tabAutos(body); };
+    if (add) add.onclick = () => { const v = p.cars[p.cars.length - 1]; p.cars.push(neuesAuto(p.cars.length, v ? v.start : p.start, v && v.pit, p.cars)); dirty(); tabAutos(body); };
   }
   // Auswahl: oben die Teamfahrzeuge (aus Garage 61, letzte 90 Tage), darunter alle Fahrzeuge
   function autoAuswahl(c) {
@@ -474,6 +475,12 @@
       ${unbekannt ? `<option value="${c.carId}" selected>${esc(c.carName || "Fahrzeug #" + c.carId)}</option>` : ""}
       ${team.length ? `<optgroup label="Teamfahrzeuge (in den letzten 90 Tagen gefahren)">${team.map(opt).join("")}</optgroup>` : ""}
       ${rest.length ? `<optgroup label="Alle Fahrzeuge">${rest.map(opt).join("")}</optgroup>` : ""}</select>`;
+  }
+  // Team-Auswahl (Liste aus Admin → Stintplaner); bereits vergebene Teams sind ausgegraut
+  function teamAuswahl(c, cars) {
+    const teams = [...(META.teams || [])];
+    if (c.name && !teams.includes(c.name)) teams.unshift(c.name);
+    return teams.map(n => { const weg = n !== c.name && cars.some(x => x !== c && x.name === n); return `<option value="${esc(n)}" ${n === c.name ? "selected" : ""} ${weg ? "disabled" : ""}>${esc(n)}${weg ? " (schon vergeben)" : ""}</option>`; }).join("");
   }
   function stdKanal() { const k = (META.channels || []).find(c => c.id === META.channel); return k ? k.name : ""; }
   function kopfZeile() { const k = $(".sp-title small"); if (k) k.textContent = (S.plan.trackName || "Strecke offen") + " · " + tagUhr(S.plan.start); }
