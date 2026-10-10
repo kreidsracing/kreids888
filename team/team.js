@@ -288,12 +288,9 @@
         <div id="tp-woche-k"></div>
       </section>
 
-      <section class="tp-sec" id="tp-livery">
-        ${secHead("Livery Show", "Unsere Designs", "brush")}
-        <div class="tp-livery">${LIVERIES.length
-          ? LIVERIES.map(l => `<a class="tp-liv" href="${IMG}liveries/${l.datei}" target="_blank" rel="noopener"><img src="${IMG}liveries/${l.datei}" alt="${esc(l.titel)}" loading="lazy"><span>${esc(l.titel)}</span></a>`).join("")
-          : [1, 2, 3].map(() => `<div class="tp-liv empty">${ICONS.brush}<span>Livery folgt</span></div>`).join("")}
-        </div>
+      <section class="tp-sec" id="tp-event">
+        ${secHead("Nächstes Event", "Wir sind am <span class=\"r\">Start</span>", "flag")}
+        <div id="tp-event-box"><div class="tm-loading"><span></span><span></span><span></span></div></div>
       </section>
 
       <section class="tp-sec tp-recruit">
@@ -394,6 +391,42 @@
       document.getElementById("tp-woche-kw").textContent = "Training · KW " + d.kwVorher;
       sec.hidden = false;
     }).catch(() => {});
+
+    // nächstes Event aus dem Stintplaner
+    fetch(API + "/public/stint").then(r => r.json()).then(d => {
+      const el = document.getElementById("tp-event-box");
+      if (!el) return;
+      const e = d.event;
+      if (!e) { el.innerHTML = `<div class="tpe tpe-leer"><b>Aktuell ist kein Event geplant.</b><span>Schau bald wieder rein.</span></div>`; return; }
+      const pad = (n) => String(n).padStart(2, "0");
+      const tag = (iso) => { const [y, m, t] = iso.split("-"); return t + "." + m + "." + y; };
+      const wann = e.von ? (e.bis && e.bis !== e.von ? tag(e.von) + " bis " + tag(e.bis) : tag(e.von)) : new Date(e.start).toLocaleDateString("de-DE", { weekday: "long", day: "2-digit", month: "long", year: "numeric" });
+      const zeit = (ms) => { const x = new Date(ms); return pad(x.getHours()) + ":" + pad(x.getMinutes()); };
+      const laenge = e.mode === "runden" ? e.runden + " Runden" : (e.dauerMin % 60 ? Math.floor(e.dauerMin / 60) + " h " + (e.dauerMin % 60) + " min" : e.dauerMin / 60 + " Stunden");
+      const farbe = (n) => /black|schwarz/i.test(n) ? "#3a3f4b" : /white|wei/i.test(n) ? "#e9ecf1" : /silver|silber/i.test(n) ? "#a7afba" : "#e11324";
+      el.innerHTML = `<div class="tpe">
+        <div class="tpe-main">
+          <div class="tpe-k">${ICONS.flag}<span>${esc(e.track || "Strecke folgt")}</span></div>
+          <h4>${esc(e.name)}</h4>
+          <div class="tpe-facts"><span>${ICONS.calendar}${esc(wann)}</span><span>${ICONS.clock}${e.zeiten && e.zeiten.length ? "Startzeiten " + e.zeiten.join(", ") + " Uhr" : zeit(e.start) + " Uhr"}</span><span>${ICONS.flag}${laenge}</span></div>
+          <div class="tpe-cd" id="tpe-cd"></div>
+        </div>
+        <div class="tpe-cars">${(e.cars || []).map(c => `<div class="tpe-car" style="--t:${farbe(c.name)}">
+          <div class="tpe-car-h"><b>${esc(c.name)}</b><span>${esc(c.carName || "")}</span></div>
+          <div class="tpe-car-s">${ICONS.clock}${new Date(c.start).toLocaleString("de-DE", { weekday: "short", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })} Uhr</div>
+          <div class="tpe-drv">${c.drivers.map(n => `<span>${esc(n)}</span>`).join("") || "<em>Fahrer folgen</em>"}</div>
+        </div>`).join("") || '<div class="tpe-car"><em>Fahrzeuge folgen</em></div>'}</div>
+      </div>`;
+      const cd = document.getElementById("tpe-cd");
+      const tick = () => {
+        if (!document.body.contains(cd)) return clearInterval(ti);
+        const rest = e.start - Date.now();
+        if (rest <= 0) { cd.innerHTML = Date.now() < e.ende ? '<span class="tpe-live">● Läuft gerade</span>' : ""; return; }
+        const t = Math.floor(rest / 864e5), h = Math.floor(rest / 36e5) % 24, m = Math.floor(rest / 6e4) % 60, sek = Math.floor(rest / 1e3) % 60;
+        cd.innerHTML = [[t, "Tage"], [h, "Std"], [m, "Min"], [sek, "Sek"]].map(([v, l]) => `<div><b>${pad(v)}</b><small>${l}</small></div>`).join("");
+      };
+      const ti = setInterval(tick, 1000); tick();
+    }).catch(() => { const el = document.getElementById("tp-event-box"); if (el) el.innerHTML = ""; });
 
     // freigegebene Fahrerprofile statt Platzhalter
     fetch(API + "/public/raceteam").then(r => r.json()).then(d => {

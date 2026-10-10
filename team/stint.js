@@ -57,15 +57,12 @@
     return ["#e11324", "#7a0a14"];
   }
   function silhouette(name) {
-    const [f, s] = teamFarbe(name);
-    return `<svg class="sp-sil" viewBox="0 0 120 44" aria-hidden="true">
-      <path d="M5 31 L9 23 Q13 18 24 17 L44 15 Q53 7 67 7 L81 8 Q91 9 99 15 L111 18 Q117 20 117 27 L117 31 Q117 34 113 34 L104 34 A9 9 0 0 0 86 34 L36 34 A9 9 0 0 0 18 34 L8 34 Q5 34 5 31 Z" fill="${f}" stroke="${s}" stroke-width="1.2"/>
-      <path d="M49 15.5 Q57 10 67 10 L79 11 Q86 12 91 16 Z" fill="#0a0b0e" opacity=".75"/>
-      <path d="M10 26 L40 25" stroke="${s}" stroke-width="1" opacity=".6"/>
-      <circle cx="27" cy="34" r="7" fill="#111" stroke="#555" stroke-width="1.5"/><circle cx="27" cy="34" r="2.6" fill="#777"/>
-      <circle cx="95" cy="34" r="7" fill="#111" stroke="#555" stroke-width="1.5"/><circle cx="95" cy="34" r="2.6" fill="#777"/>
-    </svg>`;
+    const [f, d] = teamFarbe(name);
+    const kurz = String(name || "").split(/[-–·]/).pop().trim().split(" ").pop() || "F2F";
+    const hell = /white|weiss|silver|silber/.test(norm(name));
+    return `<div class="sp-emb${hell ? " hell" : ""}" style="--t1:${f};--t2:${d}" aria-hidden="true"><img src="/team/bilder/f2f-logo.webp" alt=""><span>${esc(kurz)}</span></div>`;
   }
+
 
   function g61Vorschlag(uid, name) {
     if (!META) return "";
@@ -481,9 +478,9 @@
             <div class="sp-zeiten">${ev.zeiten.map((z, i) => `<span class="sp-chipx">${z} Uhr<button type="button" data-zdel="${i}" title="Entfernen">✕</button></span>`).join("")}
               <input class="tm-input" type="time" id="ev-zneu">${C.btn("+ Startzeit", "sm", 'id="ev-zadd"')}</div></div>
         </div>
-        <div class="tm-box"><h5>Fahrzeuge (${aktiv.length})</h5>
+        <div class="tm-box" ${cars.length ? "" : "hidden"}><h5>Fahrzeuge (${aktiv.length})</h5>
           ${cars.map((c, i) => c._weg ? "" : `<div class="sp-ecar" data-i="${i}" style="--team:${teamFarbe(c.name)[0]}">
-            <div class="sp-ecar-h"><span style="width:70px">${silhouette(c.name)}</span><b>${esc(c.name || "Neues Fahrzeug")}</b>${C.btn("Fahrzeug löschen", "sm", `data-cdel="${i}"`)}</div>
+            <div class="sp-ecar-h"><span class="sp-ecar-emb">${silhouette(c.name)}</span><b>${esc(c.name || "Neues Fahrzeug")}</b>${C.btn("Fahrzeug löschen", "sm", `data-cdel="${i}"`)}</div>
             <div class="sp-ecar-grid">
               <label class="sp-f"><span>Team</span><select class="tm-select" data-e="team">${[...new Set([c.name, ...teams].filter(Boolean))].map(n => `<option value="${esc(n)}" ${n === c.name ? "selected" : ""} ${vergeben(n, c) ? "disabled" : ""}>${esc(n)}${vergeben(n, c) ? " (vergeben)" : ""}</option>`).join("")}</select></label>
               <label class="sp-f"><span>Fahrzeug</span>${autoAuswahl(c, 'data-e="car"')}</label>
@@ -494,7 +491,6 @@
               ${c.drivers.length < 8 ? `<select class="tm-select" data-addd="${i}"><option value="">+ Fahrer eintragen …</option>${META.members.filter(mm => !c.drivers.some(d => d.uid === mm.id)).map(mm => `<option value="${mm.id}">${esc(mm.name)}</option>`).join("")}</select>` : ""}
             </div>
           </div>`).join("") || '<p class="tm-muted">Noch kein Fahrzeug.</p>'}
-          <div class="tm-actions" style="margin-top:12px">${aktiv.length < 4 ? C.btn("+ Fahrzeug hinzufügen", "sm", 'id="ev-cadd"') : '<span class="tm-muted">Maximal 4 Fahrzeuge.</span>'}</div>
         </div>
         <div class="tm-actions">${C.btn(p ? "Alles speichern" : "Event anlegen", "red", 'id="ev-save2"')}${p && S.canDelete ? C.btn("Event löschen", "sm", 'id="ev-del"') : ""}</div>`;
       $$("#ev-mode [data-m]").forEach(b => b.onclick = () => { sync(); ev.mode = b.dataset.m; zeichne(); });
@@ -1172,5 +1168,16 @@
     }, 30000);
   }
 
+  // Licht folgt der Maus auf Karten im Dashboard (nur Optik)
+  if (!window.__f2fSpot) {
+    window.__f2fSpot = true;
+    document.addEventListener("pointermove", (e) => {
+      const k = e.target.closest && e.target.closest(".td .tm-box, .td .tp-widget, .td .td-q, .td .lk-card, .td .tn-card, .td .sp-card, .td .sp-vcard");
+      if (!k) return;
+      const r = k.getBoundingClientRect();
+      k.style.setProperty("--mx", (e.clientX - r.left) + "px");
+      k.style.setProperty("--my", (e.clientY - r.top) + "px");
+    }, { passive: true });
+  }
   window.F2FStint = { mount };
 })();
