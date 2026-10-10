@@ -59,7 +59,7 @@ body{background:var(--carbon)}
 <main class="sb">
   <div class="sb-top">
     <h1>Social-<span class="r">Bild</span></h1>
-    <small>Bild für Instagram &amp; TikTok – alles bleibt in deinem Browser, nichts wird hochgeladen.</small>
+    <small>Bild oder Video für Instagram &amp; TikTok – alles bleibt in deinem Browser, nichts wird hochgeladen.</small>
   </div>
   <div class="sb-grid">
     <div>
@@ -78,9 +78,14 @@ body{background:var(--carbon)}
         <div class="sb-row">
           <label class="sb-file">Bild vom PC wählen<input type="file" id="file" accept="image/*"></label>
           <button type="button" class="sb-mini" id="useCover" hidden>Cover der News nehmen</button>
+          <label class="sb-file">Video vom PC wählen<input type="file" id="vfile" accept="video/*"></label>
           <button type="button" class="sb-mini" id="noImg">ohne Bild</button>
         </div>
-        <p class="sb-hint" id="imgHint">Bild in der Vorschau mit der Maus verschieben.</p>
+        <div id="vidBox" hidden style="margin-top:10px">
+          <label class="sb-chk"><input type="checkbox" id="vidTon"> Ton in der Vorschau</label>
+          <span class="sb-hint" id="vidInfo"></span>
+        </div>
+        <p class="sb-hint" id="imgHint">Bild in der Vorschau mit der Maus verschieben. Videos: max. 30 Sekunden, mit Ton – passende Designs heißen „Video …“.</p>
         <label>Zoom</label>
         <input type="range" id="zoom" min="1" max="3" step="0.01" value="1">
       </div>
@@ -139,6 +144,7 @@ body{background:var(--carbon)}
       <canvas id="cv" width="1080" height="1350" aria-label="Vorschau des Social-Bilds"></canvas>
       <div class="sb-go">
         <button type="button" class="sb-btn" id="dl"><span>Bild herunterladen</span></button>
+        <button type="button" class="sb-btn" id="vdl" hidden><span>Video herunterladen</span></button>
         <button type="button" class="sb-btn ghost" id="share" hidden><span>Teilen</span></button>
       </div>
       <p class="sb-hint" id="dlMsg"></p>
@@ -158,6 +164,7 @@ body{background:var(--carbon)}
 
   /* ---------- Zeichen-Hilfen für die Overlays ---------- */
   var ICON = {"youtube": "M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12z", "tiktok": "M12.525.02c1.31-.02 2.61-.01 3.91-.02.08 1.53.63 3.09 1.75 4.17 1.12 1.11 2.7 1.62 4.24 1.79v4.03c-1.44-.05-2.89-.35-4.2-.97-.57-.26-1.1-.59-1.62-.93-.01 2.92.01 5.84-.02 8.75-.08 1.4-.54 2.79-1.35 3.94-1.31 1.92-3.58 3.17-5.91 3.21-1.43.08-2.86-.31-4.08-1.03-2.02-1.19-3.44-3.37-3.65-5.71-.02-.5-.03-1-.01-1.49.18-1.9 1.12-3.72 2.58-4.96 1.66-1.44 3.98-2.13 6.15-1.72.02 1.48-.04 2.96-.04 4.44-.99-.32-2.15-.23-3.02.37-.63.41-1.11 1.04-1.36 1.75-.21.51-.15 1.07-.14 1.61.24 1.64 1.82 3.02 3.5 2.87 1.12-.01 2.19-.66 2.77-1.61.19-.33.4-.67.41-1.06.1-1.79.06-3.57.07-5.36.01-4.03-.01-8.05.02-12.07z", "instagram": "M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zM12 0C8.741 0 8.333.014 7.053.072 2.695.272.273 2.69.073 7.052.014 8.333 0 8.741 0 12c0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98C8.333 23.986 8.741 24 12 24c3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98C15.668.014 15.259 0 12 0zm0 5.838a6.162 6.162 0 100 12.324 6.162 6.162 0 000-12.324zM12 16a4 4 0 110-8 4 4 0 010 8zm6.406-11.845a1.44 1.44 0 100 2.881 1.44 1.44 0 000-2.881z", "discord": "M20 5.5A17.6 17.6 0 0 0 15.6 4l-.3.6a13 13 0 0 1 3.7 1.4 15.6 15.6 0 0 0-13.9 0A13 13 0 0 1 8.8 4.6L8.5 4A17.6 17.6 0 0 0 4.1 5.5C1.7 9 1 12.4 1.3 15.7A17.7 17.7 0 0 0 6.7 18.4l.9-1.3a11.4 11.4 0 0 1-1.8-.9l.4-.3a12.7 12.7 0 0 0 11.6 0l.4.3a11.4 11.4 0 0 1-1.8.9l.9 1.3a17.6 17.6 0 0 0 5.4-2.7c.4-3.8-.6-7.1-2.7-10.2zM8.9 14c-.9 0-1.6-.8-1.6-1.8S8 10.4 8.9 10.4s1.7.8 1.6 1.8-.7 1.8-1.6 1.8zm6.2 0c-.9 0-1.6-.8-1.6-1.8s.7-1.8 1.6-1.8 1.7.8 1.6 1.8-.7 1.8-1.6 1.8z"};
+  var QRC = {};
   var SOZ = { youtube: { name: "YOUTUBE", handle: "@Kreids888", farbe: "#ff0033" }, tiktok: { name: "TIKTOK", handle: "@kreids_", farbe: "#25f4ee" }, instagram: { name: "INSTAGRAM", handle: "kreids888", farbe: "#e1306c" }, discord: { name: "DISCORD", handle: "discord.gg/T3XsTd9Bx6", farbe: "#5865f2" } };
   var h = {
     ROT: ROT,
@@ -256,7 +263,34 @@ body{background:var(--carbon)}
       });
     },
     qrMatrix: function(text){
-      try { var q = qrcode(0, "M"); q.addData(text); q.make(); return q; } catch (e) { return null; }
+      if (QRC.hasOwnProperty(text)) return QRC[text];
+      var q = null;
+      try { q = qrcode(0, "M"); q.addData(text); q.make(); } catch (e) { q = null; }
+      return (QRC[text] = q);
+    },
+    linie: function(c, x, y, w, th){
+      var g = c.createLinearGradient(x, 0, x + w, 0);
+      g.addColorStop(0, ROT); g.addColorStop(1, "#ff7a1a");
+      c.fillStyle = g; c.fillRect(x, y, w, th);
+    },
+    fenster: function(c, d, x, y, w, hh){
+      c.fillStyle = "#000"; c.fillRect(x, y, w, hh);
+      h.bild(c, d, x, y, w, hh);
+      if (!h.hatMedium(d)) {
+        var r = Math.min(w, hh) * 0.09, mx = x + w / 2, my = y + hh / 2;
+        c.save(); c.fillStyle = "rgba(255,255,255,.12)"; c.beginPath(); c.arc(mx, my, r * 1.6, 0, Math.PI * 2); c.fill();
+        c.fillStyle = "rgba(255,255,255,.7)"; c.beginPath(); c.moveTo(mx - r * 0.5, my - r * 0.8); c.lineTo(mx + r * 0.9, my); c.lineTo(mx - r * 0.5, my + r * 0.8); c.closePath(); c.fill(); c.restore();
+      }
+      c.strokeStyle = "rgba(255,255,255,.14)"; c.lineWidth = 2; c.strokeRect(x + 1, y + 1, w - 2, hh - 2);
+    },
+    hatMedium: function(d){ return !!(d.img && (d.img.videoWidth || d.img.naturalWidth)); },
+    wortGroesse: function(c, s, maxW, start, w, fam){
+      var woerter = String(s || "").split(/\s+/).filter(Boolean), size = start;
+      for (; size > 20; size -= 2) {
+        c.font = h.f(w, size, fam);
+        if (woerter.every(function(x){ return c.measureText(x).width <= maxW; })) break;
+      }
+      return size;
     },
     qr: function(c, d, x, y, size){ h._qr = { x: x, y: y }; return true; },
     qrZeichnen: function(c, text, x, y, size){
@@ -299,8 +333,8 @@ body{background:var(--carbon)}
     },
     bild: function(c, d, x, y, w, hh){
       c.save(); c.beginPath(); c.rect(x, y, w, hh); c.clip();
-      if (d.img) {
-        var iw = d.img.naturalWidth, ih = d.img.naturalHeight;
+      if (h.hatMedium(d)) {
+        var iw = d.img.videoWidth || d.img.naturalWidth, ih = d.img.videoHeight || d.img.naturalHeight;
         var s = Math.max(w / iw, hh / ih) * d.view.zoom, dw = iw * s, dh = ih * s;
         var mx = (dw - w) / 2, my = (dh - hh) / 2;
         d.view.ox = Math.max(-mx, Math.min(mx, d.view.ox)); d.view.oy = Math.max(-my, Math.min(my, d.view.oy));
@@ -369,7 +403,122 @@ body{background:var(--carbon)}
   ["qrSize", "sozSize"].forEach(function(id){ $(id).addEventListener("input", render); $(id).addEventListener("change", renderThumbs); });
   ["kicker", "title", "text", "footer", "platz", "strecke", "wann", "qr"].forEach(function(id){ $(id).addEventListener("input", alles); });
   // Hintergrund
-  function setzeBild(img){ S.img = img; S.view = { zoom: 1, ox: 0, oy: 0 }; $("zoom").value = 1; alles(); }
+  function setzeBild(img){ if (S.vid && img !== S.vid) videoStop(); S.img = img; S.view = { zoom: 1, ox: 0, oy: 0 }; $("zoom").value = 1; alles(); }
+
+  /* ---------- Video als Hintergrund ---------- */
+  var MAXS = 30, ac = null, quelle = null, vorschau = null, recZiel = null, schleife = null, aufnahme = null, kannTeilen = false;
+  S.vid = null;
+  function meldung(t, fehler){ $("dlMsg").textContent = t; $("dlMsg").className = "sb-hint" + (fehler ? " sb-err" : ""); }
+  function modus(){
+    var v = !!S.vid;
+    $("vidBox").hidden = !v; $("vdl").hidden = !v; $("dl").hidden = v; $("share").hidden = v || !kannTeilen;
+  }
+  function videoStop(){
+    if (!S.vid) return;
+    var v = S.vid; S.vid = null;
+    try { v.pause(); } catch (e) {}
+    if (quelle) { try { quelle.disconnect(); } catch (e) {} quelle = null; }
+    URL.revokeObjectURL(v.src); v.removeAttribute("src"); try { v.load(); } catch (e) {}
+    cancelAnimationFrame(schleife); schleife = null;
+    if (S.img === v) S.img = null;
+    $("vidInfo").textContent = "";
+    modus();
+  }
+  function tonVerbinden(v){
+    try {
+      ac = ac || new (window.AudioContext || window.webkitAudioContext)();
+      if (!recZiel) { recZiel = ac.createMediaStreamDestination(); vorschau = ac.createGain(); vorschau.connect(ac.destination); }
+      quelle = ac.createMediaElementSource(v);
+      quelle.connect(recZiel); quelle.connect(vorschau);
+      vorschau.gain.value = $("vidTon").checked ? 1 : 0;
+      v.muted = false;
+      if (ac.state === "suspended") ac.resume();
+    } catch (e) { quelle = null; v.muted = true; }
+  }
+  function starteSchleife(){
+    cancelAnimationFrame(schleife);
+    (function bild(){
+      if (!S.vid) return;
+      var v = S.vid;
+      if (aufnahme) {
+        var t = v.currentTime;
+        if (aufnahme.laeuft && (t >= aufnahme.dauer || v.ended)) aufnahmeStop();
+        else if (aufnahme.laeuft) meldung("Aufnahme läuft … " + Math.floor(t) + " / " + Math.round(aufnahme.dauer) + " s – Tab bitte offen lassen.");
+      } else if (v.currentTime >= MAXS) { v.currentTime = 0; }
+      render();
+      schleife = requestAnimationFrame(bild);
+    })();
+  }
+  $("vfile").onchange = function(){
+    var f = this.files && this.files[0]; this.value = ""; if (!f) return;
+    if (aufnahme) return;
+    videoStop();
+    var v = document.createElement("video");
+    v.playsInline = true; v.loop = true; v.preload = "auto"; v.muted = true;
+    v.onloadeddata = function(){
+      v.onloadeddata = null;
+      S.vid = v; tonVerbinden(v); setzeBild(v);
+      document.querySelectorAll("#gal button").forEach(function(x){ x.classList.remove("on"); });
+      var dauer = v.duration || 0;
+      $("vidInfo").textContent = dauer > MAXS + 0.5 ? "Video ist " + Math.round(dauer) + " s lang – es werden die ersten 30 s genommen." : (dauer ? "Länge: " + Math.round(dauer) + " s" : "");
+      $("imgHint").className = "sb-hint";
+      v.play().catch(function(){});
+      modus(); starteSchleife(); meldung("");
+    };
+    v.onerror = function(){ $("imgHint").textContent = "Dieses Video kann der Browser nicht abspielen. Am besten MP4 (H.264) nehmen."; $("imgHint").className = "sb-hint sb-err"; };
+    v.src = URL.createObjectURL(f);
+  };
+  $("vidTon").onchange = function(){
+    if (vorschau) vorschau.gain.value = this.checked ? 1 : 0;
+    if (ac && ac.state === "suspended") ac.resume();
+  };
+  function vidTyp(){
+    var l = ["video/mp4;codecs=avc1.640028,mp4a.40.2", "video/mp4;codecs=avc1.4D401F,mp4a.40.2", "video/mp4;codecs=avc1.42E01E,mp4a.40.2", "video/mp4;codecs=avc1,mp4a", "video/mp4", "video/webm;codecs=vp9,opus", "video/webm;codecs=vp8,opus", "video/webm"];
+    for (var i = 0; i < l.length; i++) if (window.MediaRecorder && MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(l[i])) return l[i];
+    return "";
+  }
+  function aufnahmeStop(){
+    if (!aufnahme) return;
+    aufnahme.laeuft = false;
+    try { S.vid && S.vid.pause(); } catch (e) {}
+    if (aufnahme.rec.state !== "inactive") aufnahme.rec.stop();
+  }
+  $("vdl").onclick = function(){
+    if (aufnahme || !S.vid) return;
+    if (!window.MediaRecorder || !cv.captureStream) { meldung("Video-Aufnahme klappt in diesem Browser nicht. Bitte Chrome oder Edge nehmen.", true); return; }
+    var v = S.vid, typ = vidTyp(), dauer = Math.min(v.duration || MAXS, MAXS);
+    if (ac && ac.state === "suspended") ac.resume();
+    var stream = cv.captureStream(30);
+    if (recZiel && quelle) recZiel.stream.getAudioTracks().forEach(function(t){ stream.addTrack(t); });
+    var rec, opt = { videoBitsPerSecond: 8000000, audioBitsPerSecond: 192000 };
+    if (typ) opt.mimeType = typ;
+    try { rec = new MediaRecorder(stream, opt); } catch (e) { meldung("Video-Aufnahme konnte nicht starten: " + e.message, true); return; }
+    var teile = [];
+    rec.ondataavailable = function(e){ if (e.data && e.data.size) teile.push(e.data); };
+    rec.onstop = function(){
+      stream.getVideoTracks().forEach(function(t){ t.stop(); });
+      var mt = (rec.mimeType || typ || "video/webm").split(";")[0], ext = /mp4/.test(mt) ? "mp4" : "webm";
+      var b = new Blob(teile, { type: mt });
+      var a = document.createElement("a"); a.href = URL.createObjectURL(b); a.download = dateiname().replace(/\.jpg$/, "." + ext);
+      document.body.appendChild(a); a.click(); a.remove();
+      meldung("Gespeichert: " + a.download + (ext === "webm" ? " – WebM: Instagram nimmt das evtl. nicht direkt, dann bitte vorher in MP4 umwandeln." : ""));
+      aufnahme = null; $("vdl").querySelector("span").textContent = "Video herunterladen";
+      if (S.vid) { S.vid.loop = true; S.vid.currentTime = 0; S.vid.play().catch(function(){}); }
+    };
+    aufnahme = { rec: rec, dauer: dauer, laeuft: false };
+    $("vdl").querySelector("span").textContent = "Aufnahme läuft …";
+    meldung("Aufnahme startet …");
+    v.pause(); v.loop = false;
+    var gestartet = false;
+    function los(){
+      if (gestartet || !aufnahme) return; gestartet = true;
+      rec.start(250); aufnahme.laeuft = true;
+      v.play().catch(function(e){ meldung("Video ließ sich nicht abspielen: " + e.message, true); aufnahmeStop(); });
+    }
+    v.addEventListener("seeked", los, { once: true });
+    setTimeout(los, 800);
+    v.currentTime = 0;
+  };
   $("file").onchange = function(){
     var f = this.files && this.files[0]; if (!f) return;
     var img = new Image(); img.onload = function(){ setzeBild(img); $("imgHint").textContent = "Bild in der Vorschau mit der Maus verschieben."; $("imgHint").className = "sb-hint"; };
@@ -420,7 +569,7 @@ body{background:var(--carbon)}
     });
   };
   if (navigator.canShare && navigator.canShare({ files: [new File([""], "x.jpg", { type: "image/jpeg" })] })) {
-    $("share").hidden = false;
+    kannTeilen = true; $("share").hidden = false;
     $("share").onclick = function(){
       render();
       alsBlob(function(b){ if (b) navigator.share({ files: [new File([b], dateiname(), { type: "image/jpeg" })] }).catch(function(){}); });
