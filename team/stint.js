@@ -248,6 +248,14 @@
         <div class="sp-card-h"><b>${esc(p.name)}</b>${status}${ich ? '<span class="tm-badge">Du fährst</span>' : ""}</div>
         <div class="sp-card-m">${esc(p.track || "Strecke offen")}</div>
         <div class="sp-card-f"><span>${C.ICONS.calendar}${tagUhr(p.start)}</span><span>${C.ICONS.clock}${laenge}</span><span>${C.ICONS.car}${p.cars.length} ${p.cars.length === 1 ? "Auto" : "Autos"}</span></div>
+        ${p.cars.map(c => `<div class="sp-card-car">
+          <div class="sp-card-carh"><b>${esc(c.name)}</b>${c.carName ? `<span>${esc(c.carName)}</span>` : ""}${c.start && p.cars.length > 1 ? `<small>${tagUhr(c.start)}</small>` : ""}</div>
+          ${c.drivers.length ? `<div class="sp-card-drv">${c.drivers.map(u => {
+            const ok = p.av ? p.av[u] : null;
+            return `<span class="${u === meinId ? "ich" : ""}">${ok === true ? '<i class="ok" title="Verfügbarkeit eingetragen">✓</i>' : ok === false ? '<i class="fehlt" title="Verfügbarkeit fehlt noch">!</i>' : ""}${esc(memberName(u))}</span>`;
+          }).join("")}</div>` : '<div class="sp-card-drv"><em>Noch keine Fahrer</em></div>'}
+        </div>`).join("")}
+        ${p.av && Object.values(p.av).some(v => !v) ? `<div class="sp-card-hint">Verfügbarkeit fehlt noch: ${Object.entries(p.av).filter(([, v]) => !v).map(([u]) => esc(memberName(u))).join(", ")}</div>` : ""}
       </a>`;
     };
     const kommend = d.list.filter(p => p.start + (p.mode === "zeit" ? p.dauerMin * 60000 : 0) + 3600000 > now);
@@ -384,7 +392,7 @@
         <div class="sp-car-h"><input class="tm-input sp-carname" data-f="name" maxlength="40" value="${esc(c.name)}" aria-label="Name des Autos">
           ${p.cars.length > 1 ? C.btn("Auto entfernen", "sm", `data-rmcar="${ci}"`) : ""}</div>
         <div class="tm-row"><label>Fahrzeug<small>aus Garage 61</small></label>
-          <div><input class="tm-input" data-f="car" list="sp-cars" placeholder="Fahrzeug suchen …" value="${esc(c.carName)}"></div></div>
+          <div>${autoAuswahl(c)}</div></div>
         <div class="tm-row"><div class="lbl">Start<small>deine Ortszeit</small></div>
           <div class="sp-inline"><label class="sp-f sp-dt"><span>Datum</span><input class="tm-input" type="date" data-f="datum" value="${datumWert(c.start)}"></label>
           <label class="sp-f sp-dt"><span>Uhrzeit</span><input class="tm-input" type="time" data-f="zeit" value="${zeitWert(c.start)}"></label></div></div>
@@ -414,7 +422,6 @@
         </div>
         <div class="sp-g61info" id="sp-g61-${ci}">${g61Info(c)}</div>
       </div>`).join("") + `
-      <datalist id="sp-cars">${META.cars.map(x => `<option value="${esc(x.name)}">`).join("")}</datalist>
       <div class="tm-actions">${p.cars.length < 4 ? C.btn("+ Auto hinzufügen", "", 'id="sp-addcar"') : '<span class="tm-muted">Maximal 4 Autos pro Rennen.</span>'}</div>
       <p class="tm-muted" style="margin-top:14px">Neu zugeteilte Fahrer bekommen beim Speichern eine Nachricht in Discord mit der Bitte, ihre Verfügbarkeit einzutragen.</p>`;
 
@@ -422,9 +429,9 @@
       const c = p.cars[Number(box.dataset.car)];
       box.querySelector("[data-f=name]").addEventListener("input", (e) => { c.name = e.target.value; dirty(); });
       box.querySelector("[data-f=car]").addEventListener("change", (e) => {
-        const v = e.target.value.trim();
-        const t = META.cars.find(x => x.name === v) || META.cars.find(x => norm(x.name) === norm(v));
-        c.carName = t ? t.name : v; c.carId = t ? t.id : 0; dirty();
+        const id = Number(e.target.value) || 0;
+        const t = (META.teamCars || []).find(x => x.id === id) || META.cars.find(x => x.id === id);
+        c.carId = t ? t.id : 0; c.carName = t ? t.name : ""; dirty();
       });
       const startSet = () => {
         const t = fromLocalInput(box.querySelector("[data-f=datum]").value + "T" + (box.querySelector("[data-f=zeit]").value || "00:00"));
@@ -461,6 +468,17 @@
     });
     const add = $("#sp-addcar");
     if (add) add.onclick = () => { const v = p.cars[p.cars.length - 1]; p.cars.push(neuesAuto(p.cars.length, v ? v.start : p.start, v && v.pit)); dirty(); tabAutos(body); };
+  }
+  // Auswahl: oben die Teamfahrzeuge (aus Garage 61, letzte 90 Tage), darunter alle Fahrzeuge
+  function autoAuswahl(c) {
+    const team = META.teamCars || [];
+    const opt = (x) => `<option value="${x.id}" ${x.id === c.carId ? "selected" : ""}>${esc(x.name)}</option>`;
+    const rest = META.cars.filter(x => !team.some(t => t.id === x.id));
+    const unbekannt = c.carId && !team.some(t => t.id === c.carId) && !META.cars.some(x => x.id === c.carId);
+    return `<select class="tm-select" data-f="car"><option value="">Fahrzeug wählen …</option>
+      ${unbekannt ? `<option value="${c.carId}" selected>${esc(c.carName || "Fahrzeug #" + c.carId)}</option>` : ""}
+      ${team.length ? `<optgroup label="Teamfahrzeuge (in den letzten 90 Tagen gefahren)">${team.map(opt).join("")}</optgroup>` : ""}
+      ${rest.length ? `<optgroup label="Alle Fahrzeuge">${rest.map(opt).join("")}</optgroup>` : ""}</select>`;
   }
   function kopfZeile() { const k = $(".sp-title small"); if (k) k.textContent = (S.plan.trackName || "Strecke offen") + " · " + tagUhr(S.plan.start); }
   function g61Info(c) {

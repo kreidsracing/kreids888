@@ -1005,3 +1005,16 @@ button.wk-col:focus-visible{outline:2px solid var(--red);outline-offset:2px}
 .sp-av-h b{font-family:var(--disp);font-weight:900;font-size:18px;text-transform:uppercase}
 .sp-av-h span{color:#d5d9e0;font-size:14px}
 .sp-av-h small{color:var(--steel);font-size:13px;width:100%}
+.sp-card-car{margin-top:12px;padding-top:10px;border-top:1px solid var(--line)}
+.sp-card-carh{display:flex;flex-wrap:wrap;align-items:baseline;gap:2px 10px}
+.sp-card-carh b{font-family:var(--disp);font-weight:800;font-size:15px;letter-spacing:.06em;text-transform:uppercase}
+.sp-card-carh span{color:#d5d9e0;font-size:13px}
+.sp-card-carh small{color:var(--steel);font-size:12px;margin-left:auto}
+.sp-card-drv{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.sp-card-drv span{display:inline-flex;align-items:center;gap:6px;font-size:13px;padding:3px 9px;background:var(--panel2);border:1px solid var(--line)}
+.sp-card-drv span.ich{border-color:var(--red)}
+.sp-card-drv em{font-style:normal;color:var(--steel);font-size:13px}
+.sp-card-drv i{font-style:normal;font-weight:800;width:16px;height:16px;display:grid;place-items:center;font-size:11px;border-radius:50%}
+.sp-card-drv i.ok{background:#2ecc71;color:#0a0a0a}
+.sp-card-drv i.fehlt{background:#ffb020;color:#0a0a0a}
+.sp-card-hint{margin-top:10px;font-size:12.5px;color:#ffb020}
