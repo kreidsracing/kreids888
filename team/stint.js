@@ -218,36 +218,63 @@
     if (e === null) { const r = rechne(car, null).rows; e = r.length ? r[r.length - 1].bis : s + 3 * 3600000; }
     return { von: s, bis: Math.max(e, s + 1800000) };
   }
-  function slotLen(car) { const f = fenster(car); return f.bis - f.von > 8 * 3600000 ? 3600000 : 1800000; }
-  function slotZeiten(car) {
-    const f = fenster(car), L = slotLen(car);
+  // Verfügbarkeit wird in 15-Minuten-Stücken gespeichert (Schlüssel = Startzeit). Angezeigt wird pro Stint.
+  // Ein Stück gehört zu dem Zeitraum, in dem seine Mitte liegt, so zählt jedes Stück genau einmal.
+  const Q = 15 * 60000;
+  function viertel(von, bis) {
     const out = [];
-    let t = Math.floor(f.von / L) * L;
-    while (t < f.bis && out.length < 120) { out.push(t); t += L; }
+    let t = Math.floor(von / Q) * Q;
+    while (t < bis && out.length < 800) { if (t + Q / 2 >= von && t + Q / 2 < bis) out.push(t); t += Q; }
     return out;
   }
+  // gespeicherte Stücke eines Fahrers; ältere Einträge (30/60-Min.-Raster) werden in 15-Min.-Stücke umgerechnet
+  function slotsVon(uid) {
+    const a = S.av[uid];
+    if (!a || !a.slots) return null;
+    if (a.v === 2) return a.slots;
+    if (!a._q) {
+      const keys = Object.keys(a.slots).map(Number).sort((x, y) => x - y);
+      let L = 1800000;
+      for (let i = 1; i < keys.length; i++) { const d = keys[i] - keys[i - 1]; if (d > 0 && d < L) L = d; }
+      const q = {};
+      for (const k of keys) for (let t = k; t < k + Math.min(L, 3600000); t += Q) q[t] = a.slots[k];
+      a._q = q;
+    }
+    return a._q;
+  }
   // schlechteste Verfügbarkeit im Zeitraum: 2 ja, 1 vielleicht, 0 nein, -1 nichts eingetragen
-  function verfuegbar(uid, von, bis, car) {
-    const a = S.av[uid] && S.av[uid].slots;
+  function verfuegbar(uid, von, bis) {
+    const a = slotsVon(uid);
     if (!a) return -1;
     let schlecht = 3, offen = false;
-    const L = slotLen(car);
-    for (const t of slotZeiten(car)) {
-      if (t + L <= von || t >= bis) continue;
-      const v = a[t];
-      if (v === undefined) offen = true; else schlecht = Math.min(schlecht, v);
-    }
+    for (const t of viertel(von, bis)) { const v = a[t]; if (v === undefined) offen = true; else schlecht = Math.min(schlecht, v); }
     if (schlecht === 0) return 0;
     if (offen) return schlecht === 3 ? -1 : 1;
     return schlecht === 3 ? -1 : schlecht;
   }
   // Fahrer-Status im Zeitraum des Autos: ja / evtl / nein / fehlt
   function fahrerAv(uid, car) {
-    const a = S.av[uid] && S.av[uid].slots;
+    const a = slotsVon(uid);
     if (!a) return "fehlt";
+    const f = fenster(car);
     let best = -1;
-    for (const t of slotZeiten(car)) { const v = a[t]; if (v !== undefined) best = Math.max(best, v); }
+    for (const t of viertel(f.von, f.bis)) { const v = a[t]; if (v !== undefined) best = Math.max(best, v); }
     return best === 2 ? "ja" : best === 1 ? "evtl" : best === 0 ? "nein" : "fehlt";
+  }
+  // Spalten des Verfügbarkeits-Rasters: die geplanten Stints; solange Pace/Sprit fehlen, ganze Stunden
+  function spalten(c) {
+    const r = rechne(c, null);
+    if (!r.fehler.length && r.rows.length) return { stints: true, cols: r.rows.map(x => ({ von: x.von, bis: x.bis, kopf: "Stint " + (x.i + 1), zeit: uhr(x.von) + "–" + uhr(x.bis), d: x.uid })) };
+    const f = fenster(c), cols = [];
+    let t = Math.floor(f.von / 3600000) * 3600000;
+    while (t < f.bis && cols.length < 72) { cols.push({ von: t, bis: t + 3600000, kopf: uhr(t), zeit: "", d: "" }); t += 3600000; }
+    return { stints: false, cols };
+  }
+  // zusammengefasster Wert einer Spalte: 2/1/0, undefined = leer, "mix" = gemischt
+  function spaltenWert(a, col) {
+    const ws = viertel(col.von, col.bis).map(t => a ? a[t] : undefined);
+    if (!ws.length || ws.every(v => v === undefined)) return undefined;
+    return ws.every(v => v === ws[0]) ? ws[0] : "mix";
   }
   const AVTXT = { ja: "Verfügbar", evtl: "Vielleicht", nein: "Nicht verfügbar", fehlt: "Verfügbarkeit fehlt" };
   // Status + Liste, was fehlt und bei wem
@@ -262,7 +289,7 @@
     if (ohneWerte.length) was.push("Pace/Sprit fehlt: " + ohneWerte.join(", "));
     if (was.length) return ["fehlt", "Angaben fehlen", was];
     const konflikte = r.rows.filter(x => !x.real && x.uid && verfuegbar(x.uid, x.von, x.bis, c) !== 2)
-      .map(x => { const v = verfuegbar(x.uid, x.von, x.bis, c); return "Stint " + (x.i + 1) + " (" + uhr(x.von) + "): " + memberName(x.uid) + " " + (v === 0 ? "nicht verfügbar" : v === 1 ? "nur vielleicht" : "teils nichts eingetragen"); });
+      .map(x => { const v = verfuegbar(x.uid, x.von, x.bis, c); return "Stint " + (x.i + 1) + " (" + uhr(x.von) + "): " + memberName(x.uid) + " " + (v === 0 ? "nicht verfügbar" : v === 1 ? "nur vielleicht oder teils offen" : "nichts eingetragen"); });
     return konflikte.length ? ["arbeit", "In Arbeit", konflikte] : ["ok", "Plan vollständig", []];
   }
   const statusListe = (st) => st[2] && st[2].length ? `<ul class="sp-was">${st[2].slice(0, 6).map(x => `<li>${esc(x)}</li>`).join("")}${st[2].length > 6 ? `<li>… und ${st[2].length - 6} weitere</li>` : ""}</ul>` : "";
@@ -672,39 +699,42 @@
   function stepVerf(body) {
     const c = S.draft;
     const ich = c.drivers.some(d => d.uid === S.me);
-    const meine = { ...((S.av[S.me] && S.av[S.me].slots) || {}) };
-    const zeiten = slotZeiten(c), L = slotLen(c);
+    const meine = { ...(slotsVon(S.me) || {}) };
+    const { stints, cols } = spalten(c);
     const uids = c.drivers.map(d => d.uid);
     if (ich) { uids.splice(uids.indexOf(S.me), 1); uids.unshift(S.me); }
-    const kopf = zeiten.map((t, i) => { const d = new Date(t); const neuerTag = i === 0 || new Date(zeiten[i - 1]).getDate() !== d.getDate(); return `<th class="${neuerTag ? "tag" : ""}">${neuerTag ? `<em>${d.toLocaleDateString("de-DE", { weekday: "short", day: "2-digit", month: "2-digit" })}</em>` : ""}${uhr(t)}</th>`; }).join("");
+    const kopf = cols.map((col, i) => { const d = new Date(col.von); const neuerTag = i === 0 || new Date(cols[i - 1].von).getDate() !== d.getDate(); return `<th class="${neuerTag ? "tag" : ""}">${neuerTag ? `<em>${d.toLocaleDateString("de-DE", { weekday: "short", day: "2-digit", month: "2-digit" })}</em>` : ""}<b>${esc(col.kopf)}</b>${col.zeit ? `<small>${col.zeit}</small>` : ""}${col.d ? `<small class="sp-av-plan">${esc(memberName(col.d))}</small>` : ""}</th>`; }).join("");
+    const titel = (col, v) => `${col.kopf}${col.zeit ? " " + col.zeit : ""}: ${v === undefined ? "nichts eingetragen" : v === "mix" ? "teilweise eingetragen" : VTXT[v]}`;
+    const zelle = (v) => "sp-slot " + (v === undefined ? "" : v === "mix" ? "mix" : VCOL[v]);
     const zeile = (uid) => {
       const mein = uid === S.me;
-      const a = mein ? meine : ((S.av[uid] && S.av[uid].slots) || {});
+      const a = mein ? meine : slotsVon(uid);
       const st = fahrerAv(uid, c);
       return `<tr class="${mein ? "ich" : ""}"><td class="sp-av-n"><b>${esc(memberName(uid))}${mein ? " (du)" : ""}</b><small class="${st}">${AVTXT[st]}</small></td>
-        ${zeiten.map(t => { const v = a[t]; return `<td><button type="button" class="sp-slot ${v === undefined ? "" : VCOL[v]}" ${mein ? `data-slot="${t}"` : "disabled"} title="${uhr(t)} bis ${uhr(t + L)}: ${v === undefined ? "nichts eingetragen" : VTXT[v]}"></button></td>`; }).join("")}</tr>`;
+        ${cols.map((col, i) => { const v = spaltenWert(a, col); return `<td class="${col.d === uid ? "plan" : ""}"><button type="button" class="${zelle(v)} ${stints ? "breit" : ""}" ${mein ? `data-col="${i}"` : "disabled"} title="${titel(col, v)}"></button></td>`; }).join("")}</tr>`;
     };
     body.innerHTML = `
       <div class="tm-box"><h5>Wann kannst du fahren?</h5>
-        ${ich ? `<p class="hint">Tippe in deiner Zeile auf die Kästchen: einmal <b class="sp-t ja">verfügbar</b>, zweimal <b class="sp-t evtl">vielleicht</b>, dreimal <b class="sp-t nein">nicht verfügbar</b>, viermal wieder leer. Raster ${L === 3600000 ? "1 Stunde" : "30 Minuten"}, deine Ortszeit.</p>
+        ${ich ? `<p class="hint">${stints ? "Jede Spalte ist ein geplanter Stint (Länge aus Tank, Verbrauch und Pace). Rot umrandet: dort bist du eingeplant." : "Solange Pace oder Sprit fehlen, gibt es ein Stunden-Raster. Sobald die Werte da sind, siehst du hier die Stints."} Tippen: einmal <b class="sp-t ja">verfügbar</b>, zweimal <b class="sp-t evtl">vielleicht</b>, dreimal <b class="sp-t nein">nicht verfügbar</b>, viermal wieder leer. Deine Ortszeit.</p>
           <div class="sp-inline">${C.btn("Alles verfügbar", "sm", 'id="sp-all2"')}${C.btn("Alles leeren", "sm", 'id="sp-all0"')}${C.btn("Meine Verfügbarkeit speichern", "red", 'id="sp-avsave"')}</div>`
           : `<p class="hint">Du fährst in diesem Fahrzeug nicht mit. Klick oben auf „Mitfahren", um dich einzutragen.</p>`}
       </div>
       ${uids.length ? `<div class="sp-av-wrap"><table class="sp-av"><thead><tr><th class="sp-av-n">Fahrer</th>${kopf}</tr></thead><tbody>${uids.map(zeile).join("")}</tbody></table></div>` : '<div class="tm-box"><p class="tm-muted">Noch keine Fahrer in diesem Fahrzeug.</p></div>'}
       <div id="sp-abs"></div>`;
-    const zeichne = (b) => { const v = meine[b.dataset.slot]; b.className = "sp-slot " + (v === undefined ? "" : VCOL[v]); };
+    const setze = (col, v) => viertel(col.von, col.bis).forEach(t => { if (v === undefined) delete meine[t]; else meine[t] = v; });
+    const zeichne = (b) => { const col = cols[Number(b.dataset.col)], v = spaltenWert(meine, col); b.className = zelle(v) + (stints ? " breit" : ""); b.title = titel(col, v); };
     const puls = () => { const s = $("#sp-avsave"); if (s) s.classList.add("pulse"); };
-    $$("[data-slot]").forEach(b => b.onclick = () => {
-      const t = b.dataset.slot, v = meine[t];
-      if (v === undefined) meine[t] = 2; else if (v === 2) meine[t] = 1; else if (v === 1) meine[t] = 0; else delete meine[t];
+    $$("[data-col]").forEach(b => b.onclick = () => {
+      const col = cols[Number(b.dataset.col)], v = spaltenWert(meine, col);
+      setze(col, v === undefined || v === "mix" ? 2 : v === 2 ? 1 : v === 1 ? 0 : undefined);
       zeichne(b); puls();
     });
     if (ich) {
-      $("#sp-all2").onclick = () => { zeiten.forEach(t => (meine[t] = 2)); $$("[data-slot]").forEach(zeichne); puls(); };
-      $("#sp-all0").onclick = () => { zeiten.forEach(t => delete meine[t]); $$("[data-slot]").forEach(zeichne); puls(); };
+      $("#sp-all2").onclick = () => { cols.forEach(col => setze(col, 2)); $$("[data-col]").forEach(zeichne); puls(); };
+      $("#sp-all0").onclick = () => { cols.forEach(col => setze(col, undefined)); $$("[data-col]").forEach(zeichne); puls(); };
       $("#sp-avsave").onclick = async () => {
         const b = $("#sp-avsave"); b.disabled = true;
-        try { const r = await C.api("/stint/avail", { method: "POST", body: { id: S.id, slots: meine } }); S.av[S.me] = { slots: { ...meine }, at: Date.now() }; C.toast(r.info, true); b.classList.remove("pulse"); stepVerf(body); }
+        try { const r = await C.api("/stint/avail", { method: "POST", body: { id: S.id, slots: meine, v: 2 } }); S.av[S.me] = { slots: { ...meine }, v: 2, at: Date.now() }; C.toast(r.info, true); renderCar(); }
         catch (e) { C.toast(e.message); b.disabled = false; }
       };
     }
