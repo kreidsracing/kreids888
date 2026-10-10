@@ -268,5 +268,143 @@ window.K888_OVERLAYS = [
     var tiy = ty - 30 - ti.hoehe;
     h.zeilen(c, ti, M, tiy, "#fff", 0.6);
     h.qr(c, d, W - M - 190, fy - 100 - 190, 190);
+  } },
+
+  /* ================= VIDEO-DESIGNS: Video läuft in einem Fenster ================= */
+
+  /* ---------- 11) VIDEO-RAHMEN: dunkler Rahmen, Farblinie oben, Fenster + Textfeld ---------- */
+  { id: "rahmen", name: "Video-Rahmen", draw: function (c, W, H, d, h) {
+    var M = 48, gross = H > 1500;
+    c.fillStyle = "#0b0c10"; c.fillRect(0, 0, W, H);
+    var g = c.createRadialGradient(W * 0.85, 0, 10, W * 0.85, 0, W);
+    g.addColorStop(0, "rgba(225,19,36,.18)"); g.addColorStop(1, "rgba(225,19,36,0)");
+    c.fillStyle = g; c.fillRect(0, 0, W, H);
+    h.linie(c, 0, 0, W, 10);
+    h.logo(c, M, 108, 50);
+    c.font = h.f(900, 36);
+    var kw = c.measureText(d.kicker).width + 48;
+    h.schraeg(c, W - M - kw - 10, 62, kw, 58, 12, h.ROT);
+    h.text(c, d.kicker, W - M - 10 - kw / 2, 104, h.f(900, 36), "#fff", "center", 0.08);
+    var fy = 150, fh = gross ? 1100 : 560;
+    h.fenster(c, d, M, fy, W - 2 * M, fh);
+    h.linie(c, M, fy + fh, W - 2 * M, 6);
+    var px = M + 36, pw = W - 2 * M - 72, py = fy + fh + 6, pb = H - M - 104;
+    c.fillStyle = "#13151b"; c.fillRect(M, py, W - 2 * M, pb - py);
+    var ti = h.passend(c, d.title.toUpperCase(), pw, gross ? 3 : 2, 84, 54, 900, "Saira Condensed", 0.98);
+    h.zeilen(c, ti, px, py + 34, "#fff", 0.6);
+    var ty = py + 34 + ti.hoehe + 22, platz = pb - 30 - ty;
+    if (platz > 36) {
+      var t = h.passend(c, d.text, pw, Math.max(1, Math.min(gross ? 6 : 3, Math.floor((platz - 36) / 50) + 1)), 36, 28, 500, "Barlow", 1.38);
+      h.zeilen(c, t, px, ty, "#c9ced6");
+    }
+    h.fuss(c, M, W - M, H - M, d.footer);
+    h.qr(c, d, W - M - 30 - 200, fy + 30, 200);
+  } },
+
+  /* ---------- 12) VIDEO TV: Video oben über die volle Breite, Bauchbinde wie im TV ---------- */
+  { id: "tv", name: "Video TV", draw: function (c, W, H, d, h) {
+    var M = 60, gross = H > 1500, fh = gross ? 1160 : 640;
+    c.fillStyle = "#0b0c10"; c.fillRect(0, 0, W, H);
+    h.fenster(c, d, 0, 0, W, fh);
+    var g = c.createLinearGradient(0, 0, 0, 200);
+    g.addColorStop(0, "rgba(10,11,14,.7)"); g.addColorStop(1, "rgba(10,11,14,0)");
+    c.fillStyle = g; c.fillRect(0, 0, W, 200);
+    h.logo(c, M, 100, 48);
+    h.startnummer(c, W - M, 52, 72, "right");
+    h.linie(c, 0, fh, W, 10);
+    c.font = h.f(900, 40);
+    var kw = c.measureText(d.kicker).width + 56;
+    h.schraeg(c, M, fh - 30, kw, 70, 16, "#fff");
+    h.text(c, d.kicker, M + kw / 2, fh + 20, h.f(900, 40), "#0b0c10", "center", 0.06);
+    var fy = H - M - 72;
+    var ti = h.passend(c, d.title.toUpperCase(), W - 2 * M, gross ? 3 : 2, 96, 60, 900, "Saira Condensed", 0.98);
+    var tiy = fh + 76;
+    h.zeilen(c, ti, M, tiy, "#fff", 0.6);
+    var ty = tiy + ti.hoehe + 24, platz = fy - 30 - ty;
+    if (platz > 38) {
+      var t = h.passend(c, d.text, W - 2 * M, Math.max(1, Math.min(gross ? 7 : 4, Math.floor((platz - 38) / 52) + 1)), 38, 30, 500, "Barlow", 1.38);
+      h.zeilen(c, t, M, ty, "#c9ced6");
+    }
+    c.fillStyle = "#13151b"; c.fillRect(0, fy, W, H - fy);
+    h.linie(c, 0, fy, W, 4);
+    h.motto(c, d.footer, M, fy + 58, 36, "left");
+    h.text(c, "KREIDS888.COM", W - M, fy + 56, h.f(800, 30), "#9aa1ab", "right", 0.12);
+    h.qr(c, d, W - M - 200, fh - 60 - 240, 200);
+  } },
+
+  /* ---------- 13) VIDEO KINO: Breitbild-Video in der Mitte, Hintergrund unscharf ---------- */
+  { id: "kino", name: "Video Kino", draw: function (c, W, H, d, h) {
+    var M = 72, gross = H > 1500, fh = Math.round(W * 9 / 16), fy = Math.round(H * (gross ? 0.34 : 0.26));
+    c.fillStyle = "#0b0c10"; c.fillRect(0, 0, W, H);
+    if (h.hatMedium(d)) {
+      c.save(); c.filter = "blur(28px)";
+      h.bild(c, { img: d.img, view: { zoom: 1.1, ox: 0, oy: 0 } }, -40, -40, W + 80, H + 80);
+      c.restore();
+    }
+    c.fillStyle = "rgba(10,11,14,.62)"; c.fillRect(0, 0, W, H);
+    h.fenster(c, d, 0, fy, W, fh);
+    h.linie(c, 0, fy - 6, W, 6); h.linie(c, 0, fy + fh, W, 6);
+    var ti = h.passend(c, d.title.toUpperCase(), W - 2 * M, gross ? 3 : 2, 100, 60, 900, "Saira Condensed", 0.96);
+    var tiy = fy - 44 - ti.hoehe;
+    h.zeilen(c, ti, M, tiy, "#fff", 0.6);
+    h.text(c, d.kicker, M, tiy - 22, h.f(800, 36), "#ff4b55", "left", 0.22);
+    var ty = fy + fh + 50, platz = H - M - 110 - ty;
+    if (platz > 38) {
+      var t = h.passend(c, d.text, W - 2 * M, Math.max(1, Math.min(gross ? 7 : 3, Math.floor((platz - 38) / 52) + 1)), 38, 30, 500, "Barlow", 1.38);
+      h.zeilen(c, t, M, ty, "#dfe2e7");
+    }
+    h.fuss(c, M, W - M, H - M, d.footer);
+    h.qr(c, d, W - 40 - 200, fy + fh - 40 - 240, 200);
+  } },
+
+  /* ---------- 14) VIDEO HOCHKANT: für Hochkant-Clips (4:5 = Video links, Text rechts) ---------- */
+  { id: "hochkant", name: "Video Hochkant", draw: function (c, W, H, d, h) {
+    var M = 56;
+    c.fillStyle = "#0b0c10"; c.fillRect(0, 0, W, H);
+    h.linie(c, 0, 0, W, 10);
+    var kw, ti, t, ty;
+    if (H > 1500) {
+      var fy = 150, fh = H - fy - 300, fw = W - 2 * M;
+      h.logo(c, M, 108, 50);
+      c.font = h.f(900, 36); kw = c.measureText(d.kicker).width + 48;
+      h.schraeg(c, W - M - kw - 10, 62, kw, 58, 12, h.ROT);
+      h.text(c, d.kicker, W - M - 10 - kw / 2, 104, h.f(900, 36), "#fff", "center", 0.08);
+      h.fenster(c, d, M, fy, fw, fh);
+      c.save(); c.beginPath(); c.rect(M, fy, fw, fh); c.clip();
+      var g = c.createLinearGradient(0, fy + fh - 560, 0, fy + fh);
+      g.addColorStop(0, "rgba(10,11,14,0)"); g.addColorStop(1, "rgba(10,11,14,.94)");
+      c.fillStyle = g; c.fillRect(M, fy + fh - 560, fw, 560); c.restore();
+      t = h.passend(c, d.text, fw - 90, 3, 38, 30, 500, "Barlow", 1.38);
+      ty = fy + fh - 44 - t.hoehe;
+      h.zeilen(c, t, M + 50, ty, "#dfe2e7");
+      ti = h.passend(c, d.title.toUpperCase(), fw - 90, 3, 100, 60, 900, "Saira Condensed", 0.96);
+      var tiy = ty - (t.hoehe ? 26 : 0) - ti.hoehe;
+      c.fillStyle = h.ROT; c.fillRect(M + 26, tiy + 6, 8, ti.hoehe + t.hoehe + 20);
+      h.zeilen(c, ti, M + 50, tiy, "#fff", 0.6);
+      h.linie(c, M, fy + fh, fw, 6);
+      h.fuss(c, M, W - M, H - M, d.footer);
+      h.qr(c, d, W - M - 40 - 200, fy + 40, 200);
+    } else {
+      var oy = 140, oh = H - oy - 150, ow = Math.round(oh * 9 / 16);
+      h.logo(c, M, 100, 48);
+      h.startnummer(c, W - M, 48, 66, "right");
+      h.fenster(c, d, M, oy, ow, oh);
+      h.linie(c, M, oy + oh, ow, 6);
+      var cx = M + ow + 44, cw = W - M - cx;
+      c.font = h.f(900, 34); kw = Math.min(cw, c.measureText(d.kicker).width + 44);
+      h.schraeg(c, cx + 12, oy, kw, 54, 12, h.ROT);
+      h.text(c, d.kicker, cx + 12 + kw / 2, oy + 39, h.f(900, 34), "#fff", "center", 0.06);
+      var titel = d.title.toUpperCase();
+      ti = h.passend(c, titel, cw, 5, h.wortGroesse(c, titel, cw, 76, 900, "Saira Condensed"), 40, 900, "Saira Condensed", 0.98);
+      h.zeilen(c, ti, cx, oy + 90, "#fff", 0.4);
+      ty = oy + 90 + ti.hoehe + 26;
+      var ende = d.qr ? oy + oh - 270 : oy + oh, platz = ende - ty;
+      if (platz > 32) {
+        t = h.passend(c, d.text, cw, Math.max(1, Math.min(10, Math.floor((platz - 32) / 44) + 1)), 32, 26, 500, "Barlow", 1.38);
+        h.zeilen(c, t, cx, ty, "#c9ced6");
+      }
+      h.motto(c, d.footer, M, H - 50, 34, "left");
+      h.qr(c, d, cx, oy + oh - 240, 200);
+    }
   } }
 ];
