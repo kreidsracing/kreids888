@@ -999,3 +999,9 @@ button.wk-col:focus-visible{outline:2px solid var(--red);outline-offset:2px}
   .sp-actions{width:100%;justify-content:space-between}
   .sp-av .sp-av-n{min-width:110px}
 }
+.sp-dt{flex:0 1 180px}
+.sp-av-car{margin-bottom:18px}
+.sp-av-h{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 12px;margin-bottom:8px}
+.sp-av-h b{font-family:var(--disp);font-weight:900;font-size:18px;text-transform:uppercase}
+.sp-av-h span{color:#d5d9e0;font-size:14px}
+.sp-av-h small{color:var(--steel);font-size:13px;width:100%}

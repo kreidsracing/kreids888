@@ -48,15 +48,23 @@
     return hit ? hit.slug : "";
   }
 
+  const PIT_STD = { tank: 100, reserve: 0.5, rate: 2.5, lane: 60, reifen: 20, wechsel: 0, reifenAlle: 1, parallel: true };
   function neuerPlan() {
     const d = new Date(); d.setDate(d.getDate() + 7); d.setHours(14, 0, 0, 0);
-    return {
-      name: "", trackId: 0, trackName: "", start: d.getTime(), mode: "zeit", dauerMin: 360, runden: 100, notiz: "",
-      pit: { tank: 100, reserve: 0.5, rate: 2.5, lane: 60, reifen: 20, wechsel: 0, reifenAlle: 1, parallel: true },
-      cars: [neuesAuto(0)],
-    };
+    return { name: "", trackId: 0, trackName: "", start: d.getTime(), mode: "zeit", dauerMin: 360, runden: 100, notiz: "", cars: [neuesAuto(0, d.getTime())] };
   }
-  function neuesAuto(i) { return { key: keyNeu(), name: "Auto #" + (i + 1), carId: 0, carName: "", start: null, drivers: [], stints: [] }; }
+  function neuesAuto(i, start, pit) { return { key: keyNeu(), name: "Auto #" + (i + 1), carId: 0, carName: "", start, pit: { ...(pit || PIT_STD) }, drivers: [], stints: [] }; }
+  // ältere Pläne: Startzeit und Boxenstopp-Werte lagen beim Rennen, jetzt pro Auto
+  function normalisiere(p) {
+    for (const c of p.cars) {
+      if (!c.start) c.start = p.start;
+      if (!c.pit) c.pit = { ...PIT_STD, ...(p.pit || {}) };
+    }
+    delete p.pit;
+    ersterStart(p);
+    return p;
+  }
+  function ersterStart(p) { if (p.cars.length) p.start = Math.min(...p.cars.map(c => c.start)); }
 
   /* ---------------- Berechnung ---------------- */
   function carStart(car) { return car.start || S.plan.start; }
@@ -64,7 +72,7 @@
 
   // live = Daten vom Worker für dieses Auto (echte Stints) oder null
   function rechne(car, live) {
-    const P = S.plan.pit, plan = S.plan;
+    const P = car.pit, plan = S.plan;
     const drv = {};
     car.drivers.forEach(d => (drv[d.uid] = d));
     const mitPace = car.drivers.filter(d => d.pace > 0);
@@ -168,12 +176,13 @@
   }
 
   // schlechteste Verfügbarkeit eines Fahrers im Zeitraum: 2 ja, 1 vielleicht, 0 nein, -1 nichts eingetragen
-  function verfuegbar(uid, von, bis) {
+  function verfuegbar(uid, von, bis, car) {
     const a = S.av[uid] && S.av[uid].slots;
     if (!a) return -1;
     let schlecht = 3, offen = false;
-    for (const t of slotZeiten()) {
-      const tEnd = t + slotLen();
+    const L = slotLen(car);
+    for (const t of slotZeiten(car)) {
+      const tEnd = t + L;
       if (tEnd <= von || t >= bis) continue;
       const v = a[t];
       if (v === undefined) offen = true;
@@ -184,23 +193,23 @@
     return schlecht === 3 ? -1 : schlecht;
   }
 
-  /* ---------------- Zeitraster für Verfügbarkeit ---------------- */
-  function fenster() {
+  /* ---------------- Zeitraster für Verfügbarkeit (pro Auto, ohne Auto = alle Autos) ---------------- */
+  function fenster(car) {
     const p = S.plan;
     let von = Infinity, bis = 0;
-    for (const c of p.cars) {
+    for (const c of car ? [car] : p.cars) {
       const s = carStart(c);
       von = Math.min(von, s);
       let e = raceEnd(c);
       if (e === null) { const r = rechne(c, null).rows; e = r.length ? r[r.length - 1].bis : s + 3 * 3600000; }
       bis = Math.max(bis, e);
     }
-    if (!p.cars.length) { von = p.start; bis = p.start + (p.mode === "zeit" ? p.dauerMin * 60000 : 3 * 3600000); }
+    if (von === Infinity) { von = p.start; bis = p.start + (p.mode === "zeit" ? p.dauerMin * 60000 : 3 * 3600000); }
     return { von, bis };
   }
-  function slotLen() { const f = fenster(); return f.bis - f.von > 8 * 3600000 ? 3600000 : 1800000; }
-  function slotZeiten() {
-    const f = fenster(), L = slotLen();
+  function slotLen(car) { const f = fenster(car); return f.bis - f.von > 8 * 3600000 ? 3600000 : 1800000; }
+  function slotZeiten(car) {
+    const f = fenster(car), L = slotLen(car);
     const out = [];
     let t = Math.floor(f.von / L) * L;
     while (t < f.bis && out.length < 120) { out.push(t); t += L; }
@@ -268,7 +277,7 @@
     try { d = await C.api("/stint/plan?id=" + encodeURIComponent(id)); }
     catch (e) { root.innerHTML = C.panelHead("stint", "Stintplaner") + `<div class="tm-box tm-err">${esc(e.message)}</div><a class="tm-btn" href="#stint"><span>Zur Übersicht</span></a>`; return; }
     if (mine !== alive) return;
-    S.id = d.plan.id; S.plan = d.plan; S.rev = d.plan.rev; S.av = d.av || {}; S.me = d.me; S.canDelete = d.canDelete;
+    S.id = d.plan.id; S.plan = normalisiere(d.plan); S.rev = d.plan.rev; S.av = d.av || {}; S.me = d.me; S.canDelete = d.canDelete;
     S.dirty = false; S.car = Math.min(S.car, Math.max(0, S.plan.cars.length - 1));
     if (S.id !== S.lastId) { S.tab = istLive() ? "live" : "rennen"; S.car = 0; S.lastId = S.id; }
     renderPlan();
@@ -279,7 +288,7 @@
   }
 
   /* ---------------- Plan-Ansicht ---------------- */
-  const TABS = [["rennen", "Rennen"], ["autos", "Autos & Fahrer"], ["verf", "Verfügbarkeit"], ["plan", "Stintplan"], ["live", "Live"]];
+  const TABS = [["rennen", "Rennen"], ["autos", "Fahrzeuge & Fahrer"], ["verf", "Verfügbarkeit"], ["plan", "Stintplan"], ["live", "Live"]];
   function renderPlan() {
     const p = S.plan;
     root.innerHTML = `
@@ -326,7 +335,7 @@
 
   /* ---------------- Reiter: Rennen ---------------- */
   function tabRennen(body) {
-    const p = S.plan, P = p.pit;
+    const p = S.plan;
     const h = Math.floor(p.dauerMin / 60), m = p.dauerMin % 60;
     body.innerHTML = `
       <div class="tm-box"><h5>Rennen</h5>
@@ -334,7 +343,6 @@
         <div class="tm-row"><label for="sp-track">Strecke<small>aus Garage 61, tippen zum Suchen</small></label>
           <div><input class="tm-input" id="sp-track" list="sp-tracks" placeholder="Strecke suchen …" value="${esc(p.trackName)}"><datalist id="sp-tracks">${META.tracks.map(t => `<option value="${esc(t.name)}">`).join("")}</datalist>
           ${META.tracks.length ? "" : '<small class="tm-muted">Streckenliste aus Garage 61 nicht verfügbar, Name frei eintragen.</small>'}</div></div>
-        <div class="tm-row"><label for="sp-start">Start<small>deine Ortszeit</small></label><input class="tm-input" id="sp-start" type="datetime-local" value="${toLocalInput(p.start)}"></div>
         <div class="tm-row"><div class="lbl">Renndauer</div>
           <div><div class="sp-seg" id="sp-mode"><button type="button" data-m="zeit" class="${p.mode === "zeit" ? "on" : ""}">Nach Zeit</button><button type="button" data-m="runden" class="${p.mode === "runden" ? "on" : ""}">Nach Runden</button></div>
           <div class="sp-inline" style="margin-top:10px">${p.mode === "zeit"
@@ -342,19 +350,7 @@
             : `<input class="tm-input sp-num" id="sp-runden" type="number" min="1" max="5000" value="${p.runden}"><span>Runden</span>`}</div></div></div>
         <div class="tm-row"><label for="sp-notiz">Notiz<small>optional</small></label><textarea class="tm-input" id="sp-notiz" rows="3" maxlength="600" placeholder="z. B. Pflichtstopps, Setup, Treffpunkt im Discord …">${esc(p.notiz)}</textarea></div>
       </div>
-      <div class="tm-box"><h5>Boxenstopp</h5>
-        <p class="hint">Gilt für alle Autos. Zeitverlust Boxengasse = wie viel ein Stopp ohne Stehzeit kostet (Rein- und Rausfahren).</p>
-        <div class="sp-grid">
-          ${feld("tank", "Tankgröße", "Liter", P.tank)}
-          ${feld("reserve", "Sprit-Reserve", "Liter pro Stint", P.reserve, 0.1)}
-          ${feld("rate", "Tanken", "Liter pro Sekunde", P.rate, 0.1)}
-          ${feld("lane", "Zeitverlust Boxengasse", "Sekunden", P.lane)}
-          ${feld("reifen", "Reifenwechsel", "Sekunden", P.reifen)}
-          ${feld("wechsel", "Fahrerwechsel", "Sekunden", P.wechsel)}
-          ${feld("reifenAlle", "Reifen wechseln", "alle X Stopps (0 = nie)", P.reifenAlle)}
-        </div>
-        <label class="sp-check"><input type="checkbox" id="sp-par" ${P.parallel ? "checked" : ""}> Tanken, Reifen und Fahrerwechsel laufen gleichzeitig (wie in iRacing)</label>
-      </div>
+      <p class="tm-muted" style="margin:-4px 0 14px">Startdatum, Startzeit und Boxenstopp-Werte stellst du pro Auto unter „Fahrzeuge &amp; Fahrer" ein.</p>
       ${S.id && S.canDelete ? `<div class="tm-actions" style="margin-top:6px">${C.btn("Plan löschen", "sm", 'id="sp-del"')}</div>` : ""}`;
     const on = (id, ev, fn) => { const e = $("#" + id); if (e) e.addEventListener(ev, fn); };
     on("sp-name", "input", (e) => { p.name = e.target.value; dirty(); });
@@ -364,14 +360,11 @@
       p.trackName = t ? t.name : v; p.trackId = t ? t.id : 0; dirty();
       if (!t && v && META.tracks.length) C.toast("Strecke nicht in Garage 61 gefunden. Ohne Treffer gibt es keine Werte aus Garage 61.");
     });
-    on("sp-start", "change", (e) => { const t = fromLocalInput(e.target.value); if (t) { p.start = t; dirty(); } });
     $$("#sp-mode [data-m]").forEach(b => b.onclick = () => { p.mode = b.dataset.m; dirty(); tabRennen(body); });
     const dauerSet = () => { p.dauerMin = Math.max(10, Math.round(num($("#sp-h").value) * 60 + num($("#sp-m").value))); dirty(); };
     on("sp-h", "change", dauerSet); on("sp-m", "change", dauerSet);
     on("sp-runden", "change", (e) => { p.runden = Math.max(1, Math.round(num(e.target.value, 100))); dirty(); });
     on("sp-notiz", "input", (e) => { p.notiz = e.target.value; dirty(); });
-    $$("[data-pit]").forEach(i => i.addEventListener("change", () => { P[i.dataset.pit] = Math.max(0, num(i.value, P[i.dataset.pit])); dirty(); }));
-    on("sp-par", "change", (e) => { P.parallel = e.target.checked; dirty(); });
     on("sp-del", "click", async () => {
       if (!confirm("Diesen Plan wirklich löschen? Das geht nicht rückgängig.")) return;
       try { const r = await C.api("/stint/plan/delete", { method: "POST", body: { id: S.id } }); C.toast(r.info, true); S.dirty = false; location.hash = "stint"; }
@@ -379,8 +372,10 @@
     });
   }
   const feld = (k, l, s, v, step = 1) => `<label class="sp-f"><span>${l}<small>${s}</small></span><input class="tm-input" type="number" min="0" step="${step}" data-pit="${k}" value="${v}"></label>`;
+  const datumWert = (ms) => toLocalInput(ms).slice(0, 10);
+  const zeitWert = (ms) => toLocalInput(ms).slice(11, 16);
 
-  /* ---------------- Reiter: Autos & Fahrer ---------------- */
+  /* ---------------- Reiter: Fahrzeuge & Fahrer ---------------- */
   function tabAutos(body) {
     const p = S.plan;
     const benutzt = (uid, car) => p.cars.find(c => c !== car && c.drivers.some(d => d.uid === uid));
@@ -390,9 +385,20 @@
           ${p.cars.length > 1 ? C.btn("Auto entfernen", "sm", `data-rmcar="${ci}"`) : ""}</div>
         <div class="tm-row"><label>Fahrzeug<small>aus Garage 61</small></label>
           <div><input class="tm-input" data-f="car" list="sp-cars" placeholder="Fahrzeug suchen …" value="${esc(c.carName)}"></div></div>
-        <div class="tm-row"><div class="lbl">Startzeit</div>
-          <div><label class="sp-check"><input type="checkbox" data-f="eigen" ${c.start ? "checked" : ""}> Eigene Startzeit für dieses Auto</label>
-          ${c.start ? `<input class="tm-input" style="margin-top:8px" type="datetime-local" data-f="start" value="${toLocalInput(c.start)}">` : `<small class="tm-muted">Wie das Rennen: ${tagUhr(p.start)}</small>`}</div></div>
+        <div class="tm-row"><div class="lbl">Start<small>deine Ortszeit</small></div>
+          <div class="sp-inline"><label class="sp-f sp-dt"><span>Datum</span><input class="tm-input" type="date" data-f="datum" value="${datumWert(c.start)}"></label>
+          <label class="sp-f sp-dt"><span>Uhrzeit</span><input class="tm-input" type="time" data-f="zeit" value="${zeitWert(c.start)}"></label></div></div>
+        <div class="td-label">Boxenstopp</div>
+        <div class="sp-grid" data-pitbox="${ci}">
+          ${feld("tank", "Tankgröße", "Liter", c.pit.tank)}
+          ${feld("reserve", "Sprit-Reserve", "Liter pro Stint", c.pit.reserve, 0.1)}
+          ${feld("rate", "Tanken", "Liter pro Sekunde", c.pit.rate, 0.1)}
+          ${feld("lane", "Zeitverlust Boxengasse", "Sekunden, ohne Stehzeit", c.pit.lane)}
+          ${feld("reifen", "Reifenwechsel", "Sekunden", c.pit.reifen)}
+          ${feld("wechsel", "Fahrerwechsel", "Sekunden", c.pit.wechsel)}
+          ${feld("reifenAlle", "Reifen wechseln", "alle X Stopps (0 = nie)", c.pit.reifenAlle)}
+        </div>
+        <label class="sp-check"><input type="checkbox" data-f="par" ${c.pit.parallel ? "checked" : ""}> Tanken, Reifen und Fahrerwechsel laufen gleichzeitig (wie in iRacing)</label>
         <div class="td-label">Fahrer</div>
         <div class="sp-drv-wrap"><table class="sp-drv">
           <thead><tr><th>Fahrer</th><th>Garage-61-Fahrer</th><th>Pace<small>Ø Runde</small></th><th>Sprit<small>L pro Runde</small></th><th></th></tr></thead>
@@ -420,9 +426,14 @@
         const t = META.cars.find(x => x.name === v) || META.cars.find(x => norm(x.name) === norm(v));
         c.carName = t ? t.name : v; c.carId = t ? t.id : 0; dirty();
       });
-      box.querySelector("[data-f=eigen]").addEventListener("change", (e) => { c.start = e.target.checked ? S.plan.start : null; dirty(); tabAutos(body); });
-      const st = box.querySelector("[data-f=start]");
-      if (st) st.addEventListener("change", (e) => { const t = fromLocalInput(e.target.value); if (t) { c.start = t; dirty(); } });
+      const startSet = () => {
+        const t = fromLocalInput(box.querySelector("[data-f=datum]").value + "T" + (box.querySelector("[data-f=zeit]").value || "00:00"));
+        if (t) { c.start = t; ersterStart(p); dirty(); kopfZeile(); }
+      };
+      box.querySelector("[data-f=datum]").addEventListener("change", startSet);
+      box.querySelector("[data-f=zeit]").addEventListener("change", startSet);
+      box.querySelectorAll("[data-pit]").forEach(i => i.addEventListener("change", () => { c.pit[i.dataset.pit] = Math.max(0, num(i.value, c.pit[i.dataset.pit])); dirty(); }));
+      box.querySelector("[data-f=par]").addEventListener("change", (e) => { c.pit.parallel = e.target.checked; dirty(); });
       box.querySelector("[data-f=add]").addEventListener("change", (e) => {
         const uid = e.target.value;
         if (!uid) return;
@@ -449,14 +460,28 @@
       gb.onclick = () => holeG61(c, gb, body);
     });
     const add = $("#sp-addcar");
-    if (add) add.onclick = () => { p.cars.push(neuesAuto(p.cars.length)); dirty(); tabAutos(body); };
+    if (add) add.onclick = () => { const v = p.cars[p.cars.length - 1]; p.cars.push(neuesAuto(p.cars.length, v ? v.start : p.start, v && v.pit)); dirty(); tabAutos(body); };
   }
+  function kopfZeile() { const k = $(".sp-title small"); if (k) k.textContent = (S.plan.trackName || "Strecke offen") + " · " + tagUhr(S.plan.start); }
   function g61Info(c) {
     const g = S.g61[S.plan.trackId + "/" + c.carId];
     if (!g) return "";
     const at = new Date(g.at).toLocaleString("de-DE", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
     const fehlen = c.drivers.filter(d => d.g61 && !g.drivers[d.g61]).map(d => memberName(d.uid));
-    return `<small class="tm-muted">Garage 61 (Stand ${at}): ${Object.keys(g.drivers).length} Fahrer mit Runden auf dieser Kombi.${fehlen.length ? " Keine Runden von: " + esc(fehlen.join(", ")) + " (Teamschnitt wird benutzt oder Werte selbst eintragen)." : ""}</small>`;
+    const pt = g.pit || {};
+    const box = !pt.stopps ? "Boxenstopp: keine Stopps auf dieser Kombi gefunden, Werte bleiben wie eingetragen."
+      : pt.rate ? `Boxenstopp: aus ${pt.stopps} Stopps ermittelt (Boxengasse ${pt.lane} s, Tanken ${pt.rate} L/s).`
+      : `Boxenstopp: aus ${pt.stopps} Stopps ermittelt (im Schnitt ${Math.round(pt.verlust)} s inkl. ${Math.round(pt.rein)} L Tanken). Tankrate ließ sich nicht trennen, bleibt wie eingetragen.`;
+    return `<small class="tm-muted">Garage 61 (Stand ${at}): ${Object.keys(g.drivers).length} Fahrer mit Runden auf dieser Kombi.${fehlen.length ? " Keine Runden von: " + esc(fehlen.join(", ")) + " (Teamschnitt wird benutzt oder Werte selbst eintragen)." : ""}${pt.tank ? " Tank ca. " + pt.tank + " L (höchster gefahrener Tankstand)." : ""} ${box}</small>`;
+  }
+  // Boxenstopp-Werte aus Garage 61 ins Auto übernehmen, soweit vorhanden
+  function uebernimmPit(c, g) {
+    const pt = g.pit || {};
+    let n = 0;
+    if (pt.tank > 5) { c.pit.tank = pt.tank; n++; }
+    if (pt.rate > 0 && pt.lane > 0) { c.pit.rate = pt.rate; c.pit.lane = pt.lane; n += 2; }
+    else if (pt.stopps && pt.verlust > 0) { c.pit.lane = Math.max(5, Math.round(pt.verlust - pt.rein / (c.pit.rate || 2.5))); n++; }
+    return n;
   }
   function uebernimmG61(c, d, force) {
     const g = S.g61[S.plan.trackId + "/" + c.carId];
@@ -475,43 +500,55 @@
       S.g61[S.plan.trackId + "/" + c.carId] = g;
       let n = 0;
       for (const d of c.drivers) if (uebernimmG61(c, d, true)) n++;
-      if (n) dirty();
-      C.toast(n ? `Werte für ${n} Fahrer übernommen` : "Keine passenden Runden in Garage 61 gefunden", !!n);
+      const np = uebernimmPit(c, g);
+      if (n || np) dirty();
+      const teile = [n ? `Pace und Sprit für ${n} Fahrer` : "", np ? "Boxenstopp-Werte" : ""].filter(Boolean);
+      C.toast(teile.length ? teile.join(" und ") + " übernommen" : "Keine passenden Runden in Garage 61 gefunden", !!teile.length);
       tabAutos(body);
     } catch (e) { C.toast(e.message); b.disabled = false; }
   }
 
   /* ---------------- Reiter: Verfügbarkeit ---------------- */
+  // Ein Raster pro Auto (Zeitraum dieses Autos). Eigene Autos zuerst, nur die eigene Zeile ist klickbar.
   function tabVerf(body) {
     const p = S.plan;
-    const uids = [...new Set(p.cars.flatMap(c => c.drivers.map(d => d.uid)))];
-    if (!uids.includes(S.me)) uids.unshift(S.me);
-    else { uids.splice(uids.indexOf(S.me), 1); uids.unshift(S.me); }
-    const zeiten = slotZeiten(), L = slotLen();
     const meine = { ...((S.av[S.me] && S.av[S.me].slots) || {}) };
-    const autoVon = (uid) => p.cars.filter(c => c.drivers.some(d => d.uid === uid)).map(c => c.name).join(", ");
-    const kopf = zeiten.map((t, i) => { const d = new Date(t); const neuerTag = i === 0 || new Date(zeiten[i - 1]).getDate() !== d.getDate(); return `<th class="${neuerTag ? "tag" : ""}">${neuerTag ? `<em>${d.toLocaleDateString("de-DE", { weekday: "short", day: "2-digit", month: "2-digit" })}</em>` : ""}${uhr(t)}</th>`; }).join("");
-    const zeile = (uid) => {
-      const ich = uid === S.me;
-      const a = ich ? meine : ((S.av[uid] && S.av[uid].slots) || {});
-      return `<tr class="${ich ? "ich" : ""}"><td class="sp-av-n"><b>${esc(memberName(uid))}${ich ? " (du)" : ""}</b><small>${esc(autoVon(uid) || "nicht eingeteilt")}</small></td>
-        ${zeiten.map(t => { const v = a[t]; return `<td><button type="button" class="sp-slot ${v === undefined ? "" : VCOL[v]}" ${ich ? `data-slot="${t}"` : "disabled"} title="${uhr(t)} bis ${uhr(t + L)}: ${v === undefined ? "nichts eingetragen" : VTXT[v]}"></button></td>`; }).join("")}</tr>`;
+    const meineAutos = p.cars.filter(c => c.drivers.some(d => d.uid === S.me));
+    const reihenfolge = [...meineAutos, ...p.cars.filter(c => !meineAutos.includes(c))];
+    const raster = (c) => {
+      const zeiten = slotZeiten(c), L = slotLen(c);
+      const uids = c.drivers.map(d => d.uid);
+      if (uids.includes(S.me)) { uids.splice(uids.indexOf(S.me), 1); uids.unshift(S.me); }
+      const kopf = zeiten.map((t, i) => { const d = new Date(t); const neuerTag = i === 0 || new Date(zeiten[i - 1]).getDate() !== d.getDate(); return `<th class="${neuerTag ? "tag" : ""}">${neuerTag ? `<em>${d.toLocaleDateString("de-DE", { weekday: "short", day: "2-digit", month: "2-digit" })}</em>` : ""}${uhr(t)}</th>`; }).join("");
+      const zeile = (uid) => {
+        const ich = uid === S.me;
+        const a = ich ? meine : ((S.av[uid] && S.av[uid].slots) || {});
+        return `<tr class="${ich ? "ich" : ""}"><td class="sp-av-n"><b>${esc(memberName(uid))}${ich ? " (du)" : ""}</b></td>
+          ${zeiten.map(t => { const v = a[t]; return `<td><button type="button" class="sp-slot ${v === undefined ? "" : VCOL[v]}" ${ich ? `data-slot="${t}"` : "disabled"} title="${uhr(t)} bis ${uhr(t + L)}: ${v === undefined ? "nichts eingetragen" : VTXT[v]}"></button></td>`; }).join("")}</tr>`;
+      };
+      return `<div class="sp-av-car"><div class="sp-av-h"><b>${esc(c.name)}</b>${c.carName ? `<span>${esc(c.carName)}</span>` : ""}<small>Start ${tagUhr(c.start)} · Raster ${L === 3600000 ? "1 Std." : "30 Min."}</small></div>
+        ${uids.length ? `<div class="sp-av-wrap"><table class="sp-av"><thead><tr><th class="sp-av-n">Fahrer</th>${kopf}</tr></thead><tbody>${uids.map(zeile).join("")}</tbody></table></div>` : '<p class="tm-muted">Noch keine Fahrer auf diesem Auto.</p>'}</div>`;
     };
     body.innerHTML = `
       <div class="tm-box"><h5>Wann kannst du fahren?</h5>
-        <p class="hint">Tippe in deiner Zeile auf die Kästchen: einmal <b class="sp-t ja">verfügbar</b>, zweimal <b class="sp-t evtl">vielleicht</b>, dreimal <b class="sp-t nein">nicht verfügbar</b>, viermal wieder leer. Raster: ${L === 3600000 ? "1 Stunde" : "30 Minuten"}, deine Ortszeit.</p>
-        <div class="sp-inline">${C.btn("Alles verfügbar", "sm", 'id="sp-all2"')}${C.btn("Alles leeren", "sm", 'id="sp-all0"')}${C.btn("Meine Verfügbarkeit speichern", "red", 'id="sp-avsave"')}</div>
+        ${meineAutos.length
+          ? `<p class="hint">Tippe in deiner Zeile auf die Kästchen: einmal <b class="sp-t ja">verfügbar</b>, zweimal <b class="sp-t evtl">vielleicht</b>, dreimal <b class="sp-t nein">nicht verfügbar</b>, viermal wieder leer. Deine Ortszeit.</p>
+             <div class="sp-inline">${C.btn("Alles verfügbar", "sm", 'id="sp-all2"')}${C.btn("Alles leeren", "sm", 'id="sp-all0"')}${C.btn("Meine Verfügbarkeit speichern", "red", 'id="sp-avsave"')}</div>`
+          : '<p class="hint">Du bist in diesem Rennen auf keinem Auto eingeteilt. Hier siehst du die Verfügbarkeit der Fahrer.</p>'}
       </div>
-      <div class="sp-av-wrap"><table class="sp-av"><thead><tr><th class="sp-av-n">Fahrer</th>${kopf}</tr></thead><tbody>${uids.map(zeile).join("")}</tbody></table></div>
-      ${absenzHinweis(uids)}`;
+      ${reihenfolge.map(raster).join("")}
+      ${absenzHinweis()}`;
+    const meineZeiten = () => [...new Set(meineAutos.flatMap(c => slotZeiten(c)))];
+    const zeichneAlle = () => $$("[data-slot]").forEach(b => zeichne(b, b.dataset.slot));
     const zeichne = (btnEl, t) => { const v = meine[t]; btnEl.className = "sp-slot " + (v === undefined ? "" : VCOL[v]); btnEl.title = uhr(+t) + ": " + (v === undefined ? "nichts eingetragen" : VTXT[v]); };
     $$("[data-slot]").forEach(b => b.onclick = () => {
       const t = b.dataset.slot, v = meine[t];
       if (v === undefined) meine[t] = 2; else if (v === 2) meine[t] = 1; else if (v === 1) meine[t] = 0; else delete meine[t];
-      zeichne(b, t); $("#sp-avsave").classList.add("pulse");
+      zeichneAlle(); $("#sp-avsave").classList.add("pulse");
     });
-    $("#sp-all2").onclick = () => { zeiten.forEach(t => (meine[t] = 2)); $$("[data-slot]").forEach(b => zeichne(b, b.dataset.slot)); $("#sp-avsave").classList.add("pulse"); };
-    $("#sp-all0").onclick = () => { zeiten.forEach(t => delete meine[t]); $$("[data-slot]").forEach(b => zeichne(b, b.dataset.slot)); $("#sp-avsave").classList.add("pulse"); };
+    if (!meineAutos.length) { ladeAbsenzen(); return; }
+    $("#sp-all2").onclick = () => { meineZeiten().forEach(t => (meine[t] = 2)); zeichneAlle(); $("#sp-avsave").classList.add("pulse"); };
+    $("#sp-all0").onclick = () => { meineZeiten().forEach(t => delete meine[t]); zeichneAlle(); $("#sp-avsave").classList.add("pulse"); };
     $("#sp-avsave").onclick = async () => {
       if (!S.id) { C.toast("Plan erst speichern"); return; }
       const b = $("#sp-avsave"); b.disabled = true;
@@ -519,14 +556,14 @@
       catch (e) { C.toast(e.message); }
       b.disabled = false;
     };
-    ladeAbsenzen(uids);
+    ladeAbsenzen();
   }
   let ABS = null;
   function absenzHinweis() { return '<div id="sp-abs"></div>'; }
-  async function ladeAbsenzen(uids) {
+  // Abwesenheiten, die in das Zeitfenster eines Autos fallen, auf dem der Fahrer sitzt
+  async function ladeAbsenzen() {
     try { if (!ABS) ABS = (await C.api("/abwesend")).list || []; } catch (e) { return; }
-    const f = fenster();
-    const treffer = ABS.filter(a => uids.includes(a.uid) && a.von < f.bis && a.bis > f.von);
+    const treffer = ABS.filter(a => S.plan.cars.some(c => { const f = fenster(c); return c.drivers.some(d => d.uid === a.uid) && a.von < f.bis && a.bis > f.von; }));
     const el = document.getElementById("sp-abs");
     if (!el || !treffer.length) return;
     el.innerHTML = `<div class="tm-box sp-warn"><h5>Eingetragene Abwesenheiten im Rennzeitraum</h5>${treffer.map(a => `<div>⚠️ <b>${esc(a.name)}</b>: ${tagUhr(a.von)} bis ${tagUhr(a.bis)}${a.text ? " · " + esc(a.text) : ""}</div>`).join("")}</div>`;
@@ -542,7 +579,7 @@
 
   function tabPlan(body) {
     const p = S.plan;
-    if (!p.cars.length) { body.innerHTML = '<div class="tm-box"><p class="tm-muted">Erst unter „Autos & Fahrer" ein Auto anlegen.</p></div>'; return; }
+    if (!p.cars.length) { body.innerHTML = '<div class="tm-box"><p class="tm-muted">Erst unter „Fahrzeuge & Fahrer" ein Auto anlegen.</p></div>'; return; }
     const c = p.cars[S.car] || p.cars[0];
     const r = rechne(c, null);
     body.innerHTML = carTabs(S.car) + stintTabelle(c, r, false) + (r.rows.length ? `
@@ -564,7 +601,7 @@
       po.disabled = true;
       const cars = p.cars.map(car => {
         const rr = rechne(car, null).rows;
-        return { name: car.name + (car.carName ? " · " + car.carName : ""), lines: rr.map(s => `${s.i + 1}. ${uhr(s.von)} bis ${uhr(s.bis)} · ${s.name} · ${s.laps} Rd.`) };
+        return { name: car.name + (car.carName ? " · " + car.carName : "") + " · Start " + tagUhr(car.start), lines: rr.map(s => `${s.i + 1}. ${uhr(s.von)} bis ${uhr(s.bis)} · ${s.name} · ${s.laps} Rd.`) };
       });
       try { const x = await C.api("/stint/post", { method: "POST", body: { id: S.id, cars } }); C.toast(x.info, true); }
       catch (e) { C.toast(e.message); }
@@ -573,9 +610,9 @@
   }
 
   function stintTabelle(c, r, live) {
-    if (r.fehler.length) return `<div class="tm-box sp-warn"><h5>Noch nicht berechenbar</h5>${r.fehler.map(f => `<div>• ${esc(f)}</div>`).join("")}<p class="tm-muted" style="margin-top:8px">Unter „Autos & Fahrer" ergänzen.</p></div>`;
+    if (r.fehler.length) return `<div class="tm-box sp-warn"><h5>Noch nicht berechenbar</h5>${r.fehler.map(f => `<div>• ${esc(f)}</div>`).join("")}<p class="tm-muted" style="margin-top:8px">Unter „Fahrzeuge & Fahrer" ergänzen.</p></div>`;
     const rows = r.rows;
-    const P = S.plan.pit;
+    const P = c.pit;
     const stopps = rows.filter(x => x.pit).length;
     const runden = rows.reduce((a, x) => a + x.laps, 0);
     const sprit = rows.reduce((a, x) => a + x.fuel, 0);
@@ -584,7 +621,7 @@
     rows.forEach(x => { if (x.uid) zeitFahrer[x.uid] = (zeitFahrer[x.uid] || 0) + (x.bis - x.von); });
     const avDot = (x) => {
       if (!x.uid || x.real === "fertig") return "";
-      const v = verfuegbar(x.uid, x.von, x.bis);
+      const v = verfuegbar(x.uid, x.von, x.bis, c);
       const t = v === -1 ? "Nichts eingetragen" : VTXT[v];
       return `<span class="sp-dot ${v === -1 ? "" : VCOL[v]}" title="${t}"></span>`;
     };
@@ -649,7 +686,7 @@
       }
       return `<div class="tm-box sp-livebox"><h5>Live aus Garage 61 <span class="tm-badge ${cls}">${cls === "live" ? "Live" : "Info"}</span></h5>
         <p class="hint">${esc(txt)}</p>
-        <p class="tm-muted">Während das Rennen läuft, holt die Seite alle 5 Minuten die echten Runden aus Garage 61 (solange sie offen ist). Gefahrene Stints werden grün markiert, der Rest wird ab dem echten Stand neu gerechnet. Das klappt nur, wenn die Fahrer beim Fahren Garage 61 laufen haben und unter „Autos & Fahrer" mit ihrem Garage-61-Namen verknüpft sind.</p>
+        <p class="tm-muted">Während das Rennen läuft, holt die Seite alle 5 Minuten die echten Runden aus Garage 61 (solange sie offen ist). Gefahrene Stints werden grün markiert, der Rest wird ab dem echten Stand neu gerechnet. Das klappt nur, wenn die Fahrer beim Fahren Garage 61 laufen haben und unter „Fahrzeuge & Fahrer" mit ihrem Garage-61-Namen verknüpft sind.</p>
         <div class="tm-actions">${C.btn("Jetzt aktualisieren", "sm", 'id="sp-lv"')}</div></div>`;
     };
     const zeichne = () => {
