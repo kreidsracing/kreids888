@@ -46,6 +46,7 @@
     link: I('<path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/>'),
     ext: I('<path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/>'),
     eye: I('<path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>'),
+    stint: I('<path d="M4 4h16v16H4z"/><path d="M4 9h16M9 9v11M14 13h3M14 16h3"/><path d="M6.5 6.5h.01"/>'),
     gauge: I('<path d="M3.5 18a9 9 0 1 1 17 0"/><path d="M12 15l4.5-5.5"/><circle cx="12" cy="15" r="1.4" fill="currentColor"/>'),
   };
 
@@ -60,6 +61,7 @@
     trainer:  { title: "Kreids-Trainer", desc: "Live-Coach, Setup-Berater und Streckenberater – direkt im Dashboard.", live: true },
     garage61: { title: "Garage 61", desc: "Team-Bestenliste und Bestzeit-Posts direkt in Discord.", live: true },
     links:    { title: "Links", desc: "Wichtige Links fürs Team.", live: true },
+    stint:    { title: "Stintplaner", desc: "Stints, Sprit und Fahrer für Endurance-Rennen planen.", live: true },
   };
   const SESSION = { 1: "Training", 2: "Quali", 3: "Rennen" };
 
@@ -410,7 +412,7 @@
   function renderShell() {
     const id = location.hash.replace("#", "");
     const tools = Object.keys(PANELS).filter(p => ME.panels[p] && p !== "garage61" && p !== "links");
-    const link = (hid, icon, label) => `<a class="td-link${id === hid ? " on" : ""}" href="#${hid}">${ICONS[icon]}<span>${esc(label)}</span></a>`;
+    const link = (hid, icon, label) => `<a class="td-link${id === hid || (hid && id.startsWith(hid + "/")) ? " on" : ""}" href="#${hid}">${ICONS[icon]}<span>${esc(label)}</span></a>`;
 
     view.innerHTML = `
       <div class="td">
@@ -427,7 +429,7 @@
         <div class="td-main" id="td-main"></div>
       </div>`;
 
-    if (id !== "garage61" && id !== "woche") merke(id || "dashboard");
+    if (id !== "garage61" && id !== "woche") merke(id.startsWith("stint/") ? "stint" : id || "dashboard");
     if (id === "woche" && ME.panels.garage61) return renderG61("woche");
     if (id === "nutzung" && ME.isAdmin) return renderNutzung();
     if (id === "limits" && ME.isAdmin) return renderLimits();
@@ -444,6 +446,8 @@
     if (id === "garage61" && ME.panels.garage61) return renderG61();
     if (id === "trainer" && ME.panels.trainer && window.F2FTrainer)
       return window.F2FTrainer.mount(main(), { api, esc, toast, ICONS, panelHead, btn });
+    if ((id === "stint" || id.startsWith("stint/")) && ME.panels.stint && window.F2FStint)
+      return window.F2FStint.mount(main(), { api, esc, toast, ICONS, panelHead, btn, ME }, id.slice(6));
     if (PANELS[id] && ME.panels[id]) return renderSoon(PANELS[id].title, id, PANELS[id].desc);
     renderHome(tools);
   }
@@ -1198,7 +1202,7 @@
 
   /* ---------------- Nutzung (nur Admin) ---------------- */
   const BEREICHE = {
-    dashboard: "Dashboard", news: "Team News", fahrer: "Fahrerprofil", abwesend: "Abwesenheiten", links: "Links", trainer: "Trainer",
+    dashboard: "Dashboard", news: "Team News", fahrer: "Fahrerprofil", abwesend: "Abwesenheiten", links: "Links", trainer: "Trainer", stint: "Stintplaner",
     "g61-woche": "Wochenübersicht", "g61-fleiss": "Trainingsfleiß", "g61-trips": "Fahrtenbuch", "g61-board": "Bestenliste", "g61-ratings": "iRating", "g61-rennen": "Nächstes Rennen", "g61-training": "Training", "g61-bestzeiten": "Bestzeiten",
     aktivitaet: "Aktivität", "news-schreiben": "News schreiben", fahrerprofile: "Fahrerprofile", "kalender-admin": "Rennkalender", admin: "Admin",
   };
