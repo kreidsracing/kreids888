@@ -266,17 +266,7 @@
       <div class="td-label">Kommende Rennen</div>
       ${kommend.length ? `<div class="sp-cards">${kommend.map(karte).join("")}</div>` : '<div class="tm-box"><p class="tm-muted">Noch kein Rennen geplant.</p></div>'}
       ${alt.length ? `<div class="td-label">Vergangene Rennen</div><div class="sp-cards alt">${alt.map(karte).join("")}</div>` : ""}
-      ${META.isAdmin ? `<div class="tm-box" style="margin-top:22px"><h5>Discord-Kanal</h5>
-        <p class="hint">Hier postet der Bot, wenn Fahrer einem Auto zugeteilt werden (mit Ping und Bitte um Verfügbarkeit), und auf Knopfdruck den fertigen Plan.</p>
-        <div class="sp-inline"><select class="tm-select" id="sp-chan"><option value="">Kein Kanal (keine Posts)</option>${(META.channels || []).map(c => `<option value="${c.id}" ${c.id === META.channel ? "selected" : ""}># ${esc(c.name)}</option>`).join("")}</select>
-        ${C.btn("Speichern", "", 'id="sp-chan-save"')}</div></div>` : ""}`;
-    const cs = $("#sp-chan-save");
-    if (cs) cs.onclick = async () => {
-      cs.disabled = true;
-      try { await C.api("/stint/channel", { method: "POST", body: { channel: $("#sp-chan").value } }); META.channel = $("#sp-chan").value; C.toast("Kanal gespeichert", true); }
-      catch (e) { C.toast(e.message); }
-      cs.disabled = false;
-    };
+      ${META.isAdmin ? `<p class="tm-muted" style="margin-top:18px">Standard-Kanal und Pings stellst du unter <a class="r" href="#admin">Admin → Stintplaner</a> ein.</p>` : ""}`;
   }
 
   /* ---------------- Plan laden ---------------- */
@@ -331,6 +321,8 @@
     if (!S.plan.name.trim()) { C.toast("Bitte einen Namen fürs Rennen eintragen"); S.tab = "rennen"; return renderPlan(); }
     b.disabled = true;
     try {
+      // geplante Stint-Starts mitschicken, damit der Bot die Fahrer vorher anpingen kann
+      S.plan.schedule = S.plan.cars.flatMap(c => rechne(c, null).rows.map(x => ({ c: c.key, i: x.i, u: x.uid, v: Math.round(x.von) })));
       const r = await C.api("/stint/plan", { method: "POST", body: { id: S.id, rev: S.rev, plan: S.plan } });
       C.toast(r.info || "Gespeichert", true);
       S.dirty = false;
@@ -356,6 +348,8 @@
           <div class="sp-inline" style="margin-top:10px">${p.mode === "zeit"
             ? `<input class="tm-input sp-num" id="sp-h" type="number" min="0" max="48" value="${h}"><span>Std.</span><input class="tm-input sp-num" id="sp-m" type="number" min="0" max="59" step="5" value="${m}"><span>Min.</span>`
             : `<input class="tm-input sp-num" id="sp-runden" type="number" min="1" max="5000" value="${p.runden}"><span>Runden</span>`}</div></div></div>
+        <div class="tm-row"><label for="sp-chan">Discord-Kanal<small>für Pings und Posts zu diesem Rennen</small></label>
+          <div><select class="tm-select" id="sp-chan"><option value="">Standard${stdKanal() ? " (# " + esc(stdKanal()) + ")" : " (keiner eingestellt)"}</option>${(META.channels || []).map(c => `<option value="${c.id}" ${c.id === p.channel ? "selected" : ""}># ${esc(c.name)}</option>`).join("")}</select></div></div>
         <div class="tm-row"><label for="sp-notiz">Notiz<small>optional</small></label><textarea class="tm-input" id="sp-notiz" rows="3" maxlength="600" placeholder="z. B. Pflichtstopps, Setup, Treffpunkt im Discord …">${esc(p.notiz)}</textarea></div>
       </div>
       <p class="tm-muted" style="margin:-4px 0 14px">Startdatum, Startzeit und Boxenstopp-Werte stellst du pro Auto unter „Fahrzeuge &amp; Fahrer" ein.</p>
@@ -373,6 +367,7 @@
     on("sp-h", "change", dauerSet); on("sp-m", "change", dauerSet);
     on("sp-runden", "change", (e) => { p.runden = Math.max(1, Math.round(num(e.target.value, 100))); dirty(); });
     on("sp-notiz", "input", (e) => { p.notiz = e.target.value; dirty(); });
+    on("sp-chan", "change", (e) => { p.channel = e.target.value; dirty(); });
     on("sp-del", "click", async () => {
       if (!confirm("Diesen Plan wirklich löschen? Das geht nicht rückgängig.")) return;
       try { const r = await C.api("/stint/plan/delete", { method: "POST", body: { id: S.id } }); C.toast(r.info, true); S.dirty = false; location.hash = "stint"; }
@@ -480,6 +475,7 @@
       ${team.length ? `<optgroup label="Teamfahrzeuge (in den letzten 90 Tagen gefahren)">${team.map(opt).join("")}</optgroup>` : ""}
       ${rest.length ? `<optgroup label="Alle Fahrzeuge">${rest.map(opt).join("")}</optgroup>` : ""}</select>`;
   }
+  function stdKanal() { const k = (META.channels || []).find(c => c.id === META.channel); return k ? k.name : ""; }
   function kopfZeile() { const k = $(".sp-title small"); if (k) k.textContent = (S.plan.trackName || "Strecke offen") + " · " + tagUhr(S.plan.start); }
   function g61Info(c) {
     const g = S.g61[S.plan.trackId + "/" + c.carId];
@@ -604,7 +600,7 @@
       <div class="tm-actions" style="margin-top:14px">
         ${C.btn("Fahrer reihum verteilen", "sm", 'id="sp-rot"')}
         ${C.btn("Runden zurücksetzen", "sm", 'id="sp-reset"')}
-        ${S.id ? C.btn("Plan in Discord posten", "sm", `id="sp-post" ${META.channel ? "" : 'disabled title="Admin muss erst einen Kanal einstellen"'}`) : ""}
+        ${S.id ? C.btn("Plan in Discord posten", "sm", `id="sp-post" ${META.channel || p.channel ? "" : 'disabled title="Kein Discord-Kanal eingestellt"'}`) : ""}
       </div>
       <p class="tm-muted" style="margin-top:10px">Runden leer lassen = so weit wie der Tank reicht. Fahrer und Runden ändern sofort die Rechnung, gespeichert wird mit „Speichern" oben.</p>` : "");
     bindCarTabs(body, tabPlan);

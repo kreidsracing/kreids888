@@ -1718,6 +1718,20 @@
       </div>
 
       <div class="tm-box">
+        <h5>Stintplaner</h5>
+        <p class="hint">Grundeinstellungen für alle Rennen. Pro Rennen kann im Stintplaner ein anderer Kanal gewählt werden.</p>
+        <div class="tm-row"><label for="sp-ch">Standard-Kanal</label>
+          <div><select class="tm-select" id="sp-ch"><option value="">– nicht posten –</option>${(d.channels || []).map(c => `<option value="${c.id}" ${c.id === (cfg.stint || {}).channel ? "selected" : ""}># ${esc(c.name)}</option>`).join("")}</select></div></div>
+        <div class="tm-row"><div class="lbl">Pings</div>
+          <div class="tm-actions">
+            <label class="tm-switch"><input type="checkbox" id="sp-ping" ${(cfg.stint || {}).stintPing !== false ? "checked" : ""}><span class="s"></span>Fahrer vor seinem Stint anpingen</label>
+            <label class="tm-switch"><input type="checkbox" id="sp-av24" ${(cfg.stint || {}).avPing !== false ? "checked" : ""}><span class="s"></span>24 Std. vorher: fehlende Verfügbarkeit anmahnen</label>
+          </div></div>
+        <div class="tm-row"><label for="sp-vor">Vorlauf Stint-Ping<small>wird alle 10 Min. geprüft</small></label>
+          <div><select class="tm-select" id="sp-vor">${[10, 15, 20, 30, 45, 60].map(m => `<option value="${m}" ${m === ((cfg.stint || {}).vorlauf || 15) ? "selected" : ""}>${m} Minuten vorher</option>`).join("")}</select></div></div>
+      </div>
+
+      <div class="tm-box">
         <h5>Links</h5>
         <p class="hint">Erscheinen im Dashboard unter „Links" für alle Teammitglieder. Mit ▲▼ sortieren.</p>
         <div id="lk-edit"></div>
@@ -1773,7 +1787,8 @@
         };
       });
     });
-    box.querySelectorAll("#g61-team,#g61-ziel,#g61-ch,#g61-on,#g61-rec,#rm-on,#rm-24,#rm-1,#rm-ch,#rm-ping,#ab-ch,#li-on,#li-90,#li-100,#li-ch,#li-ping").forEach(el => el.addEventListener("input", markDirty));
+    box.querySelectorAll("#g61-team,#g61-ziel,#g61-ch,#g61-on,#g61-rec,#rm-on,#rm-24,#rm-1,#rm-ch,#rm-ping,#ab-ch,#li-on,#li-90,#li-100,#li-ch,#li-ping,#sp-ch,#sp-vor").forEach(el => el.addEventListener("input", markDirty));
+    box.querySelectorAll("#sp-ping,#sp-av24").forEach(el => el.addEventListener("change", markDirty));
     box.querySelectorAll("#g61-on,#g61-rec").forEach(el => el.addEventListener("change", markDirty));
 
     // ---- Links bearbeiten ----
@@ -1833,6 +1848,12 @@
         },
         links: (lkSync(), links.filter(l => l.title.trim() && l.url.trim())),
         absences: { channel: document.getElementById("ab-ch").value },
+        stint: {
+          channel: document.getElementById("sp-ch").value,
+          vorlauf: Number(document.getElementById("sp-vor").value) || 15,
+          stintPing: document.getElementById("sp-ping").checked,
+          avPing: document.getElementById("sp-av24").checked,
+        },
         limits: {
           enabled: document.getElementById("li-on").checked,
           channel: document.getElementById("li-ch").value,
