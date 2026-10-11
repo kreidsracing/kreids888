@@ -313,6 +313,8 @@
     const car = carByKey(teile[1]);
     if (!car) return fehler("Fahrzeug nicht gefunden");
     if (teile[2] === "bearbeiten") return carForm(car);
+    // direkt zu einem Schritt springen, z. B. #stint/<id>/<key>/plan ("Mein Stintplan")
+    if (["verf", "werte", "plan", "live"].includes(teile[2])) { S.nextStep = teile[2]; if (S.key === car.key) { S.step = teile[2]; } }
     if (S.key !== car.key || !S.dirty) { S.draft = kopie(car); S.dirty = false; }
     if (S.key !== car.key) { S.step = istLive(car) ? "live" : car.drivers.some(d => d.uid === S.me) && fahrerAv(S.me, car) === "fehlt" ? "verf" : "plan"; S.live = null; }
     if (S.nextStep) { S.step = S.nextStep; S.nextStep = null; }

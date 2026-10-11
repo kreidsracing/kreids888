@@ -1497,3 +1497,6 @@ body:has(.td)::after{content:"";position:fixed;inset:0;z-index:-1;pointer-events
 .sp-wz-team b{display:flex;align-items:center;gap:8px;font-family:var(--disp);font-weight:900;text-transform:uppercase;margin-bottom:8px}
 .sp-wz-team b i{width:10px;height:10px;border-radius:50%}
 .sp-inl-team{align-self:flex-start;width:auto}
+.td-link.td-ev-top{font-size:14px}
+.td-link.td-ev-top+.td-link.td-ev:not(.td-ev-top),.td-link.td-ev-top+.td-ev-leer{margin-top:8px;position:relative}
+.td-link.td-ev-top+.td-link.td-ev:not(.td-ev-top)::after{content:"";position:absolute;left:10px;right:10px;top:-5px;height:1px;background:rgba(255,255,255,.07)}
