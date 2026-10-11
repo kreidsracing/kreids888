@@ -283,6 +283,7 @@ body{background:var(--carbon)}
 
 <script src="overlays/qrcode.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/mp4-muxer@5.2.2/build/mp4-muxer.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/mp4box@0.5.2/dist/mp4box.all.min.js"></script>
 <script src="overlays/overlays.js?v=202610111300"></script>
 <script>
 (function(){
@@ -685,7 +686,7 @@ body{background:var(--carbon)}
   }
   function render(statisch){
     S.statisch = !!statisch;
-    S.zeitJetzt = statisch ? null : aufnahme ? (aufnahme.laeuft ? (S.vid ? S.vid.currentTime : (performance.now() - aufnahme.t0) / 1000) : 0) : performance.now() / 1000;
+    S.zeitJetzt = statisch ? null : aufnahme && aufnahme.offline ? aufnahme.zeit : aufnahme ? (aufnahme.laeuft ? (S.vid ? S.vid.currentTime : (performance.now() - aufnahme.t0) / 1000) : 0) : performance.now() / 1000;
     if (cv.width !== 1080) cv.width = 1080;
     if (cv.height !== S.H) cv.height = S.H;
     zeichne(ctx, OV[S.ov], 1080, S.H, 1, true);
@@ -754,6 +755,7 @@ body{background:var(--carbon)}
     if (schleife) return;
     (function bild(){
       if (!brauchtSchleife()) { schleife = null; render(); return; }
+      if (aufnahme && aufnahme.offline) { schleife = requestAnimationFrame(bild); return; } // Bild-für-Bild-Export zeichnet selbst
       var v = S.vid, t = null;
       if (aufnahme && aufnahme.laeuft) {
         t = v ? v.currentTime : (performance.now() - aufnahme.t0) / 1000;
@@ -761,9 +763,61 @@ body{background:var(--carbon)}
         else meldung("Aufnahme läuft … " + Math.floor(t) + " / " + Math.round(aufnahme.dauer) + " s – Tab bitte offen lassen.");
       } else if (v && !aufnahme && v.currentTime >= MAXS) { v.currentTime = 0; }
       render();
-      if (t !== null && aufnahme && aufnahme.wc) aufnahme.wc.frame(t);
       schleife = requestAnimationFrame(bild);
     })();
+  }
+  // Bildrate direkt aus der MP4/MOV-Datei lesen (Videospur: mdhd-Zeitbasis / häufigster stts-Abstand)
+  async function fpsAusDatei(file){
+    try {
+      var off = 0, size = file.size;
+      while (off + 8 <= size) {
+        var hd = new DataView(await file.slice(off, off + 16).arrayBuffer());
+        var sz = hd.getUint32(0), typ = String.fromCharCode(hd.getUint8(4), hd.getUint8(5), hd.getUint8(6), hd.getUint8(7));
+        if (sz === 1) sz = Number(hd.getBigUint64(8)); else if (sz === 0) sz = size - off;
+        if (sz < 8) return null;
+        if (typ === "moov") return fpsAusMoov(new DataView(await file.slice(off, off + sz).arrayBuffer()));
+        off += sz;
+      }
+    } catch (e) {}
+    return null;
+  }
+  function fpsAusMoov(dv){
+    function name(o){ return String.fromCharCode(dv.getUint8(o), dv.getUint8(o + 1), dv.getUint8(o + 2), dv.getUint8(o + 3)); }
+    function kind(s, e, wer){ for (var o = s; o + 8 <= e;) { var z = dv.getUint32(o); if (z < 8) return null; if (name(o + 4) === wer) return [o, o + z]; o += z; } return null; }
+    for (var o = 8; o + 8 <= dv.byteLength;) {
+      var z = dv.getUint32(o); if (z < 8) break;
+      if (name(o + 4) === "trak") {
+        var mdia = kind(o + 8, o + z, "mdia"), hdlr = mdia && kind(mdia[0] + 8, mdia[1], "hdlr");
+        if (hdlr && name(hdlr[0] + 16) === "vide") {
+          var mdhd = kind(mdia[0] + 8, mdia[1], "mdhd"), minf = kind(mdia[0] + 8, mdia[1], "minf");
+          var stbl = minf && kind(minf[0] + 8, minf[1], "stbl"), stts = stbl && kind(stbl[0] + 8, stbl[1], "stts");
+          if (!mdhd || !stts) return null;
+          var ts = dv.getUint8(mdhd[0] + 8) === 1 ? dv.getUint32(mdhd[0] + 28) : dv.getUint32(mdhd[0] + 20);
+          var anz = dv.getUint32(stts[0] + 12), best = 0, delta = 0;
+          for (var i = 0; i < anz; i++) { var c = dv.getUint32(stts[0] + 16 + i * 8), d = dv.getUint32(stts[0] + 20 + i * 8); if (c > best) { best = c; delta = d; } }
+          if (!ts || !delta) return null;
+          var f = ts / delta;
+          return f >= 10 && f <= 121 ? f : null;
+        }
+      }
+      o += z;
+    }
+    return null;
+  }
+  // Rückfall: Bildrate beim Abspielen messen (Abstand der gezeigten Bilder), auf übliche Werte runden
+  function fpsMessen(v){
+    if (!v.requestVideoFrameCallback) return;
+    var letzte = null, d = [];
+    function cb(now, m){
+      if (S.vid !== v) return;
+      if (letzte !== null && !v.paused) { var x = m.mediaTime - letzte; if (x > 0.004 && x < 0.1) d.push(x); }
+      letzte = m.mediaTime;
+      if (d.length < 24) { v.requestVideoFrameCallback(cb); return; }
+      d.sort(function(a, b){ return a - b; });
+      var f = 1 / d[Math.floor(d.length / 4)];
+      S.vidFps = [23.976, 24, 25, 29.97, 30, 48, 50, 59.94, 60].reduce(function(a, b){ return Math.abs(b - f) < Math.abs(a - f) ? b : a; });
+    }
+    v.requestVideoFrameCallback(cb);
   }
   $("vfile").onchange = function(){
     var f = this.files && this.files[0]; this.value = ""; if (!f) return;
@@ -773,7 +827,8 @@ body{background:var(--carbon)}
     v.playsInline = true; v.loop = true; v.preload = "auto"; v.muted = true;
     v.onloadeddata = function(){
       v.onloadeddata = null;
-      S.vid = v; tonVerbinden(v); setzeBild(v);
+      S.vid = v; S.vidFile = f; S.vidFps = 30; tonVerbinden(v); setzeBild(v);
+      fpsAusDatei(f).then(function(fps){ if (S.vid !== v) return; if (fps) S.vidFps = fps; else fpsMessen(v); });
       document.querySelectorAll("#gal button").forEach(function(x){ x.classList.remove("on"); });
       var dauer = v.duration || 0;
       $("vidInfo").textContent = dauer > MAXS + 0.5 ? "Video ist " + Math.round(dauer) + " s lang – es werden die ersten 30 s genommen." : (dauer ? "Länge: " + Math.round(dauer) + " s" : "");
@@ -797,10 +852,7 @@ body{background:var(--carbon)}
     if (!aufnahme || aufnahme.stoppt) return;
     aufnahme.laeuft = false; aufnahme.stoppt = true;
     try { S.vid && S.vid.pause(); } catch (e) {}
-    if (aufnahme.wc) {
-      meldung("Video wird fertig gebaut …");
-      aufnahme.wc.stop().then(function(b){ videoFertig(b, "mp4"); }).catch(function(e){ meldung("Video konnte nicht gespeichert werden: " + (e && e.message || e), true); videoFertig(null); });
-    } else if (aufnahme.rec.state !== "inactive") aufnahme.rec.stop();
+    if (aufnahme.rec && aufnahme.rec.state !== "inactive") aufnahme.rec.stop();
   }
   function knoepfe(laeuft){
     $("vdl").querySelector("span").textContent = laeuft ? "Aufnahme läuft …" : "Video herunterladen";
@@ -816,72 +868,59 @@ body{background:var(--carbon)}
     if (S.vid) { S.vid.loop = true; S.vid.currentTime = 0; S.vid.play().catch(function(){}); }
     starteSchleife(); render();
   }
-  /* ---------- Normales MP4 (WebCodecs + mp4-muxer): feste 30 fps, Länge im Kopf, Schlüsselbild jede Sekunde ---------- */
-  function wcMoeglich(){ return !!(window.VideoEncoder && window.VideoFrame && window.Mp4Muxer && window.Mp4Muxer.Muxer); }
-  async function wcRekorder(mitTon){
-    var W = cv.width, H = cv.height, FPS = 30, vcfg = null, acfg = null, aCodec = "";
-    var vl = ["avc1.640028", "avc1.640032", "avc1.4d0028", "avc1.4d0032", "avc1.42e028"];
+  /* ---------- Normales MP4 (WebCodecs + mp4-muxer), Bild für Bild gerendert ----------
+     Kein Echtzeit-Mitschnitt: jedes Bild wird einzeln gezeichnet und kodiert, Bildrate = Bildrate des Clips,
+     Ton direkt aus der Datei. Dadurch kein Ruckeln, Länge im Kopf, hohe Datenrate. */
+  function wcMoeglich(){ return !!(window.VideoEncoder && window.VideoFrame && window.AudioEncoder && window.AudioData && window.Mp4Muxer && window.Mp4Muxer.Muxer); }
+  function warte(ms){ return new Promise(function(r){ setTimeout(r, ms); }); }
+  async function wcRekorder(fps, tonPuffer, dauer){
+    var W = cv.width, H = cv.height, vcfg = null, acfg = null, aCodec = "";
+    var rate = fps > 31 ? 40000000 : 25000000;
+    var vl = fps > 31 ? ["avc1.64002a", "avc1.640032", "avc1.640033", "avc1.4d002a"] : ["avc1.640028", "avc1.640032", "avc1.4d0028", "avc1.42e028"];
     for (var i = 0; i < vl.length && !vcfg; i++) {
-      var c1 = { codec: vl[i], width: W, height: H, bitrate: 10000000, framerate: FPS, avc: { format: "avc" } };
+      var c1 = { codec: vl[i], width: W, height: H, bitrate: rate, framerate: fps, latencyMode: "quality", avc: { format: "avc" } };
       try { if ((await VideoEncoder.isConfigSupported(c1)).supported) vcfg = c1; } catch (e) {}
     }
     if (!vcfg) return null;
-    var spur = mitTon && recZiel ? recZiel.stream.getAudioTracks()[0] : null;
-    if (spur) {
-      if (!window.AudioEncoder || !window.MediaStreamTrackProcessor || !window.AudioData) return null;
+    if (tonPuffer) {
       var al = [["mp4a.40.2", "aac"], ["opus", "opus"]];
       for (var j = 0; j < al.length && !acfg; j++) {
-        var c2 = { codec: al[j][0], sampleRate: ac.sampleRate, numberOfChannels: 2, bitrate: 192000 };
+        var c2 = { codec: al[j][0], sampleRate: tonPuffer.sampleRate, numberOfChannels: 2, bitrate: 256000 };
         try { if ((await AudioEncoder.isConfigSupported(c2)).supported) { acfg = c2; aCodec = al[j][1]; } } catch (e) {}
       }
-      if (!acfg) return null;
     }
     var muxer = new Mp4Muxer.Muxer({
       target: new Mp4Muxer.ArrayBufferTarget(),
-      video: { codec: "avc", width: W, height: H, frameRate: FPS },
+      video: { codec: "avc", width: W, height: H, frameRate: Math.round(fps) },
       audio: acfg ? { codec: aCodec, numberOfChannels: 2, sampleRate: acfg.sampleRate } : undefined,
       fastStart: "in-memory", firstTimestampBehavior: "offset"
     });
-    var fehler = null, laeuft = false, n = 0, aT0 = null, leser = null, kopie = null, aenc = null;
+    var fehler = null, n = 0, key = Math.max(1, Math.round(fps));
     var venc = new VideoEncoder({ output: function(ch, m){ muxer.addVideoChunk(ch, m); }, error: function(e){ fehler = e; } });
     venc.configure(vcfg);
+    var aenc = null;
     if (acfg) {
       aenc = new AudioEncoder({ output: function(ch, m){ muxer.addAudioChunk(ch, m); }, error: function(e){ fehler = e; } });
       aenc.configure(acfg);
-      kopie = spur.clone();
-      leser = new MediaStreamTrackProcessor({ track: kopie }).readable.getReader();
-    }
-    async function tonLesen(){
-      while (true) {
-        var r; try { r = await leser.read(); } catch (e) { break; }
-        if (r.done) break;
-        var d = r.value;
-        if (!laeuft || fehler) { d.close(); continue; }
-        if (aT0 === null) aT0 = d.timestamp;
-        var nf = d.numberOfFrames, nc = d.numberOfChannels, buf = new Float32Array(nf * 2);
-        try {
-          for (var k = 0; k < 2; k++) d.copyTo(buf.subarray(k * nf, (k + 1) * nf), { planeIndex: Math.min(k, nc - 1), format: "f32-planar" });
-          var nd = new AudioData({ format: "f32-planar", sampleRate: d.sampleRate, numberOfFrames: nf, numberOfChannels: 2, timestamp: d.timestamp - aT0, data: buf });
-          aenc.encode(nd); nd.close();
-        } catch (e) { fehler = fehler || e; }
-        d.close();
+      var sr = tonPuffer.sampleRate, len = Math.min(tonPuffer.length, Math.round(dauer * sr));
+      var L = tonPuffer.getChannelData(0), R = tonPuffer.numberOfChannels > 1 ? tonPuffer.getChannelData(1) : L;
+      for (var p = 0; p < len; p += 4096) {
+        var m = Math.min(4096, len - p), buf = new Float32Array(m * 2);
+        buf.set(L.subarray(p, p + m), 0); buf.set(R.subarray(p, p + m), m);
+        var ad = new AudioData({ format: "f32-planar", sampleRate: sr, numberOfFrames: m, numberOfChannels: 2, timestamp: Math.round(p / sr * 1e6), data: buf });
+        aenc.encode(ad); ad.close();
       }
     }
     return {
-      start: function(){ laeuft = true; if (leser) tonLesen(); },
-      frame: function(t){
-        if (!laeuft || fehler) return;
-        var soll = Math.floor(t * FPS) + 1;
-        if (soll - n > FPS) n = soll - 1; // Tab lag im Hintergrund: Lücke überspringen statt hunderte Kopien
-        while (n < soll) {
-          var f = new VideoFrame(cv, { timestamp: Math.round(n * 1e6 / FPS), duration: Math.round(1e6 / FPS) });
-          venc.encode(f, { keyFrame: n % FPS === 0 }); f.close(); n++;
-        }
+      fps: fps, tonCodec: aCodec,
+      bild: async function(){
+        if (fehler) throw fehler;
+        var f = new VideoFrame(cv, { timestamp: Math.round(n * 1e6 / fps), duration: Math.round(1e6 / fps) });
+        venc.encode(f, { keyFrame: n % key === 0 }); f.close(); n++;
+        while (venc.encodeQueueSize > 12) await warte(4);
       },
+      anzahl: function(){ return n; },
       stop: async function(){
-        laeuft = false;
-        if (leser) { try { await leser.cancel(); } catch (e) {} }
-        if (kopie) kopie.stop();
         await venc.flush(); if (aenc) await aenc.flush();
         venc.close(); if (aenc) aenc.close();
         if (fehler) throw fehler;
@@ -891,31 +930,144 @@ body{background:var(--carbon)}
       }
     };
   }
+  // Ton aus der Videodatei holen (ohne Ton im Clip: null)
+  async function tonAusDatei(file){
+    if (!file) return null;
+    try { var ctx = ac || new (window.AudioContext || window.webkitAudioContext)(); return await ctx.decodeAudioData(await file.arrayBuffer()); }
+    catch (e) { return null; }
+  }
+  // Videohintergrund: Bild für Bild abspielen, nach jedem gezeigten Bild anhalten und kodieren (requestVideoFrameCallback)
+  function clipDurchlaufen(v, wc, gesamt, fortschritt){
+    return new Promise(function(fertig, kaputt){
+      var fps = wc.fps, offen = true;
+      function ende(){ if (!offen) return; offen = false; v.onended = null; try { v.pause(); } catch (e) {} fertig(); }
+      function fehler(e){ if (!offen) return; offen = false; v.onended = null; try { v.pause(); } catch (x) {} kaputt(e); }
+      async function bisZeit(mt){
+        while (wc.anzahl() < gesamt && wc.anzahl() / fps <= mt + 0.5 / fps) { aufnahme.zeit = wc.anzahl() / fps; render(); await wc.bild(); }
+        fortschritt(wc.anzahl() / gesamt);
+      }
+      function cb(now, meta){
+        if (!offen) return;
+        if (!aufnahme) return ende();
+        v.pause();
+        bisZeit(meta.mediaTime).then(function(){
+          if (!offen) return;
+          if (wc.anzahl() >= gesamt) return ende();
+          v.requestVideoFrameCallback(cb);
+          v.play().catch(fehler);
+        }, fehler);
+      }
+      v.onended = function(){
+        // Rest mit dem letzten Bild auffüllen
+        bisZeit(1e9).then(ende, fehler);
+      };
+      v.pause(); v.loop = false;
+      v.addEventListener("seeked", function(){ v.requestVideoFrameCallback(cb); v.play().catch(fehler); }, { once: true });
+      v.currentTime = 0;
+    });
+  }
+  // Clip direkt aus der Datei lesen (mp4box) und jedes Bild selbst dekodieren (VideoDecoder): kein Bild doppelt, keins fehlt
+  function mp4Lesen(file, bis){
+    return new Promise(function(ok){
+      if (!window.MP4Box || !window.DataStream || !window.VideoDecoder) return ok(null);
+      file.arrayBuffer().then(function(ab){
+        var mp = MP4Box.createFile(), spur = null, proben = [];
+        mp.onError = function(){ ok(null); };
+        mp.onReady = function(info){
+          spur = info.videoTracks && info.videoTracks[0];
+          if (!spur) return;
+          mp.setExtractionOptions(spur.id, null, { nbSamples: 1000000 });
+          mp.start();
+        };
+        mp.onSamples = function(id, u, s){ for (var i = 0; i < s.length; i++) proben.push(s[i]); };
+        try { ab.fileStart = 0; mp.appendBuffer(ab); mp.flush(); } catch (e) { return ok(null); }
+        setTimeout(function(){
+          if (!spur || !proben.length) return ok(null);
+          var desc = null, trak = mp.getTrackById(spur.id);
+          (trak.mdia.minf.stbl.stsd.entries || []).forEach(function(en){
+            var box = en.avcC || en.hvcC || en.vpcC || en.av1C;
+            if (box && !desc) { var ds = new DataStream(undefined, 0, DataStream.BIG_ENDIAN); box.write(ds); desc = new Uint8Array(ds.buffer, 8); }
+          });
+          var t0 = proben.reduce(function(m, p){ return Math.min(m, p.cts); }, Infinity);
+          var chunks = proben.filter(function(p){ return (p.cts - t0) / p.timescale < bis + 0.2; }).map(function(p){
+            return new EncodedVideoChunk({ type: p.is_sync ? "key" : "delta", timestamp: Math.round((p.cts - t0) * 1e6 / p.timescale), duration: Math.round(p.duration * 1e6 / p.timescale), data: p.data });
+          });
+          ok({ codec: spur.codec, w: spur.video.width, h: spur.video.height, description: desc, chunks: chunks });
+        }, 0);
+      }, function(){ ok(null); });
+    });
+  }
+  async function clipDekodiert(file, dauer, wc, gesamt, fortschritt){
+    var info = await mp4Lesen(file, dauer);
+    if (!info) return false;
+    var cfg = { codec: info.codec, codedWidth: info.w, codedHeight: info.h };
+    if (info.description) cfg.description = info.description;
+    try { if (!(await VideoDecoder.isConfigSupported(cfg)).supported) return false; } catch (e) { return false; }
+    var fc = document.createElement("canvas"); fc.width = info.w; fc.height = info.h;
+    fc.naturalWidth = info.w; fc.naturalHeight = info.h;
+    var fx = fc.getContext("2d"), alt = S.img, fps = wc.fps, schlange = [], fehler = null, i = 0, geleert = false, hatBild = false;
+    var dec = new VideoDecoder({ output: function(f){ schlange.push(f); }, error: function(e){ fehler = e; } });
+    dec.configure(cfg);
+    S.img = fc;
+    try {
+      while (wc.anzahl() < gesamt) {
+        if (fehler) throw fehler;
+        while (i < info.chunks.length && dec.decodeQueueSize < 6 && schlange.length < 4) dec.decode(info.chunks[i++]);
+        if (!schlange.length) {
+          if (i >= info.chunks.length) { if (!geleert) { geleert = true; await dec.flush(); continue; } break; }
+          await warte(2); continue;
+        }
+        var f = schlange.shift(), ts = f.timestamp / 1e6;
+        fx.drawImage(f, 0, 0, fc.width, fc.height); f.close(); hatBild = true;
+        while (wc.anzahl() < gesamt && wc.anzahl() / fps <= ts + 0.5 / fps) { aufnahme.zeit = wc.anzahl() / fps; render(); await wc.bild(); }
+        fortschritt(wc.anzahl() / gesamt);
+      }
+      if (!hatBild) throw new Error("Video ließ sich nicht dekodieren");
+      while (wc.anzahl() < gesamt) { aufnahme.zeit = wc.anzahl() / fps; render(); await wc.bild(); }
+    } finally {
+      schlange.forEach(function(f){ f.close(); });
+      try { dec.close(); } catch (e) {}
+      S.img = alt;
+    }
+    return true;
+  }
+  async function aufnehmenWC(dauer){
+    var v = S.vid, fps = v ? (S.vidFps || 30) : 30, gesamt = Math.max(1, Math.round(dauer * fps));
+    aufnahme = { dauer: dauer, laeuft: true, offline: true, zeit: 0, t0: 0 };
+    knoepfe(true); meldung("Video wird vorbereitet …");
+    if (vorschau) vorschau.gain.value = 0;
+    function tonZurueck(){ if (vorschau) vorschau.gain.value = $("vidTon").checked ? 1 : 0; }
+    try {
+      var ton = v ? await tonAusDatei(S.vidFile) : null;
+      var wc = await wcRekorder(fps, ton, dauer);
+      if (!wc) { aufnahme = null; tonZurueck(); return aufnehmenMR(dauer); }
+      var zeige = function(anteil){ meldung("Video wird gebaut … " + Math.round(anteil * 100) + " % (Tab bitte offen lassen)"); };
+      if (v) { v.pause(); }
+      if (v && await clipDekodiert(S.vidFile, dauer, wc, gesamt, zeige)) {}
+      else if (v && v.requestVideoFrameCallback) await clipDurchlaufen(v, wc, gesamt, zeige);
+      else {
+        for (var n = 0; n < gesamt; n++) {
+          aufnahme.zeit = n / fps;
+          if (v) { v.pause(); await new Promise(function(r){ v.addEventListener("seeked", r, { once: true }); v.currentTime = Math.min(v.duration || dauer, (n + 0.5) / fps); }); }
+          render(); await wc.bild();
+          if (n % 15 === 0) { zeige(n / gesamt); await warte(0); }
+        }
+      }
+      meldung("Video wird fertig gebaut …");
+      var blob = await wc.stop();
+      tonZurueck();
+      videoFertig(blob, "mp4");
+      if (wc.tonCodec === "opus") meldung($("dlMsg").textContent + " (Ton als Opus, dieser Browser kann kein AAC. Für Instagram am besten Chrome oder Edge nehmen.)");
+    } catch (e) {
+      tonZurueck();
+      meldung("Video konnte nicht gespeichert werden: " + (e && e.message || e), true);
+      videoFertig(null);
+    }
+  }
   function aufnehmen(dauer){
     if (aufnahme) return;
-    var v = S.vid;
     if (!wcMoeglich()) return aufnehmenMR(dauer);
-    if (ac && ac.state === "suspended") ac.resume();
-    aufnahme = { dauer: dauer, laeuft: false, t0: 0 };
-    knoepfe(true); meldung("Aufnahme startet …");
-    wcRekorder(!!(v && recZiel && quelle)).catch(function(){ return null; }).then(function(wc){
-      if (!wc) { aufnahme = null; return aufnehmenMR(dauer); }
-      aufnahme.wc = wc;
-      var gestartet = false;
-      function los(){
-        if (gestartet || !aufnahme) return; gestartet = true;
-        aufnahme.t0 = performance.now(); aufnahme.laeuft = true; wc.start();
-        render(); wc.frame(0);
-        if (v) v.play().catch(function(e){ meldung("Video ließ sich nicht abspielen: " + e.message, true); aufnahmeStop(); });
-        starteSchleife();
-      }
-      if (v) {
-        v.pause(); v.loop = false;
-        v.addEventListener("seeked", los, { once: true });
-        setTimeout(los, 800);
-        v.currentTime = 0;
-      } else los();
-    });
+    aufnehmenWC(dauer);
   }
   // alter Weg (MediaRecorder), nur falls der Browser kein WebCodecs kann
   function aufnehmenMR(dauer){
