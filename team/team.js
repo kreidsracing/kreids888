@@ -47,7 +47,6 @@
     ext: I('<path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/>'),
     eye: I('<path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>'),
     stint: I('<path d="M4 4h16v16H4z"/><path d="M4 9h16M9 9v11M14 13h3M14 16h3"/><path d="M6.5 6.5h.01"/>'),
-    overlay: I('<rect x="2" y="4" width="20" height="14" rx="1"/><rect x="4.5" y="6.5" width="7" height="4" rx=".5"/><rect x="13" y="12" width="6.5" height="3.5" rx=".5"/><path d="M8 21h8"/>'),
     gauge: I('<path d="M3.5 18a9 9 0 1 1 17 0"/><path d="M12 15l4.5-5.5"/><circle cx="12" cy="15" r="1.4" fill="currentColor"/>'),
   };
 
@@ -159,7 +158,6 @@
 
   function render() {
     if (window.F2FTrainer) window.F2FTrainer.unmount();
-    if (window.F2FOverlay) window.F2FOverlay.unmount();
     const inside = ME.loggedIn && ME.access;
     barNav.hidden = inside;
     if (!inside) return renderPublic();
@@ -513,7 +511,7 @@
             ${SECTIONS.map(s => link(s.id, s.icon, s.label)).join("")}
             ${ME.panels.links ? link("links", "link", "Links") : ""}
             ${ME.panels.stint ? `<div class="td-nav-h">Endurance Planung</div><div class="td-evnav" id="td-evnav">${evNavHtml(id)}</div>` : ""}
-            <div class="td-nav-h">Tools</div>${link("abwesend", "clock", "Abwesenheiten")}${tools.map(p => link(p, p, PANELS[p].title)).join("")}${ME.isAdmin ? link("overlay", "overlay", "Overlays") : ""}
+            <div class="td-nav-h">Tools</div>${link("abwesend", "clock", "Abwesenheiten")}${tools.map(p => link(p, p, PANELS[p].title)).join("")}
             ${ME.isAdmin ? `<div class="td-nav-h">Verwaltung</div>${link("aktivitaet", "activity", "Aktivität")}${link("nutzung", "eye", "Nutzung")}${link("limits", "gauge", "Limits")}${link("posts", "trophy", "G61-Posts")}${link("news-schreiben", "news", "News schreiben")}${link("fahrerprofile", "helmet", "Fahrerprofile")}${link("kalender-admin", "calendar", "Rennkalender")}${link("admin", "admin", "Admin")}${id === "admin" || id.startsWith("admin/") ? `<div class="td-admsub">${ADMIN_TEILE.map(([k, l]) => `<a class="td-link td-ev td-ev-sub" href="#admin/${k}" data-admteil="${k}"><span>${esc(l)}</span></a>`).join("")}</div>` : ""}<a class="td-link" href="https://kreids888-admin.kreids.workers.dev/" target="_blank" rel="noopener">${ICONS.ext}<span>kreids888-Dashboard</span></a>` : ""}
           </nav>
         </aside>
@@ -538,8 +536,6 @@
     if (id === "garage61" && ME.panels.garage61) return renderG61();
     if (id === "trainer" && ME.panels.trainer && window.F2FTrainer)
       return window.F2FTrainer.mount(main(), { api, esc, toast, ICONS, panelHead, btn });
-    if (id === "overlay" && ME.isAdmin && window.F2FOverlay)
-      return window.F2FOverlay.mount(main(), { api, esc, toast, ICONS, panelHead, btn });
     if ((id === "stint" || id.startsWith("stint/")) && ME.panels.stint && window.F2FStint)
       return window.F2FStint.mount(main(), { api, esc, toast, ICONS, panelHead, btn, ME }, id.slice(6));
     if (PANELS[id] && ME.panels[id]) return renderSoon(PANELS[id].title, id, PANELS[id].desc);
@@ -1299,7 +1295,7 @@
 
   /* ---------------- Nutzung (nur Admin) ---------------- */
   const BEREICHE = {
-    dashboard: "Dashboard", news: "Team News", fahrer: "Fahrerprofil", abwesend: "Abwesenheiten", links: "Links", trainer: "Trainer", stint: "Stintplaner", overlay: "Overlays",
+    dashboard: "Dashboard", news: "Team News", fahrer: "Fahrerprofil", abwesend: "Abwesenheiten", links: "Links", trainer: "Trainer", stint: "Stintplaner",
     "g61-woche": "Wochenübersicht", "g61-fleiss": "Trainingsfleiß", "g61-trips": "Fahrtenbuch", "g61-board": "Bestenliste", "g61-ratings": "iRating", "g61-rennen": "Nächstes Rennen", "g61-training": "Training", "g61-bestzeiten": "Bestzeiten",
     aktivitaet: "Aktivität", "news-schreiben": "News schreiben", fahrerprofile: "Fahrerprofile", "kalender-admin": "Rennkalender", admin: "Admin",
   };
