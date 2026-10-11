@@ -111,7 +111,26 @@ body{background:var(--carbon)}
         <p class="sb-hint">Im Bild mit der Maus verschieben.</p>
       </div>
       <div class="sb-panel">
-        <div class="sb-h">4 · Texte</div>
+        <div class="sb-h">4 · Ich-Bild (optional)</div>
+        <div class="sb-gal team" id="persGal"></div>
+        <div class="sb-row">
+          <label class="sb-file">Eigenes vom PC<input type="file" id="persFile" accept="image/*"></label>
+          <button type="button" class="sb-mini" id="persAus">kein Ich-Bild</button>
+        </div>
+        <label>Größe</label>
+        <input type="range" id="persSize" min="120" max="1600" step="1" value="620">
+        <label>Zuschneiden oben</label>
+        <input type="range" id="persCo" min="0" max="0.6" step="0.005" value="0">
+        <label>Zuschneiden unten</label>
+        <input type="range" id="persCu" min="0" max="0.6" step="0.005" value="0">
+        <label>Zuschneiden links</label>
+        <input type="range" id="persCl" min="0" max="0.6" step="0.005" value="0">
+        <label>Zuschneiden rechts</label>
+        <input type="range" id="persCr" min="0" max="0.6" step="0.005" value="0">
+        <p class="sb-hint">Im Bild mit der Maus verschieben. Liegt über dem Design, aber unter freien Texten, Aufruf, QR-Code und Leiste.</p>
+      </div>
+      <div class="sb-panel">
+        <div class="sb-h">5 · Texte</div>
         <label for="kicker">Kategorie</label>
         <input type="text" id="kicker" value="NEWS" maxlength="40">
         <label for="title">Überschrift</label>
@@ -130,7 +149,7 @@ body{background:var(--carbon)}
         <input type="text" id="footer" value="Konstanz schlägt Geschwindigkeit" maxlength="60">
       </div>
       <div class="sb-panel">
-        <div class="sb-h">5 · QR-Code (optional)</div>
+        <div class="sb-h">6 · QR-Code (optional)</div>
         <label for="qr">Link zum Scannen</label>
         <input type="text" id="qr" maxlength="300" placeholder="https://kreids888.com">
         <div class="sb-row" style="margin-top:8px">
@@ -146,7 +165,7 @@ body{background:var(--carbon)}
         <div class="sb-row" style="margin-top:10px"><button type="button" class="sb-file" id="qrDl">QR-Code einzeln herunterladen</button></div>
       </div>
       <div class="sb-panel">
-        <div class="sb-h">6 · Social-Media-Leiste (optional)</div>
+        <div class="sb-h">7 · Social-Media-Leiste (optional)</div>
         <div class="sb-row" id="soz">
           <label class="sb-chk"><input type="checkbox" value="youtube"> YouTube</label>
           <label class="sb-chk"><input type="checkbox" value="tiktok"> TikTok</label>
@@ -163,7 +182,7 @@ body{background:var(--carbon)}
         <p class="sb-hint">Im Bild mit der Maus verschieben.</p>
       </div>
       <div class="sb-panel">
-        <div class="sb-h">7 · Freie Texte (optional)</div>
+        <div class="sb-h">8 · Freie Texte (optional)</div>
         <div class="sb-row"><button type="button" class="sb-file" id="ftNeu">+ Text mit Rahmen</button><button type="button" class="sb-file" id="ftNeuNormal">+ Normaler Text</button></div>
         <div class="sb-ftl" id="ftListe"></div>
         <div id="ftEdit" hidden>
@@ -206,7 +225,7 @@ body{background:var(--carbon)}
         <p class="sb-hint">Text im Bild mit der Maus verschieben, anklicken zum Bearbeiten. Effekte siehst du in der Vorschau und im Video – im Bild steht der Text ruhig.</p>
       </div>
       <div class="sb-panel">
-        <div class="sb-h">8 · Aufruf (optional)</div>
+        <div class="sb-h">9 · Aufruf (optional)</div>
         <div class="sb-ftl" id="ctaVor"></div>
         <label for="ctaText">Haupttext</label>
         <input type="text" id="ctaText" maxlength="40" placeholder="ABONNIEREN">
@@ -606,6 +625,21 @@ body{background:var(--carbon)}
     c.restore();
     return { x: mx - bw / 2, y: my - bh / 2, w: bw, h: bh };
   }
+  // Ich-Bild: Position = Mittelpunkt, Größe = Höhe des ganzen Bildes, Zuschnitt in Anteilen
+  S.pers = null; S.persPos = null;
+  function persZeichnen(c, W, H){
+    var img = S.pers; if (!img || !img.naturalWidth) return null;
+    var iw = img.naturalWidth, ih = img.naturalHeight;
+    var co = +$("persCo").value, cu = +$("persCu").value, cl = +$("persCl").value, cr = +$("persCr").value;
+    if (co + cu > 0.9) cu = 0.9 - co; if (cl + cr > 0.9) cr = 0.9 - cl;
+    var sx = iw * cl, sy = ih * co, sw = iw * (1 - cl - cr), sh = ih * (1 - co - cu);
+    var k = +$("persSize").value / ih, w = Math.round(sw * k), hh = Math.round(sh * k);
+    var p = S.persPos || { x: Math.round(W * 0.72), y: H - hh / 2 };
+    var mx = Math.max(0, Math.min(W, p.x)), my = Math.max(0, Math.min(H, p.y));
+    var x = Math.round(mx - w / 2), y = Math.round(my - hh / 2);
+    c.drawImage(img, sx, sy, sw, sh, x, y, w, hh);
+    return { x: x, y: y, w: w, h: hh };
+  }
   // Team-Bild: Position = Mittelpunkt, Größe = Breite
   function teamZeichnen(c, W, H){
     var img = S.team; if (!img || !img.naturalWidth) return null;
@@ -622,6 +656,8 @@ body{background:var(--carbon)}
     c.clearRect(0, 0, W, H);
     var d = daten(); h._qr = null;
     try { ov.draw(c, W, H, d, h); } catch (e) { console.error(e); }
+    var pb = persZeichnen(c, W, H);
+    if (haupt) S.hit.pers = pb;
     var tb = teamZeichnen(c, W, H);
     if (haupt) S.hit.team = tb;
     if (haupt) {
@@ -889,18 +925,19 @@ body{background:var(--carbon)}
   function punkt(e){ var r = cv.getBoundingClientRect(), k = cv.width / r.width; return { x: (e.clientX - r.left) * k, y: (e.clientY - r.top) * k, k: k }; }
   cv.addEventListener("pointerdown", function(e){
     var p = punkt(e), fi = freiTreffer(p.x, p.y);
-    var was = inBox(S.hit.qr, p.x, p.y) ? "qr" : inBox(S.hit.soz, p.x, p.y) ? "soz" : inBox(S.hit.cta, p.x, p.y) ? "cta" : fi >= 0 ? "frei" : inBox(S.hit.team, p.x, p.y) ? "team" : (S.img ? "bild" : null);
+    var was = inBox(S.hit.qr, p.x, p.y) ? "qr" : inBox(S.hit.soz, p.x, p.y) ? "soz" : inBox(S.hit.cta, p.x, p.y) ? "cta" : fi >= 0 ? "frei" : inBox(S.hit.team, p.x, p.y) ? "team" : inBox(S.hit.pers, p.x, p.y) ? "pers" : (S.img ? "bild" : null);
     if (!was) return;
     if (was === "frei" && S.akt !== fi) { S.akt = fi; ftEditor(); render(); }
     var t = S.hit.team;
-    var start = was === "qr" ? { a: S.hit.qr.x, b: S.hit.qr.y } : was === "soz" ? { a: S.hit.soz.x, b: S.hit.soz.y } : was === "frei" ? { a: S.texte[fi].x, b: S.texte[fi].y } : was === "team" ? { a: t.x + t.w / 2, b: t.y + t.h / 2 } : was === "cta" ? { a: S.hit.cta.x + S.hit.cta.w / 2, b: S.hit.cta.y + S.hit.cta.h / 2 } : { a: S.view.ox, b: S.view.oy };
+    var start = was === "qr" ? { a: S.hit.qr.x, b: S.hit.qr.y } : was === "soz" ? { a: S.hit.soz.x, b: S.hit.soz.y } : was === "frei" ? { a: S.texte[fi].x, b: S.texte[fi].y } : was === "team" ? { a: t.x + t.w / 2, b: t.y + t.h / 2 } : was === "cta" ? { a: S.hit.cta.x + S.hit.cta.w / 2, b: S.hit.cta.y + S.hit.cta.h / 2 } : was === "pers" ? { a: S.hit.pers.x + S.hit.pers.w / 2, b: S.hit.pers.y + S.hit.pers.h / 2 } : { a: S.view.ox, b: S.view.oy };
     zieh = { was: was, x: e.clientX, y: e.clientY, a: start.a, b: start.b }; cv.setPointerCapture(e.pointerId);
   });
   cv.addEventListener("pointermove", function(e){
     var k = cv.width / cv.getBoundingClientRect().width;
-    if (!zieh) { var p = punkt(e); cv.style.cursor = (inBox(S.hit.qr, p.x, p.y) || inBox(S.hit.soz, p.x, p.y) || freiTreffer(p.x, p.y) >= 0 || inBox(S.hit.team, p.x, p.y) || inBox(S.hit.cta, p.x, p.y)) ? "move" : (S.img ? "grab" : "default"); return; }
+    if (!zieh) { var p = punkt(e); cv.style.cursor = (inBox(S.hit.qr, p.x, p.y) || inBox(S.hit.soz, p.x, p.y) || freiTreffer(p.x, p.y) >= 0 || inBox(S.hit.team, p.x, p.y) || inBox(S.hit.cta, p.x, p.y) || inBox(S.hit.pers, p.x, p.y)) ? "move" : (S.img ? "grab" : "default"); return; }
     var nx = zieh.a + (e.clientX - zieh.x) * k, ny = zieh.b + (e.clientY - zieh.y) * k;
     if (zieh.was === "qr") S.qrPos = { x: nx, y: ny };
+    else if (zieh.was === "pers") S.persPos = { x: Math.max(0, Math.min(cv.width, nx)), y: Math.max(0, Math.min(cv.height, ny)) };
     else if (zieh.was === "cta") S.ctaPos = { x: Math.max(0, Math.min(cv.width, nx)), y: Math.max(0, Math.min(cv.height, ny)) };
     else if (zieh.was === "team") S.teamPos = { x: Math.max(0, Math.min(cv.width, nx)), y: Math.max(0, Math.min(cv.height, ny)) };
     else if (zieh.was === "frei") { var o = ftAkt(); if (o) { o.x = Math.max(-200, Math.min(cv.width - 40, nx)); o.y = Math.max(-100, Math.min(cv.height - 40, ny)); } }
@@ -986,6 +1023,24 @@ body{background:var(--carbon)}
     document.querySelectorAll("#ctaVor button").forEach(function(x){ x.classList.remove("on"); });
     alles();
   };
+  // Ich-Bilder (freigestellt, aus overlays/personen/)
+  var PERS = [["zeigt-auf-dich.webp", "Zeigt auf dich"], ["zeigt-zur-seite.webp", "Zeigt zur Seite"], ["arme-verschraenkt.webp", "Arme verschränkt"], ["facepalm.webp", "Facepalm"], ["schock.webp", "Schock"]];
+  $("persGal").innerHTML = PERS.map(function(b){ return '<button type="button" title="' + b[1] + '" data-src="overlays/personen/' + b[0] + '"><img src="overlays/personen/' + b[0] + '" alt="' + b[1] + '" loading="lazy"></button>'; }).join("");
+  function setzePers(img, knopf){
+    S.pers = img; S.persPos = null;
+    document.querySelectorAll("#persGal button").forEach(function(x){ x.classList.toggle("on", x === knopf); });
+    alles();
+  }
+  document.querySelectorAll("#persGal button").forEach(function(b){
+    b.onclick = function(){ var img = new Image(); img.onload = function(){ setzePers(img, b); }; img.src = b.dataset.src; };
+  });
+  $("persFile").onchange = function(){
+    var f = this.files && this.files[0]; this.value = ""; if (!f) return;
+    var img = new Image(); img.onload = function(){ setzePers(img, null); };
+    img.src = URL.createObjectURL(f);
+  };
+  $("persAus").onclick = function(){ setzePers(null, null); };
+  ["persSize", "persCo", "persCu", "persCl", "persCr"].forEach(function(id){ $(id).addEventListener("input", function(){ render(); }); $(id).addEventListener("change", renderThumbs); });
   // Team-Bilder (F2F)
   var TEAM = [["team/bilder/f2f-logo.webp", "F2F Logo", true], ["team/bilder/f2f-motto.webp", "F2F Motto", true], ["team/bilder/f2f-cars.webp", "F2F Autos"], ["team/bilder/f2f-recruiting.webp", "F2F Recruiting"]];
   $("teamGal").innerHTML = TEAM.map(function(b){ return '<button type="button" title="' + b[1] + '" data-src="' + b[0] + '"' + (b[2] ? ' data-schwarz="1"' : '') + '><img src="' + b[0] + '" alt="' + b[1] + '" loading="lazy"></button>'; }).join("");
