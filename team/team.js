@@ -203,9 +203,10 @@
       <p class="tp-login-sub">Nur für Teammitglieder. Interner Bereich.</p>
       <a class="tp-login-btn" href="${API}/login">${ICONS.discord}<span>Mit Discord anmelden</span></a>
       <div class="tp-neu">
-        <b class="tp-neu-h">Neu bei uns? Das erwartet dich:</b>
+        <b class="tp-neu-h">Das erwartet dich:</b>
         <ul class="tp-neu-list">${items.map(([ic, t]) => `<li><span class="tp-neu-ic">${ic}</span><span>${t}</span></li>`).join("")}</ul>
-        <button type="button" class="tp-neu-btn" data-scroll="tp-join">Jetzt Fahrer werden →</button>
+        <button type="button" class="tp-neu-btn" data-scroll="tp-join">Jetzt bewerben und Platz sichern →</button>
+        <p class="tp-neu-knapp">Nur 10 bis 12 Plätze im Team</p>
       </div>`;
   }
 
@@ -416,11 +417,6 @@
           <div class="tpe-facts"><span>${ICONS.calendar}${esc(wann)}</span><span>${ICONS.clock}${e.zeiten && e.zeiten.length ? "Startzeiten " + e.zeiten.join(", ") + " Uhr" : zeit(e.start) + " Uhr"}</span><span>${ICONS.flag}${laenge}</span></div>
           <div class="tpe-cd" id="tpe-cd"></div>
         </div>
-        <div class="tpe-cars">${(e.cars || []).map(c => `<div class="tpe-car" style="--t:${farbe(c.name)}">
-          <div class="tpe-car-h"><b>${esc(c.name)}</b><span>${esc(c.carName || "")}</span></div>
-          <div class="tpe-car-s">${ICONS.clock}${new Date(c.start).toLocaleString("de-DE", { weekday: "short", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })} Uhr</div>
-          <div class="tpe-drv">${c.drivers.map(n => `<span>${esc(n)}</span>`).join("") || "<em>Fahrer folgen</em>"}</div>
-        </div>`).join("") || '<div class="tpe-car"><em>Fahrzeuge folgen</em></div>'}</div>
       </div>`;
       const cd = document.getElementById("tpe-cd");
       const tick = () => {
@@ -487,6 +483,21 @@
   }
   window.F2FEvNav = { refresh: () => ladeEvNav(true) };
 
+  const ADMIN_TEILE = [["status", "Status"], ["zugang", "Zugang"], ["panels", "Panels"], ["g61", "Garage 61 → Discord"], ["woche", "Wochen-Post"], ["abw", "Abwesenheiten"], ["stint", "Stintplaner"], ["links", "Links"], ["erinn", "Renn-Erinnerungen"], ["limits", "Limit-Warnung"]];
+  // Admin-Kasten öffnen und hinscrollen (ohne neu zu laden, damit nichts Ungespeichertes verloren geht)
+  function adminOeffnen(teil) {
+    const el = document.getElementById("adm-" + teil);
+    if (!el) return false;
+    el.open = true;
+    el.scrollIntoView({ behavior: "smooth", block: "start" });
+    document.querySelectorAll("[data-admteil]").forEach(a => a.classList.toggle("on", a.dataset.admteil === teil));
+    return true;
+  }
+  document.addEventListener("click", (e) => {
+    const a = e.target.closest && e.target.closest("[data-admteil]");
+    if (a && document.getElementById("adm") && adminOeffnen(a.dataset.admteil)) e.preventDefault();
+  });
+
   function renderShell() {
     const id = location.hash.replace("#", "");
     const tools = Object.keys(PANELS).filter(p => ME.panels[p] && p !== "garage61" && p !== "links" && p !== "stint");
@@ -502,7 +513,7 @@
             ${ME.panels.links ? link("links", "link", "Links") : ""}
             ${ME.panels.stint ? `<div class="td-nav-h">Endurance Planung</div><div class="td-evnav" id="td-evnav">${evNavHtml(id)}</div>` : ""}
             <div class="td-nav-h">Tools</div>${link("abwesend", "clock", "Abwesenheiten")}${tools.map(p => link(p, p, PANELS[p].title)).join("")}
-            ${ME.isAdmin ? `<div class="td-nav-h">Verwaltung</div>${link("aktivitaet", "activity", "Aktivität")}${link("nutzung", "eye", "Nutzung")}${link("limits", "gauge", "Limits")}${link("posts", "trophy", "G61-Posts")}${link("news-schreiben", "news", "News schreiben")}${link("fahrerprofile", "helmet", "Fahrerprofile")}${link("kalender-admin", "calendar", "Rennkalender")}${link("admin", "admin", "Admin")}<a class="td-link" href="https://kreids888-admin.kreids.workers.dev/" target="_blank" rel="noopener">${ICONS.ext}<span>kreids888-Dashboard</span></a>` : ""}
+            ${ME.isAdmin ? `<div class="td-nav-h">Verwaltung</div>${link("aktivitaet", "activity", "Aktivität")}${link("nutzung", "eye", "Nutzung")}${link("limits", "gauge", "Limits")}${link("posts", "trophy", "G61-Posts")}${link("news-schreiben", "news", "News schreiben")}${link("fahrerprofile", "helmet", "Fahrerprofile")}${link("kalender-admin", "calendar", "Rennkalender")}${link("admin", "admin", "Admin")}${id === "admin" || id.startsWith("admin/") ? `<div class="td-admsub">${ADMIN_TEILE.map(([k, l]) => `<a class="td-link td-ev td-ev-sub" href="#admin/${k}" data-admteil="${k}"><span>${esc(l)}</span></a>`).join("")}</div>` : ""}<a class="td-link" href="https://kreids888-admin.kreids.workers.dev/" target="_blank" rel="noopener">${ICONS.ext}<span>kreids888-Dashboard</span></a>` : ""}
           </nav>
         </aside>
         <div class="td-main" id="td-main"></div>
@@ -513,7 +524,7 @@
     if (id === "woche" && ME.panels.garage61) return renderG61("woche");
     if (id === "nutzung" && ME.isAdmin) return renderNutzung();
     if (id === "limits" && ME.isAdmin) return renderLimits();
-    if (id === "admin" && ME.isAdmin) return renderAdmin();
+    if ((id === "admin" || id.startsWith("admin/")) && ME.isAdmin) return renderAdmin(id.slice(6));
     if (id === "posts" && ME.isAdmin) return renderPosts();
     if (id === "aktivitaet" && ME.isAdmin) return renderActivity();
     if (id === "news-schreiben" && ME.isAdmin) return renderNewsAdmin();
@@ -1700,7 +1711,7 @@
 
 
   /* ---------------- Admin ---------------- */
-  async function renderAdmin() {
+  async function renderAdmin(teil) {
     main().innerHTML = panelHead("admin", "Admin", '<span class="tm-badge">Rollen & Rechte</span>') + '<div id="adm"><div class="tm-loading"><span></span><span></span><span></span></div></div>';
     const box = document.getElementById("adm");
     let d;
@@ -1860,6 +1871,23 @@
       </div>
 
       <div class="tm-savebar" id="savebar"><span>Alles gespeichert</span>${btn("Speichern", "red", 'id="tm-save"')}</div>`;
+
+    // jeden Kasten einklappbar machen (Inhalte werden nur verschoben, Eingaben bleiben erhalten)
+    [...box.children].forEach(k => {
+      if (!k.classList.contains("tm-box")) return;
+      const h = k.querySelector(":scope > h5");
+      if (!h) return;
+      const eintrag = ADMIN_TEILE.find(([, l]) => h.textContent.trim().startsWith(l));
+      const det = document.createElement("details");
+      det.className = k.className + " adm-teil";
+      if (eintrag) det.id = "adm-" + eintrag[0];
+      const sum = document.createElement("summary");
+      sum.appendChild(h);
+      det.appendChild(sum);
+      while (k.firstChild) det.appendChild(k.firstChild);
+      k.replaceWith(det);
+    });
+    if (teil) setTimeout(() => adminOeffnen(teil), 50);
 
     // Rollen-Auswahl vorbelegen + umschalten
     const setFor = (key) => key.startsWith("panel:") ? sel.panels[key.slice(6)] : sel[key];

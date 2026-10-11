@@ -1532,3 +1532,15 @@ body:has(.td)::after{content:"";position:fixed;inset:0;z-index:-1;pointer-events
 .tp-neu-list li span:last-child{padding-top:4px}
 .tp-neu-btn{width:100%;padding:12px 16px;border-radius:12px;border:1px solid rgba(225,19,36,.6);background:linear-gradient(135deg,rgba(225,19,36,.22),rgba(225,19,36,.06));color:#fff;font-family:var(--disp);font-weight:800;font-size:15px;letter-spacing:.08em;text-transform:uppercase;cursor:pointer;transition:.2s}
 .tp-neu-btn:hover{background:linear-gradient(135deg,#ff2b3d,#b30c1b);border-color:transparent;box-shadow:0 10px 26px rgba(225,19,36,.4);transform:translateY(-1px)}
+/* Admin einklappbar + Schnelleinstieg */
+.adm-teil[open]>summary{margin-bottom:12px}
+.adm-teil>summary h5{margin:0}
+.td-admsub{display:flex;flex-direction:column;margin:2px 0 6px}
+.td-admsub .td-link{padding-top:4px;padding-bottom:4px;font-size:13px}
+.td-admsub .td-link.on{color:#fff;background:rgba(255,43,61,.12)}
+@media (max-width:860px){.td-admsub{flex-direction:row}}
+.tpe{grid-template-columns:minmax(0,1fr)}
+.tp-neu-btn{background:linear-gradient(135deg,#ff2b3d,#b30c1b);border-color:transparent;box-shadow:0 10px 26px rgba(225,19,36,.35);font-size:14px}
+.tp-neu-btn:hover{filter:brightness(1.1)}
+.tp-neu-knapp{margin:8px 0 0;text-align:center;font-size:12.5px;color:#ffb7bd;letter-spacing:.04em}
+.tp-neu-knapp::before{content:"";display:inline-block;width:7px;height:7px;border-radius:50%;background:#ff2b3d;margin-right:7px;box-shadow:0 0 8px #ff2b3d;animation:gPuls 1.6s infinite;vertical-align:middle}
