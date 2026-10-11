@@ -282,6 +282,7 @@ body{background:var(--carbon)}
 </main>
 
 <script src="overlays/qrcode.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/mp4-muxer@5.2.2/build/mp4-muxer.min.js"></script>
 <script src="overlays/overlays.js?v=202610111300"></script>
 <script>
 (function(){
@@ -753,13 +754,14 @@ body{background:var(--carbon)}
     if (schleife) return;
     (function bild(){
       if (!brauchtSchleife()) { schleife = null; render(); return; }
-      var v = S.vid;
+      var v = S.vid, t = null;
       if (aufnahme && aufnahme.laeuft) {
-        var t = v ? v.currentTime : (performance.now() - aufnahme.t0) / 1000;
-        if (t >= aufnahme.dauer || (v && v.ended)) aufnahmeStop();
+        t = v ? v.currentTime : (performance.now() - aufnahme.t0) / 1000;
+        if (t >= aufnahme.dauer || (v && v.ended)) { aufnahmeStop(); t = null; }
         else meldung("Aufnahme läuft … " + Math.floor(t) + " / " + Math.round(aufnahme.dauer) + " s – Tab bitte offen lassen.");
       } else if (v && !aufnahme && v.currentTime >= MAXS) { v.currentTime = 0; }
       render();
+      if (t !== null && aufnahme && aufnahme.wc) aufnahme.wc.frame(t);
       schleife = requestAnimationFrame(bild);
     })();
   }
@@ -792,16 +794,131 @@ body{background:var(--carbon)}
     return "";
   }
   function aufnahmeStop(){
-    if (!aufnahme) return;
-    aufnahme.laeuft = false;
+    if (!aufnahme || aufnahme.stoppt) return;
+    aufnahme.laeuft = false; aufnahme.stoppt = true;
     try { S.vid && S.vid.pause(); } catch (e) {}
-    if (aufnahme.rec.state !== "inactive") aufnahme.rec.stop();
+    if (aufnahme.wc) {
+      meldung("Video wird fertig gebaut …");
+      aufnahme.wc.stop().then(function(b){ videoFertig(b, "mp4"); }).catch(function(e){ meldung("Video konnte nicht gespeichert werden: " + (e && e.message || e), true); videoFertig(null); });
+    } else if (aufnahme.rec.state !== "inactive") aufnahme.rec.stop();
   }
   function knoepfe(laeuft){
     $("vdl").querySelector("span").textContent = laeuft ? "Aufnahme läuft …" : "Video herunterladen";
     $("bvdl").querySelector("span").textContent = laeuft ? "Aufnahme läuft …" : "Als Video speichern";
   }
+  function videoFertig(b, ext){
+    if (b) {
+      var a = document.createElement("a"); a.href = URL.createObjectURL(b); a.download = dateiname().replace(/\.jpg$/, "." + ext);
+      document.body.appendChild(a); a.click(); a.remove();
+      meldung("Gespeichert: " + a.download + (ext === "webm" ? " – WebM: Instagram nimmt das evtl. nicht direkt, dann bitte vorher in MP4 umwandeln." : ""));
+    }
+    aufnahme = null; knoepfe(false);
+    if (S.vid) { S.vid.loop = true; S.vid.currentTime = 0; S.vid.play().catch(function(){}); }
+    starteSchleife(); render();
+  }
+  /* ---------- Normales MP4 (WebCodecs + mp4-muxer): feste 30 fps, Länge im Kopf, Schlüsselbild jede Sekunde ---------- */
+  function wcMoeglich(){ return !!(window.VideoEncoder && window.VideoFrame && window.Mp4Muxer && window.Mp4Muxer.Muxer); }
+  async function wcRekorder(mitTon){
+    var W = cv.width, H = cv.height, FPS = 30, vcfg = null, acfg = null, aCodec = "";
+    var vl = ["avc1.640028", "avc1.640032", "avc1.4d0028", "avc1.4d0032", "avc1.42e028"];
+    for (var i = 0; i < vl.length && !vcfg; i++) {
+      var c1 = { codec: vl[i], width: W, height: H, bitrate: 10000000, framerate: FPS, avc: { format: "avc" } };
+      try { if ((await VideoEncoder.isConfigSupported(c1)).supported) vcfg = c1; } catch (e) {}
+    }
+    if (!vcfg) return null;
+    var spur = mitTon && recZiel ? recZiel.stream.getAudioTracks()[0] : null;
+    if (spur) {
+      if (!window.AudioEncoder || !window.MediaStreamTrackProcessor || !window.AudioData) return null;
+      var al = [["mp4a.40.2", "aac"], ["opus", "opus"]];
+      for (var j = 0; j < al.length && !acfg; j++) {
+        var c2 = { codec: al[j][0], sampleRate: ac.sampleRate, numberOfChannels: 2, bitrate: 192000 };
+        try { if ((await AudioEncoder.isConfigSupported(c2)).supported) { acfg = c2; aCodec = al[j][1]; } } catch (e) {}
+      }
+      if (!acfg) return null;
+    }
+    var muxer = new Mp4Muxer.Muxer({
+      target: new Mp4Muxer.ArrayBufferTarget(),
+      video: { codec: "avc", width: W, height: H, frameRate: FPS },
+      audio: acfg ? { codec: aCodec, numberOfChannels: 2, sampleRate: acfg.sampleRate } : undefined,
+      fastStart: "in-memory", firstTimestampBehavior: "offset"
+    });
+    var fehler = null, laeuft = false, n = 0, aT0 = null, leser = null, kopie = null, aenc = null;
+    var venc = new VideoEncoder({ output: function(ch, m){ muxer.addVideoChunk(ch, m); }, error: function(e){ fehler = e; } });
+    venc.configure(vcfg);
+    if (acfg) {
+      aenc = new AudioEncoder({ output: function(ch, m){ muxer.addAudioChunk(ch, m); }, error: function(e){ fehler = e; } });
+      aenc.configure(acfg);
+      kopie = spur.clone();
+      leser = new MediaStreamTrackProcessor({ track: kopie }).readable.getReader();
+    }
+    async function tonLesen(){
+      while (true) {
+        var r; try { r = await leser.read(); } catch (e) { break; }
+        if (r.done) break;
+        var d = r.value;
+        if (!laeuft || fehler) { d.close(); continue; }
+        if (aT0 === null) aT0 = d.timestamp;
+        var nf = d.numberOfFrames, nc = d.numberOfChannels, buf = new Float32Array(nf * 2);
+        try {
+          for (var k = 0; k < 2; k++) d.copyTo(buf.subarray(k * nf, (k + 1) * nf), { planeIndex: Math.min(k, nc - 1), format: "f32-planar" });
+          var nd = new AudioData({ format: "f32-planar", sampleRate: d.sampleRate, numberOfFrames: nf, numberOfChannels: 2, timestamp: d.timestamp - aT0, data: buf });
+          aenc.encode(nd); nd.close();
+        } catch (e) { fehler = fehler || e; }
+        d.close();
+      }
+    }
+    return {
+      start: function(){ laeuft = true; if (leser) tonLesen(); },
+      frame: function(t){
+        if (!laeuft || fehler) return;
+        var soll = Math.floor(t * FPS) + 1;
+        if (soll - n > FPS) n = soll - 1; // Tab lag im Hintergrund: Lücke überspringen statt hunderte Kopien
+        while (n < soll) {
+          var f = new VideoFrame(cv, { timestamp: Math.round(n * 1e6 / FPS), duration: Math.round(1e6 / FPS) });
+          venc.encode(f, { keyFrame: n % FPS === 0 }); f.close(); n++;
+        }
+      },
+      stop: async function(){
+        laeuft = false;
+        if (leser) { try { await leser.cancel(); } catch (e) {} }
+        if (kopie) kopie.stop();
+        await venc.flush(); if (aenc) await aenc.flush();
+        venc.close(); if (aenc) aenc.close();
+        if (fehler) throw fehler;
+        if (!n) throw new Error("keine Bilder aufgenommen");
+        muxer.finalize();
+        return new Blob([muxer.target.buffer], { type: "video/mp4" });
+      }
+    };
+  }
   function aufnehmen(dauer){
+    if (aufnahme) return;
+    var v = S.vid;
+    if (!wcMoeglich()) return aufnehmenMR(dauer);
+    if (ac && ac.state === "suspended") ac.resume();
+    aufnahme = { dauer: dauer, laeuft: false, t0: 0 };
+    knoepfe(true); meldung("Aufnahme startet …");
+    wcRekorder(!!(v && recZiel && quelle)).catch(function(){ return null; }).then(function(wc){
+      if (!wc) { aufnahme = null; return aufnehmenMR(dauer); }
+      aufnahme.wc = wc;
+      var gestartet = false;
+      function los(){
+        if (gestartet || !aufnahme) return; gestartet = true;
+        aufnahme.t0 = performance.now(); aufnahme.laeuft = true; wc.start();
+        render(); wc.frame(0);
+        if (v) v.play().catch(function(e){ meldung("Video ließ sich nicht abspielen: " + e.message, true); aufnahmeStop(); });
+        starteSchleife();
+      }
+      if (v) {
+        v.pause(); v.loop = false;
+        v.addEventListener("seeked", los, { once: true });
+        setTimeout(los, 800);
+        v.currentTime = 0;
+      } else los();
+    });
+  }
+  // alter Weg (MediaRecorder), nur falls der Browser kein WebCodecs kann
+  function aufnehmenMR(dauer){
     if (aufnahme) return;
     if (!window.MediaRecorder || !cv.captureStream) { meldung("Video-Aufnahme klappt in diesem Browser nicht. Bitte Chrome oder Edge nehmen.", true); return; }
     var v = S.vid, typ = vidTyp();
@@ -817,13 +934,7 @@ body{background:var(--carbon)}
     rec.onstop = function(){
       stream.getVideoTracks().forEach(function(t){ t.stop(); });
       var mt = (rec.mimeType || typ || "video/webm").split(";")[0], ext = /mp4/.test(mt) ? "mp4" : "webm";
-      var b = new Blob(teile, { type: mt });
-      var a = document.createElement("a"); a.href = URL.createObjectURL(b); a.download = dateiname().replace(/\.jpg$/, "." + ext);
-      document.body.appendChild(a); a.click(); a.remove();
-      meldung("Gespeichert: " + a.download + (ext === "webm" ? " – WebM: Instagram nimmt das evtl. nicht direkt, dann bitte vorher in MP4 umwandeln." : ""));
-      aufnahme = null; knoepfe(false);
-      if (S.vid) { S.vid.loop = true; S.vid.currentTime = 0; S.vid.play().catch(function(){}); }
-      starteSchleife(); render();
+      videoFertig(new Blob(teile, { type: mt }), ext);
     };
     aufnahme = { rec: rec, dauer: dauer, laeuft: false, t0: 0 };
     knoepfe(true); meldung("Aufnahme startet …");
