@@ -1506,3 +1506,15 @@ body:has(.td)::after{content:"";position:fixed;inset:0;z-index:-1;pointer-events
 .sp-wunsch .sp-seg button{padding:7px 12px}
 .sp-wtxt{color:#9fb6ff!important}
 .sp-flegende span.zuviel{border-color:rgba(255,176,32,.6);background:rgba(255,176,32,.1)}
+/* Discord-Posts einklappbar */
+.dp-post>summary{padding:2px 0}
+.dp-post>summary h5{margin:0;flex:1 1 auto}
+.dp-post[open]>summary{margin-bottom:12px}
+.dp-st{display:inline-flex;align-items:center;gap:6px;padding:4px 12px;border-radius:999px;font-family:var(--disp);font-weight:800;font-size:12px;letter-spacing:.08em;text-transform:uppercase;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);color:var(--steel)}
+.dp-st::before{content:"";width:8px;height:8px;border-radius:50%;background:var(--steel-d)}
+.dp-st.an{background:rgba(46,204,113,.14);border-color:rgba(46,204,113,.45);color:#4ee28c}
+.dp-st.an::before{background:#2ecc71;box-shadow:0 0 8px rgba(46,204,113,.8)}
+.dp-ch{font-size:13px;color:var(--steel);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:260px}
+/* Schalter: Knopf bei An sichtbar (weiß auf Rot) */
+.td .tm-switch .s::after{top:3px;width:16px;height:16px}
+.td .tm-switch input:checked+.s::after{background:#fff;box-shadow:0 1px 4px rgba(0,0,0,.4)}

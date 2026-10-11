@@ -993,8 +993,8 @@
         <div class="tm-actions" style="margin-top:12px">${btn("Daten holen", "sm", 'id="dp-scan"')}</div>
       </div>
       ${Object.keys(POST_INFO).map(k => `
-      <div class="tm-box" id="dp-${k}">
-        <h5>${esc(POST_INFO[k].t)}</h5>
+      <details class="tm-box dp-post" id="dp-${k}">
+        <summary><h5>${esc(POST_INFO[k].t)}</h5><span class="dp-st ${P[k].on ? "an" : ""}" data-st="${k}">${P[k].on ? "Aktiv" : "Aus"}</span><span class="dp-ch" data-chn="${k}">${P[k].channel ? "# " + esc((d.channels.find(c => c.id === P[k].channel) || {}).name || "") : "kein Kanal"}</span></summary>
         <p class="hint">${esc(POST_INFO[k].h)}</p>
         <div class="tm-row"><div class="lbl">Automatisch</div>${sw(k, "on", "An", P[k].on)}</div>
         <div class="tm-row"><div class="lbl">Discord-Kanal</div><div>${kanal(k)}</div></div>
@@ -1005,10 +1005,13 @@
           <div><div class="tm-actions" style="flex-wrap:wrap;margin-bottom:10px">${extra(k)}${btn("Jetzt senden", "sm red", `data-send="${k}"`)}</div>
           <div class="dc-wrap" data-prev="${k}"><div class="dc-leer">Lädt …</div></div>
           <p class="tm-muted" style="margin-top:8px">Zuletzt gesendet: ${d.last[k] ? fmtDate(d.last[k].at) + " · " + esc(d.last[k].info) : "noch nie"}</p></div></div>
-      </div>`).join("")}
+      </details>`).join("")}
       <div class="tm-savebar" id="dp-bar"><span>Alles gespeichert</span>${btn("Speichern", "red", 'id="dp-save"')}</div>`;
 
     let dirty = false;
+    // Status im eingeklappten Kopf mitziehen
+    box.querySelectorAll('[data-f="on"]').forEach(el => el.addEventListener("change", () => { const st = box.querySelector(`[data-st="${el.dataset.k}"]`); if (st) { st.classList.toggle("an", el.checked); st.textContent = el.checked ? "Aktiv" : "Aus"; } }));
+    box.querySelectorAll('[data-f="channel"]').forEach(el => el.addEventListener("change", () => { const ch = box.querySelector(`[data-chn="${el.dataset.k}"]`); if (ch) ch.textContent = el.value ? el.selectedOptions[0].text : "kein Kanal"; }));
     const markDirty = () => { dirty = true; const b = document.getElementById("dp-bar"); b.classList.add("dirty"); b.querySelector("span").textContent = "Ungespeicherte Änderungen"; };
 
     // Einstellungen eines Posts aus dem Formular lesen
