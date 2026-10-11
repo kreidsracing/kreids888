@@ -350,7 +350,7 @@ window.K888_OVERLAYS = [
       h.bild(c, { img: d.img, view: { zoom: 1.1, ox: 0, oy: 0 } }, -40, -40, W + 80, H + 80);
       c.restore();
     }
-    c.fillStyle = "rgba(10,11,14,.62)"; c.fillRect(0, 0, W, H);
+    h.abdunkeln(c, W, H, "rgba(10,11,14,.62)");
     h.fenster(c, d, 0, fy, W, fh);
     h.linie(c, 0, fy - 6, W, 6); h.linie(c, 0, fy + fh, W, 6);
     var ti = h.passend(c, d.title.toUpperCase(), W - 2 * M, gross ? 3 : 2, 100, 60, 900, "Saira Condensed", 0.96);
@@ -540,7 +540,7 @@ window.K888_OVERLAYS = [
     var M = 80, t = d.zeit == null ? 0.5 : d.zeit, f = Math.floor(t * 12);
     var flacker = d.zeit == null ? 1 : (Math.sin(f * 78.233) * 43758.5 % 1 + 1) % 1 > 0.08 ? 1 : 0.35;
     h.bild(c, d, 0, 0, W, H);
-    c.fillStyle = "rgba(6,4,10,.55)"; c.fillRect(0, 0, W, H);
+    h.abdunkeln(c, W, H, "rgba(6,4,10,.55)");
     h.verlauf(c, 0, H * 0.4, 0, H, [[0, "rgba(6,4,10,0)"], [1, "rgba(6,4,10,.9)"]]);
     function roehre(fn, farbe, breite) {
       c.save(); c.globalAlpha = flacker; c.strokeStyle = farbe; c.shadowColor = farbe; c.lineJoin = "round"; c.lineCap = "round";
