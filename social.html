@@ -205,6 +205,41 @@ body{background:var(--carbon)}
         </div>
         <p class="sb-hint">Text im Bild mit der Maus verschieben, anklicken zum Bearbeiten. Effekte siehst du in der Vorschau und im Video – im Bild steht der Text ruhig.</p>
       </div>
+      <div class="sb-panel">
+        <div class="sb-h">8 · Aufruf (optional)</div>
+        <div class="sb-ftl" id="ctaVor"></div>
+        <label for="ctaText">Haupttext</label>
+        <input type="text" id="ctaText" maxlength="40" placeholder="ABONNIEREN">
+        <label for="ctaSub">Untertext</label>
+        <input type="text" id="ctaSub" maxlength="60" placeholder="um nix zu verpassen">
+        <label for="ctaIcon">Symbol</label>
+        <select id="ctaIcon">
+          <option value="">Kein Symbol</option>
+          <option value="glocke">Glocke</option>
+          <option value="youtube">YouTube</option>
+          <option value="tiktok">TikTok</option>
+          <option value="instagram">Instagram</option>
+          <option value="discord">Discord</option>
+        </select>
+        <label>Form</label>
+        <div class="sb-seg" id="ctaForm">
+          <button type="button" data-v="knopf" class="on">Knopf</button>
+          <button type="button" data-v="lauf">Laufschrift</button>
+        </div>
+        <label>Stil</label>
+        <div class="sb-seg" id="ctaStil">
+          <button type="button" data-v="rot" class="on">Rot</button>
+          <button type="button" data-v="weiss">Weiß</button>
+          <button type="button" data-v="dunkel">Dunkel</button>
+        </div>
+        <label>Größe Aufruf</label>
+        <input type="range" id="ctaSize" min="0.5" max="2" step="0.01" value="1">
+        <div class="sb-row" style="margin-top:10px">
+          <label class="sb-chk"><input type="checkbox" id="ctaPuls"> Pulsieren / Laufen (Vorschau &amp; Video)</label>
+          <button type="button" class="sb-mini sb-err" id="ctaAus">Aufruf entfernen</button>
+        </div>
+        <p class="sb-hint">Vorlage antippen oder selbst schreiben. Im Bild mit der Maus verschieben.</p>
+      </div>
     </div>
     <div class="sb-prev">
       <canvas id="cv" width="1080" height="1350" aria-label="Vorschau des Social-Bilds"></canvas>
@@ -239,6 +274,7 @@ body{background:var(--carbon)}
 
   /* ---------- Zeichen-Hilfen für die Overlays ---------- */
   var ICON = {"youtube": "M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12z", "tiktok": "M12.525.02c1.31-.02 2.61-.01 3.91-.02.08 1.53.63 3.09 1.75 4.17 1.12 1.11 2.7 1.62 4.24 1.79v4.03c-1.44-.05-2.89-.35-4.2-.97-.57-.26-1.1-.59-1.62-.93-.01 2.92.01 5.84-.02 8.75-.08 1.4-.54 2.79-1.35 3.94-1.31 1.92-3.58 3.17-5.91 3.21-1.43.08-2.86-.31-4.08-1.03-2.02-1.19-3.44-3.37-3.65-5.71-.02-.5-.03-1-.01-1.49.18-1.9 1.12-3.72 2.58-4.96 1.66-1.44 3.98-2.13 6.15-1.72.02 1.48-.04 2.96-.04 4.44-.99-.32-2.15-.23-3.02.37-.63.41-1.11 1.04-1.36 1.75-.21.51-.15 1.07-.14 1.61.24 1.64 1.82 3.02 3.5 2.87 1.12-.01 2.19-.66 2.77-1.61.19-.33.4-.67.41-1.06.1-1.79.06-3.57.07-5.36.01-4.03-.01-8.05.02-12.07z", "instagram": "M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zM12 0C8.741 0 8.333.014 7.053.072 2.695.272.273 2.69.073 7.052.014 8.333 0 8.741 0 12c0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98C8.333 23.986 8.741 24 12 24c3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98C15.668.014 15.259 0 12 0zm0 5.838a6.162 6.162 0 100 12.324 6.162 6.162 0 000-12.324zM12 16a4 4 0 110-8 4 4 0 010 8zm6.406-11.845a1.44 1.44 0 100 2.881 1.44 1.44 0 000-2.881z", "discord": "M20 5.5A17.6 17.6 0 0 0 15.6 4l-.3.6a13 13 0 0 1 3.7 1.4 15.6 15.6 0 0 0-13.9 0A13 13 0 0 1 8.8 4.6L8.5 4A17.6 17.6 0 0 0 4.1 5.5C1.7 9 1 12.4 1.3 15.7A17.7 17.7 0 0 0 6.7 18.4l.9-1.3a11.4 11.4 0 0 1-1.8-.9l.4-.3a12.7 12.7 0 0 0 11.6 0l.4.3a11.4 11.4 0 0 1-1.8.9l.9 1.3a17.6 17.6 0 0 0 5.4-2.7c.4-3.8-.6-7.1-2.7-10.2zM8.9 14c-.9 0-1.6-.8-1.6-1.8S8 10.4 8.9 10.4s1.7.8 1.6 1.8-.7 1.8-1.6 1.8zm6.2 0c-.9 0-1.6-.8-1.6-1.8s.7-1.8 1.6-1.8 1.7.8 1.6 1.8-.7 1.8-1.6 1.8z"};
+  ICON.glocke = "M12 22a2.5 2.5 0 0 0 2.45-2h-4.9A2.5 2.5 0 0 0 12 22zm7-6v-5a7 7 0 0 0-5.5-6.84V3a1.5 1.5 0 0 0-3 0v1.16A7 7 0 0 0 5 11v5l-2 2v1h18v-1z";
   var QRC = {};
   function farbeA(hex, a){ var n = parseInt(String(hex || "#000000").slice(1), 16); return "rgba(" + (n >> 16 & 255) + "," + (n >> 8 & 255) + "," + (n & 255) + "," + (a == null ? 1 : a) + ")"; }
   function esc(x){ return String(x == null ? "" : x).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;"); }
@@ -491,6 +527,85 @@ body{background:var(--carbon)}
   }
   S.qrPos = null; S.sozPos = null; S.hit = {}; S.sozDir = "h"; S.texte = []; S.akt = -1; S.team = null; S.teamPos = null;
   function sozListe(){ return [].slice.call(document.querySelectorAll("#soz input:checked")).map(function(i){ return i.value; }); }
+  // Aufruf (Call-to-Action): Position = Mittelpunkt
+  S.ctaPos = null; S.ctaStil = "rot"; S.ctaForm = "knopf";
+  function ctaAn(){ return !!($("ctaText").value.trim() || $("ctaSub").value.trim()); }
+  function ctaIconFarbe(icon, stil){ return stil === "rot" ? "#ffffff" : icon === "glocke" ? (stil === "weiss" ? ROT : "#ffffff") : icon === "tiktok" ? (stil === "weiss" ? "#0a0b0e" : "#ffffff") : SOZ[icon].farbe; }
+  // Laufschrift: Band über die ganze Breite, läuft in Vorschau/Video nach links
+  function laufZeichnen(c, W, H, zeit, haupt, sub, icon, stil, k){
+    var bh = Math.round(86 * k), fh = Math.round(50 * k), fs = Math.round(30 * k), is = Math.round(46 * k), gap = Math.round(22 * k);
+    var p = S.ctaPos || { x: W / 2, y: Math.round(H * 0.68) };
+    var y = Math.round(Math.max(0, Math.min(H, p.y)) - bh / 2);
+    var bg = stil === "weiss" ? "#ffffff" : stil === "dunkel" ? "rgba(10,11,14,.9)" : ROT;
+    var tf = stil === "weiss" ? "#0a0b0e" : "#ffffff", sf = stil === "weiss" ? ROT : stil === "dunkel" ? "#c9ced6" : "rgba(255,255,255,.9)";
+    c.save();
+    c.fillStyle = bg; c.fillRect(0, y, W, bh);
+    var rand = stil === "rot" ? "rgba(255,255,255,.85)" : ROT;
+    c.fillStyle = rand; c.fillRect(0, y, W, Math.max(2, Math.round(4 * k))); c.fillRect(0, y + bh - Math.max(2, Math.round(4 * k)), W, Math.max(2, Math.round(4 * k)));
+    c.beginPath(); c.rect(0, y, W, bh); c.clip();
+    // Breite eines Abschnitts messen
+    c.font = h.f(900, fh); if ("letterSpacing" in c) c.letterSpacing = Math.round(fh * 0.04) + "px";
+    var hw = haupt ? c.measureText(haupt).width : 0;
+    if ("letterSpacing" in c) c.letterSpacing = "0px";
+    c.font = h.f(600, fs, "Barlow"); var sw = sub ? c.measureText(sub).width : 0;
+    var trenn = Math.round(14 * k);
+    var segW = (icon ? is + gap : 0) + hw + (haupt && sub ? gap : 0) + sw + gap * 2 + trenn + gap;
+    var lauf = $("ctaPuls").checked && zeit != null;
+    var off = lauf ? (zeit * 150 * k) % segW : 0;
+    var mitte = y + bh / 2;
+    for (var x = -off; x < W; x += segW) {
+      var cx = x;
+      if (icon) { h.icon(c, icon, cx, mitte - is / 2, is, ctaIconFarbe(icon, stil)); cx += is + gap; }
+      if (haupt) {
+        c.font = h.f(900, fh); c.fillStyle = tf; c.textAlign = "left";
+        if ("letterSpacing" in c) c.letterSpacing = Math.round(fh * 0.04) + "px";
+        c.fillText(haupt, cx, mitte + fh * 0.34); cx += hw + (sub ? gap : 0);
+        if ("letterSpacing" in c) c.letterSpacing = "0px";
+      }
+      if (sub) { c.font = h.f(600, fs, "Barlow"); c.fillStyle = sf; c.fillText(sub, cx, mitte + fs * 0.34); cx += sw; }
+      cx += gap * 2;
+      c.fillStyle = stil === "rot" ? "#ffffff" : ROT;
+      c.beginPath(); c.moveTo(cx, mitte - trenn); c.lineTo(cx + trenn, mitte); c.lineTo(cx, mitte + trenn); c.closePath(); c.fill();
+    }
+    c.restore();
+    return { x: 0, y: y, w: W, h: bh };
+  }
+  function ctaZeichnen(c, W, H, zeit){
+    if (!ctaAn()) return null;
+    var k = +$("ctaSize").value, haupt = $("ctaText").value.trim().toUpperCase(), sub = $("ctaSub").value.trim(), icon = $("ctaIcon").value, stil = S.ctaStil;
+    if (S.ctaForm === "lauf") return laufZeichnen(c, W, H, zeit, haupt, sub, icon, stil, k);
+    var fh = Math.round(62 * k), fs = Math.round(30 * k), pad = Math.round(26 * k), sk = Math.round(16 * k);
+    c.save();
+    c.font = h.f(900, fh); if ("letterSpacing" in c) c.letterSpacing = Math.round(fh * 0.03) + "px";
+    var hw = haupt ? c.measureText(haupt).width : 0;
+    if ("letterSpacing" in c) c.letterSpacing = "0px";
+    c.font = h.f(600, fs, "Barlow"); var sw = sub ? c.measureText(sub).width : 0;
+    var th = (haupt ? fh * 0.92 : 0) + (haupt && sub ? Math.round(10 * k) : 0) + (sub ? fs : 0);
+    var is = icon ? Math.round(Math.max(th, fh) * 0.9) : 0, ig = icon ? Math.round(20 * k) : 0;
+    var bw = Math.round(pad * 2 + sk * 2 + is + ig + Math.max(hw, sw)), bh = Math.round(th + pad * 2);
+    var p = S.ctaPos || { x: W / 2, y: Math.round(H * 0.68) };
+    var mx = Math.max(0, Math.min(W, p.x)), my = Math.max(0, Math.min(H, p.y));
+    var sc = 1;
+    if ($("ctaPuls").checked && zeit != null) sc = 1 + 0.05 * Math.sin(zeit * Math.PI * 2 * 1.2);
+    c.translate(mx, my); c.scale(sc, sc); c.translate(-bw / 2, -bh / 2);
+    var bg = stil === "weiss" ? "#ffffff" : stil === "dunkel" ? "rgba(10,11,14,.9)" : ROT;
+    var tf = stil === "weiss" ? "#0a0b0e" : "#ffffff", sf = stil === "weiss" ? ROT : stil === "dunkel" ? "#c9ced6" : "rgba(255,255,255,.9)";
+    c.shadowColor = "rgba(0,0,0,.45)"; c.shadowBlur = Math.round(24 * k); c.shadowOffsetY = Math.round(8 * k);
+    h.schraeg(c, sk, 0, bw - 2 * sk, bh, sk, bg);
+    c.shadowColor = "transparent";
+    if (stil === "dunkel") h.schraeg(c, sk, 0, Math.round(10 * k), bh, sk, ROT);
+    var x = pad + sk, ty = pad;
+    if (icon) { h.icon(c, icon, x, (bh - is) / 2, is, ctaIconFarbe(icon, stil)); x += is + ig; }
+    if (haupt) {
+      c.font = h.f(900, fh); c.fillStyle = tf; c.textAlign = "left";
+      if ("letterSpacing" in c) c.letterSpacing = Math.round(fh * 0.03) + "px";
+      c.fillText(haupt, x, ty + fh * 0.8); ty += fh * 0.92 + (sub ? Math.round(10 * k) : 0);
+      if ("letterSpacing" in c) c.letterSpacing = "0px";
+    }
+    if (sub) { c.font = h.f(600, fs, "Barlow"); c.fillStyle = sf; c.fillText(sub, x, ty + fs * 0.8); }
+    c.restore();
+    return { x: mx - bw / 2, y: my - bh / 2, w: bw, h: bh };
+  }
   // Team-Bild: Position = Mittelpunkt, Größe = Breite
   function teamZeichnen(c, W, H){
     var img = S.team; if (!img || !img.naturalWidth) return null;
@@ -518,6 +633,8 @@ body{background:var(--carbon)}
         c.strokeRect(sel.x - 6, sel.y - 6, sel.w + 12, sel.h + 12); c.restore();
       }
     }
+    var bc = ctaZeichnen(c, W, H, S.zeitJetzt);
+    if (haupt) S.hit.cta = bc;
     var sp = S.sozPos || { x: 72, y: Math.round(H * 0.42) };
     var bs = h.sozialZeichnen(c, sozListe(), sp.x, sp.y, +$("sozSize").value, S.sozDir);
     if (haupt) S.hit.soz = bs;
@@ -595,7 +712,7 @@ body{background:var(--carbon)}
       if (ac.state === "suspended") ac.resume();
     } catch (e) { quelle = null; v.muted = true; }
   }
-  function brauchtSchleife(){ return !!S.vid || !!aufnahme || !!(OV[S.ov] && OV[S.ov].anim) || S.texte.some(function(o){ return o.effekt && o.effekt !== "kein"; }); }
+  function brauchtSchleife(){ return !!S.vid || !!aufnahme || !!(OV[S.ov] && OV[S.ov].anim) || S.texte.some(function(o){ return o.effekt && o.effekt !== "kein"; }) || (ctaAn() && $("ctaPuls").checked); }
   function starteSchleife(){
     if (schleife) return;
     (function bild(){
@@ -772,18 +889,19 @@ body{background:var(--carbon)}
   function punkt(e){ var r = cv.getBoundingClientRect(), k = cv.width / r.width; return { x: (e.clientX - r.left) * k, y: (e.clientY - r.top) * k, k: k }; }
   cv.addEventListener("pointerdown", function(e){
     var p = punkt(e), fi = freiTreffer(p.x, p.y);
-    var was = inBox(S.hit.qr, p.x, p.y) ? "qr" : inBox(S.hit.soz, p.x, p.y) ? "soz" : fi >= 0 ? "frei" : inBox(S.hit.team, p.x, p.y) ? "team" : (S.img ? "bild" : null);
+    var was = inBox(S.hit.qr, p.x, p.y) ? "qr" : inBox(S.hit.soz, p.x, p.y) ? "soz" : inBox(S.hit.cta, p.x, p.y) ? "cta" : fi >= 0 ? "frei" : inBox(S.hit.team, p.x, p.y) ? "team" : (S.img ? "bild" : null);
     if (!was) return;
     if (was === "frei" && S.akt !== fi) { S.akt = fi; ftEditor(); render(); }
     var t = S.hit.team;
-    var start = was === "qr" ? { a: S.hit.qr.x, b: S.hit.qr.y } : was === "soz" ? { a: S.hit.soz.x, b: S.hit.soz.y } : was === "frei" ? { a: S.texte[fi].x, b: S.texte[fi].y } : was === "team" ? { a: t.x + t.w / 2, b: t.y + t.h / 2 } : { a: S.view.ox, b: S.view.oy };
+    var start = was === "qr" ? { a: S.hit.qr.x, b: S.hit.qr.y } : was === "soz" ? { a: S.hit.soz.x, b: S.hit.soz.y } : was === "frei" ? { a: S.texte[fi].x, b: S.texte[fi].y } : was === "team" ? { a: t.x + t.w / 2, b: t.y + t.h / 2 } : was === "cta" ? { a: S.hit.cta.x + S.hit.cta.w / 2, b: S.hit.cta.y + S.hit.cta.h / 2 } : { a: S.view.ox, b: S.view.oy };
     zieh = { was: was, x: e.clientX, y: e.clientY, a: start.a, b: start.b }; cv.setPointerCapture(e.pointerId);
   });
   cv.addEventListener("pointermove", function(e){
     var k = cv.width / cv.getBoundingClientRect().width;
-    if (!zieh) { var p = punkt(e); cv.style.cursor = (inBox(S.hit.qr, p.x, p.y) || inBox(S.hit.soz, p.x, p.y) || freiTreffer(p.x, p.y) >= 0 || inBox(S.hit.team, p.x, p.y)) ? "move" : (S.img ? "grab" : "default"); return; }
+    if (!zieh) { var p = punkt(e); cv.style.cursor = (inBox(S.hit.qr, p.x, p.y) || inBox(S.hit.soz, p.x, p.y) || freiTreffer(p.x, p.y) >= 0 || inBox(S.hit.team, p.x, p.y) || inBox(S.hit.cta, p.x, p.y)) ? "move" : (S.img ? "grab" : "default"); return; }
     var nx = zieh.a + (e.clientX - zieh.x) * k, ny = zieh.b + (e.clientY - zieh.y) * k;
     if (zieh.was === "qr") S.qrPos = { x: nx, y: ny };
+    else if (zieh.was === "cta") S.ctaPos = { x: Math.max(0, Math.min(cv.width, nx)), y: Math.max(0, Math.min(cv.height, ny)) };
     else if (zieh.was === "team") S.teamPos = { x: Math.max(0, Math.min(cv.width, nx)), y: Math.max(0, Math.min(cv.height, ny)) };
     else if (zieh.was === "frei") { var o = ftAkt(); if (o) { o.x = Math.max(-200, Math.min(cv.width - 40, nx)); o.y = Math.max(-100, Math.min(cv.height - 40, ny)); } }
     else if (zieh.was === "soz") S.sozPos = { x: Math.max(0, Math.min(cv.width - S.hit.soz.w, nx)), y: Math.max(0, Math.min(cv.height - S.hit.soz.h, ny)) };
@@ -834,6 +952,40 @@ body{background:var(--carbon)}
       };
     });
   }).catch(function(){});
+  // Aufruf: Vorlagen + Regler
+  var CTA = [
+    ["Abonnieren", "ABONNIEREN", "um nix zu verpassen", "glocke"],
+    ["Folge mir", "FOLGE MIR", "für mehr Racing-Content", ""],
+    ["YouTube", "JETZT ABONNIEREN", "@KREIDS888 auf YouTube", "youtube"],
+    ["TikTok", "FOLGE MIR", "@kreids_ auf TikTok", "tiktok"],
+    ["Instagram", "FOLGE MIR", "kreids888 auf Instagram", "instagram"],
+    ["Discord", "KOMM IN DEN DISCORD", "discord.gg/T3XsTd9Bx6", "discord"],
+    ["Link in Bio", "LINK IN BIO", "alle Infos findest du dort", ""],
+    ["Kommentieren", "SCHREIB'S IN DIE KOMMENTARE", "was meinst du?", ""]
+  ];
+  $("ctaVor").innerHTML = CTA.map(function(v, i){ return '<button type="button" data-i="' + i + '">' + esc(v[0]) + '</button>'; }).join("");
+  document.querySelectorAll("#ctaVor button").forEach(function(b){
+    b.onclick = function(){
+      var v = CTA[+b.dataset.i];
+      $("ctaText").value = v[1]; $("ctaSub").value = v[2]; $("ctaIcon").value = v[3];
+      document.querySelectorAll("#ctaVor button").forEach(function(x){ x.classList.toggle("on", x === b); });
+      starteSchleife(); alles();
+    };
+  });
+  ["ctaText", "ctaSub"].forEach(function(id){ $(id).addEventListener("input", function(){ starteSchleife(); alles(); }); });
+  ["ctaIcon", "ctaPuls"].forEach(function(id){ $(id).addEventListener("change", function(){ starteSchleife(); alles(); }); });
+  $("ctaSize").addEventListener("input", function(){ render(); });
+  $("ctaSize").addEventListener("change", renderThumbs);
+  [["ctaStil", "ctaStil"], ["ctaForm", "ctaForm"]].forEach(function(p){
+    document.querySelectorAll("#" + p[0] + " button").forEach(function(b){
+      b.onclick = function(){ S[p[1]] = b.dataset.v; seg(p[0], b.dataset.v); alles(); };
+    });
+  });
+  $("ctaAus").onclick = function(){
+    $("ctaText").value = ""; $("ctaSub").value = ""; $("ctaIcon").value = ""; S.ctaPos = null;
+    document.querySelectorAll("#ctaVor button").forEach(function(x){ x.classList.remove("on"); });
+    alles();
+  };
   // Team-Bilder (F2F)
   var TEAM = [["team/bilder/f2f-logo.webp", "F2F Logo", true], ["team/bilder/f2f-motto.webp", "F2F Motto", true], ["team/bilder/f2f-cars.webp", "F2F Autos"], ["team/bilder/f2f-recruiting.webp", "F2F Recruiting"]];
   $("teamGal").innerHTML = TEAM.map(function(b){ return '<button type="button" title="' + b[1] + '" data-src="' + b[0] + '"' + (b[2] ? ' data-schwarz="1"' : '') + '><img src="' + b[0] + '" alt="' + b[1] + '" loading="lazy"></button>'; }).join("");
