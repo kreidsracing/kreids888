@@ -305,7 +305,7 @@
     if (mine !== alive) return;
     const teile = (sub || "").split("/").filter(Boolean);
     if (!teile.length) return renderListe(mine);
-    if (teile[0] === "neu") { S.plan = null; return eventForm(null); }
+    if (teile[0] === "neu") { S.plan = null; return eventWizard(); }
     if (!(await ladePlan(teile[0], mine))) return;
     if (teile.length === 1) return renderEvent();
     if (teile[1] === "bearbeiten") return eventForm(S.plan);
@@ -330,7 +330,8 @@
     return true;
   }
   function istLive(c) { const now = Date.now(), s = carStart(c), e = raceEnd(c) || s + 48 * 3600000; return now > s - 1800000 && now < e + 2 * 3600000; }
-  window.addEventListener("beforeunload", (e) => { if (S.dirty && root && document.body.contains(root)) { e.preventDefault(); e.returnValue = ""; } });
+  window.addEventListener("beforeunload", (e) => { if (S.dirty && root && document.body.contains(root)) { flush(); e.preventDefault(); e.returnValue = ""; } });
+  window.addEventListener("hashchange", () => { if (S.dirty) flush(); });
   function weg(e) { if (S.dirty && !confirm("Ungespeicherte Änderungen am Fahrzeug verwerfen?")) { e.preventDefault(); return; } S.dirty = false; }
 
   /* ================================================================
@@ -381,9 +382,9 @@
   }
   function tageVon(ev) {
     const out = [];
-    if (!ev.von || !ev.bis) return out;
+    if (!ev.von) return out;
     const d = new Date(ev.von + "T12:00");
-    const ende = new Date(ev.bis + "T12:00");
+    const ende = new Date((ev.bis || ev.von) + "T12:00");
     while (d <= ende && out.length < 31) { out.push(datumWert(d.getTime())); d.setDate(d.getDate() + 1); }
     return out;
   }
@@ -424,28 +425,146 @@
     return `<span class="sp-ava" style="width:${gr}px;height:${gr}px;font-size:${Math.round(gr * .4)}px">${m && m.avatar ? `<img src="${esc(m.avatar)}" alt="" loading="lazy">` : esc(ini)}</span>`;
   }
 
-  // Event komplett bearbeiten: Eventdaten, Zeitraum, mögliche Startzeiten und alle Fahrzeuge auf einer Seite
-  function eventForm(p) {
-    const ev = p
-      ? { name: p.name, trackId: p.trackId, trackName: p.trackName, mode: p.mode, dauerMin: p.dauerMin, runden: p.runden, notiz: p.notiz || "", channel: p.channel || "", von: p.von || "", bis: p.bis || "", zeiten: [...(p.zeiten || [])] }
-      : { name: "", trackId: 0, trackName: "", mode: "zeit", dauerMin: 360, runden: 100, notiz: "", channel: "", von: "", bis: "", zeiten: [] };
-    const orig = {};
-    const cars = p ? p.cars.map(c => { orig[c.key] = JSON.stringify(c); return kopie(c); }) : [];
-    const standardStart = () => {
-      const t = ev.von || datumWert(Date.now() + 7 * 864e5);
-      return fromLocalInput(t + "T" + ((ev.zeiten || [])[0] || "14:00"));
-    };
-    const teams = META.teams || [];
+  // Gemeinsame Felder „Was wird gefahren?“ (Assistent + Bearbeiten)
+  function wasFelder(ev) {
+    const h = Math.floor(ev.dauerMin / 60), m = ev.dauerMin % 60;
+    return `
+      <div class="tm-row"><label for="ev-name">Eventname</label><input class="tm-input" id="ev-name" maxlength="80" placeholder="z. B. 6h Watkins Glen" value="${esc(ev.name)}"></div>
+      <div class="tm-row"><label for="ev-track">Strecke</label>
+        <div><input class="tm-input" id="ev-track" list="ev-tracks" placeholder="Strecke suchen …" value="${esc(ev.trackName)}"><datalist id="ev-tracks">${META.tracks.map(t => `<option value="${esc(t.name)}">`).join("")}</datalist></div></div>
+      <div class="tm-row"><div class="lbl">Rennlänge</div>
+        <div class="sp-inline"><div class="sp-seg" id="ev-mode"><button type="button" data-m="zeit" class="${ev.mode === "zeit" ? "on" : ""}">Zeit</button><button type="button" data-m="runden" class="${ev.mode === "runden" ? "on" : ""}">Runden</button></div>
+        ${ev.mode === "zeit"
+          ? `<input class="tm-input sp-num" id="ev-h" type="number" min="0" max="48" value="${h}"><span>Std.</span><input class="tm-input sp-num" id="ev-m" type="number" min="0" max="59" step="5" value="${m}"><span>Min.</span>`
+          : `<input class="tm-input sp-num" id="ev-runden" type="number" min="1" max="5000" value="${ev.runden}"><span>Runden</span>`}</div></div>`;
+  }
+  function wannFelder(ev) {
+    return `
+      <div class="sp-grid">
+        <label class="sp-f"><span>Erster Tag</span><input class="tm-input" type="date" id="ev-von" value="${ev.von}"></label>
+        <label class="sp-f"><span>Letzter Tag<small>leer = nur ein Tag</small></span><input class="tm-input" type="date" id="ev-bis" value="${ev.bis && ev.bis !== ev.von ? ev.bis : ""}"></label>
+      </div>
+      <div class="sp-f" style="margin-top:14px"><span>Startzeiten</span>
+        <div class="sp-zeiten">${ev.zeiten.map((z, i) => `<span class="sp-chipx">${z} Uhr<button type="button" data-zdel="${i}" title="Entfernen">✕</button></span>`).join("")}
+          <input class="tm-input" type="time" id="ev-zneu">${C.btn("+ Startzeit", "sm", 'id="ev-zadd"')}</div></div>`;
+  }
+  function leseWas(ev) {
     const v = (id) => root.querySelector("#" + id);
+    if (!v("ev-name")) return;
+    ev.name = v("ev-name").value;
+    if (v("ev-h")) ev.dauerMin = Math.max(10, Math.round(num(v("ev-h").value) * 60 + num(v("ev-m").value)));
+    if (v("ev-runden")) ev.runden = Math.max(1, Math.round(num(v("ev-runden").value, 100)));
+    const tv = v("ev-track").value.trim();
+    const t = META.tracks.find(x => x.name === tv) || META.tracks.find(x => norm(x.name) === norm(tv));
+    ev.trackName = t ? t.name : tv; ev.trackId = t ? t.id : 0;
+  }
+  function leseWann(ev) {
+    const v = (id) => root.querySelector("#" + id);
+    if (!v("ev-von")) return;
+    ev.von = v("ev-von").value; ev.bis = v("ev-bis").value || ev.von;
+    if (ev.bis && ev.von && ev.bis < ev.von) [ev.von, ev.bis] = [ev.bis, ev.von];
+  }
+  function zeitHinzu(ev) {
+    const z = root.querySelector("#ev-zneu").value;
+    if (!/^\d{2}:\d{2}$/.test(z)) { C.toast("Uhrzeit eingeben"); return false; }
+    if (!ev.zeiten.includes(z)) ev.zeiten.push(z);
+    ev.zeiten.sort();
+    return true;
+  }
+
+  // Neues Event: Assistent in 3 Schritten (Was? Wann? Teams?)
+  function eventWizard() {
+    const w = { schritt: 1, name: "", trackId: 0, trackName: "", mode: "zeit", dauerMin: 360, runden: 100, notiz: "", channel: "", von: datumWert(Date.now() + 7 * 864e5), bis: "", zeiten: ["14:00"], teams: [], carId: 0, carName: "", starts: {}, ich: "" };
+    const teams = META.teams || [];
+    const startVon = (n) => w.starts[n] || startAnpassen(fromLocalInput(w.von + "T" + (w.zeiten[0] || "14:00")), w, true);
+    const zeichne = () => {
+      const titel = ["Was wird gefahren?", "Wann wird gefahren?", "Welche Teams fahren?"][w.schritt - 1];
+      let inhalt = "";
+      if (w.schritt === 1) inhalt = wasFelder(w) + `
+        <details class="sp-mehr"><summary>Mehr (Discord-Kanal, Notizen)</summary>
+          <div class="tm-row"><label for="ev-chan">Discord-Kanal</label><select class="tm-select" id="ev-chan"><option value="">Standard${stdKanal() ? " (# " + esc(stdKanal()) + ")" : ""}</option>${(META.channels || []).map(c => `<option value="${c.id}" ${c.id === w.channel ? "selected" : ""}># ${esc(c.name)}</option>`).join("")}</select></div>
+          <div class="tm-row"><label for="ev-notiz">Notizen</label><textarea class="tm-input" id="ev-notiz" rows="3" maxlength="1500" placeholder="z. B. Pflichtstopps, Regeln …">${esc(w.notiz)}</textarea></div>
+        </details>`;
+      if (w.schritt === 2) inhalt = wannFelder(w);
+      if (w.schritt === 3) inhalt = `
+        <div class="sp-f"><span>Teams antippen</span><div class="sp-teamwahl">${teams.map(n => `<button type="button" class="sp-teamchip ${w.teams.includes(n) ? "on" : ""}" data-team="${esc(n)}" style="--t1:${teamFarbe(n)[0]}"><i></i>${esc(n)}</button>`).join("") || '<span class="tm-muted">Keine Teams angelegt (Admin → Stintplaner).</span>'}</div></div>
+        <div class="sp-f" style="margin-top:14px"><span>Fahrzeug</span>${autoAuswahl(w, 'id="wz-car"')}</div>
+        ${w.teams.map(n => `<div class="sp-wz-team" data-wt="${esc(n)}"><b><i style="background:${teamFarbe(n)[0]}"></i>${esc(n)}</b><div class="sp-grid">${startFelder(startVon(n), "wz" + teams.indexOf(n), w)}</div>
+          <label class="sp-check"><input type="radio" name="wz-ich" value="${esc(n)}" ${w.ich === n ? "checked" : ""}> Ich fahre hier</label></div>`).join("")}
+        ${w.teams.length ? `<label class="sp-check"><input type="radio" name="wz-ich" value="" ${w.ich ? "" : "checked"}> Ich fahre selbst nicht mit</label>` : ""}`;
+      root.innerHTML = `
+        <a class="sp-back" href="#stint">← Alle Events</a>
+        <div class="sp-wz">
+          <div class="sp-wz-steps">${["Was?", "Wann?", "Teams?"].map((l, i) => `<div class="sp-wz-step ${w.schritt === i + 1 ? "on" : ""} ${w.schritt > i + 1 ? "done" : ""}"><span>${w.schritt > i + 1 ? "✓" : i + 1}</span>${l}</div>`).join('<i></i>')}</div>
+          <div class="tm-box"><h5>${titel}</h5>${inhalt}
+            <div class="sp-wz-nav">${w.schritt > 1 ? C.btn("← Zurück", "", 'id="wz-back"') : "<span></span>"}${w.schritt < 3 ? C.btn("Weiter →", "red", 'id="wz-next"') : C.btn("Event anlegen ✓", "red", 'id="wz-done"')}</div>
+          </div>
+        </div>`;
+      const v = (id) => root.querySelector("#" + id);
+      const lese = () => {
+        if (w.schritt === 1) { leseWas(w); w.channel = v("ev-chan").value; w.notiz = v("ev-notiz").value; }
+        if (w.schritt === 2) leseWann(w);
+        if (w.schritt === 3) {
+          const id = Number(v("wz-car").value) || 0;
+          const f = (META.teamCars || []).find(x => x.id === id) || META.cars.find(x => x.id === id);
+          w.carId = f ? f.id : 0; w.carName = f ? f.name : "";
+          $$(".sp-wz-team").forEach(box => { const n = box.dataset.wt; const t = leseStart(box, "wz" + teams.indexOf(n)); if (t) w.starts[n] = t; });
+          const r = root.querySelector('input[name="wz-ich"]:checked'); w.ich = r ? r.value : "";
+        }
+      };
+      $$("#ev-mode [data-m]").forEach(b => b.onclick = () => { lese(); w.mode = b.dataset.m; zeichne(); });
+      if (v("ev-zadd")) v("ev-zadd").onclick = () => { lese(); if (zeitHinzu(w)) zeichne(); };
+      $$("[data-zdel]").forEach(b => b.onclick = () => { lese(); w.zeiten.splice(Number(b.dataset.zdel), 1); zeichne(); });
+      $$(".sp-wz-team").forEach(box => bindStartFelder(box, "wz" + teams.indexOf(box.dataset.wt)));
+      $$("[data-team]").forEach(b => b.onclick = () => {
+        lese();
+        const n = b.dataset.team;
+        if (w.teams.includes(n)) w.teams = w.teams.filter(x => x !== n);
+        else if (w.teams.length >= 4) return C.toast("Maximal 4 Fahrzeuge");
+        else w.teams.push(n);
+        zeichne();
+      });
+      if (v("wz-back")) v("wz-back").onclick = () => { lese(); w.schritt--; zeichne(); };
+      if (v("wz-next")) v("wz-next").onclick = () => {
+        lese();
+        if (w.schritt === 1 && !w.name.trim()) return C.toast("Bitte einen Eventnamen eintragen");
+        if (w.schritt === 2 && !w.von) return C.toast("Bitte den ersten Tag wählen");
+        if (w.schritt === 2 && !w.zeiten.length) return C.toast("Bitte mindestens eine Startzeit hinzufügen");
+        w.schritt++; zeichne();
+      };
+      if (v("wz-done")) v("wz-done").onclick = async () => {
+        lese();
+        const b = v("wz-done"); b.disabled = true;
+        try {
+          const ersterStart = w.teams.length ? Math.min(...w.teams.map(startVon)) : fromLocalInput(w.von + "T" + w.zeiten[0]);
+          const r = await C.api("/stint/event", { method: "POST", body: { event: { name: w.name, trackId: w.trackId, trackName: w.trackName, mode: w.mode, dauerMin: w.dauerMin, runden: w.runden, notiz: w.notiz, channel: w.channel, von: w.von, bis: w.bis || w.von, zeiten: w.zeiten, start: ersterStart } } });
+          for (const n of w.teams) {
+            await C.api("/stint/car", { method: "POST", body: { id: r.id, car: { name: n, carId: w.carId, carName: w.carName, start: startVon(n), pit: { ...PIT_STD }, drivers: w.ich === n ? [{ uid: S.me || C.ME.user.id, name: C.ME.user.name, g61: g61Vorschlag(C.ME.user.id, C.ME.user.name), pace: 0, fuel: 0 }] : [], stints: [] } } }).catch(x => C.toast(n + ": " + x.message));
+          }
+          C.toast("Event angelegt", true);
+          if (window.F2FEvNav) window.F2FEvNav.refresh();
+          location.hash = "stint/" + r.id;
+        } catch (x) { C.toast(x.message); b.disabled = false; }
+      };
+    };
+    zeichne();
+  }
+
+  // Event bearbeiten: alles auf einer Seite, speichert automatisch
+  function eventForm(p) {
+    const ev = { name: p.name, trackId: p.trackId, trackName: p.trackName, mode: p.mode, dauerMin: p.dauerMin, runden: p.runden, notiz: p.notiz || "", channel: p.channel || "", von: p.von || "", bis: p.bis || "", zeiten: [...(p.zeiten || [])] };
+    const sig = (c) => JSON.stringify({ ...c, schedule: undefined, crev: undefined });
+    const orig = {};
+    let cars = p.cars.map(c => { orig[c.key] = sig(c); return kopie(c); });
+    let evSig = JSON.stringify(ev);
+    const teams = META.teams || [];
+    let stTxt = "", stCls = "", t = null, laeuft = false;
+    const v = (id) => root.querySelector("#" + id);
+    const status = (txt, cls) => { stTxt = txt; stCls = cls || ""; const el = v("ev-stat"); if (el) { el.textContent = txt; el.className = "sp-save " + stCls; } };
     const sync = () => {
       if (!v("ev-name")) return;
-      ev.name = v("ev-name").value; ev.notiz = v("ev-notiz").value; ev.channel = v("ev-chan").value;
-      if (v("ev-h")) ev.dauerMin = Math.max(10, Math.round(num(v("ev-h").value) * 60 + num(v("ev-m").value)));
-      if (v("ev-runden")) ev.runden = Math.max(1, Math.round(num(v("ev-runden").value, 100)));
-      const tv = v("ev-track").value.trim();
-      const t = META.tracks.find(x => x.name === tv) || META.tracks.find(x => norm(x.name) === norm(tv));
-      ev.trackName = t ? t.name : tv; ev.trackId = t ? t.id : 0;
-      ev.von = v("ev-von").value; ev.bis = v("ev-bis").value || ev.von;
+      leseWas(ev); leseWann(ev);
+      ev.notiz = v("ev-notiz").value; ev.channel = v("ev-chan").value;
       $$(".sp-ecar").forEach(box => {
         const c = cars[Number(box.dataset.i)];
         const ts = box.querySelector("[data-e=team]"); if (ts) c.name = ts.value;
@@ -455,117 +574,91 @@
         const st = leseStart(box, "c" + box.dataset.i); if (st) c.start = st;
       });
     };
+    const plane = () => { status("Speichert …", "laeuft"); clearTimeout(t); t = setTimeout(speichern, 700); };
+    async function speichern() {
+      t = null;
+      if (laeuft) { clearTimeout(t); t = setTimeout(speichern, 400); return; }
+      sync();
+      if (!ev.name.trim()) return status("Eventname fehlt", "err");
+      if (new Set(cars.map(c => c.name)).size !== cars.length) return status("Ein Team ist doppelt", "err");
+      laeuft = true;
+      try {
+        if (JSON.stringify(ev) !== evSig) {
+          await C.api("/stint/event", { method: "POST", body: { id: p.id, event: { ...ev, start: cars.length ? Math.min(...cars.map(c => c.start)) : fromLocalInput((ev.von || datumWert(Date.now())) + "T" + (ev.zeiten[0] || "14:00")) } } });
+          evSig = JSON.stringify(ev);
+        }
+        const altPlan = S.plan;
+        S.plan = { ...p, ...ev, cars };
+        for (const c of cars) {
+          if (orig[c.key] === sig(c)) continue;
+          c.schedule = rechne(c, null).rows.filter(x => !x.real).map(x => ({ i: x.i, u: x.uid, v: Math.round(x.von) }));
+          const r = await C.api("/stint/car", { method: "POST", body: { id: p.id, crev: c.crev || 0, car: c } });
+          c.crev = r.crev; orig[c.key] = sig(c);
+        }
+        S.plan = altPlan;
+        status("✓ Gespeichert", "ok");
+        if (window.F2FEvNav) window.F2FEvNav.refresh();
+      } catch (x) { status("Nicht gespeichert", "err"); C.toast(x.message); }
+      finally { laeuft = false; }
+    }
     const zeichne = () => {
-      const h = Math.floor(ev.dauerMin / 60), m = ev.dauerMin % 60;
-      const aktiv = cars.filter(c => !c._weg);
-      const vergeben = (n, c) => aktiv.some(x => x !== c && x.name === n);
+      const vergeben = (n, c) => cars.some(x => x !== c && x.name === n);
       root.innerHTML = `
-        <div class="sp-head"><a class="sp-back" href="${p ? "#stint/" + esc(p.id) : "#stint"}">← ${p ? "Zurück zum Event" : "Übersicht"}</a>
-          <div class="sp-title"><h3>${p ? "Event bearbeiten" : "Neues Event"}</h3><small>Alles an einem Ort: Event, Zeitraum, Startzeiten und Fahrzeuge</small></div>
-          <div class="sp-actions">${C.btn(p ? "Alles speichern" : "Event anlegen", "red", 'id="ev-save"')}</div></div>
-        <div class="tm-box"><h5>Event</h5>
-          <div class="tm-row"><label for="ev-name">Eventname</label><input class="tm-input" id="ev-name" maxlength="80" placeholder="z. B. 6h Watkins Glen" value="${esc(ev.name)}"></div>
-          <div class="tm-row"><label for="ev-track">Strecke<small>aus Garage 61, tippen zum Suchen</small></label>
-            <div><input class="tm-input" id="ev-track" list="ev-tracks" placeholder="Strecke suchen …" value="${esc(ev.trackName)}"><datalist id="ev-tracks">${META.tracks.map(t => `<option value="${esc(t.name)}">`).join("")}</datalist></div></div>
-          <div class="tm-row"><div class="lbl">Rennlänge</div>
-            <div><div class="sp-seg" id="ev-mode"><button type="button" data-m="zeit" class="${ev.mode === "zeit" ? "on" : ""}">Nach Zeit</button><button type="button" data-m="runden" class="${ev.mode === "runden" ? "on" : ""}">Nach Runden</button></div>
-            <div class="sp-inline" style="margin-top:10px">${ev.mode === "zeit"
-              ? `<input class="tm-input sp-num" id="ev-h" type="number" min="0" max="48" value="${h}"><span>Std.</span><input class="tm-input sp-num" id="ev-m" type="number" min="0" max="59" step="5" value="${m}"><span>Min.</span>`
-              : `<input class="tm-input sp-num" id="ev-runden" type="number" min="1" max="5000" value="${ev.runden}"><span>Runden</span>`}</div></div></div>
-          <div class="tm-row"><label for="ev-chan">Discord-Kanal<small>für Pings zu diesem Event</small></label>
-            <div><select class="tm-select" id="ev-chan"><option value="">Standard${stdKanal() ? " (# " + esc(stdKanal()) + ")" : " (keiner eingestellt)"}</option>${(META.channels || []).map(c => `<option value="${c.id}" ${c.id === ev.channel ? "selected" : ""}># ${esc(c.name)}</option>`).join("")}</select></div></div>
-          <div class="tm-row"><label for="ev-notiz">Notizen<small>optional</small></label><textarea class="tm-input" id="ev-notiz" rows="3" maxlength="1500" placeholder="z. B. Pflichtstopps, Regeln, Setup …">${esc(ev.notiz)}</textarea></div>
+        <div class="sp-head"><a class="sp-back" href="#stint/${esc(p.id)}" id="ev-fertig0">← Zurück zum Event</a>
+          <div class="sp-title"><h3>Event bearbeiten</h3><small>Änderungen werden automatisch gespeichert</small></div>
+          <div class="sp-actions"><span class="sp-save ${stCls}" id="ev-stat">${esc(stTxt)}</span><a class="tm-btn red" href="#stint/${esc(p.id)}" id="ev-fertig"><span>Fertig</span></a></div></div>
+        <div class="tm-box"><h5>Was wird gefahren?</h5>${wasFelder(ev)}
+          <div class="tm-row"><label for="ev-chan">Discord-Kanal</label><select class="tm-select" id="ev-chan"><option value="">Standard${stdKanal() ? " (# " + esc(stdKanal()) + ")" : ""}</option>${(META.channels || []).map(c => `<option value="${c.id}" ${c.id === ev.channel ? "selected" : ""}># ${esc(c.name)}</option>`).join("")}</select></div>
+          <div class="tm-row"><label for="ev-notiz">Notizen</label><textarea class="tm-input" id="ev-notiz" rows="3" maxlength="1500" placeholder="z. B. Pflichtstopps, Regeln …">${esc(ev.notiz)}</textarea></div>
         </div>
-        <div class="tm-box"><h5>Zeitraum &amp; mögliche Startzeiten</h5>
-          <p class="hint">Optional, z. B. für Special Events über mehrere Tage. Bei jedem Fahrzeug wählst du dann Tag und Uhrzeit daraus (eigene Uhrzeit geht auch).</p>
-          <div class="sp-grid">
-            <label class="sp-f"><span>Von</span><input class="tm-input" type="date" id="ev-von" value="${ev.von}"></label>
-            <label class="sp-f"><span>Bis</span><input class="tm-input" type="date" id="ev-bis" value="${ev.bis}"></label>
-          </div>
-          <div class="sp-f" style="margin-top:12px"><span>Mögliche Startzeiten</span>
-            <div class="sp-zeiten">${ev.zeiten.map((z, i) => `<span class="sp-chipx">${z} Uhr<button type="button" data-zdel="${i}" title="Entfernen">✕</button></span>`).join("")}
-              <input class="tm-input" type="time" id="ev-zneu">${C.btn("+ Startzeit", "sm", 'id="ev-zadd"')}</div></div>
-        </div>
-        <div class="tm-box" ${cars.length ? "" : "hidden"}><h5>Fahrzeuge (${aktiv.length})</h5>
-          ${cars.map((c, i) => c._weg ? "" : `<div class="sp-ecar" data-i="${i}" style="--team:${teamFarbe(c.name)[0]}">
-            <div class="sp-ecar-h"><span class="sp-ecar-emb">${silhouette(c.name)}</span><b>${esc(c.name || "Neues Fahrzeug")}</b>${C.btn("Fahrzeug löschen", "sm", `data-cdel="${i}"`)}</div>
+        <div class="tm-box"><h5>Wann wird gefahren?</h5>${wannFelder(ev)}</div>
+        <div class="tm-box" ${cars.length ? "" : "hidden"}><h5>Fahrzeuge</h5>
+          ${cars.map((c, i) => `<div class="sp-ecar" data-i="${i}">
+            <div class="sp-ecar-h"><span class="sp-ecar-emb">${silhouette(c.name)}</span><b>${esc(c.name)}</b><button type="button" class="sp-iconbtn" data-cdel="${i}" title="Fahrzeug löschen">✕</button></div>
             <div class="sp-ecar-grid">
-              <label class="sp-f"><span>Team</span><select class="tm-select" data-e="team">${[...new Set([c.name, ...teams].filter(Boolean))].map(n => `<option value="${esc(n)}" ${n === c.name ? "selected" : ""} ${vergeben(n, c) ? "disabled" : ""}>${esc(n)}${vergeben(n, c) ? " (vergeben)" : ""}</option>`).join("")}</select></label>
+              <label class="sp-f"><span>Team</span><select class="tm-select" data-e="team">${[...new Set([c.name, ...teams].filter(Boolean))].map(n => `<option value="${esc(n)}" ${n === c.name ? "selected" : ""} ${vergeben(n, c) ? "disabled" : ""}>${esc(n)}</option>`).join("")}</select></label>
               <label class="sp-f"><span>Fahrzeug</span>${autoAuswahl(c, 'data-e="car"')}</label>
               ${startFelder(c.start, "c" + i, ev)}
             </div>
-            <div class="sp-chips"><span class="tm-muted" style="font-size:13px">Fahrer:</span>
-              ${c.drivers.map((d, di) => `<span class="sp-chipx">${ava(d.uid, 22)}${esc(memberName(d.uid))}<button type="button" data-rmd="${i}:${di}" title="Austragen">✕</button></span>`).join("") || '<span class="tm-muted" style="font-size:13px">noch keine</span>'}
-              ${c.drivers.length < 8 ? `<select class="tm-select" data-addd="${i}"><option value="">+ Fahrer eintragen …</option>${META.members.filter(mm => !c.drivers.some(d => d.uid === mm.id)).map(mm => `<option value="${mm.id}">${esc(mm.name)}</option>`).join("")}</select>` : ""}
+            <div class="sp-chips">${c.drivers.map((d, di) => `<span class="sp-chipx">${ava(d.uid, 22)}${esc(memberName(d.uid))}<button type="button" data-rmd="${i}:${di}" title="Austragen">✕</button></span>`).join("")}
+              ${c.drivers.length < 8 ? `<select class="tm-select" data-addd="${i}"><option value="">+ Fahrer</option>${META.members.filter(mm => !c.drivers.some(d => d.uid === mm.id)).map(mm => `<option value="${mm.id}">${esc(mm.name)}</option>`).join("")}</select>` : ""}
             </div>
-          </div>`).join("") || '<p class="tm-muted">Noch kein Fahrzeug.</p>'}
+          </div>`).join("")}
         </div>
-        <div class="tm-actions">${C.btn(p ? "Alles speichern" : "Event anlegen", "red", 'id="ev-save2"')}${p && S.canDelete ? C.btn("Event löschen", "sm", 'id="ev-del"') : ""}</div>`;
-      $$("#ev-mode [data-m]").forEach(b => b.onclick = () => { sync(); ev.mode = b.dataset.m; zeichne(); });
-      // Zeitraum/Startzeiten geändert: Fahrzeuge in den neuen Rahmen ziehen
-      const nachziehen = (zeitAuch) => cars.forEach(c => { if (!c._weg) c.start = startAnpassen(c.start, ev, zeitAuch); });
-      ["ev-von", "ev-bis"].forEach(id => v(id).onchange = () => { sync(); nachziehen(false); zeichne(); });
-      v("ev-zadd").onclick = () => { sync(); const z = v("ev-zneu").value; if (!/^\d{2}:\d{2}$/.test(z)) return C.toast("Uhrzeit eingeben"); const erste = !ev.zeiten.length; if (!ev.zeiten.includes(z)) ev.zeiten.push(z); ev.zeiten.sort(); if (erste) nachziehen(true); zeichne(); };
-      $$("[data-zdel]").forEach(b => b.onclick = () => { sync(); ev.zeiten.splice(Number(b.dataset.zdel), 1); nachziehen(true); zeichne(); });
-      $$(".sp-ecar").forEach(box => bindStartFelder(box, "c" + box.dataset.i));
-      $$("[data-e=team]").forEach(s => s.onchange = () => { sync(); zeichne(); });
-      $$("[data-cdel]").forEach(b => b.onclick = () => {
-        const c = cars[Number(b.dataset.cdel)];
-        if (!confirm("Fahrzeug „" + (c.name || "Neues Fahrzeug") + "“ wirklich löschen? Wird beim Speichern endgültig entfernt.")) return;
-        sync(); c._weg = true; zeichne();
+        ${S.canDelete ? `<div class="tm-actions">${C.btn("Event löschen", "sm", 'id="ev-del"')}</div>` : ""}`;
+      // jede Änderung speichert automatisch
+      root.querySelectorAll("input,select,textarea").forEach(el => {
+        if (el.id === "ev-zneu" || el.dataset.addd !== undefined) return;
+        el.addEventListener(el.matches("input[type=text],input:not([type]),textarea") ? "input" : "change", plane);
       });
-      $$("[data-rmd]").forEach(b => b.onclick = () => { sync(); const [ci, di] = b.dataset.rmd.split(":").map(Number); cars[ci].drivers.splice(di, 1); cars[ci].stints = (cars[ci].stints || []).map(s => ({ ...s, d: "" })); zeichne(); });
+      $$(".sp-ecar").forEach(box => bindStartFelder(box, "c" + box.dataset.i));
+      const nachziehen = (zeitAuch) => cars.forEach(c => { c.start = startAnpassen(c.start, ev, zeitAuch); });
+      $$("#ev-mode [data-m]").forEach(b => b.onclick = () => { sync(); ev.mode = b.dataset.m; zeichne(); plane(); });
+      ["ev-von", "ev-bis"].forEach(id => v(id).addEventListener("change", () => { sync(); nachziehen(false); zeichne(); plane(); }));
+      v("ev-zadd").onclick = () => { sync(); const erste = !ev.zeiten.length; if (!zeitHinzu(ev)) return; if (erste) nachziehen(true); zeichne(); plane(); };
+      $$("[data-zdel]").forEach(b => b.onclick = () => { sync(); ev.zeiten.splice(Number(b.dataset.zdel), 1); nachziehen(true); zeichne(); plane(); });
+      $$("[data-e=team]").forEach(s => s.addEventListener("change", () => { sync(); zeichne(); }));
+      $$("[data-rmd]").forEach(b => b.onclick = () => { sync(); const [ci, di] = b.dataset.rmd.split(":").map(Number); cars[ci].drivers.splice(di, 1); cars[ci].stints = (cars[ci].stints || []).map(s => ({ ...s, d: "" })); zeichne(); plane(); });
       $$("[data-addd]").forEach(s => s.onchange = () => {
         if (!s.value) return;
         sync();
         const c = cars[Number(s.dataset.addd)], name = memberName(s.value);
         c.drivers.push({ uid: s.value, name, g61: g61Vorschlag(s.value, name), pace: 0, fuel: 0, src: "", quelle: "" });
-        zeichne();
+        zeichne(); plane();
       });
-      const cadd = v("ev-cadd");
-      if (cadd) cadd.onclick = () => {
+      $$("[data-cdel]").forEach(b => b.onclick = async () => {
         sync();
-        const frei = teams.find(n => !cars.some(x => !x._weg && x.name === n)) || "";
-        const vor = cars.filter(x => !x._weg).slice(-1)[0];
-        cars.push({ _neu: true, name: frei, carId: vor ? vor.carId : 0, carName: vor ? vor.carName : "", start: vor ? vor.start : standardStart(), pit: { ...(vor ? vor.pit : PIT_STD) }, drivers: [], stints: [], stops: [] });
-        zeichne();
-      };
-      const speichern = async (btn) => {
-        sync();
-        if (!ev.name.trim()) return C.toast("Bitte einen Eventnamen eintragen");
-        const aktivJetzt = cars.filter(c => !c._weg);
-        if (aktivJetzt.some(c => !c.name)) return C.toast("Bitte bei jedem Fahrzeug ein Team wählen");
-        if (new Set(aktivJetzt.map(c => c.name)).size !== aktivJetzt.length) return C.toast("Jedes Team darf nur einmal vorkommen");
-        btn.disabled = true;
-        const fehlerListe = [];
-        try {
-          const r = await C.api("/stint/event", { method: "POST", body: { id: p ? p.id : undefined, event: { ...ev, start: aktivJetzt.length ? Math.min(...aktivJetzt.map(c => c.start)) : standardStart() } } });
-          const id = r.id;
-          const altPlan = S.plan;
-          S.plan = { ...(p || {}), ...ev, id, cars: aktivJetzt };
-          for (const c of cars) {
-            if (c._weg) {
-              if (!c._neu) await C.api("/stint/car/delete", { method: "POST", body: { id, key: c.key } }).catch(x => fehlerListe.push(c.name + ": " + x.message));
-              continue;
-            }
-            const { _neu, _weg, ...car } = c;
-            if (!_neu && orig[c.key] === JSON.stringify(car)) continue;
-            car.schedule = rechne(car, null).rows.filter(x => !x.real).map(x => ({ i: x.i, u: x.uid, v: Math.round(x.von) }));
-            await C.api("/stint/car", { method: "POST", body: { id, crev: _neu ? undefined : car.crev || 0, car } }).catch(x => fehlerListe.push((c.name || "Fahrzeug") + ": " + x.message));
-          }
-          S.plan = altPlan;
-          if (fehlerListe.length) C.toast("Gespeichert, aber: " + fehlerListe.join(" · "));
-          else C.toast(p ? "Alles gespeichert" : "Event angelegt", true);
-          S.key = null; S.dirty = false;
-          location.hash = "stint/" + id;
-        } catch (x) { C.toast(x.message); btn.disabled = false; }
-      };
-      v("ev-save").onclick = () => speichern(v("ev-save"));
-      v("ev-save2").onclick = () => speichern(v("ev-save2"));
+        const c = cars[Number(b.dataset.cdel)];
+        if (!confirm("Fahrzeug „" + c.name + "“ wirklich löschen? Das geht nicht rückgängig.")) return;
+        try { await C.api("/stint/car/delete", { method: "POST", body: { id: p.id, key: c.key } }); cars = cars.filter(x => x !== c); status("✓ Fahrzeug gelöscht", "ok"); zeichne(); if (window.F2FEvNav) window.F2FEvNav.refresh(); }
+        catch (x) { C.toast(x.message); }
+      });
+      const fertig = async (e) => { if (t || laeuft) { e.preventDefault(); clearTimeout(t); await speichern(); location.hash = "stint/" + p.id; } };
+      v("ev-fertig").onclick = fertig; v("ev-fertig0").onclick = fertig;
       const del = v("ev-del");
       if (del) del.onclick = async () => {
         if (!confirm("Dieses Event mit allen Fahrzeugen wirklich löschen? Das geht nicht rückgängig.")) return;
-        try { const r = await C.api("/stint/plan/delete", { method: "POST", body: { id: p.id } }); C.toast(r.info, true); location.hash = "stint"; }
+        try { const r = await C.api("/stint/plan/delete", { method: "POST", body: { id: p.id } }); C.toast(r.info, true); if (window.F2FEvNav) window.F2FEvNav.refresh(); location.hash = "stint"; }
         catch (x) { C.toast(x.message); }
       };
     };
@@ -575,6 +668,16 @@
   /* ================================================================
      EVENT-SEITE (Fahrzeuge & Teams, Zeitplan, Notizen)
      ================================================================ */
+  // Aufgaben auf der Event-Seite: was muss ICH tun?
+  function evAufgaben(p, infos, istDrin) {
+    let liste = [];
+    if (!p.cars.length) return `<div class="sp-tasks"><div class="sp-task ich"><i class="sp-task-dot"></i><span>Noch kein Fahrzeug angelegt</span><a class="tm-btn red sm" href="#stint/${esc(p.id)}/neu"><span>Fahrzeug anlegen →</span></a></div></div>`;
+    if (!istDrin) return `<div class="sp-tasks"><div class="sp-task ich"><i class="sp-task-dot"></i><span>Du fährst noch nicht mit. Such dir unten ein Fahrzeug aus.</span></div></div>`;
+    const info = infos.find(x => x.c === istDrin);
+    liste = aufgaben(istDrin, info ? info.r : null).filter(t => t.ich && t.a !== "join");
+    if (!liste.length) return `<div class="sp-tasks"><div class="sp-task ok"><i class="sp-task-dot ok"></i><span>Bei dir ist alles erledigt (${esc(istDrin.name)}).</span><a class="tm-btn sm" href="#stint/${esc(p.id)}/${esc(istDrin.key)}"><span>Mein Fahrzeug →</span></a></div></div>`;
+    return `<div class="sp-tasks">${liste.map(t => `<div class="sp-task ich"><i class="sp-task-dot"></i><span>${esc(t.t)}</span><button type="button" class="tm-btn red sm" data-evtask="${esc(istDrin.key)}|${t.a}"><span>${esc(t.b)} →</span></button></div>`).join("")}</div>`;
+  }
   function renderEvent() {
     const p = S.plan, now = Date.now();
     const infos = p.cars.map(c => { const r = rechne(c, liveFuer(c)); return { c, r, st: carStatus(c, r) }; });
@@ -622,7 +725,7 @@
       <section class="sp-hero" style="--img:url('/team/bilder/f2f-cars.webp')">
         <div class="sp-hero-in">
           <span class="sp-hero-tag">${status}</span>
-          <h3>${esc(p.name)}</h3>
+          <h3>${esc(p.name)} <a class="sp-pen" href="#stint/${esc(p.id)}/bearbeiten" title="Event bearbeiten">✎</a></h3>
           <div class="sp-hero-facts">
             <span>${C.ICONS.calendar}${zeitraumText(p) || datumLang(p.start)}</span>
             <span>${C.ICONS.clock}${(p.zeiten || []).length ? "Startzeiten: " + p.zeiten.join(", ") + " Uhr" : uhr(p.start) + " Uhr (Start)"}</span>
@@ -634,6 +737,7 @@
         </div>
         <div class="sp-hero-st"><b>Planungsstatus</b><span>${fertig} / ${p.cars.length} Fahrzeuge fertig</span><div class="sp-bar"><i style="width:${p.cars.length ? Math.round(fertig / p.cars.length * 100) : 0}%"></i></div></div>
       </section>
+      ${evAufgaben(p, infos, istDrin)}
       <div class="sp-ev">
         <div class="sp-ev-main">
           <div class="g6-tabs sp-tabs">${[["autos", "Fahrzeuge & Teams"], ["zeit", "Zeitplan"], ["notiz", "Notizen"]].map(([k, l]) => `<button type="button" data-evtab="${k}" class="${S.evTab === k ? "on" : ""}">${l}</button>`).join("")}</div>
@@ -667,6 +771,7 @@
         </aside>
       </div>`;
     $$("[data-evtab]").forEach(b => b.onclick = () => { S.evTab = b.dataset.evtab; renderEvent(); });
+    $$("[data-evtask]").forEach(b => b.onclick = () => { const [k, st] = b.dataset.evtask.split("|"); S.key = null; S.nextStep = st; location.hash = "stint/" + p.id + "/" + k; });
     $$("[data-open]").forEach(el => {
       const go = () => (location.hash = "stint/" + p.id + "/" + el.dataset.open);
       el.onclick = (e) => { if (!e.target.closest("button")) go(); };
@@ -758,46 +863,108 @@
      FAHRZEUG-SEITE: 1 Verfügbarkeit · 2 Fahrer & Werte · 3 Stintplan · 4 Live
      ================================================================ */
   const STEPS = [["verf", "Verfügbarkeit"], ["werte", "Fahrer & Werte"], ["plan", "Stintplan"], ["live", "Live"]];
+
+  // Was ist als Nächstes zu tun? (eigene Aufgaben zuerst, dann Hinweise zum Fahrzeug)
+  function aufgaben(c, r) {
+    const out = [];
+    const ich = c.drivers.find(d => d.uid === S.me);
+    if (!ich) out.push({ t: "Du fährst hier nicht mit", b: "Mitfahren", a: "join", ich: true });
+    else {
+      if (fahrerAv(S.me, c) === "fehlt") out.push({ t: "Trag deine Verfügbarkeit ein", b: "Jetzt eintragen", a: "verf", ich: true });
+      if (!(ich.pace > 0 && ich.fuel > 0)) out.push({ t: "Deine Rundenzeit und dein Sprit fehlen", b: "Eintragen", a: "werte", ich: true });
+    }
+    if (!c.carId) out.push({ t: "Fahrzeugmodell fehlt", b: "Wählen", a: "kopf" });
+    const andere = c.drivers.filter(d => d.uid !== S.me && fahrerAv(d.uid, c) === "fehlt").map(d => memberName(d.uid));
+    if (andere.length) out.push({ t: "Warten auf Verfügbarkeit: " + andere.join(", ") });
+    const ohne = c.drivers.filter(d => d.uid !== S.me && !(d.pace > 0 && d.fuel > 0)).map(d => memberName(d.uid));
+    if (ohne.length) out.push({ t: "Pace/Sprit fehlt: " + ohne.join(", "), b: "Ansehen", a: "werte" });
+    if (r && !r.fehler.length) {
+      const k = r.rows.filter(x => !x.real && x.uid && verfuegbar(x.uid, x.von, x.bis) === 0);
+      if (k.length) out.push({ t: k.length === 1 ? `Stint ${k[0].i + 1}: ${memberName(k[0].uid)} kann nicht` : `${k.length} Stints mit Fahrern, die nicht können`, b: "Fahrer tauschen", a: "plan" });
+    }
+    return out;
+  }
+
   function renderCar() {
+    const p = S.plan;
+    root.innerHTML = `
+      <a class="sp-back" href="#stint/${esc(p.id)}" id="sp-back">← ${esc(p.name)}</a>
+      <div class="sp-chead" id="sp-ckopf"></div>
+      <div id="sp-tasks"></div>
+      <div class="sp-stepper" id="sp-stepper"></div>
+      <div id="sp-body"></div>`;
+    $("#sp-back").onclick = () => flush();
+    zeichneKopf();
+    zeigeStep();
+  }
+  // Kopf, Aufgaben und Schrittleiste (ohne den Inhalt des Schritts, damit Eingaben dort erhalten bleiben)
+  function zeichneKopf() {
     const p = S.plan, c = S.draft;
+    if (!$("#sp-ckopf")) return;
     const r = rechne(c, liveFuer(c));
     const st = carStatus(c, r);
     const ich = c.drivers.some(d => d.uid === S.me);
-    root.innerHTML = `
-      <div class="sp-chead">
-        <a class="sp-back" href="#stint/${esc(p.id)}" id="sp-back">← ${esc(p.name)}</a>
-        <div class="sp-chead-in">
-          <div class="sp-chead-pic">${silhouette(c.name)}</div>
-          <div class="sp-title"><h3>${esc(c.name)}</h3><small>${esc(c.carName || "Fahrzeug offen")} · Start ${tagUhr(carStart(c))} · ${esc(p.trackName || "")}</small></div>
-          <div class="sp-chead-st"><span class="sp-st ${st[0]}">${st[1]}</span>${statusListe(st)}</div>
+    const darfLoeschen = S.canDelete || c.by === S.me || META.isAdmin;
+    const teams = [...new Set([c.name, ...(META.teams || [])].filter(Boolean))];
+    const vergeben = (n) => p.cars.some(x => x.key !== c.key && x.name === n);
+    $("#sp-ckopf").innerHTML = `
+      <div class="sp-chead-in">
+        <div class="sp-chead-pic">${silhouette(c.name)}</div>
+        <div class="sp-chead-main">
+          <select class="sp-inl-team" id="ck-team" title="Team ändern">${teams.map(n => `<option value="${esc(n)}" ${n === c.name ? "selected" : ""} ${vergeben(n) ? "disabled" : ""}>${esc(n)}</option>`).join("")}</select>
+          <div class="sp-inl-row">
+            <div class="sp-inl-f sp-inl-car">${C.ICONS.car}${autoAuswahl(c, 'id="ck-car"')}</div>
+            <div class="sp-inl-f sp-inl-start" id="ck-start">${C.ICONS.calendar}${startFelder(c.start, "ck", p)}</div>
+          </div>
         </div>
-        <div class="sp-actions">
-          <span class="sp-dirty" id="sp-dirty" ${S.dirty ? "" : "hidden"}>Nicht gespeichert</span>
-          ${C.btn("Speichern", "red", `id="sp-save" ${S.dirty ? "" : "hidden"}`)}
+        <div class="sp-chead-act">
+          <span class="sp-save ${S.saveCls || ""}" id="sp-savest">${esc(S.saveTxt || "")}</span>
           ${ich ? C.btn("Abmelden", "sm", 'id="sp-leave"') : C.btn("Mitfahren", "red sm", 'id="sp-join"')}
-          <a class="tm-btn sm" href="#stint/${esc(p.id)}/${esc(c.key)}/bearbeiten" id="sp-edit"><span>Bearbeiten</span></a>
-          ${S.canDelete || c.by === S.me || META.isAdmin ? C.btn("Löschen", "sm", 'id="sp-cdel"') : ""}
+          ${darfLoeschen ? `<button type="button" class="sp-iconbtn" id="sp-cdel" title="Fahrzeug löschen">✕</button>` : ""}
         </div>
-      </div>
-      <div class="sp-stepper">${STEPS.map(([k, l], i) => { const ok = { verf: c.drivers.length && c.drivers.every(d => fahrerAv(d.uid, c) !== "fehlt"), werte: c.drivers.length && c.drivers.every(d => d.pace > 0 && d.fuel > 0), plan: st[0] === "ok", live: r.quelle === "g61" || r.quelle === "hand" }[k]; return `<button type="button" data-step="${k}" class="sp-stp ${S.step === k ? "on" : ""} ${ok ? "done" : ""}"><span class="sp-stp-n">${ok ? "✓" : i + 1}</span><span class="sp-stp-l">${l}</span></button>`; }).join('<i class="sp-stp-line"></i>')}</div>
-      <div id="sp-body"></div>`;
-    $("#sp-back").onclick = weg;
-    $("#sp-edit").onclick = weg;
-    $("#sp-save").onclick = speichernCar;
+      </div>`;
+    const tasks = aufgaben(c, r);
+    $("#sp-tasks").innerHTML = tasks.length
+      ? `<div class="sp-tasks">${tasks.map((t, i) => `<div class="sp-task ${t.ich ? "ich" : ""}"><i class="sp-task-dot ${t.ich ? "" : "info"}"></i><span>${esc(t.t)}</span>${t.b ? `<button type="button" class="tm-btn ${t.ich ? "red" : ""} sm" data-task="${i}"><span>${esc(t.b)} →</span></button>` : ""}</div>`).join("")}</div>`
+      : `<div class="sp-tasks"><div class="sp-task ok"><i class="sp-task-dot ok"></i><span>Alles erledigt, der Plan steht.</span></div></div>`;
+    $("#sp-stepper").innerHTML = STEPS.map(([k, l], i) => {
+      const ok = { verf: c.drivers.length && c.drivers.every(d => fahrerAv(d.uid, c) !== "fehlt"), werte: c.drivers.length && c.drivers.every(d => d.pace > 0 && d.fuel > 0), plan: st[0] === "ok", live: r.quelle === "g61" || r.quelle === "hand" }[k];
+      return `<button type="button" data-step="${k}" class="sp-stp ${S.step === k ? "on" : ""} ${ok ? "done" : ""}"><span class="sp-stp-n">${ok ? "✓" : i + 1}</span><span class="sp-stp-l">${l}</span></button>`;
+    }).join('<i class="sp-stp-line"></i>');
+    // direkt bearbeiten: Team, Fahrzeug, Tag, Uhrzeit
+    $("#ck-team").onchange = (e) => { c.name = e.target.value; dirty(); zeichneKopf(); };
+    $("#ck-car").onchange = (e) => {
+      const id = Number(e.target.value) || 0;
+      const f = (META.teamCars || []).find(x => x.id === id) || META.cars.find(x => x.id === id);
+      c.carId = f ? f.id : 0; c.carName = f ? f.name : "";
+      dirty(); zeichneKopf(); autoG61(c);
+    };
+    const sb = $("#ck-start");
+    bindStartFelder(sb, "ck");
+    sb.querySelectorAll("select,input").forEach(el => el.addEventListener("change", () => {
+      const z = sb.querySelector('[data-s="ckz"]');
+      if (z && z.value === "andere" && el === z) return;
+      const t = leseStart(sb, "ck");
+      if (t && t !== c.start) { c.start = t; dirty(); zeichneKopf(); zeigeStep(); }
+    }));
+    $$("[data-task]").forEach(b => b.onclick = () => {
+      const t = tasks[Number(b.dataset.task)];
+      if (t.a === "join") return mitfahren(true, b);
+      if (t.a === "kopf") { const s = $("#ck-car"); if (s) { s.focus(); s.classList.add("sp-blink"); } return; }
+      S.step = t.a; zeichneKopf(); zeigeStep();
+      const el = $("#sp-stepper"); if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+    $$("[data-step]").forEach(b => b.onclick = () => { S.step = b.dataset.step; zeichneKopf(); zeigeStep(); });
     const cdel = $("#sp-cdel");
     if (cdel) cdel.onclick = async () => {
       if (!confirm("Fahrzeug „" + c.name + "“ mit allen Fahrern und Stints wirklich löschen? Das geht nicht rückgängig.")) return;
-      cdel.disabled = true;
-      try { const r = await C.api("/stint/car/delete", { method: "POST", body: { id: p.id, key: c.key } }); C.toast(r.info, true); S.key = null; S.dirty = false; location.hash = "stint/" + p.id; }
-      catch (x) { C.toast(x.message); cdel.disabled = false; }
+      try { const x = await C.api("/stint/car/delete", { method: "POST", body: { id: p.id, key: c.key } }); C.toast(x.info, true); S.key = null; S.dirty = false; if (window.F2FEvNav) window.F2FEvNav.refresh(); location.hash = "stint/" + p.id; }
+      catch (x) { C.toast(x.message); }
     };
     const j = $("#sp-join"), l = $("#sp-leave");
     if (j) j.onclick = () => mitfahren(true, j);
     if (l) l.onclick = () => { if (confirm("Wirklich aus „" + c.name + "“ abmelden? Das Team bekommt eine Nachricht in Discord.")) mitfahren(false, l); };
-    $$("[data-step]").forEach(b => b.onclick = () => { S.step = b.dataset.step; $$("[data-step]").forEach(x => x.classList.toggle("on", x === b)); zeigeStep(); });
-    zeigeStep();
   }
-  function dirty() { S.dirty = true; const d = $("#sp-dirty"), s = $("#sp-save"); if (d) d.hidden = false; if (s) s.hidden = false; }
   function zeigeStep() {
     const body = $("#sp-body");
     if (!body) return;
@@ -806,6 +973,44 @@
     if (S.step === "werte") return stepWerte(body);
     if (S.step === "plan") return stepPlan(body);
     if (S.step === "live") return stepLive(body);
+  }
+
+  // ---------- automatisch speichern ----------
+  let saveT = null, saving = false;
+  S.aend = 0;
+  function speicherStatus(txt, cls) {
+    S.saveTxt = txt; S.saveCls = cls || "";
+    const el = $("#sp-savest");
+    if (el) { el.textContent = txt; el.className = "sp-save " + (cls || ""); }
+  }
+  function dirty() {
+    S.dirty = true; S.aend++;
+    speicherStatus("Speichert …", "laeuft");
+    clearTimeout(saveT);
+    saveT = setTimeout(autoSpeichern, 800);
+  }
+  function flush() { if (S.dirty) { clearTimeout(saveT); autoSpeichern(); } }
+  async function autoSpeichern() {
+    if (saving) { clearTimeout(saveT); saveT = setTimeout(autoSpeichern, 400); return; }
+    const c = S.draft;
+    if (!c || !S.dirty) return;
+    saving = true;
+    const stand = S.aend;
+    c.schedule = rechne(c, null).rows.filter(x => !x.real).map(x => ({ i: x.i, u: x.uid, v: Math.round(x.von) }));
+    try {
+      const r = await C.api("/stint/car", { method: "POST", body: { id: S.id, crev: c.crev || 0, car: c } });
+      c.crev = r.crev;
+      const i = S.plan.cars.findIndex(x => x.key === c.key);
+      if (i >= 0) S.plan.cars[i] = kopie(c);
+      if (S.aend === stand) { S.dirty = false; speicherStatus("✓ Gespeichert", "ok"); }
+      if (/benachrichtigt|fehlgeschlagen/.test(r.info || "")) C.toast(r.info, !/fehlgeschlagen/.test(r.info));
+      if (S.draft === c && !S.dirty) zeichneKopf();
+      if (window.F2FEvNav) window.F2FEvNav.refresh();
+    } catch (x) {
+      speicherStatus("Nicht gespeichert", "err");
+      C.toast(x.message);
+      if (/inzwischen/.test(x.message)) { S.dirty = false; await neuLaden(); }
+    } finally { saving = false; }
   }
   async function neuLaden() {
     const mine = alive;
@@ -817,32 +1022,20 @@
     renderCar();
   }
   async function mitfahren(rein, b) {
-    if (rein && S.dirty) return C.toast("Erst speichern, dann mitfahren");
+    if (S.dirty) { clearTimeout(saveT); await autoSpeichern(); }
     b.disabled = true;
     try {
       const r = await C.api(rein ? "/stint/join" : "/stint/leave", { method: "POST", body: { id: S.id, key: S.key } });
       C.toast(r.info, true);
       S.dirty = false;
       if (rein) S.step = "verf";
-      await neuLaden();
-    } catch (x) { C.toast(x.message); b.disabled = false; }
-  }
-  async function speichernCar() {
-    const b = $("#sp-save");
-    const c = S.draft;
-    c.schedule = rechne(c, null).rows.filter(x => !x.real).map(x => ({ i: x.i, u: x.uid, v: Math.round(x.von) }));
-    b.disabled = true;
-    try {
-      const r = await C.api("/stint/car", { method: "POST", body: { id: S.id, crev: c.crev || 0, car: c } });
-      C.toast(r.info, true);
-      S.dirty = false;
-      const alt = META;
-      META = await C.api("/stint/meta").catch(() => alt);
+      if (window.F2FEvNav) window.F2FEvNav.refresh();
       await neuLaden();
     } catch (x) { C.toast(x.message); b.disabled = false; }
   }
 
-  /* ---------- Schritt 1: Verfügbarkeit ---------- */
+  /* ---------- Schritt 1: Verfügbarkeit (speichert bei jedem Tippen) ---------- */
+  let avT = null;
   function stepVerf(body) {
     const c = S.draft;
     const ich = c.drivers.some(d => d.uid === S.me);
@@ -864,30 +1057,36 @@
         ${cols.map((col, i) => { const v = spaltenWert(a, col); return `<button type="button" class="${zelle(v, col.d === uid)}" ${mein ? `data-col="${i}"` : "disabled"} title="${titel(col, v)}">${v === undefined ? (mein ? "+" : "") : ICON[v]}</button>`; }).join("")}</div>`;
     };
     body.innerHTML = `
-      <div class="tm-box"><h5>Wann kannst du fahren?</h5>
-        ${ich ? `<p class="hint">${stints ? "Jede Spalte ist ein geplanter Stint (Länge aus Tank, Verbrauch und Pace). Weiß umrandet: dort bist du eingeplant." : "Solange Pace oder Sprit fehlen, gibt es ein Stunden-Raster. Sobald die Werte da sind, siehst du hier die Stints."} Tippen: einmal <b class="sp-t ja">verfügbar</b>, zweimal <b class="sp-t evtl">vielleicht</b>, dreimal <b class="sp-t nein">nicht verfügbar</b>, viermal wieder leer. Deine Ortszeit.</p>
-          <div class="sp-inline">${C.btn("Alles verfügbar", "sm", 'id="sp-all2"')}${C.btn("Alles leeren", "sm", 'id="sp-all0"')}${C.btn("Meine Verfügbarkeit speichern", "red", 'id="sp-avsave"')}</div>`
-          : `<p class="hint">Du fährst in diesem Fahrzeug nicht mit. Klick oben auf „Mitfahren", um dich einzutragen.</p>`}
-      </div>
+      ${ich ? `<div class="sp-verf-top"><p class="sp-kurz">Tippe auf deine ${stints ? "Stints" : "Stunden"}: <b>✓</b> kann · <b>?</b> vielleicht · <b>✕</b> kann nicht. Speichert automatisch.</p>
+        <div class="sp-inline">${C.btn("Ich kann alles", "sm", 'id="sp-all2"')}${C.btn("Leeren", "sm", 'id="sp-all0"')}</div></div>` : ""}
       ${uids.length ? `<div class="sp-tl-wrap"><div class="sp-tl" style="grid-template-columns:${raster}"><div class="sp-tl-head"><div class="sp-tl-corner">Fahrer</div>${kopf}</div>${uids.map(zeile).join("")}</div>
-        <div class="sp-tl-legende"><span><i style="background:linear-gradient(135deg,#34d67a,#1fa85a)"></i>verfügbar</span><span><i style="background:linear-gradient(135deg,#ffc24d,#f09a00)"></i>vielleicht</span><span><i style="background:linear-gradient(135deg,#ff4d5a,#c40f1e)"></i>nicht verfügbar</span><span><i style="border:1.5px dashed rgba(255,255,255,.3)"></i>offen</span><span><i style="outline:2px solid #fff"></i>dort eingeplant</span></div></div>` : '<div class="tm-box"><p class="tm-muted">Noch keine Fahrer in diesem Fahrzeug.</p></div>'}
+        <div class="sp-tl-legende"><span><i style="background:linear-gradient(135deg,#34d67a,#1fa85a)"></i>kann</span><span><i style="background:linear-gradient(135deg,#ffc24d,#f09a00)"></i>vielleicht</span><span><i style="background:linear-gradient(135deg,#ff4d5a,#c40f1e)"></i>kann nicht</span><span><i style="outline:2px solid #fff"></i>dort eingeplant</span></div></div>` : '<div class="tm-box"><p class="tm-muted">Noch keine Fahrer in diesem Fahrzeug.</p></div>'}
       <div id="sp-abs"></div>`;
     const setze = (col, v) => viertel(col.von, col.bis).forEach(t => { if (v === undefined) delete meine[t]; else meine[t] = v; });
     const zeichne = (b, pop) => { const col = cols[Number(b.dataset.col)], v = spaltenWert(meine, col); b.className = zelle(v, col.d === S.me) + (pop ? " pop" : ""); b.textContent = v === undefined ? "+" : ICON[v]; b.title = titel(col, v); };
-    const puls = () => { const s = $("#sp-avsave"); if (s) s.classList.add("pulse"); };
+    const speichern = () => {
+      speicherStatus("Speichert …", "laeuft");
+      clearTimeout(avT);
+      avT = setTimeout(async () => {
+        try {
+          await C.api("/stint/avail", { method: "POST", body: { id: S.id, slots: meine, v: 2 } });
+          S.av[S.me] = { slots: { ...meine }, v: 2, at: Date.now() };
+          speicherStatus("✓ Gespeichert", "ok");
+          zeichneKopf();
+          const st = fahrerAv(S.me, c), sm = body.querySelector(".sp-tl-row.ich small");
+          if (sm) { sm.className = st; sm.textContent = AVTXT[st]; }
+          if (window.F2FEvNav) window.F2FEvNav.refresh();
+        } catch (e) { speicherStatus("Nicht gespeichert", "err"); C.toast(e.message); }
+      }, 700);
+    };
     $$("[data-col]").forEach(b => b.onclick = () => {
       const col = cols[Number(b.dataset.col)], v = spaltenWert(meine, col);
       setze(col, v === undefined || v === "mix" ? 2 : v === 2 ? 1 : v === 1 ? 0 : undefined);
-      zeichne(b, true); puls();
+      zeichne(b, true); speichern();
     });
     if (ich) {
-      $("#sp-all2").onclick = () => { cols.forEach(col => setze(col, 2)); $$("[data-col]").forEach(zeichne); puls(); };
-      $("#sp-all0").onclick = () => { cols.forEach(col => setze(col, undefined)); $$("[data-col]").forEach(zeichne); puls(); };
-      $("#sp-avsave").onclick = async () => {
-        const b = $("#sp-avsave"); b.disabled = true;
-        try { const r = await C.api("/stint/avail", { method: "POST", body: { id: S.id, slots: meine, v: 2 } }); S.av[S.me] = { slots: { ...meine }, v: 2, at: Date.now() }; C.toast(r.info, true); renderCar(); }
-        catch (e) { C.toast(e.message); b.disabled = false; }
-      };
+      $("#sp-all2").onclick = () => { cols.forEach(col => setze(col, 2)); $$("[data-col]").forEach(b => zeichne(b, true)); speichern(); };
+      $("#sp-all0").onclick = () => { cols.forEach(col => setze(col, undefined)); $$("[data-col]").forEach(b => zeichne(b)); speichern(); };
     }
     ladeAbsenzen(c);
   }
@@ -905,7 +1104,7 @@
     const c = S.draft;
     body.innerHTML = `
       <div class="tm-box"><h5>Fahrer, Rundenzeit und Sprit</h5>
-        <p class="hint">Pace und Sprit kommen automatisch aus Garage 61 und werden zweimal täglich und beim Öffnen aufgefrischt. Fehlen Runden auf genau dieser Strecke mit diesem Auto, nimmt er die letzten Daten von einer anderen Streckenvariante oder einem ähnlichen Auto (Hinweis unter der Zeit). Von Hand geänderte Werte bleiben stehen. „Werte aus Garage 61" holt alles neu, auch über deine eigenen Werte.</p>
+        <p class="sp-kurz">Kommt automatisch aus Garage 61. Eigene Werte bleiben stehen. Speichert automatisch.</p>
         <div class="sp-drv-wrap"><table class="sp-drv">
           <thead><tr><th>Fahrer</th><th>Garage-61-Fahrer</th><th>Pace<small>Ø Runde</small></th><th>Sprit<small>L pro Runde</small></th><th></th></tr></thead>
           <tbody>${c.drivers.map((d, di) => `<tr data-d="${di}">
@@ -919,7 +1118,7 @@
           ${C.btn("Werte aus Garage 61", "sm", `id="sp-g61" ${META.g61Ready ? "" : "disabled"}`)}
         </div>
         <div class="sp-g61info">${g61Info(c)}</div>
-        <p class="tm-muted" style="margin-top:10px">Wer hier eingetragen wird, bekommt beim Speichern einen Ping in Discord mit der Bitte, seine Verfügbarkeit einzutragen. Wer rausgenommen wird, löst eine Abmelde-Nachricht aus.</p>
+
       </div>`;
     const add = $("#sp-add");
     if (add) add.onchange = () => {
@@ -972,15 +1171,12 @@
     let neu = false;
     for (const d of c.drivers) if (uebernimmG61(c, d, false)) neu = true;
     if (!c.pitHand && uebernimmPit(c, S.g61[k], true)) neu = true;
-    if (!neu) { if (S.step === "werte") zeigeStep(); return; }
-    if (S.dirty) { dirty(); zeigeStep(); return; }
-    try {
-      c.schedule = rechne(c, null).rows.filter(x => !x.real).map(x => ({ i: x.i, u: x.uid, v: Math.round(x.von) }));
-      await C.api("/stint/car", { method: "POST", body: { id: S.id, crev: c.crev || 0, car: c } });
-      C.toast("Werte aus Garage 61 aktualisiert", true);
-      await neuLaden();
-    } catch (e) { /* still: dann eben beim nächsten Mal */ }
+    if (!neu) return;
+    dirty();
+    zeichneKopf();
+    if (S.step === "werte" || S.step === "plan" || S.step === "verf") zeigeStep();
   }
+
   function uebernimmPit(c, g, nurAenderung) {
     const pt = g.pit || {};
     let n = 0;
@@ -1028,7 +1224,7 @@
       </details>
       ${stintTabelle(c, r, false)}
       ${r.rows.length ? `<div class="tm-actions" style="margin-top:14px">${C.btn("Fahrer reihum verteilen", "sm", 'id="sp-rot"')}${C.btn("Runden zurücksetzen", "sm", 'id="sp-reset"')}</div>
-        <p class="tm-muted" style="margin-top:10px">Runden leer lassen = so weit wie der Tank reicht. Änderungen rechnen sofort neu, gespeichert wird mit „Speichern" oben. Gespeicherte Startzeiten nutzt der Bot für die Stint-Pings.</p>` : ""}`;
+        <p class="sp-kurz" style="margin-top:10px">Runden leer = so weit der Tank reicht. Speichert automatisch.</p>` : ""}`;
     $$("[data-pit]").forEach(i => i.onchange = () => { c.pit[i.dataset.pit] = Math.max(0, num(i.value, c.pit[i.dataset.pit])); c.pitHand = true; dirty(); stepPlan(body); $(".sp-pitbox").open = true; });
     $("#sp-par").onchange = (e) => { c.pit.parallel = e.target.checked; dirty(); stepPlan(body); $(".sp-pitbox").open = true; };
     bindStintEdit(body, c, stepPlan);
@@ -1117,7 +1313,7 @@
       }
       return `<div class="tm-box sp-livebox"><h5>Live aus Garage 61 <span class="tm-badge ${live ? "live" : "grey"}">${live ? "Live" : "Info"}</span></h5>
         <p class="hint">${esc(txt)}</p>
-        <p class="tm-muted">Während des Rennens holt die Seite alle 5 Minuten die echten Runden aus Garage 61 (solange sie offen ist). Gefahrene Stints werden grün, der Rest wird ab dem echten Stand neu gerechnet. Dafür müssen die Fahrer Garage 61 laufen haben und in Schritt 2 verknüpft sein.</p>
+        <p class="sp-kurz">Holt im Rennen alle 5 Min. die echten Runden. Gefahrene Stints werden markiert, der Rest neu gerechnet.</p>
         <div class="tm-actions">${C.btn("Jetzt aktualisieren", "sm", 'id="sp-lv"')}</div></div>`;
     };
     const handBox = () => {

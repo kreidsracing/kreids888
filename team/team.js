@@ -442,9 +442,47 @@
   /* ================================================================
      DASHBOARD (nach Login)
      ================================================================ */
+  /* ---------------- Seitenleiste: kommende Events (Stintplaner) ---------------- */
+  let EVNAV = null, EVNAV_AT = 0;
+  function evNavHtml(id) {
+    const meinId = ME.user.id, now = Date.now();
+    const lnk = (href, inner, on, cls = "") => `<a class="td-link td-ev ${cls}${on ? " on" : ""}" href="#${href}">${inner}</a>`;
+    let h = "";
+    if (!EVNAV) h = '<div class="td-ev-leer">Lädt …</div>';
+    else {
+      const ende = (p) => Math.max(p.start, ...p.cars.map(c => c.start || p.start)) + (p.mode === "zeit" ? p.dauerMin * 60000 : 6 * 3600000);
+      const kommend = EVNAV.filter(p => ende(p) + 3600000 > now).sort((a, b) => a.start - b.start).slice(0, 5);
+      for (const p of kommend) {
+        const auto = p.cars.find(c => c.drivers.includes(meinId));
+        const fehlt = auto && p.av && p.av[meinId] === false;
+        const live = now >= p.start && now < ende(p);
+        const tag = new Date(p.start).toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit" });
+        const autoHref = auto ? "stint/" + p.id + "/" + auto.key : "";
+        const on = (id === "stint/" + p.id || id.startsWith("stint/" + p.id + "/")) && !(auto && id.startsWith(autoHref));
+        h += lnk("stint/" + p.id, `<span class="td-ev-tag${live ? " live" : ""}">${live ? "LIVE" : tag}</span><span class="td-ev-name">${esc(p.name)}</span>${fehlt ? '<b class="td-ev-mark warn" title="Deine Verfügbarkeit fehlt">!</b>' : auto ? '<b class="td-ev-mark" title="Du fährst mit"></b>' : ""}`, on);
+        if (auto) h += lnk(autoHref, `${ICONS.car}<span>Mein Fahrzeug</span>`, id.startsWith(autoHref), "td-ev-sub");
+      }
+      if (!kommend.length) h += '<div class="td-ev-leer">Kein Event geplant</div>';
+    }
+    h += lnk("stint/neu", `${ICONS.flag}<span>Neues Event</span>`, id === "stint/neu", "td-ev-sub td-ev-neu");
+    h += lnk("stint", `${ICONS.calendar}<span>Alle Events</span>`, id === "stint", "td-ev-sub");
+    return h;
+  }
+  function ladeEvNav(force) {
+    if (!ME || !ME.panels || !ME.panels.stint) return;
+    if (!force && EVNAV && Date.now() - EVNAV_AT < 60000) return;
+    EVNAV_AT = Date.now();
+    api("/stint/list").then(d => {
+      EVNAV = d.list || [];
+      const el = document.getElementById("td-evnav");
+      if (el) el.innerHTML = evNavHtml(location.hash.replace("#", ""));
+    }).catch(() => {});
+  }
+  window.F2FEvNav = { refresh: () => ladeEvNav(true) };
+
   function renderShell() {
     const id = location.hash.replace("#", "");
-    const tools = Object.keys(PANELS).filter(p => ME.panels[p] && p !== "garage61" && p !== "links");
+    const tools = Object.keys(PANELS).filter(p => ME.panels[p] && p !== "garage61" && p !== "links" && p !== "stint");
     const link = (hid, icon, label) => `<a class="td-link${id === hid || (hid && id.startsWith(hid + "/")) ? " on" : ""}" href="#${hid}">${ICONS[icon]}<span>${esc(label)}</span></a>`;
 
     view.innerHTML = `
@@ -455,6 +493,7 @@
             ${ME.panels.garage61 ? link("garage61", "garage61", "Garage 61") : ""}
             ${SECTIONS.map(s => link(s.id, s.icon, s.label)).join("")}
             ${ME.panels.links ? link("links", "link", "Links") : ""}
+            ${ME.panels.stint ? `<div class="td-nav-h">Events</div><div class="td-evnav" id="td-evnav">${evNavHtml(id)}</div>` : ""}
             <div class="td-nav-h">Tools</div>${link("abwesend", "clock", "Abwesenheiten")}${tools.map(p => link(p, p, PANELS[p].title)).join("")}
             ${ME.isAdmin ? `<div class="td-nav-h">Verwaltung</div>${link("aktivitaet", "activity", "Aktivität")}${link("nutzung", "eye", "Nutzung")}${link("limits", "gauge", "Limits")}${link("posts", "trophy", "Discord-Posts")}${link("news-schreiben", "news", "News schreiben")}${link("fahrerprofile", "helmet", "Fahrerprofile")}${link("kalender-admin", "calendar", "Rennkalender")}${link("admin", "admin", "Admin")}<a class="td-link" href="https://kreids888-admin.kreids.workers.dev/" target="_blank" rel="noopener">${ICONS.ext}<span>kreids888-Dashboard</span></a>` : ""}
           </nav>
@@ -462,6 +501,7 @@
         <div class="td-main" id="td-main"></div>
       </div>`;
 
+    ladeEvNav(false);
     if (id !== "garage61" && id !== "woche") merke(id.startsWith("stint/") ? "stint" : id || "dashboard");
     if (id === "woche" && ME.panels.garage61) return renderG61("woche");
     if (id === "nutzung" && ME.isAdmin) return renderNutzung();
