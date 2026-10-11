@@ -196,12 +196,17 @@
         ? "Du bist angemeldet, aber dir fehlt die Team-Rolle. Melde dich bei der Teamleitung, wenn du zu F2F Motorsport gehörst."
         : "Dein Discord-Konto ist nicht auf unserem Server. Tritt zuerst bei und melde dich dann erneut an."}</p>
       ${ME.roles && ME.roles.length ? `<div class="tm-roles">${ME.roles.map(chip).join("")}</div>` : ""}`;
-    const items = [["news", "Team News"], ["garage61", "Garage 61: Fahrtenbuch & Bestzeiten"], ["trainer", "Kreids-Trainer"], ["helmet", "Fahrerprofil & Raceteam"], ["arrow", "und vieles mehr …"]];
+    // für neue Fahrer: was sie bei uns erwartet
+    const items = [["🏁", "Endurance-Rennen mit echtem Stintplan und Teamstrategie"], ["⏱️", "Telemetrie und Bestzeiten über Garage 61"], ["🎯", "Eigener KI-Trainer für schnellere Runden"], ["🎨", "Eigene Team-Liveries"], ["🤝", "Festes Team statt Zufallsgrid"]];
     return `
       <div class="tp-login-h">${ICONS.discord}<b>Team Login</b></div>
       <p class="tp-login-sub">Nur für Teammitglieder. Interner Bereich.</p>
       <a class="tp-login-btn" href="${API}/login">${ICONS.discord}<span>Mit Discord anmelden</span></a>
-      <ul class="tp-login-list">${items.map(([ic, t]) => `<li>${ICONS[ic]}<span>${t}</span></li>`).join("")}</ul>`;
+      <div class="tp-neu">
+        <b class="tp-neu-h">Neu bei uns? Das erwartet dich:</b>
+        <ul class="tp-neu-list">${items.map(([ic, t]) => `<li><span class="tp-neu-ic">${ic}</span><span>${t}</span></li>`).join("")}</ul>
+        <button type="button" class="tp-neu-btn" data-scroll="tp-join">Jetzt Fahrer werden →</button>
+      </div>`;
   }
 
   const ph = (w) => `<span class="sk" style="width:${w}"></span>`;
@@ -434,7 +439,7 @@
       if (el && d.team && d.team.length) el.innerHTML = d.team.map(p => driverCard(p, p.name, p.avatar)).join("");
     }).catch(() => {});
 
-    barNav.querySelectorAll("[data-scroll]").forEach(b => {
+    document.querySelectorAll(".tm-bar-nav [data-scroll], .tp-neu-btn[data-scroll]").forEach(b => {
       b.onclick = () => document.getElementById(b.dataset.scroll).scrollIntoView({ behavior: "smooth", block: "start" });
     });
   }
