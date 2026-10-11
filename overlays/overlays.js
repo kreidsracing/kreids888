@@ -714,6 +714,9 @@ window.K888_OVERLAYS = [
     c.beginPath(); c.arc(x - r * 0.3, y - r * 0.3, r * 0.3, 0, Math.PI * 2); c.fill(); c.restore();
   }
 
+  // Hilfen auch für weitere Overlay-Pakete
+  window.K888_OV_HILFE = { zufall: zufall, ease: ease, zeit: zeit, lauf: lauf, block: block, etikett: etikett, streifen: streifen, konfetti: konfetti, blinklicht: blinklicht, breite: breite };
+
   window.K888_OVERLAYS.push(
 
   /* ---------- UNFALL: Warnstreifen, Warndreieck, Aufprall-Blitz ---------- */
@@ -1001,6 +1004,290 @@ window.K888_OVERLAYS = [
     var tiy = by - 34 - ti.hoehe;
     h.zeilen(c, ti, M, tiy, "#fff", 0.6);
     etikett(c, h, d.kicker, M, tiy - 92, h.ROT, "#fff", 36);
+    h.qr(c, d, W - M - 190, 80, 190);
+  } }
+
+  );
+})();
+
+/* ===========================================================
+   OVERLAY-PAKET 2 (Okt 2026): Tor auf/zu, Flügeltor, Countdown,
+   Startaufstellung, Regen, Rennuhr, Rote Flagge, Pole Position
+   =========================================================== */
+(function () {
+  var H_ = window.K888_OV_HILFE, zufall = H_.zufall, ease = H_.ease, zeit = H_.zeit, lauf = H_.lauf, block = H_.block, etikett = H_.etikett, blinklicht = H_.blinklicht, breite = H_.breite;
+
+  // Garagen-Rolltor: deckt von oben bis „unten“ ab (unten = Unterkante in px)
+  function rolltor(c, W, H, h, unten, beschriftung) {
+    if (unten <= 0) return;
+    c.save();
+    var g = c.createLinearGradient(0, 0, W, 0);
+    g.addColorStop(0, "#3a3f49"); g.addColorStop(0.5, "#5b616c"); g.addColorStop(1, "#353a43");
+    c.fillStyle = g; c.fillRect(0, 0, W, unten);
+    for (var y = unten - 64; y > -64; y -= 64) {
+      c.fillStyle = "rgba(0,0,0,.35)"; c.fillRect(0, y, W, 6);
+      c.fillStyle = "rgba(255,255,255,.08)"; c.fillRect(0, y + 6, W, 3);
+    }
+    c.fillStyle = "#23262d"; c.fillRect(0, unten - 26, W, 26);
+    c.fillStyle = "#ffc400"; for (var x = 0; x < W; x += 80) { c.beginPath(); c.moveTo(x, unten - 26); c.lineTo(x + 40, unten - 26); c.lineTo(x + 20, unten); c.lineTo(x - 20, unten); c.closePath(); c.fill(); }
+    if (beschriftung) beschriftung(unten);
+    c.restore();
+  }
+  function lichtspalt(c, W, unten, staerke) {
+    if (staerke <= 0) return;
+    var g = c.createLinearGradient(0, unten, 0, unten + 260);
+    g.addColorStop(0, "rgba(255,240,210," + (0.55 * staerke) + ")"); g.addColorStop(1, "rgba(255,240,210,0)");
+    c.fillStyle = g; c.fillRect(0, unten, W, 260);
+  }
+  function rundumleuchte(c, x, y, t, farbe) {
+    c.save(); c.translate(x, y);
+    var w = t * 6;
+    var g = c.createRadialGradient(0, 0, 4, 0, 0, 170);
+    g.addColorStop(0, farbe); g.addColorStop(1, "rgba(0,0,0,0)");
+    c.globalAlpha = 0.55; c.fillStyle = g; c.beginPath(); c.moveTo(0, 0); c.arc(0, 0, 170, w - 0.35, w + 0.35); c.closePath(); c.fill();
+    c.globalAlpha = 1; c.shadowColor = farbe; c.shadowBlur = 25; c.fillStyle = farbe; c.beginPath(); c.arc(0, 0, 20, 0, Math.PI * 2); c.fill();
+    c.restore();
+  }
+  function wehendeFlagge(c, x, y, w, hh, t, farbe1, farbe2) {
+    c.fillStyle = "#d9d9d9"; c.fillRect(x, y - 12, 10, hh + 160);
+    var n = 18;
+    for (var s = 0; s < n; s++) {
+      var wx = x + 10 + s * w / n, wy = y + Math.sin(s * 0.55 - t * 7) * 12 * (s / n);
+      var licht = 0.8 + 0.2 * Math.cos(s * 0.55 - t * 7);
+      c.globalAlpha = licht; c.fillStyle = s % 2 ? farbe1 : farbe2; c.fillRect(wx, wy, w / n + 1, hh); c.globalAlpha = 1;
+    }
+  }
+
+  window.K888_OVERLAYS.push(
+
+  /* ---------- TOR AUF: Rennankündigung ---------- */
+  { id: "tor_auf", name: "Tor auf · Ankündigung", anim: true, felder: ["wann", "strecke"], draw: function (c, W, H, d, h) {
+    var M = 64, t = d.zeit == null ? 1.25 : zeit(d, 7), tl = lauf(d);
+    h.bild(c, d, 0, 0, W, H);
+    h.verlauf(c, 0, 0, 0, H, [[0, "rgba(10,11,14,.35)"], [0.45, "rgba(10,11,14,.4)"], [1, "rgba(10,11,14,.97)"]]);
+    var tiy = block(c, W, H, d, h, M, "#fff", 3);
+    var wann = (d.wann || "Sonntag · 20:00 Uhr").toUpperCase();
+    var ws = h.passGroesse(c, wann, W - 2 * M, 110, 50, 900);
+    h.text(c, wann, M, tiy - 40, h.f(900, ws), h.ROT, "left", 0.02);
+    etikett(c, h, "RENNANKÜNDIGUNG" + (d.strecke ? " · " + d.strecke.toUpperCase() : ""), M, tiy - 40 - ws - 100, "#fff", "#0b0c10", 36);
+    // Tor fährt hoch (0.6 s warten, dann 2 s)
+    var auf = ease((t - 0.6) / 2), unten = (H + 30) * (1 - auf);
+    lichtspalt(c, W, unten, auf > 0 && auf < 1 ? 1 : 0);
+    rolltor(c, W, H, h, unten, function (u) {
+      h.logo(c, W / 2 - 170, u - 220, 92);
+      h.text(c, "RENNTAG", W / 2, u - 120, h.f(900, 64), "#ffc400", "center", 0.3);
+    });
+    c.fillStyle = "#16181d"; c.fillRect(0, 0, W, 70); c.fillStyle = "#2b2f38"; c.fillRect(0, 62, W, 8);
+    rundumleuchte(c, W - 70, 120, tl, "rgba(255,170,0,.95)");
+    h.qr(c, d, W - M - 190, 210, 190);
+  } },
+
+  /* ---------- TOR ZU: Rennende ---------- */
+  { id: "tor_zu", name: "Tor zu · Rennende", anim: true, felder: ["platz", "strecke"], draw: function (c, W, H, d, h) {
+    var M = 64, t = d.zeit == null ? 99 : zeit(d, 7), tl = lauf(d);
+    h.bild(c, d, 0, 0, W, H);
+    h.verlauf(c, 0, 0, 0, H, [[0, "rgba(10,11,14,.35)"], [0.45, "rgba(10,11,14,.4)"], [1, "rgba(10,11,14,.97)"]]);
+    block(c, W, H, d, h, M, "#fff", 3);
+    var zu = ease((t - 1.2) / 2.2), unten = (H + 30) * zu;
+    rolltor(c, W, H, h, unten, function (u) {
+      var pl = String(d.platz || "").replace(/^p/i, "");
+      var my = u - H / 2 - 40;
+      h.text(c, "RENNENDE", W / 2, my - 40, h.f(900, 120), "#fff", "center", 0.08);
+      if (pl) { h.text(c, "P" + pl, W / 2, my + 190, h.f(900, 220), h.ROT, "center", 0.02); }
+      if (d.strecke) h.text(c, d.strecke.toUpperCase(), W / 2, my + (pl ? 260 : 40), h.f(800, 40), "#ffc400", "center", 0.2);
+      h.logo(c, W / 2 - 115, u - 120, 62);
+    });
+    c.fillStyle = "#16181d"; c.fillRect(0, 0, W, 70); c.fillStyle = "#2b2f38"; c.fillRect(0, 62, W, 8);
+    if (zu < 1 || d.zeit == null) rundumleuchte(c, W - 70, 120, tl, "rgba(255,170,0,.95)");
+    h.qr(c, d, W - M - 190, 210, 190);
+  } },
+
+  /* ---------- FLÜGELTOR: Tor geht seitlich auf, START FREI ---------- */
+  { id: "fluegeltor", name: "Flügeltor · Start frei", anim: true, felder: ["wann"], draw: function (c, W, H, d, h) {
+    var M = 64, t = d.zeit == null ? 1.4 : zeit(d, 7);
+    h.bild(c, d, 0, 0, W, H);
+    h.verlauf(c, 0, 0, 0, H, [[0, "rgba(10,11,14,.3)"], [0.45, "rgba(10,11,14,.35)"], [1, "rgba(10,11,14,.97)"]]);
+    var tiy = block(c, W, H, d, h, M, "#fff", 3);
+    if (d.wann) h.text(c, d.wann.toUpperCase(), M, tiy - 40, h.f(900, h.passGroesse(c, d.wann.toUpperCase(), W - 2 * M, 96, 44, 900)), h.ROT, "left", 0.02);
+    var auf = ease((t - 0.7) / 1.8), halb = W / 2 * (1 - auf);
+    // Lichtspalt in der Mitte
+    if (auf > 0 && auf < 1) {
+      var gl = c.createLinearGradient(W / 2 - 200, 0, W / 2 + 200, 0);
+      gl.addColorStop(0, "rgba(255,255,255,0)"); gl.addColorStop(0.5, "rgba(255,245,220,.6)"); gl.addColorStop(1, "rgba(255,255,255,0)");
+      c.fillStyle = gl; c.fillRect(W / 2 - 200, 0, 400, H);
+    }
+    function fluegel(x, w, links) {
+      if (w <= 0) return;
+      var g = c.createLinearGradient(x, 0, x + w, 0);
+      g.addColorStop(0, links ? "#2b2f37" : "#4a505b"); g.addColorStop(1, links ? "#4a505b" : "#2b2f37");
+      c.fillStyle = g; c.fillRect(x, 0, w, H);
+      c.fillStyle = "rgba(0,0,0,.3)"; for (var y = 120; y < H; y += 160) c.fillRect(x, y, w, 5);
+      c.fillStyle = h.ROT; c.fillRect(links ? x + w - 14 : x, 0, 14, H);
+    }
+    fluegel(0, halb, true); fluegel(W - halb, halb, false);
+    if (halb > 120) {
+      c.save(); c.beginPath(); c.rect(0, 0, halb, H); c.rect(W - halb, 0, halb, H); c.clip();
+      h.text(c, "START", W / 2, H / 2 - 20, h.f(900, 170), "#fff", "center", 0.1);
+      h.text(c, "FREI", W / 2, H / 2 + 140, h.f(900, 170), h.ROT, "center", 0.1);
+      c.restore();
+    }
+    h.qr(c, d, W - M - 190, 80, 190);
+  } },
+
+  /* ---------- COUNTDOWN: 3, 2, 1, LOS ---------- */
+  { id: "countdown", name: "Countdown", anim: true, felder: ["wann"], draw: function (c, W, H, d, h) {
+    var M = 64, t = d.zeit == null ? null : (d.aufn ? d.zeit : d.zeit % 5);
+    h.bild(c, d, 0, 0, W, H);
+    h.verlauf(c, 0, 0, 0, H, [[0, "rgba(10,11,14,.45)"], [0.45, "rgba(10,11,14,.45)"], [1, "rgba(10,11,14,.97)"]]);
+    var tiy = block(c, W, H, d, h, M, "#fff", 3);
+    var cx = W / 2, cy = Math.min(tiy - 300, H * 0.36), r = 210;
+    c.save();
+    c.strokeStyle = "rgba(255,255,255,.12)"; c.lineWidth = 26; c.beginPath(); c.arc(cx, cy, r, 0, Math.PI * 2); c.stroke();
+    var zahl, anteil;
+    if (t == null) { zahl = "LIVE"; anteil = 1; }
+    else if (t < 3) { zahl = String(3 - Math.floor(t)); anteil = 1 - (t % 1); }
+    else { zahl = "LOS"; anteil = 1; }
+    c.strokeStyle = h.ROT; c.lineCap = "round"; c.shadowColor = h.ROT; c.shadowBlur = 30;
+    c.beginPath(); c.arc(cx, cy, r, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * anteil); c.stroke();
+    c.restore();
+    var sk = t == null ? 1 : t < 3 ? 1 + 0.25 * Math.pow(1 - (t % 1), 4) : 1 + 0.08 * Math.sin((t - 3) * 12);
+    c.save(); c.translate(cx, cy); c.scale(sk, sk);
+    var zs = zahl.length > 1 ? 150 : 240;
+    h.text(c, zahl, 0, zs * 0.36, h.f(900, zs), t != null && t >= 3 ? h.ROT : "#fff", "center", 0.02);
+    c.restore();
+    var unter = (d.wann || "Gleich geht's los").toUpperCase();
+    h.text(c, unter, cx, cy + r + 90, h.f(900, h.passGroesse(c, unter, W - 2 * M, 60, 30, 900)), "#fff", "center", 0.1);
+    h.qr(c, d, W - M - 190, 80, 190);
+  } },
+
+  /* ---------- STARTAUFSTELLUNG: Startplätze fliegen rein, dein Platz leuchtet ---------- */
+  { id: "grid", name: "Startaufstellung", anim: true, felder: ["platz", "strecke"], draw: function (c, W, H, d, h) {
+    var M = 64, t = d.zeit == null ? 99 : zeit(d, 7), tl = lauf(d);
+    h.bild(c, d, 0, 0, W, H);
+    h.verlauf(c, 0, 0, 0, H, [[0, "rgba(10,11,14,.75)"], [0.5, "rgba(10,11,14,.55)"], [1, "rgba(10,11,14,.97)"]]);
+    var tiy = block(c, W, H, d, h, M, "#fff", 2);
+    var mein = parseInt(String(d.platz || "3").replace(/\D/g, ""), 10) || 3;
+    var plaetze = 8, oben = 200, unten = tiy - 70, zh = Math.min(120, (unten - oben) / (plaetze / 2 + 0.5));
+    h.text(c, "STARTAUFSTELLUNG", M, oben - 60, h.f(900, 54), "#fff", "left", 0.08);
+    if (d.strecke) h.text(c, d.strecke.toUpperCase(), W - M, oben - 62, h.f(800, 32), "rgba(255,255,255,.75)", "right", 0.14);
+    var start = Math.max(1, Math.min(mein - 3, 99));
+    for (var i = 0; i < plaetze; i++) {
+      var p = start + i, links = i % 2 === 0, reihe = Math.floor(i / 2);
+      var bw = (W - 2 * M - 40) / 2, bx = links ? M : M + bw + 40, by = oben + reihe * zh + (links ? 0 : zh * 0.5);
+      var ein = d.zeit == null ? 1 : ease((t - 0.2 - i * 0.18) / 0.45);
+      if (ein <= 0) continue;
+      var ich = p === mein;
+      c.save(); c.globalAlpha = ein; c.translate((links ? -1 : 1) * (1 - ein) * 300, 0);
+      c.fillStyle = ich ? h.ROT : "rgba(20,22,28,.9)"; c.fillRect(bx, by, bw, zh - 14);
+      if (ich && d.zeit != null) { c.shadowColor = h.ROT; c.shadowBlur = 20 + 20 * Math.sin(tl * 5); c.fillRect(bx, by, bw, zh - 14); c.shadowBlur = 0; }
+      c.fillStyle = ich ? "#fff" : "rgba(255,255,255,.18)"; c.fillRect(bx, by, 8, zh - 14);
+      h.text(c, "P" + p, bx + 30, by + (zh - 14) * 0.68, h.f(900, (zh - 14) * 0.55), "#fff", "left", 0.02);
+      h.text(c, ich ? "KREIDS888 #888" : "", bx + bw - 24, by + (zh - 14) * 0.64, h.f(900, (zh - 14) * 0.3), "#fff", "right", 0.06);
+      c.restore();
+    }
+    h.qr(c, d, W - M - 190, 80, 190);
+  } },
+
+  /* ---------- REGEN: Regen fällt, Blitz, Tropfen-Warnung ---------- */
+  { id: "regen", name: "Regen", anim: true, felder: ["strecke"], draw: function (c, W, H, d, h) {
+    var M = 64, tl = lauf(d), BLAU = "#3aa7ff";
+    h.bild(c, d, 0, 0, W, H);
+    h.verlauf(c, 0, 0, 0, H, [[0, "rgba(8,14,24,.55)"], [0.45, "rgba(8,14,24,.4)"], [1, "rgba(8,12,18,.97)"]]);
+    var blitz = d.zeit != null && (tl % 5 > 3.1 && tl % 5 < 3.18 || tl % 5 > 3.26 && tl % 5 < 3.32);
+    if (blitz) { c.fillStyle = "rgba(220,235,255,.35)"; c.fillRect(0, 0, W, H); }
+    c.strokeStyle = "rgba(200,225,255,.45)"; c.lineWidth = 2;
+    for (var i = 0; i < 140; i++) {
+      var sp = 1400 + zufall(i) * 900, x = zufall(i + 300) * (W + 200) - 100, len = 30 + zufall(i + 600) * 40;
+      var y = ((zufall(i + 900) * H) + tl * sp) % (H + 100) - 50, sx = x - y * 0.18;
+      c.beginPath(); c.moveTo(sx, y); c.lineTo(sx - len * 0.18, y + len); c.stroke();
+    }
+    var tiy = block(c, W, H, d, h, M, "#fff", 3);
+    // Tropfen-Symbol + Schriftzug
+    var dy = tiy - 150, puls = d.zeit == null ? 1 : 0.85 + 0.15 * Math.sin(tl * 4);
+    c.save(); c.translate(M + 45, dy + 50); c.scale(puls, puls);
+    c.shadowColor = BLAU; c.shadowBlur = 30; c.fillStyle = BLAU;
+    c.beginPath(); c.moveTo(0, -55); c.bezierCurveTo(30, -15, 45, 5, 45, 25); c.arc(0, 25, 45, 0, Math.PI); c.bezierCurveTo(-45, 5, -30, -15, 0, -55); c.fill();
+    c.restore();
+    h.text(c, "REGEN", M + 120, dy + 82, h.f(900, 104), "#fff", "left", 0.06);
+    if (d.strecke) h.text(c, d.strecke.toUpperCase(), M + 128 + breite(c, h, "REGEN", 104, 900, 0.06) + 20, dy + 78, h.f(800, 36), BLAU, "left", 0.12);
+    h.qr(c, d, W - M - 190, 80, 190);
+  } },
+
+  /* ---------- RENNUHR: Endurance, Zeiger im Zeitraffer ---------- */
+  { id: "rennuhr", name: "Rennuhr · Endurance", anim: true, felder: ["wann", "strecke"], draw: function (c, W, H, d, h) {
+    var M = 64, tl = lauf(d);
+    h.bild(c, d, 0, 0, W, H);
+    h.verlauf(c, 0, 0, 0, H, [[0, "rgba(10,11,14,.55)"], [0.45, "rgba(10,11,14,.45)"], [1, "rgba(10,11,14,.97)"]]);
+    var tiy = block(c, W, H, d, h, M, "#fff", 2);
+    var r = 190, cx = M + r + 10, cy = Math.min(tiy - r - 70, 140 + r + 120);
+    var sek = d.zeit == null ? 5 * 3600 + 23 * 60 + 12 : (tl * 1500) % 86400;
+    c.save(); c.translate(cx, cy);
+    c.fillStyle = "rgba(10,11,14,.88)"; c.beginPath(); c.arc(0, 0, r, 0, Math.PI * 2); c.fill();
+    c.strokeStyle = h.ROT; c.lineWidth = 8; c.beginPath(); c.arc(0, 0, r - 4, 0, Math.PI * 2); c.stroke();
+    for (var i = 0; i < 24; i++) {
+      c.save(); c.rotate(i * Math.PI / 12); c.fillStyle = i % 6 === 0 ? "#fff" : "rgba(255,255,255,.4)";
+      c.fillRect(-3, -r + 18, 6, i % 6 === 0 ? 30 : 16); c.restore();
+    }
+    // Fortschritt (24 h) als Ring
+    c.strokeStyle = "rgba(225,19,36,.5)"; c.lineWidth = 14; c.beginPath(); c.arc(0, 0, r - 46, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * sek / 86400); c.stroke();
+    function zeiger(w, len, br, farbe) { c.save(); c.rotate(w); c.fillStyle = farbe; c.fillRect(-br / 2, -len, br, len + 18); c.restore(); }
+    zeiger(sek / 86400 * Math.PI * 2, r * 0.5, 12, "#fff");
+    zeiger((sek % 3600) / 3600 * Math.PI * 2, r * 0.72, 7, "#fff");
+    zeiger((sek % 60) / 60 * Math.PI * 2, r * 0.8, 3, h.ROT);
+    c.fillStyle = h.ROT; c.beginPath(); c.arc(0, 0, 12, 0, Math.PI * 2); c.fill();
+    c.restore();
+    var hh = Math.floor(sek / 3600), mm = Math.floor(sek % 3600 / 60), ss = Math.floor(sek % 60);
+    var txt = (hh < 10 ? "0" : "") + hh + ":" + (mm < 10 ? "0" : "") + mm + ":" + (ss < 10 ? "0" : "") + ss;
+    var tx = cx + r + 50;
+    h.text(c, "RENNZEIT", tx, cy - 70, h.f(800, 34), "rgba(255,255,255,.7)", "left", 0.16);
+    h.text(c, txt, tx, cy + 30, h.f(900, h.passGroesse(c, txt, W - M - tx, 110, 50, 900)), "#fff", "left", 0.02);
+    var unter = (d.wann || "24 h").toUpperCase() + (d.strecke ? " · " + d.strecke.toUpperCase() : "");
+    h.text(c, unter, tx, cy + 90, h.f(800, h.passGroesse(c, unter, W - M - tx, 38, 22, 800)), h.ROT, "left", 0.12);
+    h.qr(c, d, W - M - 190, 80, 190);
+  } },
+
+  /* ---------- ROTE FLAGGE: Rennabbruch ---------- */
+  { id: "rotflagge", name: "Rote Flagge", anim: true, felder: ["strecke"], draw: function (c, W, H, d, h) {
+    var M = 64, tl = lauf(d), an = d.zeit == null || Math.floor(tl * 3) % 2 === 0;
+    h.bild(c, d, 0, 0, W, H);
+    h.verlauf(c, 0, 0, 0, H, [[0, "rgba(10,11,14,.5)"], [0.4, "rgba(10,11,14,.25)"], [0.6, "rgba(10,11,14,.6)"], [1, "rgba(10,11,14,.97)"]]);
+    if (d.zeit != null && an) { c.fillStyle = "rgba(225,19,36,.12)"; c.fillRect(0, 0, W, H); }
+    c.fillStyle = "rgba(10,11,14,.9)"; c.fillRect(M, 70, W - 2 * M, 96);
+    for (var i = 0; i < 6; i++) blinklicht(c, M + 70 + i * ((W - 2 * M - 140) / 5), 118, 28, (i % 2 === 0) === an, "#ff1e2d");
+    var tiy = block(c, W, H, d, h, M, "#fff", 3);
+    var fy = tiy - 200;
+    wehendeFlagge(c, M, fy, 170, 115, tl, "#e11324", "#c50f1e");
+    var gx = M + 210;
+    h.text(c, "ROTE FLAGGE", gx, fy + 62, h.f(900, 80), "#fff", "left", 0.04);
+    h.text(c, "RENNABBRUCH" + (d.strecke ? " · " + d.strecke.toUpperCase() : ""), gx + 4, fy + 116, h.f(800, 36), "#ff4b55", "left", 0.14);
+    h.qr(c, d, W - M - 190, 200, 190);
+  } },
+
+  /* ---------- POLE POSITION: Scheinwerfer, Rundenzeit ---------- */
+  { id: "pole", name: "Pole Position", anim: true, felder: ["rundenzeit", "strecke"], draw: function (c, W, H, d, h) {
+    var M = 64, t = zeit(d, 6), tl = lauf(d), GOLD = "#ffc83a";
+    h.bild(c, d, 0, 0, W, H);
+    h.verlauf(c, 0, 0, 0, H, [[0, "rgba(10,11,14,.6)"], [0.45, "rgba(10,11,14,.5)"], [1, "rgba(10,11,14,.97)"]]);
+    // zwei Scheinwerfer
+    [[0.12, 1], [0.88, -1]].forEach(function (s) {
+      var w = (d.zeit == null ? 0.25 : Math.sin(tl * 1.3) * 0.35) * s[1] + s[1] * 0.25;
+      c.save(); c.translate(W * s[0], -20); c.rotate(w);
+      var g = c.createLinearGradient(0, 0, 0, H * 0.7); g.addColorStop(0, "rgba(255,240,200,.45)"); g.addColorStop(1, "rgba(255,240,200,0)");
+      c.fillStyle = g; c.beginPath(); c.moveTo(-14, 0); c.lineTo(14, 0); c.lineTo(190, H * 0.7); c.lineTo(-190, H * 0.7); c.closePath(); c.fill();
+      c.restore();
+    });
+    var tiy = block(c, W, H, d, h, M, "#fff", 2);
+    var ein = d.zeit == null ? 1 : ease(t / 0.7), by = tiy - 330;
+    c.save(); c.globalAlpha = ein; c.translate(0, (1 - ein) * 50);
+    h.text(c, "POLE", M, by + 120, h.f(900, 150), "#fff", "left", 0.08);
+    h.text(c, "POSITION", M + breite(c, h, "POLE", 150, 900, 0.08) + 24, by + 120, h.f(900, 150), GOLD, "left", 0.08);
+    var zt = d.rundenzeit || "1:58.432";
+    c.fillStyle = "rgba(10,11,14,.88)"; c.fillRect(M, by + 160, W - 2 * M, 120);
+    c.fillStyle = GOLD; c.fillRect(M, by + 160, 12, 120);
+    h.text(c, "P1", M + 40, by + 248, h.f(900, 84), GOLD, "left", 0.02);
+    h.text(c, zt, W - M - 30, by + 250, h.f(900, h.passGroesse(c, zt, W - 2 * M - 300, 96, 40, 900)), "#fff", "right", 0.02);
+    if (d.strecke) h.text(c, d.strecke.toUpperCase(), M + 160, by + 236, h.f(800, 34), "rgba(255,255,255,.7)", "left", 0.14);
+    c.restore();
     h.qr(c, d, W - M - 190, 80, 190);
   } }
 

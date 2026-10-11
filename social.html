@@ -100,24 +100,27 @@ body{background:var(--carbon)}
         <p class="sb-hint" id="imgHint">Bild in der Vorschau mit der Maus verschieben. Videos: max. 30 Sekunden, mit Ton – passende Designs heißen „Video …“.</p>
         <label>Zoom</label>
         <input type="range" id="zoom" min="1" max="3" step="0.01" value="1">
-        <label>Abdunkeln</label>
-        <div class="sb-seg" id="dkModus">
-          <button type="button" data-v="design" class="on">Wie Design</button>
-          <button type="button" data-v="eigen">Eigener Verlauf</button>
-        </div>
-        <div id="dkDesign">
-          <label>Stärke <span id="dunkelWert">100 %</span></label>
-          <input type="range" id="dunkel" min="0" max="100" step="1" value="100">
-        </div>
-        <div id="dkEigen" hidden>
-          <label>Höhe von unten <span id="vlHoeheW">60 %</span></label>
-          <input type="range" id="vlHoehe" min="5" max="100" step="1" value="60">
-          <label>Übergang (weich) <span id="vlWeichW">60 %</span></label>
+        <label>Abdunkeln durch das Design <span id="dunkelWert">100 %</span></label>
+        <input type="range" id="dunkel" min="0" max="100" step="1" value="100">
+        <label class="sb-chk" style="margin-top:14px"><input type="checkbox" id="flAn"> Eigene Fläche (z. B. schwarz von unten)</label>
+        <div id="flBox" hidden>
+          <label>Seite</label>
+          <div class="sb-seg" id="flSeite">
+            <button type="button" data-v="unten" class="on">Unten</button>
+            <button type="button" data-v="oben">Oben</button>
+            <button type="button" data-v="beide">Beide</button>
+          </div>
+          <div class="sb-farben">
+            <div><label for="flFarbe">Farbe</label><input type="color" id="flFarbe" value="#000000"></div>
+          </div>
+          <label>Höhe <span id="vlHoeheW">60 %</span></label>
+          <input type="range" id="vlHoehe" min="2" max="100" step="1" value="60">
+          <label>Übergang (0 = harte Kante) <span id="vlWeichW">60 %</span></label>
           <input type="range" id="vlWeich" min="0" max="100" step="1" value="60">
           <label>Stärke <span id="vlStaerkeW">90 %</span></label>
           <input type="range" id="vlStaerke" min="0" max="100" step="1" value="90">
         </div>
-        <p class="sb-hint">Wie stark Bild/Video abgedunkelt wird (auch im Overlay). Eigener Verlauf: dunkel von unten, läuft weich in durchsichtig aus.</p>
+        <p class="sb-hint">Gilt auch im Overlay für Filmora. Übergang = wie lang die Fläche weich in durchsichtig ausläuft.</p>
       </div>
       <div class="sb-panel">
         <div class="sb-h">3 · Team-Bild (optional)</div>
@@ -342,7 +345,7 @@ body{background:var(--carbon)}
 <script src="overlays/qrcode.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/mp4-muxer@5.2.2/build/mp4-muxer.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/mp4box@0.5.2/dist/mp4box.all.min.js"></script>
-<script src="overlays/overlays.js?v=202610111732"></script>
-<script src="social.js?v=202610111741"></script>
+<script src="overlays/overlays.js?v=202610111750"></script>
+<script src="social.js?v=202610111750"></script>
 </body>
 </html>

@@ -14,21 +14,26 @@
   ICON.glocke = "M12 22a2.5 2.5 0 0 0 2.45-2h-4.9A2.5 2.5 0 0 0 12 22zm7-6v-5a7 7 0 0 0-5.5-6.84V3a1.5 1.5 0 0 0-3 0v1.16A7 7 0 0 0 5 11v5l-2 2v1h18v-1z";
   var QRC = {};
   function dunkelSkala(farbe){
-    var k = S.dunkelModus === "eigen" ? 0 : $("dunkel") ? +$("dunkel").value / 100 : 1;
+    var k = $("dunkel") ? +$("dunkel").value / 100 : 1;
     return String(farbe).replace(/rgba\(([^,]+),([^,]+),([^,]+),\s*([\d.]+)\)/, function(m, r, g, b, a){ return "rgba(" + r + "," + g + "," + b + "," + (+a * k) + ")"; });
   }
-  // Eigener Verlauf: von unten dunkel (Stärke), ab „Höhe“ weich in durchsichtig („Übergang“ = Anteil der Höhe)
-  S.dunkelModus = "design";
+  // Eigene Fläche: Farbe von unten/oben, ab „Höhe“ mit „Übergang“ (0 = harte Kante) in durchsichtig
   function eigenerVerlauf(c, x, y, w, hh){
-    if (S.dunkelModus !== "eigen") return;
-    var hoehe = hh * +$("vlHoehe").value / 100, weich = +$("vlWeich").value / 100, a = +$("vlStaerke").value / 100;
+    if (!$("flAn") || !$("flAn").checked) return;
+    var seite = S.flSeite || "unten", hoehe = hh * +$("vlHoehe").value / 100, weich = +$("vlWeich").value / 100, a = +$("vlStaerke").value / 100;
     if (hoehe <= 0 || a <= 0) return;
-    var y0 = y + hh - hoehe, g = c.createLinearGradient(0, y0, 0, y + hh);
-    g.addColorStop(0, "rgba(10,11,14,0)");
-    if (weich > 0) { for (var i = 1; i <= 6; i++) { var p = i / 6, e = p * p * (3 - 2 * p); g.addColorStop(weich * p, "rgba(10,11,14," + (a * e).toFixed(3) + ")"); } }
-    else g.addColorStop(0.001, "rgba(10,11,14," + a + ")");
-    g.addColorStop(1, "rgba(10,11,14," + a + ")");
-    c.save(); c.fillStyle = g; c.fillRect(x, y0, w, hoehe); c.restore();
+    var n = parseInt(String($("flFarbe").value || "#0a0b0e").slice(1), 16), rgb = (n >> 16 & 255) + "," + (n >> 8 & 255) + "," + (n & 255);
+    function teil(unten){
+      var y0 = unten ? y + hh - hoehe : y, g = c.createLinearGradient(0, unten ? y0 : y0 + hoehe, 0, unten ? y + hh : y0);
+      // Verlauf läuft von der offenen Kante (0) zur Bildkante (1)
+      g.addColorStop(0, "rgba(" + rgb + ",0)");
+      if (weich > 0) { for (var i = 1; i <= 8; i++) { var p = i / 8, e = p * p * (3 - 2 * p); g.addColorStop(weich * p, "rgba(" + rgb + "," + (a * e).toFixed(3) + ")"); } }
+      else g.addColorStop(0.0005, "rgba(" + rgb + "," + a + ")");
+      g.addColorStop(1, "rgba(" + rgb + "," + a + ")");
+      c.save(); c.fillStyle = g; c.fillRect(x, y0, w, hoehe); c.restore();
+    }
+    if (seite !== "oben") teil(true);
+    if (seite !== "unten") teil(false);
   }
   function farbeA(hex, a){ var n = parseInt(String(hex || "#000000").slice(1), 16); return "rgba(" + (n >> 16 & 255) + "," + (n >> 8 & 255) + "," + (n & 255) + "," + (a == null ? 1 : a) + ")"; }
   function mischen(f1, f2, k){
@@ -78,10 +83,10 @@
       woerter.forEach(function(w, i){ c.fillStyle = (S.fussRot ? S.fussRot[i] : i === 0) ? ROT : "#fff"; c.fillText(w, xx, y); xx += breiten[i] + leer; });
       c.restore();
     },
-    f: function(w, size, fam){ return w + " " + size + "px \"" + (fam || "Saira Condensed") + "\""; },
+    f: function(w, size, fam){ return w + " " + (Math.round(size * 10) / 10) + "px \"" + (fam || "Saira Condensed") + "\""; },
     text: function(c, s, x, y, font, color, align, spacing){
       c.save(); c.font = font; c.fillStyle = color; c.textAlign = align || "left";
-      var px = +(font.match(/(\d+)px/) || [0, 0])[1];
+      var px = +(font.match(/([\d.]+)px/) || [0, 0])[1];
       if ("letterSpacing" in c) c.letterSpacing = Math.round(px * (spacing || 0)) + "px";
       c.fillText(s, x, y); c.restore();
     },
@@ -1153,8 +1158,11 @@
   $("zoom").oninput = function(){ S.view.zoom = +this.value; alles(); };
   $("dunkel").addEventListener("input", function(){ $("dunkelWert").textContent = this.value + " %"; render(); });
   $("dunkel").addEventListener("change", renderThumbs);
-  document.querySelectorAll("#dkModus button").forEach(function(b){
-    b.onclick = function(){ S.dunkelModus = b.dataset.v; seg("dkModus", b.dataset.v); $("dkDesign").hidden = b.dataset.v !== "design"; $("dkEigen").hidden = b.dataset.v !== "eigen"; alles(); };
+  $("flAn").addEventListener("change", function(){ $("flBox").hidden = !this.checked; alles(); });
+  $("flFarbe").addEventListener("input", function(){ render(); });
+  $("flFarbe").addEventListener("change", renderThumbs);
+  document.querySelectorAll("#flSeite button").forEach(function(b){
+    b.onclick = function(){ S.flSeite = b.dataset.v; seg("flSeite", b.dataset.v); alles(); };
   });
   [["vlHoehe", "vlHoeheW"], ["vlWeich", "vlWeichW"], ["vlStaerke", "vlStaerkeW"]].forEach(function(p){
     $(p[0]).addEventListener("input", function(){ $(p[1]).textContent = this.value + " %"; render(); });
