@@ -655,3 +655,354 @@ window.K888_OVERLAYS = [
     h.qr(c, d, W - M - 200, 80, 200);
   } }
 ];
+
+/* ===========================================================
+   WEITERE ANIMIERTE OVERLAYS (Okt 2026): Unfall, Zieleinlauf,
+   Bestzeit, Gelbe Flagge, Überholt, Boxenstopp, Sieger, Replay, Teamfunk
+   =========================================================== */
+(function () {
+  // fester Zufall (gleich bei jedem Bild, damit Konfetti/Funken ruhig laufen)
+  function zufall(i) { var x = Math.sin(i * 127.1 + 311.7) * 43758.5453; return x - Math.floor(x); }
+  function ease(p) { p = Math.max(0, Math.min(1, p)); return 1 - Math.pow(1 - p, 3); }
+  // Zeit: Vorschau läuft in Schleife, Video läuft durch, Bild = Endzustand
+  function zeit(d, schleife) { return d.zeit == null ? 99 : (d.aufn ? d.zeit : d.zeit % (schleife || 6)); }
+  function lauf(d) { return d.zeit == null ? 0.4 : d.zeit; }
+  // Block unten: Fußzeile, Text, Überschrift; gibt Oberkante der Überschrift zurück
+  function block(c, W, H, d, h, M, farbe, maxTi) {
+    var fy = H - M;
+    h.fuss(c, M, W - M, fy, d.footer);
+    var tx = h.passend(c, d.text, W - 2 * M, 3, 38, 30, 500, "Barlow", 1.38);
+    var ty = fy - 110 - tx.hoehe;
+    h.zeilen(c, tx, M, ty, "#d5d9e0");
+    var ti = h.passend(c, d.title.toUpperCase(), W - 2 * M, maxTi || 3, 112, 64, 900, "Saira Condensed", 0.95);
+    var tiy = ty - 30 - ti.hoehe;
+    h.zeilen(c, ti, M, tiy, farbe || "#fff", 0.6);
+    return tiy;
+  }
+  // Breite inkl. Buchstabenabstand (wie h.text zeichnet)
+  function breite(c, h, s, gr, w, sp) { c.save(); c.font = h.f(w, gr); if ("letterSpacing" in c) c.letterSpacing = Math.round(gr * (sp || 0)) + "px"; var b = c.measureText(s).width; c.restore(); return b; }
+  function etikett(c, h, s, x, y, bg, fg, groesse) {
+    var gs = groesse || 40;
+    c.font = h.f(900, gs); var w = c.measureText(s).width + gs * 1.3;
+    h.schraeg(c, x, y, w, gs * 1.5, gs * 0.35, bg);
+    h.text(c, s, x + gs * 0.65, y + gs * 1.08, h.f(900, gs), fg || "#fff", "left", 0.06);
+    return w;
+  }
+  function streifen(c, x, y, w, hh, off, a, b) {
+    c.save(); c.beginPath(); c.rect(x, y, w, hh); c.clip();
+    c.fillStyle = a; c.fillRect(x, y, w, hh); c.fillStyle = b;
+    var st = hh * 1.1;
+    for (var sx = x - hh - st * 2 + (off % (st * 2)); sx < x + w + hh; sx += st * 2) {
+      c.beginPath(); c.moveTo(sx, y + hh); c.lineTo(sx + hh, y); c.lineTo(sx + hh + st, y); c.lineTo(sx + st, y + hh); c.closePath(); c.fill();
+    }
+    c.restore();
+  }
+  function konfetti(c, W, H, t, anz, farben, start) {
+    for (var i = 0; i < anz; i++) {
+      var r = zufall(i), sp = 140 + zufall(i + 50) * 220, x = r * W + Math.sin(t * 2 + i) * 30;
+      var y = ((zufall(i + 100) * H + t * sp) % (H + 60)) - 30;
+      if (start != null && t < start) continue;
+      c.save(); c.translate(x, y); c.rotate(t * (2 + zufall(i + 7) * 4) + i);
+      c.fillStyle = farben[i % farben.length]; c.fillRect(-9, -4, 18, 8 * Math.abs(Math.cos(t * 3 + i)) + 2); c.restore();
+    }
+  }
+  function blinklicht(c, x, y, r, an, farbe) {
+    c.save();
+    if (an) { c.shadowColor = farbe; c.shadowBlur = r * 2.2; }
+    c.fillStyle = an ? farbe : "rgba(60,60,60,.85)"; c.beginPath(); c.arc(x, y, r, 0, Math.PI * 2); c.fill();
+    c.shadowBlur = 0; c.fillStyle = an ? "rgba(255,255,255,.6)" : "rgba(255,255,255,.08)";
+    c.beginPath(); c.arc(x - r * 0.3, y - r * 0.3, r * 0.3, 0, Math.PI * 2); c.fill(); c.restore();
+  }
+
+  window.K888_OVERLAYS.push(
+
+  /* ---------- UNFALL: Warnstreifen, Warndreieck, Aufprall-Blitz ---------- */
+  { id: "unfall", name: "Unfall", anim: true, felder: ["strecke"], draw: function (c, W, H, d, h) {
+    var M = 64, t = lauf(d), zyk = t % 4, stoss = zyk < 0.4 ? (1 - zyk / 0.4) : 0;
+    h.bild(c, d, 0, 0, W, H);
+    h.verlauf(c, 0, 0, 0, H, [[0, "rgba(10,11,14,.45)"], [0.4, "rgba(10,11,14,.2)"], [0.6, "rgba(10,11,14,.6)"], [1, "rgba(10,11,14,.97)"]]);
+    if (d.zeit != null && stoss > 0) { c.fillStyle = "rgba(225,19,36," + (0.28 * stoss) + ")"; c.fillRect(0, 0, W, H); }
+    streifen(c, 0, 0, W, 46, t * 140, "#ffc400", "#0b0c10");
+    var tiy = block(c, W, H, d, h, M, "#fff", 3);
+    streifen(c, 0, tiy - 196, W, 22, -t * 140, "#ffc400", "#0b0c10");
+    // Warndreieck + Schriftzug, wackelt beim Aufprall
+    var wx = Math.sin(t * 80) * 10 * stoss, an = d.zeit == null || Math.floor(t * 3) % 2 === 0;
+    c.save(); c.translate(wx, 0);
+    var dy = tiy - 150, dx = M;
+    c.save(); if (an) { c.shadowColor = "#ffc400"; c.shadowBlur = 30; }
+    c.fillStyle = an ? "#ffc400" : "#7a6200"; c.beginPath(); c.moveTo(dx + 52, dy); c.lineTo(dx + 104, dy + 90); c.lineTo(dx, dy + 90); c.closePath(); c.fill(); c.restore();
+    c.fillStyle = "#0b0c10"; c.fillRect(dx + 47, dy + 28, 10, 34); c.fillRect(dx + 47, dy + 68, 10, 10);
+    h.text(c, "UNFALL", dx + 128, dy + 78, h.f(900, 92), "#fff", "left", 0.04);
+    if (d.strecke) { var uw = breite(c, h, "UNFALL", 92, 900, 0.04); h.text(c, d.strecke.toUpperCase(), dx + 128 + uw + 28, dy + 76, h.f(700, 36), "#ffc400", "left", 0.1); }
+    c.restore();
+    // Streckenposten-Lichter + REPLAY
+    blinklicht(c, M + 26, 110, 22, d.zeit == null || Math.floor(t * 4) % 2 === 0, "#ffc400");
+    blinklicht(c, M + 82, 110, 22, d.zeit != null && Math.floor(t * 4) % 2 === 1, "#ffc400");
+    if (d.zeit == null || Math.floor(t * 2) % 2 === 0) { c.fillStyle = "#ff2a35"; c.beginPath(); c.arc(W - M - 196, 110, 13, 0, Math.PI * 2); c.fill(); }
+    h.text(c, "REPLAY", W - M, 124, h.f(900, 42), "#fff", "right", 0.12);
+    h.qr(c, d, W - M - 190, 170, 190);
+  } },
+
+  /* ---------- ZIELEINLAUF: wehende Zielflagge, Platz springt rein, Konfetti ---------- */
+  { id: "ziel", name: "Zieleinlauf", anim: true, felder: ["platz", "strecke"], draw: function (c, W, H, d, h) {
+    var M = 64, t = zeit(d, 7), tl = lauf(d);
+    h.bild(c, d, 0, 0, W, H);
+    h.verlauf(c, 0, 0, 0, H, [[0, "rgba(10,11,14,.35)"], [0.45, "rgba(10,11,14,.45)"], [1, "rgba(10,11,14,.97)"]]);
+    // Zielflagge
+    var sp = 20, zei = 5, gr = W / sp, fy0 = 40;
+    for (var x = 0; x < sp; x++) {
+      var welle = Math.sin(x * 0.55 - tl * 5) * 16, licht = 0.75 + 0.25 * Math.cos(x * 0.55 - tl * 5);
+      for (var y = 0; y < zei; y++) {
+        var hell = (x + y) % 2 === 0;
+        var v = Math.round((hell ? 240 : 20) * licht);
+        c.fillStyle = "rgb(" + v + "," + v + "," + v + ")";
+        c.fillRect(Math.floor(x * gr), Math.floor(fy0 + y * gr * 0.62 + welle), Math.ceil(gr) + 1, Math.ceil(gr * 0.62) + 1);
+      }
+    }
+    var tiy = block(c, W, H, d, h, M, "#fff", 3);
+    // Platz springt rein
+    var pl = (d.platz || "1").replace(/^p/i, ""), ein = d.zeit == null ? 1 : ease((t - 0.3) / 0.5);
+    var hupf = d.zeit == null ? 1 : 1 + Math.sin(Math.min(1, Math.max(0, (t - 0.3) / 0.7)) * Math.PI) * 0.18;
+    var py = tiy - 60;
+    c.save(); c.globalAlpha = ein; c.translate(M, py); c.scale(hupf, hupf);
+    c.font = h.f(900, 230); var pw = c.measureText("P" + pl).width;
+    h.text(c, "P", 0, 0, h.f(900, 230), h.ROT, "left", 0);
+    h.text(c, pl, c.measureText("P").width + 10, 0, h.f(900, 230), "#fff", "left", 0);
+    c.restore();
+    h.text(c, "ZIELEINLAUF", M + pw * hupf + 40, py - 120, h.f(900, 56), "#fff", "left", 0.08);
+    if (d.strecke) h.text(c, d.strecke.toUpperCase(), M + pw * hupf + 40, py - 66, h.f(700, 34), "rgba(255,255,255,.75)", "left", 0.14);
+    if (d.zeit != null) konfetti(c, W, H, tl, 70, ["#e11324", "#ffffff", "#ffffff", "#1a1d24"], 0);
+    h.qr(c, d, W - M - 190, 230, 190);
+  } },
+
+  /* ---------- PERSÖNLICHE BESTZEIT: Zeit läuft hoch, grüne Sektoren, Auto auf Mini-Strecke ---------- */
+  { id: "bestzeit", name: "Persönliche Bestzeit", anim: true, felder: ["rundenzeit", "strecke"], draw: function (c, W, H, d, h) {
+    var M = 64, GRUEN = "#1fd36b", t = zeit(d, 7), tl = lauf(d);
+    h.bild(c, d, 0, 0, W, H);
+    h.verlauf(c, 0, 0, 0, H, [[0, "rgba(10,11,14,.4)"], [0.45, "rgba(10,11,14,.5)"], [1, "rgba(10,11,14,.97)"]]);
+    var tiy = block(c, W, H, d, h, M, "#fff", 2);
+    var bw = W - 2 * M, bh = 300, by = tiy - 50 - bh, ein = d.zeit == null ? 1 : ease(t / 0.5);
+    c.save(); c.globalAlpha = ein; c.translate(0, (1 - ein) * 60);
+    c.fillStyle = "rgba(9,14,12,.93)"; c.fillRect(M, by, bw, bh);
+    c.fillStyle = GRUEN; c.fillRect(M, by, bw, 70);
+    h.text(c, "PERSÖNLICHE BESTZEIT", M + 30, by + 51, h.f(900, 42), "#04140b", "left", 0.06);
+    if (d.strecke) h.text(c, d.strecke.toUpperCase(), M + bw - 30, by + 49, h.f(800, 30), "#04140b", "right", 0.1);
+    // Mini-Strecke mit fahrendem Punkt
+    var kx = M + 40, ky = by + 100, kw = 300, kh = 170;
+    var punkte = [[0.1, 0.8], [0.05, 0.35], [0.3, 0.1], [0.62, 0.22], [0.75, 0.05], [0.95, 0.3], [0.85, 0.7], [0.55, 0.62], [0.42, 0.92]];
+    c.save(); c.translate(kx, ky); c.lineJoin = "round";
+    function pfad() { c.beginPath(); punkte.forEach(function (p, i) { var px = p[0] * kw, py = p[1] * kh; if (i) c.lineTo(px, py); else c.moveTo(px, py); }); c.closePath(); }
+    c.strokeStyle = "rgba(255,255,255,.18)"; c.lineWidth = 14; pfad(); c.stroke();
+    c.strokeStyle = "rgba(255,255,255,.75)"; c.lineWidth = 4; pfad(); c.stroke();
+    var weg = (tl * 0.22) % 1, n = punkte.length, seg = weg * n, i0 = Math.floor(seg), f = seg - i0;
+    var a = punkte[i0 % n], b = punkte[(i0 + 1) % n], cx = (a[0] + (b[0] - a[0]) * f) * kw, cy = (a[1] + (b[1] - a[1]) * f) * kh;
+    c.shadowColor = GRUEN; c.shadowBlur = 24; c.fillStyle = GRUEN; c.beginPath(); c.arc(cx, cy, 11, 0, Math.PI * 2); c.fill();
+    c.restore();
+    // Zeit zählt hoch und rastet ein
+    var ziel = d.rundenzeit || "1:58.432", sek = 0, tz = ziel.match(/^(?:(\d+):)?(\d+)(?:[.,](\d+))?$/);
+    if (tz) sek = (+tz[1] || 0) * 60 + (+tz[2]) + (tz[3] ? +("0." + tz[3]) : 0);
+    var zeige = ziel;
+    if (tz && d.zeit != null && t < 2.2) {
+      var s = sek * ease(t / 2.2), mm = Math.floor(s / 60), rest = s - mm * 60, nk = tz[3] ? tz[3].length : 3;
+      zeige = (tz[1] != null ? mm + ":" + (rest < 10 ? "0" : "") : "") + rest.toFixed(nk);
+    }
+    var gs = h.passGroesse(c, zeige, bw - kw - 120, 140, 50, 900);
+    c.save(); if (d.zeit != null && t >= 2.2 && t < 3.2) { c.shadowColor = GRUEN; c.shadowBlur = 50 * (1 - (t - 2.2)); }
+    h.text(c, zeige, M + bw - 34, by + 205, h.f(900, gs), d.zeit != null && t < 2.2 ? "#fff" : GRUEN, "right", 0.02); c.restore();
+    var sw = (bw - kw - 120) / 3;
+    for (var i = 0; i < 3; i++) {
+      var sx = M + kw + 86 + i * (sw + 8), voll = d.zeit == null ? 1 : ease((t - 0.3 - i * 0.6) / 0.5);
+      c.fillStyle = "rgba(255,255,255,.1)"; c.fillRect(sx, by + 236, sw, 34);
+      c.fillStyle = GRUEN; c.fillRect(sx, by + 236, sw * voll, 34);
+      h.text(c, "S" + (i + 1), sx + 10, by + 262, h.f(800, 24), "#04140b", "left", 0.1);
+    }
+    c.restore();
+    h.qr(c, d, W - M - 190, 80, 190);
+  } },
+
+  /* ---------- GELBE FLAGGE: Warnlichter, wehende Flagge ---------- */
+  { id: "gelb", name: "Gelbe Flagge", anim: true, felder: ["strecke"], draw: function (c, W, H, d, h) {
+    var M = 64, GELB = "#ffcc00", t = lauf(d), an = d.zeit == null || Math.floor(t * 3) % 2 === 0;
+    h.bild(c, d, 0, 0, W, H);
+    h.verlauf(c, 0, 0, 0, H, [[0, "rgba(10,11,14,.5)"], [0.35, "rgba(10,11,14,.15)"], [0.6, "rgba(10,11,14,.6)"], [1, "rgba(10,11,14,.97)"]]);
+    if (d.zeit != null) { c.fillStyle = "rgba(255,204,0," + (an ? 0.07 : 0) + ")"; c.fillRect(0, 0, W, H); }
+    // Lichterleiste oben
+    c.fillStyle = "rgba(10,11,14,.9)"; c.fillRect(M, 70, W - 2 * M, 96);
+    for (var i = 0; i < 6; i++) blinklicht(c, M + 70 + i * ((W - 2 * M - 140) / 5), 118, 28, (i % 2 === 0) === an, GELB);
+    var tiy = block(c, W, H, d, h, M, "#fff", 3);
+    // wehende Flagge + Schriftzug
+    var fx = M, fy = tiy - 180, fw = 150, fh = 100;
+    c.fillStyle = "#d9d9d9"; c.fillRect(fx, fy - 10, 8, 150);
+    for (var s = 0; s < 15; s++) {
+      var wx = fx + 8 + s * fw / 15, wy = fy + Math.sin(s * 0.6 - t * 7) * 8 * (s / 15);
+      c.fillStyle = s % 2 ? GELB : "#f5c000"; c.fillRect(wx, wy, fw / 15 + 1, fh);
+    }
+    var gx = fx + fw + 40;
+    c.fillStyle = GELB; c.font = h.f(900, 70); var gw = c.measureText("GELBE FLAGGE").width + 50;
+    h.schraeg(c, gx, fy + 4, gw, 92, 18, GELB);
+    h.text(c, "GELBE FLAGGE", gx + 25, fy + 76, h.f(900, 70), "#0b0c10", "left", 0.03);
+    if (d.strecke) h.text(c, d.strecke.toUpperCase(), gx + 6, fy + 136, h.f(800, 34), GELB, "left", 0.12);
+    h.qr(c, d, W - M - 190, 200, 190);
+  } },
+
+  /* ---------- ÜBERHOLT: alte Position fällt raus, neue kommt rein ---------- */
+  { id: "ueberholt", name: "Überholt", anim: true, felder: ["platz"], draw: function (c, W, H, d, h) {
+    var M = 64, GRUEN = "#1fd36b", t = zeit(d, 5), tl = lauf(d);
+    h.bild(c, d, 0, 0, W, H);
+    h.verlauf(c, 0, 0, 0, H, [[0, "rgba(10,11,14,.45)"], [0.4, "rgba(10,11,14,.25)"], [0.6, "rgba(10,11,14,.6)"], [1, "rgba(10,11,14,.97)"]]);
+    // Tempo-Linien
+    if (d.zeit != null) for (var i = 0; i < 14; i++) {
+      var ly = 200 + zufall(i) * (H * 0.45), lx = ((zufall(i + 9) * W) - tl * 1600 * (0.6 + zufall(i + 3))) % (W + 400);
+      if (lx < -400) lx += W + 400;
+      c.fillStyle = "rgba(255,255,255," + (0.08 + zufall(i + 5) * 0.12) + ")"; c.fillRect(lx, ly, 240 + zufall(i + 2) * 200, 3);
+    }
+    var tiy = block(c, W, H, d, h, M, "#fff", 3);
+    var neu = parseInt(String(d.platz || "4").replace(/\D/g, ""), 10) || 4, alt = neu + 1;
+    var bx = M, by = tiy - 300, bh = 240, bw = 420;
+    c.fillStyle = "rgba(10,11,14,.9)"; c.fillRect(bx, by, bw, bh);
+    c.fillStyle = GRUEN; c.fillRect(bx, by, 10, bh);
+    c.save(); c.beginPath(); c.rect(bx, by, bw, bh); c.clip();
+    var p = d.zeit == null ? 1 : ease((t - 0.6) / 0.6);
+    h.text(c, "P" + alt, bx + 50, by + 195 + p * bh, h.f(900, 190), "rgba(255,255,255,.5)", "left", 0);
+    h.text(c, "P" + neu, bx + 50, by + 195 - (1 - p) * bh, h.f(900, 190), "#fff", "left", 0);
+    c.restore();
+    // Pfeil pulsiert
+    var puls = d.zeit == null ? 1 : 1 + 0.12 * Math.sin(tl * 6);
+    c.save(); c.translate(bx + bw + 90, by + bh / 2); c.scale(puls, puls);
+    c.shadowColor = GRUEN; c.shadowBlur = 30; c.fillStyle = GRUEN;
+    c.beginPath(); c.moveTo(0, -80); c.lineTo(62, 0); c.lineTo(22, 0); c.lineTo(22, 70); c.lineTo(-22, 70); c.lineTo(-22, 0); c.lineTo(-62, 0); c.closePath(); c.fill();
+    c.restore();
+    h.text(c, "POSITION", bx + bw + 180, by + 100, h.f(900, 54), "#fff", "left", 0.06);
+    h.text(c, "GEWONNEN", bx + bw + 180, by + 160, h.f(900, 54), GRUEN, "left", 0.06);
+    etikett(c, h, d.kicker, M, by - 96, h.ROT, "#fff", 36);
+    h.qr(c, d, W - M - 190, 80, 190);
+  } },
+
+  /* ---------- BOXENSTOPP: schwingende Boxentafel, Standzeit, Pit-Limiter ---------- */
+  { id: "box", name: "Boxenstopp", anim: true, felder: ["platz", "rundenzeit"], draw: function (c, W, H, d, h) {
+    var M = 64, t = zeit(d, 6), tl = lauf(d);
+    h.bild(c, d, 0, 0, W, H);
+    h.verlauf(c, 0, 0, 0, H, [[0, "rgba(10,11,14,.4)"], [0.4, "rgba(10,11,14,.3)"], [0.6, "rgba(10,11,14,.6)"], [1, "rgba(10,11,14,.97)"]]);
+    var tiy = block(c, W, H, d, h, M, "#fff", 2);
+    // Boxentafel
+    var tw = 380, th = 330, tx = M + 20, ty = tiy - th - 60, wink = d.zeit == null ? 0 : Math.sin(tl * 2.4) * 0.04;
+    c.save(); c.translate(tx + tw / 2, ty - 40); c.rotate(wink);
+    c.fillStyle = "#9aa1ab"; c.fillRect(-6, -60, 12, 60);
+    c.fillStyle = "#0b0c10"; c.fillRect(-tw / 2, 0, tw, th);
+    c.strokeStyle = "#e5e7eb"; c.lineWidth = 6; c.strokeRect(-tw / 2 + 3, 3, tw - 6, th - 6);
+    var zeilen = ["BOX", "P" + String(d.platz || "6").replace(/^p/i, ""), "888"];
+    zeilen.forEach(function (z, i) { h.text(c, z, 0, 92 + i * 100, h.f(900, 90), i === 0 ? "#ffd400" : "#fff", "center", 0.06); });
+    c.restore();
+    // Standzeit läuft
+    var ziel = parseFloat(String(d.rundenzeit || "24.8").replace(",", ".")) || 24.8;
+    var s = d.zeit == null ? ziel : Math.min(ziel, ziel * ease(t / 3));
+    var sx = tx + tw + 70, sy = ty + 20;
+    h.text(c, "STANDZEIT", sx, sy + 40, h.f(800, 34), "rgba(255,255,255,.75)", "left", 0.14);
+    h.text(c, s.toFixed(1) + " s", sx, sy + 150, h.f(900, 120), "#fff", "left", 0.02);
+    var bw2 = W - M - sx; c.fillStyle = "rgba(255,255,255,.12)"; c.fillRect(sx, sy + 180, bw2, 16);
+    c.fillStyle = "#ffd400"; c.fillRect(sx, sy + 180, bw2 * (s / ziel), 16);
+    // Pit-Limiter blinkt blau/gelb
+    var an = d.zeit == null || Math.floor(tl * 3) % 2 === 0;
+    c.fillStyle = an ? "#1f6bff" : "#ffd400"; c.fillRect(sx, sy + 228, bw2, 70);
+    h.text(c, "PIT LIMITER 60", sx + bw2 / 2, sy + 276, h.f(900, 42), an ? "#fff" : "#0b0c10", "center", 0.08);
+    h.qr(c, d, W - M - 190, 80, 190);
+  } },
+
+  /* ---------- SIEGER: drehende Goldstrahlen, Funkeln, Gold-Konfetti ---------- */
+  { id: "sieg", name: "Sieger", anim: true, felder: ["platz", "strecke"], draw: function (c, W, H, d, h) {
+    var M = 64, GOLD = "#ffc83a", t = zeit(d, 7), tl = lauf(d);
+    h.bild(c, d, 0, 0, W, H);
+    h.verlauf(c, 0, 0, 0, H, [[0, "rgba(10,11,14,.5)"], [0.45, "rgba(10,11,14,.5)"], [1, "rgba(10,11,14,.97)"]]);
+    var tiy = block(c, W, H, d, h, M, "#fff", 3);
+    var mx = W / 2, my = tiy - 230;
+    // Strahlen
+    c.save(); c.translate(mx, my); c.rotate(tl * 0.25);
+    for (var i = 0; i < 16; i++) {
+      c.rotate(Math.PI * 2 / 16);
+      var g = c.createLinearGradient(0, 0, 0, -620); g.addColorStop(0, "rgba(255,200,58,.38)"); g.addColorStop(1, "rgba(255,200,58,0)");
+      c.fillStyle = g; c.beginPath(); c.moveTo(0, 0); c.lineTo(-46, -620); c.lineTo(46, -620); c.closePath(); c.fill();
+    }
+    c.restore();
+    // Platz in Gold
+    var pl = (d.platz || "1").replace(/^p/i, ""), ein = d.zeit == null ? 1 : ease(t / 0.7), sk = 0.6 + 0.4 * ein;
+    c.save(); c.translate(mx, my); c.scale(sk, sk); c.globalAlpha = ein;
+    var gg = c.createLinearGradient(0, -140, 0, 60); gg.addColorStop(0, "#fff3c4"); gg.addColorStop(0.5, GOLD); gg.addColorStop(1, "#b07a10");
+    c.shadowColor = "rgba(255,200,58,.8)"; c.shadowBlur = 50;
+    c.font = h.f(900, 260); c.textAlign = "center"; c.fillStyle = gg; c.fillText("P" + pl, 0, 80);
+    c.restore();
+    h.text(c, "SIEG", mx, my + 150, h.f(900, 64), GOLD, "center", 0.3);
+    if (d.strecke) h.text(c, d.strecke.toUpperCase(), mx, my - 190, h.f(800, 36), "#fff", "center", 0.2);
+    // Funkeln
+    for (var k = 0; k < 14; k++) {
+      var fx = mx + (zufall(k) - 0.5) * W * 0.9, fy = my + (zufall(k + 20) - 0.5) * 420, fa = Math.max(0, Math.sin(tl * 3 + k * 1.7));
+      if (d.zeit == null) fa = zufall(k + 40) > 0.5 ? 0.8 : 0;
+      c.save(); c.globalAlpha = fa; c.translate(fx, fy); c.fillStyle = "#fff";
+      c.beginPath(); c.moveTo(0, -18); c.lineTo(4, -4); c.lineTo(18, 0); c.lineTo(4, 4); c.lineTo(0, 18); c.lineTo(-4, 4); c.lineTo(-18, 0); c.lineTo(-4, -4); c.closePath(); c.fill(); c.restore();
+    }
+    if (d.zeit != null) konfetti(c, W, H, tl, 50, [GOLD, "#fff3c4", "#ffffff", "#e11324"], 0);
+    h.qr(c, d, W - M - 190, 80, 190);
+  } },
+
+  /* ---------- REPLAY: TV-Wischblende, REC, Timecode, Zeitlupe ---------- */
+  { id: "replay", name: "Replay", anim: true, felder: ["strecke"], draw: function (c, W, H, d, h) {
+    var M = 64, t = zeit(d, 6), tl = lauf(d);
+    h.bild(c, d, 0, 0, W, H);
+    h.verlauf(c, 0, 0, 0, H, [[0, "rgba(10,11,14,.35)"], [0.5, "rgba(10,11,14,.2)"], [0.65, "rgba(10,11,14,.6)"], [1, "rgba(10,11,14,.97)"]]);
+    // Scanlines
+    c.fillStyle = "rgba(0,0,0,.12)"; for (var y = 0; y < H; y += 6) c.fillRect(0, y, W, 2);
+    // Eckwinkel
+    h.ecken(c, 40, 40, W - 80, H - 80, 80, 8, "rgba(255,255,255,.85)");
+    var an = d.zeit == null || Math.floor(tl * 2) % 2 === 0;
+    if (an) { c.fillStyle = "#ff2a35"; c.beginPath(); c.arc(M + 30, 110, 16, 0, Math.PI * 2); c.fill(); }
+    h.text(c, "REC", M + 60, 124, h.f(900, 42), "#fff", "left", 0.1);
+    var bild = Math.floor(tl * 25), tc = ["00", String(Math.floor(bild / 1500) % 60).padStart(2, "0"), String(Math.floor(bild / 25) % 60).padStart(2, "0"), String(bild % 25).padStart(2, "0")].join(":");
+    h.text(c, tc, W - M - 10, 124, h.f(800, 40), "#fff", "right", 0.08);
+    h.text(c, "0.5×  ZEITLUPE", W - M - 10, 172, h.f(700, 28), "rgba(255,255,255,.75)", "right", 0.12);
+    var tiy = block(c, W, H, d, h, M, "#fff", 3);
+    // REPLAY-Band mit Wischblende
+    var by = tiy - 150, wisch = d.zeit == null ? 1 : ease(t / 0.6);
+    c.save(); c.beginPath(); c.rect(0, by - 10, W * wisch + 60, 130); c.clip();
+    h.schraeg(c, -40, by, W * 0.78, 110, 30, h.ROT);
+    h.text(c, "REPLAY", M, by + 88, h.f(900, 96), "#fff", "left", 0.14);
+    var rw = breite(c, h, "REPLAY", 96, 900, 0.14) + 40;
+    if (d.strecke) h.text(c, d.strecke.toUpperCase(), M + rw, by + 82, h.f(800, 34), "rgba(255,255,255,.9)", "left", 0.12);
+    c.restore();
+    if (d.zeit != null && t < 0.6) { c.fillStyle = "#fff"; c.fillRect(W * wisch, by - 10, 18, 130); }
+    h.qr(c, d, W - M - 190, 220, 190);
+  } },
+
+  /* ---------- TEAMFUNK: Funk-Box mit Sprach-Ausschlägen ---------- */
+  { id: "funk", name: "Teamfunk", anim: true, draw: function (c, W, H, d, h) {
+    var M = 64, t = zeit(d, 6), tl = lauf(d);
+    h.bild(c, d, 0, 0, W, H);
+    h.verlauf(c, 0, 0, 0, H, [[0, "rgba(10,11,14,.3)"], [0.45, "rgba(10,11,14,.3)"], [1, "rgba(10,11,14,.95)"]]);
+    var fy = H - M;
+    h.fuss(c, M, W - M, fy, d.footer);
+    // Funk-Box mit Text als Funkspruch
+    var bw = W - 2 * M, tx = h.passend(c, d.text || "Box, box, box!", bw - 80, 5, 42, 32, 600, "Barlow", 1.36);
+    var bh = 150 + tx.hoehe + 50, by = fy - 110 - bh, ein = d.zeit == null ? 1 : ease(t / 0.5);
+    c.save(); c.globalAlpha = ein; c.translate(0, (1 - ein) * 40);
+    c.fillStyle = "rgba(10,11,14,.92)"; c.fillRect(M, by, bw, bh);
+    c.fillStyle = h.ROT; c.fillRect(M, by, 10, bh);
+    // Headset-Symbol
+    c.strokeStyle = "#fff"; c.lineWidth = 7; c.beginPath(); c.arc(M + 70, by + 70, 28, Math.PI, 0); c.stroke();
+    c.fillStyle = "#fff"; c.fillRect(M + 36, by + 66, 14, 26); c.fillRect(M + 90, by + 66, 14, 26);
+    h.text(c, "TEAMFUNK", M + 124, by + 84, h.f(900, 48), "#fff", "left", 0.1);
+    // Ausschläge
+    var n = 26, wx = M + 420, ww = bw - 420 - 40, sp = ww / n;
+    for (var i = 0; i < n; i++) {
+      var amp = d.zeit == null ? 0.3 + 0.5 * zufall(i) : Math.abs(Math.sin(tl * 9 + i * 0.7) * Math.sin(tl * 3.1 + i * 0.23)) * (0.4 + 0.6 * zufall(i + Math.floor(tl * 8)));
+      var hh = 10 + amp * 80;
+      c.fillStyle = i % 4 === 0 ? h.ROT : "#fff"; c.fillRect(wx + i * sp, by + 66 - hh / 2, sp * 0.55, hh);
+    }
+    h.zeilen(c, tx, M + 40, by + 140, "#fff");
+    c.restore();
+    var ti = h.passend(c, d.title.toUpperCase(), W - 2 * M, 3, 104, 60, 900, "Saira Condensed", 0.95);
+    var tiy = by - 34 - ti.hoehe;
+    h.zeilen(c, ti, M, tiy, "#fff", 0.6);
+    etikett(c, h, d.kicker, M, tiy - 92, h.ROT, "#fff", 36);
+    h.qr(c, d, W - M - 190, 80, 190);
+  } }
+
+  );
+})();
