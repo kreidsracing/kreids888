@@ -514,7 +514,9 @@
 
   // Neues Event: Assistent in 3 Schritten (Was? Wann? Teams?)
   function eventWizard() {
-    const w = { schritt: 1, name: "", trackId: 0, trackName: "", mode: "zeit", dauerMin: 360, runden: 100, notiz: "", channel: "", von: datumWert(Date.now() + 7 * 864e5), bis: "", zeiten: ["14:00"], teams: [], carId: 0, carName: "", starts: {}, ich: "" };
+    // Standard-Notiz für neue Events (kann im Assistenten angepasst werden)
+    const STANDARD_NOTIZ = "Das nächste Event ist in der Endurance Planung angelegt! Schaut mal rein und meldet euch schon mal bei einem Fahrzeug an.\n\nDie Verfügbarkeit hat noch Zeit, die könnt ihr später in Ruhe eintragen. Der Bot erinnert euch rechtzeitig.\n\nKonstanz bis ins Ziel! 🏁";
+    const w = { schritt: 1, name: "", trackId: 0, trackName: "", mode: "zeit", dauerMin: 360, runden: 100, notiz: STANDARD_NOTIZ, channel: "", von: datumWert(Date.now() + 7 * 864e5), bis: "", zeiten: ["14:00"], teams: [], carId: 0, carName: "", starts: {}, ich: "" };
     const teams = META.teams || [];
     const startVon = (n) => w.starts[n] || startAnpassen(fromLocalInput(w.von + "T" + (w.zeiten[0] || "14:00")), w, true);
     const zeichne = () => {
@@ -528,7 +530,6 @@
       if (w.schritt === 2) inhalt = wannFelder(w);
       if (w.schritt === 3) inhalt = `
         <div class="sp-f"><span>Teams antippen</span><div class="sp-teamwahl">${teams.map(n => `<button type="button" class="sp-teamchip ${w.teams.includes(n) ? "on" : ""}" data-team="${esc(n)}" style="--t1:${teamFarbe(n)[0]}"><i></i>${esc(n)}</button>`).join("") || '<span class="tm-muted">Keine Teams angelegt (Admin → Stintplaner).</span>'}</div></div>
-        <div class="sp-f" style="margin-top:14px"><span>Fahrzeug</span>${autoAuswahl(w, 'id="wz-car"')}</div>
         ${w.teams.map(n => `<div class="sp-wz-team" data-wt="${esc(n)}"><b><i style="background:${teamFarbe(n)[0]}"></i>${esc(n)}</b><div class="sp-grid">${startFelder(startVon(n), "wz" + teams.indexOf(n), w)}</div>
           <label class="sp-check"><input type="radio" name="wz-ich" value="${esc(n)}" ${w.ich === n ? "checked" : ""}> Ich fahre hier</label></div>`).join("")}
         ${w.teams.length ? `<label class="sp-check"><input type="radio" name="wz-ich" value="" ${w.ich ? "" : "checked"}> Ich fahre selbst nicht mit</label>` : ""}`;
@@ -545,9 +546,6 @@
         if (w.schritt === 1) { leseWas(w); w.channel = v("ev-chan").value; w.notiz = v("ev-notiz").value; }
         if (w.schritt === 2) leseWann(w);
         if (w.schritt === 3) {
-          const id = Number(v("wz-car").value) || 0;
-          const f = (META.teamCars || []).find(x => x.id === id) || META.cars.find(x => x.id === id);
-          w.carId = f ? f.id : 0; w.carName = f ? f.name : "";
           $$(".sp-wz-team").forEach(box => { const n = box.dataset.wt; const t = leseStart(box, "wz" + teams.indexOf(n)); if (t) w.starts[n] = t; });
           const r = root.querySelector('input[name="wz-ich"]:checked'); w.ich = r ? r.value : "";
         }
