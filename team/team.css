@@ -1544,3 +1544,4 @@ body:has(.td)::after{content:"";position:fixed;inset:0;z-index:-1;pointer-events
 .tp-neu-btn:hover{filter:brightness(1.1)}
 .tp-neu-knapp{margin:8px 0 0;text-align:center;font-size:12.5px;color:#ffb7bd;letter-spacing:.04em}
 .tp-neu-knapp::before{content:"";display:inline-block;width:7px;height:7px;border-radius:50%;background:#ff2b3d;margin-right:7px;box-shadow:0 0 8px #ff2b3d;animation:gPuls 1.6s infinite;vertical-align:middle}
+.sp-task.warn{background:linear-gradient(90deg,rgba(255,176,32,.16),rgba(255,176,32,.03) 70%);border-color:rgba(255,176,32,.45)}.sp-task.warn span{color:#ffe1a8;font-weight:600}.sp-task.warn .sp-task-dot{background:#ffb020;box-shadow:0 0 0 4px rgba(255,176,32,.2)}

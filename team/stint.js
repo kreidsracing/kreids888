@@ -520,7 +520,7 @@
     const teams = META.teams || [];
     const startVon = (n) => w.starts[n] || startAnpassen(fromLocalInput(w.von + "T" + (w.zeiten[0] || "14:00")), w, true);
     const zeichne = () => {
-      const titel = ["Was wird gefahren?", "Wann wird gefahren?", "Welche Teams fahren?"][w.schritt - 1];
+      const titel = ["Was wird gefahren?", "Wann wird gefahren?"][w.schritt - 1];
       let inhalt = "";
       if (w.schritt === 1) inhalt = wasFelder(w) + `
         <details class="sp-mehr"><summary>Mehr (Discord-Kanal, Notizen)</summary>
@@ -536,9 +536,9 @@
       root.innerHTML = `
         <a class="sp-back" href="#stint">← Alle Events</a>
         <div class="sp-wz">
-          <div class="sp-wz-steps">${["Was?", "Wann?", "Teams?"].map((l, i) => `<div class="sp-wz-step ${w.schritt === i + 1 ? "on" : ""} ${w.schritt > i + 1 ? "done" : ""}"><span>${w.schritt > i + 1 ? "✓" : i + 1}</span>${l}</div>`).join('<i></i>')}</div>
+          <div class="sp-wz-steps">${["Was?", "Wann?"].map((l, i) => `<div class="sp-wz-step ${w.schritt === i + 1 ? "on" : ""} ${w.schritt > i + 1 ? "done" : ""}"><span>${w.schritt > i + 1 ? "✓" : i + 1}</span>${l}</div>`).join('<i></i>')}</div>
           <div class="tm-box"><h5>${titel}</h5>${inhalt}
-            <div class="sp-wz-nav">${w.schritt > 1 ? C.btn("← Zurück", "", 'id="wz-back"') : "<span></span>"}${w.schritt < 3 ? C.btn("Weiter →", "red", 'id="wz-next"') : C.btn("Event anlegen ✓", "red", 'id="wz-done"')}</div>
+            <div class="sp-wz-nav">${w.schritt > 1 ? C.btn("← Zurück", "", 'id="wz-back"') : "<span></span>"}${w.schritt < 2 ? C.btn("Weiter →", "red", 'id="wz-next"') : C.btn("Event anlegen ✓", "red", 'id="wz-done"')}</div>
           </div>
         </div>`;
       const v = (id) => root.querySelector("#" + id);
@@ -572,6 +572,8 @@
       };
       if (v("wz-done")) v("wz-done").onclick = async () => {
         lese();
+        if (!w.von) return C.toast("Bitte den ersten Tag wählen");
+        if (!w.zeiten.length) return C.toast("Bitte mindestens eine Startzeit hinzufügen");
         const b = v("wz-done"); b.disabled = true;
         try {
           const ersterStart = w.teams.length ? Math.min(...w.teams.map(startVon)) : fromLocalInput(w.von + "T" + w.zeiten[0]);
@@ -579,7 +581,8 @@
           for (const n of w.teams) {
             await C.api("/stint/car", { method: "POST", body: { id: r.id, car: { name: n, carId: w.carId, carName: w.carName, start: startVon(n), pit: { ...PIT_STD }, drivers: w.ich === n ? [{ uid: S.me || C.ME.user.id, name: C.ME.user.name, g61: g61Vorschlag(C.ME.user.id, C.ME.user.name), pace: 0, fuel: 0 }] : [], stints: [] } } }).catch(x => C.toast(n + ": " + x.message));
           }
-          C.toast("Event angelegt", true);
+          C.toast(r.info || "Event angelegt", !r.warn);
+          if (r.warn) S.evHinweis = { id: r.id, txt: r.info };
           if (window.F2FEvNav) window.F2FEvNav.refresh();
           location.hash = "stint/" + r.id;
         } catch (x) { C.toast(x.message); b.disabled = false; }
@@ -775,6 +778,7 @@
         </div>
         <div class="sp-hero-st"><b>Planungsstatus</b><span>${fertig} / ${p.cars.length} Fahrzeuge fertig</span><div class="sp-bar"><i style="width:${p.cars.length ? Math.round(fertig / p.cars.length * 100) : 0}%"></i></div></div>
       </section>
+      ${S.evHinweis && S.evHinweis.id === p.id ? `<div class="sp-tasks"><div class="sp-task warn"><i class="sp-task-dot"></i><span>${esc(S.evHinweis.txt)}</span><button type="button" class="tm-btn sm" id="sp-ank2"><span>Nochmal posten</span></button><button type="button" class="sp-iconbtn" id="sp-hinweg" title="Ausblenden">✕</button></div></div>` : ""}
       ${evAufgaben(p, infos, istDrin)}
       <div class="sp-ev">
         <div class="sp-ev-main">
@@ -801,6 +805,7 @@
             ${istDrin ? `<a class="tm-btn red sm sp-full" href="#stint/${esc(p.id)}/${esc(istDrin.key)}"><span>Mein Fahrzeug: ${esc(istDrin.name)}</span></a>
               <button type="button" class="tm-btn sm sp-full" id="sp-myav"><span>Meine Verfügbarkeit</span></button>` : `<p class="tm-muted">Du bist noch in keinem Fahrzeug. Öffne eins und klick auf „Mitfahren".</p>`}
             <a class="tm-btn sm sp-full" href="#stint/${esc(p.id)}/bearbeiten"><span>Event bearbeiten</span></a>
+            <button type="button" class="tm-btn sm sp-full" id="sp-ank"><span>In Discord ankündigen</span></button>
             ${p.cars.length ? `<button type="button" class="tm-btn sm sp-full" id="sp-post" ${META.channel || p.channel ? "" : 'disabled title="Kein Discord-Kanal eingestellt"'}><span>Plan in Discord posten</span></button><button type="button" class="tm-btn sm sp-full" id="sp-erinn"><span>Fehlende jetzt erinnern</span></button>` : ""}
           </div>
           <div class="tm-box sp-side"><h5>Nächste Termine</h5>
@@ -824,6 +829,14 @@
     });
     const myav = $("#sp-myav");
     if (myav) myav.onclick = () => { S.nextStep = "verf"; S.key = null; location.hash = "stint/" + p.id + "/" + istDrin.key; };
+    const ankuend = async (b) => {
+      b.disabled = true;
+      try { const x = await C.api("/stint/ankuendigen", { method: "POST", body: { id: p.id } }); C.toast(x.info, true); S.evHinweis = null; renderEvent(); }
+      catch (x) { S.evHinweis = { id: p.id, txt: x.message }; renderEvent(); }
+    };
+    const ank = $("#sp-ank"); if (ank) ank.onclick = () => ankuend(ank);
+    const ank2 = $("#sp-ank2"); if (ank2) ank2.onclick = () => ankuend(ank2);
+    const hw = $("#sp-hinweg"); if (hw) hw.onclick = () => { S.evHinweis = null; renderEvent(); };
     const er = $("#sp-erinn");
     if (er) er.onclick = async () => {
       if (!confirm("Alle, bei denen noch Angaben fehlen, jetzt in Discord anpingen?")) return;
