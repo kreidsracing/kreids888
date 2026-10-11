@@ -1729,7 +1729,7 @@
       : '<span class="tm-err">Keine Rollen geladen – ist der Bot auf dem Server?</span>';
 
     const g = cfg.g61, gi = d.g61;
-    const wp = cfg.wpost || {}, wpo = wp.opt || {};
+    const wp = cfg.wpost || {}, wpo = wp.opt || {}, wpa = cfg.wpostAuto || {};
     const teamOpts = gi.teams.length
       ? `<select class="tm-select" id="g61-team"><option value="">– Team wählen –</option>${gi.teams.map(t => `<option value="${esc(t.slug)}" ${t.slug === g.teamSlug ? "selected" : ""}>${esc(t.name)}</option>`).join("")}</select>`
       : `<input class="tm-input" id="g61-team" placeholder="Team-Slug aus Garage 61" value="${esc(g.teamSlug)}">`;
@@ -1797,6 +1797,10 @@
           <div><select class="tm-select" id="wp-ch"><option value="">– Kanal wählen –</option>${(d.channels || []).map(c => `<option value="${c.id}" ${c.id === (wp.channel || g.channel) ? "selected" : ""}># ${esc(c.name)}</option>`).join("")}</select></div></div>
         <div class="tm-row"><label for="wp-ping">Rolle pingen<small>z. B. Teamfahrer</small></label>
           <div><select class="tm-select" id="wp-ping"><option value="">– niemanden pingen –</option>${d.roles.map(r => `<option value="${r.id}" ${r.id === wp.ping ? "selected" : ""}>@${esc(r.name)}</option>`).join("")}</select></div></div>
+        <div class="tm-row"><div class="lbl">Automatisch posten<small>postet die abgeschlossene Vorwoche mit Kanal, Ping und Inhalt von oben · mit „Speichern" sichern</small></div>
+          <div class="tm-actions"><label class="tm-switch"><input type="checkbox" id="wpa-an" ${wpa.an ? "checked" : ""}><span class="s"></span>An</label>
+            <select class="tm-select" id="wpa-tag" style="width:auto">${["Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag", "Sonntag"].map((t, i) => `<option value="${i + 1}" ${(wpa.tag || 1) === i + 1 ? "selected" : ""}>${t}</option>`).join("")}</select>
+            <select class="tm-select" id="wpa-std" style="width:auto">${Array.from({ length: 24 }, (_, h) => `<option value="${h}" ${(wpa.stunde ?? 18) === h ? "selected" : ""}>${String(h).padStart(2, "0")}:00 Uhr</option>`).join("")}</select></div></div>
         <div class="tm-row"><div class="lbl">Posten</div>
           <div class="tm-actions">${btn("Vorschau", "sm", 'id="wp-prev"')}${btn("🏁 In Discord posten", "sm red", 'id="wp-send"')}</div></div>
         <div id="wp-vorschau"></div>
@@ -1903,7 +1907,8 @@
         };
       });
     });
-    box.querySelectorAll("#g61-team,#g61-ziel,#g61-ch,#g61-on,#g61-rec,#rm-on,#rm-24,#rm-1,#rm-ch,#rm-ping,#ab-ch,#li-on,#li-90,#li-100,#li-ch,#li-ping,#sp-ch,#sp-vor,#sp-ek").forEach(el => el.addEventListener("input", markDirty));
+    box.querySelectorAll("#g61-team,#g61-ziel,#g61-ch,#g61-on,#g61-rec,#rm-on,#rm-24,#rm-1,#rm-ch,#rm-ping,#ab-ch,#li-on,#li-90,#li-100,#li-ch,#li-ping,#sp-ch,#sp-vor,#sp-ek,#wpa-tag,#wpa-std,#wp-ch,#wp-ping").forEach(el => el.addEventListener("input", markDirty));
+    box.querySelectorAll("#wpa-an,#wp-alle,#wp-vgl,#wp-sprung,#wp-ziel,#wp-sauber,#wp-top").forEach(el => el.addEventListener("change", markDirty));
     box.querySelectorAll("[data-etag]").forEach(el => el.addEventListener("change", markDirty));
     box.querySelectorAll("#sp-ping,#sp-av24").forEach(el => el.addEventListener("change", markDirty));
     // Stintplaner-Teams: Liste mit Eingabefeldern, ✕ zum Entfernen
@@ -1975,6 +1980,8 @@
         },
         links: (lkSync(), links.filter(l => l.title.trim() && l.url.trim())),
         absences: { channel: document.getElementById("ab-ch").value },
+        wpost: { channel: document.getElementById("wp-ch").value, ping: document.getElementById("wp-ping").value, opt: Object.fromEntries(["alle", "vgl", "sprung", "ziel", "sauber", "top"].map(k => [k, document.getElementById("wp-" + k).checked])) },
+        wpostAuto: { an: document.getElementById("wpa-an").checked, tag: Number(document.getElementById("wpa-tag").value), stunde: Number(document.getElementById("wpa-std").value) },
         stint: {
           channel: document.getElementById("sp-ch").value,
           vorlauf: Number(document.getElementById("sp-vor").value) || 15,
