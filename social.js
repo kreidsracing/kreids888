@@ -6,6 +6,8 @@
   var cv = $("cv"), ctx = cv.getContext("2d");
   var OV = window.K888_OVERLAYS || [];
   var S = { ov: 0, H: 1920, img: null, cover: "", view: { zoom: 1, ox: 0, oy: 0 } };
+  // Format vom aktiven Knopf übernehmen (Bedienfelder und Programm passen so immer zusammen)
+  var fmtAn = document.querySelector("#fmt button.on"); if (fmtAn) S.H = +fmtAn.dataset.h || 1920;
 
   /* ---------- Zeichen-Hilfen für die Overlays ---------- */
   var ICON = {"youtube": "M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12z", "tiktok": "M12.525.02c1.31-.02 2.61-.01 3.91-.02.08 1.53.63 3.09 1.75 4.17 1.12 1.11 2.7 1.62 4.24 1.79v4.03c-1.44-.05-2.89-.35-4.2-.97-.57-.26-1.1-.59-1.62-.93-.01 2.92.01 5.84-.02 8.75-.08 1.4-.54 2.79-1.35 3.94-1.31 1.92-3.58 3.17-5.91 3.21-1.43.08-2.86-.31-4.08-1.03-2.02-1.19-3.44-3.37-3.65-5.71-.02-.5-.03-1-.01-1.49.18-1.9 1.12-3.72 2.58-4.96 1.66-1.44 3.98-2.13 6.15-1.72.02 1.48-.04 2.96-.04 4.44-.99-.32-2.15-.23-3.02.37-.63.41-1.11 1.04-1.36 1.75-.21.51-.15 1.07-.14 1.61.24 1.64 1.82 3.02 3.5 2.87 1.12-.01 2.19-.66 2.77-1.61.19-.33.4-.67.41-1.06.1-1.79.06-3.57.07-5.36.01-4.03-.01-8.05.02-12.07z", "instagram": "M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zM12 0C8.741 0 8.333.014 7.053.072 2.695.272.273 2.69.073 7.052.014 8.333 0 8.741 0 12c0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98C8.333 23.986 8.741 24 12 24c3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98C15.668.014 15.259 0 12 0zm0 5.838a6.162 6.162 0 100 12.324 6.162 6.162 0 000-12.324zM12 16a4 4 0 110-8 4 4 0 010 8zm6.406-11.845a1.44 1.44 0 100 2.881 1.44 1.44 0 000-2.881z", "discord": "M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028c.462-.63.874-1.295 1.226-1.994a.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03zM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.956-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.956 2.418-2.157 2.418zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.955-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.946 2.418-2.157 2.418z"};
@@ -29,6 +31,11 @@
     c.save(); c.fillStyle = g; c.fillRect(x, y0, w, hoehe); c.restore();
   }
   function farbeA(hex, a){ var n = parseInt(String(hex || "#000000").slice(1), 16); return "rgba(" + (n >> 16 & 255) + "," + (n >> 8 & 255) + "," + (n & 255) + "," + (a == null ? 1 : a) + ")"; }
+  function mischen(f1, f2, k){
+    var a = parseInt(String(f1 || "#ffffff").slice(1), 16), b = parseInt(String(f2 || "#e11324").slice(1), 16);
+    var r = Math.round((a >> 16 & 255) * (1 - k) + (b >> 16 & 255) * k), g = Math.round((a >> 8 & 255) * (1 - k) + (b >> 8 & 255) * k), bl = Math.round((a & 255) * (1 - k) + (b & 255) * k);
+    return "rgb(" + r + "," + g + "," + bl + ")";
+  }
   function esc(x){ return String(x == null ? "" : x).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;"); }
   var SOZ = { youtube: { name: "YOUTUBE", handle: "@Kreids888", farbe: "#ff0033" }, tiktok: { name: "TIKTOK", handle: "@kreids_", farbe: "#25f4ee" }, instagram: { name: "INSTAGRAM", handle: "kreids888", farbe: "#e1306c" }, discord: { name: "DISCORD", handle: "discord.gg/T3XsTd9Bx6", farbe: "#5865f2" } };
   var h = {
@@ -61,11 +68,14 @@
       c.restore();
     },
     motto: function(c, s, x, y, size, align){
-      s = String(s || "").toUpperCase(); var i = s.indexOf(" ");
-      var a = i > 0 ? s.slice(0, i) : s, b = i > 0 ? s.slice(i) : "";
+      // Fußzeile: welche Wörter rot sind, wählt man unter dem Feld (S.fussRot), sonst erstes Wort rot
+      var woerter = String(s || "").toUpperCase().split(/\s+/).filter(Boolean);
       c.save(); c.font = h.f(900, size); if ("letterSpacing" in c) c.letterSpacing = Math.round(size * 0.03) + "px";
-      var wa = c.measureText(a).width, wb = c.measureText(b).width, x0 = align === "right" ? x - wa - wb : x;
-      c.textAlign = "left"; c.fillStyle = ROT; c.fillText(a, x0, y); c.fillStyle = "#fff"; c.fillText(b, x0 + wa, y);
+      var leer = c.measureText(" ").width, breiten = woerter.map(function(w){ return c.measureText(w).width; });
+      var ges = breiten.reduce(function(a, b){ return a + b; }, 0) + leer * Math.max(0, woerter.length - 1);
+      var xx = align === "right" ? x - ges : x;
+      c.textAlign = "left";
+      woerter.forEach(function(w, i){ c.fillStyle = (S.fussRot ? S.fussRot[i] : i === 0) ? ROT : "#fff"; c.fillText(w, xx, y); xx += breiten[i] + leer; });
       c.restore();
     },
     f: function(w, size, fam){ return w + " " + size + "px \"" + (fam || "Saira Condensed") + "\""; },
@@ -189,41 +199,79 @@
       var zeilen = String(o.t || "").split("\n");
       if (!zeilen.join("").trim()) return null;
       var fam = o.schrift === "barlow" ? "Barlow" : "Saira Condensed", w = o.schrift === "barlow" ? 700 : 900, size = o.size;
+      var abst = o.abstand != null ? o.abstand : 0.02, ausr = o.ausr || "links";
       c.save(); c.font = h.f(w, size, fam);
-      if ("letterSpacing" in c) c.letterSpacing = Math.round(size * 0.02) + "px";
-      var tw = Math.max.apply(null, zeilen.map(function(z){ return c.measureText(z).width; })), lh = size * 1.06;
+      if ("letterSpacing" in c) c.letterSpacing = Math.round(size * abst) + "px";
+      var breiten = zeilen.map(function(z){ return c.measureText(z).width; });
+      var tw = Math.max.apply(null, breiten), lh = size * 1.06;
       var pad = o.bg === "kein" ? Math.round(o.rand + 4) : Math.round(size * 0.24);
       var padX = o.bg === "schraeg" ? pad + size * 0.22 : o.bg === "streifen" ? pad + Math.max(8, size * 0.1) : pad;
       var bw = tw + 2 * padX, bh = size * 0.96 + (zeilen.length - 1) * lh + 2 * pad;
       var box = { x: o.x, y: o.y, w: bw, h: bh };
       var a = 1, sk = 1, rot = (o.dreh || 0) * Math.PI / 180, dx = 0, dy = 0, glow = 0, zeichen = Infinity;
+      var farbe = o.farbe, proZeichen = null, glitch = 0, canW = c.canvas.width / (c.getTransform().a || 1);
       if (zeit != null && o.effekt && o.effekt !== "kein") {
-        var t = zeit * (o.tempo || 1), ti = aufn ? t : t % 4;
-        if (o.effekt === "blinken") a = Math.floor(t * 2) % 2 === 0 ? 1 : 0;
-        else if (o.effekt === "pulsieren") sk = 1 + 0.07 * Math.sin(t * Math.PI * 2);
-        else if (o.effekt === "gluehen") glow = 0.5 + 0.5 * Math.sin(t * Math.PI * 2);
-        else if (o.effekt === "einblenden") { var p = Math.min(1, ti / 0.7); p = 1 - Math.pow(1 - p, 3); a = p; dy = (1 - p) * 50; }
-        else if (o.effekt === "schreiben") zeichen = Math.floor(ti * 16);
-        else if (o.effekt === "wackeln") { rot += Math.sin(t * Math.PI * 6) * 0.035; dx = Math.sin(t * Math.PI * 9) * 4; }
+        var t = zeit * (o.tempo || 1), ti = aufn ? t : t % 4, p = Math.min(1, ti / 0.7), e = 1 - Math.pow(1 - p, 3);
+        var ef = o.effekt;
+        if (ef === "blinken") a = Math.floor(t * 2) % 2 === 0 ? 1 : 0;
+        else if (ef === "pulsieren") sk = 1 + 0.07 * Math.sin(t * Math.PI * 2);
+        else if (ef === "gluehen") glow = 0.5 + 0.5 * Math.sin(t * Math.PI * 2);
+        else if (ef === "einblenden") { a = e; dy = (1 - e) * 50; }
+        else if (ef === "schreiben") zeichen = Math.floor(ti * 16);
+        else if (ef === "wackeln") { rot += Math.sin(t * Math.PI * 6) * 0.035; dx = Math.sin(t * Math.PI * 9) * 4; }
+        else if (ef === "rein_links") dx = -(1 - e) * (o.x + bw + 60);
+        else if (ef === "rein_rechts") dx = (1 - e) * (canW - o.x + 60);
+        else if (ef === "rein_oben") dy = -(1 - e) * (o.y + bh + 60);
+        else if (ef === "rein_unten") dy = (1 - e) * 2000;
+        else if (ef === "zoom") { var q = Math.min(1, ti / 0.6); sk = q < 1 ? 0.2 + 0.8 * (1 + 2.7 * Math.pow(q - 1, 3) + 1.7 * Math.pow(q - 1, 2)) : 1; a = Math.min(1, ti / 0.25); }
+        else if (ef === "huepfen") dy = -Math.abs(Math.sin(t * Math.PI * 1.4)) * size * 0.35;
+        else if (ef === "herz") { var hz = (t * 1.1) % 1; sk = 1 + 0.09 * (Math.exp(-Math.pow((hz - 0.1) * 18, 2)) + 0.7 * Math.exp(-Math.pow((hz - 0.32) * 18, 2))); }
+        else if (ef === "farbwechsel") farbe = mischen(o.farbe, o.randFarbe, 0.5 + 0.5 * Math.sin(t * Math.PI * 1.5));
+        else if (ef === "flackern") { var fl = Math.sin(Math.floor(t * 14) * 78.233) * 43758.5; fl = fl - Math.floor(fl); a = fl > 0.12 ? 1 : 0.2; glow = 0.8; }
+        else if (ef === "glitch") { var gk = Math.sin(Math.floor(t * 10) * 12.9898) * 43758.5; gk = gk - Math.floor(gk); glitch = gk > 0.55 ? (gk - 0.55) * 40 : 3; dx = gk > 0.85 ? (gk - 0.85) * 120 - 9 : 0; }
+        else if (ef === "lauf") dx = canW - ((t * 320) % (canW + bw + 40)) - o.x;
+        else if (ef === "welle") proZeichen = function(i){ return { y: Math.sin(t * 6 - i * 0.55) * size * 0.12, a: 1 }; };
+        else if (ef === "buchstaben") proZeichen = function(i){ var v = Math.max(0, Math.min(1, ti * 14 - i)); return { y: (1 - v) * size * 0.4, a: v }; };
       }
       if (a <= 0) { c.restore(); return box; }
-      c.globalAlpha = a;
-      c.translate(o.x + bw / 2 + dx, o.y + bh / 2 + dy); c.rotate(rot); c.scale(sk, sk); c.translate(-bw / 2, -bh / 2);
+      c.globalAlpha = a * (o.deck != null ? o.deck : 1);
+      c.translate(o.x + bw / 2 + dx, o.y + bh / 2 + dy); c.rotate(rot); c.scale(sk, sk);
+      if (o.kursiv) c.transform(1, 0, -0.18, 1, 0, 0);
+      c.translate(-bw / 2, -bh / 2);
       var bg = farbeA(o.bgFarbe, o.bgAlpha);
       if (o.bg === "box") { c.fillStyle = bg; c.fillRect(0, 0, bw, bh); }
       else if (o.bg === "schraeg") h.schraeg(c, size * 0.12, 0, bw - size * 0.24, bh, size * 0.12, bg);
       else if (o.bg === "streifen") { c.fillStyle = bg; c.fillRect(0, 0, bw, bh); c.fillStyle = ROT; c.fillRect(0, 0, Math.max(6, Math.round(size * 0.08)), bh); }
       c.textAlign = "left"; c.lineJoin = "round"; c.miterLimit = 2;
-      var rest = zeichen;
+      function fuellung(y){
+        if (!o.verlauf) return farbe;
+        var g = c.createLinearGradient(0, y - size * 0.8, 0, y + size * 0.1); g.addColorStop(0, farbe); g.addColorStop(1, o.farbe2 || "#e11324"); return g;
+      }
+      function stueck(s, x, y){
+        if (o.rand > 0) { c.lineWidth = o.rand * 2; c.strokeStyle = o.randFarbe; c.strokeText(s, x, y); }
+        if (glitch) {
+          c.save(); c.globalAlpha *= 0.75; c.fillStyle = "#ff2a55"; c.fillText(s, x - glitch, y); c.fillStyle = "#25f4ee"; c.fillText(s, x + glitch, y); c.restore();
+        }
+        if (o.schatten) { c.shadowColor = "rgba(0,0,0,.65)"; c.shadowBlur = size * 0.18; c.shadowOffsetY = size * 0.06; }
+        if (glow) { c.shadowColor = o.randFarbe; c.shadowBlur = 12 + 46 * glow; c.shadowOffsetY = 0; }
+        c.fillStyle = fuellung(y); c.fillText(s, x, y);
+        c.shadowBlur = 0; c.shadowOffsetY = 0;
+      }
+      var rest = zeichen, nr = 0;
       zeilen.forEach(function(z, i){
         var s = z;
         if (rest !== Infinity) { s = z.slice(0, Math.max(0, rest)); rest -= z.length; }
-        if (!s) return;
+        var x = padX + (ausr === "mitte" ? (tw - breiten[i]) / 2 : ausr === "rechts" ? tw - breiten[i] : 0);
         var y = pad + size * 0.8 + i * lh;
-        if (o.effekt === "gluehen" && zeit != null) { c.shadowColor = o.randFarbe; c.shadowBlur = 12 + 46 * glow; }
-        if (o.rand > 0) { c.lineWidth = o.rand * 2; c.strokeStyle = o.randFarbe; c.strokeText(s, padX, y); }
-        c.fillStyle = o.farbe; c.fillText(s, padX, y);
-        c.shadowBlur = 0;
+        if (!s) { nr += z.length; return; }
+        if (!proZeichen) { stueck(s, x, y); nr += z.length; return; }
+        var ga = c.globalAlpha;
+        for (var k = 0; k < s.length; k++) {
+          var pz = proZeichen(nr + k), ch = s[k];
+          if (pz.a > 0) { c.globalAlpha = ga * pz.a; stueck(ch, x, y + pz.y); }
+          x += c.measureText(ch).width;
+        }
+        c.globalAlpha = ga; nr += z.length;
       });
       c.restore();
       return box;
@@ -482,6 +530,15 @@
   document.querySelectorAll("#sozDir button").forEach(function(b){ b.onclick = function(){ S.sozDir = b.dataset.d; document.querySelectorAll("#sozDir button").forEach(function(x){ x.classList.toggle("on", x === b); }); alles(); }; });
   ["qrSize", "sozSize", "teamSize"].forEach(function(id){ $(id).addEventListener("input", function(){ render(); }); $(id).addEventListener("change", renderThumbs); });
   ["kicker", "title", "text", "footer", "platz", "strecke", "wann", "rundenzeit", "qr"].forEach(function(id){ $(id).addEventListener("input", alles); });
+  // Fußzeile: Wörter antippen = rot/weiß
+  S.fussRot = [true];
+  function fussWoerter(){
+    var w = $("footer").value.split(/\s+/).filter(Boolean);
+    $("fussWoerter").innerHTML = w.map(function(x, i){ var rot = !!S.fussRot[i]; return "<button type=\"button\" data-i=\"" + i + "\" style=\"color:" + (rot ? "#ff4b55" : "#fff") + ";border-color:" + (rot ? "var(--red)" : "var(--line)") + "\">" + esc(x.toUpperCase()) + "</button>"; }).join("");
+    document.querySelectorAll("#fussWoerter button").forEach(function(b){ b.onclick = function(){ var i = +b.dataset.i; S.fussRot[i] = !S.fussRot[i]; fussWoerter(); alles(); }; });
+  }
+  $("footer").addEventListener("input", fussWoerter);
+  fussWoerter();
   // Hintergrund
   function setzeBild(img){ if (S.vid && img !== S.vid) videoStop(); S.img = img; S.view = { zoom: 1, ox: 0, oy: 0 }; $("zoom").value = 1; alles(); }
 
@@ -1017,7 +1074,7 @@
   $("bvdl").onclick = function(){ aufnehmen(+$("bvLen").value || 10); };
 
   /* ---------- Freie Texte ---------- */
-  var EFFEKTE = [["kein", "Kein Effekt"], ["blinken", "Blinken"], ["pulsieren", "Pulsieren"], ["gluehen", "Glühen"], ["einblenden", "Einblenden"], ["schreiben", "Schreibmaschine"], ["wackeln", "Wackeln"]];
+  var EFFEKTE = [["kein", "Kein Effekt"], ["einblenden", "Einblenden"], ["rein_links", "Reinfliegen von links"], ["rein_rechts", "Reinfliegen von rechts"], ["rein_oben", "Reinfallen von oben"], ["rein_unten", "Reinkommen von unten"], ["zoom", "Reinzoomen"], ["schreiben", "Schreibmaschine"], ["buchstaben", "Buchstabe für Buchstabe"], ["welle", "Welle"], ["huepfen", "Hüpfen"], ["pulsieren", "Pulsieren"], ["herz", "Herzschlag"], ["blinken", "Blinken"], ["gluehen", "Glühen"], ["flackern", "Neon-Flackern"], ["farbwechsel", "Farbwechsel (Schrift ↔ Rand)"], ["glitch", "Glitch"], ["wackeln", "Wackeln"], ["lauf", "Laufschrift"]];
   $("ftEffekt").innerHTML = EFFEKTE.map(function(e){ return '<option value="' + e[0] + '">' + e[1] + '</option>'; }).join("");
   function ftAkt(){ return S.texte[S.akt]; }
   function ftListe(){
@@ -1034,7 +1091,9 @@
     $("ftText").value = o.t; $("ftSize").value = o.size; $("ftFarbe").value = o.farbe; $("ftRandFarbe").value = o.randFarbe;
     $("ftBgFarbe").value = o.bgFarbe; $("ftRand").value = o.rand; $("ftBgAlpha").value = o.bgAlpha; $("ftEffekt").value = o.effekt;
     $("ftTempo").value = o.tempo; $("ftDreh").value = o.dreh;
-    seg("ftSchrift", o.schrift); seg("ftBg", o.bg);
+    $("ftAbstand").value = Math.round((o.abstand != null ? o.abstand : 0.02) * 100); $("ftDeck").value = Math.round((o.deck != null ? o.deck : 1) * 100);
+    $("ftFarbe2").value = o.farbe2 || "#e11324"; $("ftVerlauf").checked = !!o.verlauf; $("ftSchatten").checked = !!o.schatten; $("ftKursiv").checked = !!o.kursiv;
+    seg("ftSchrift", o.schrift); seg("ftBg", o.bg); seg("ftAusr", o.ausr || "links");
   }
   function ftGeaendert(){ starteSchleife(); render(); }
   function ftNeu(o){
@@ -1067,7 +1126,13 @@
   [["ftSize", "size"], ["ftRand", "rand"], ["ftBgAlpha", "bgAlpha"], ["ftTempo", "tempo"], ["ftDreh", "dreh"]].forEach(function(p){
     $(p[0]).addEventListener("input", function(){ var o = ftAkt(); if (!o) return; o[p[1]] = +this.value; ftGeaendert(); });
   });
-  [["ftSchrift", "schrift"], ["ftBg", "bg"]].forEach(function(p){
+  $("ftAbstand").addEventListener("input", function(){ var o = ftAkt(); if (o) { o.abstand = +this.value / 100; ftGeaendert(); } });
+  $("ftDeck").addEventListener("input", function(){ var o = ftAkt(); if (o) { o.deck = +this.value / 100; ftGeaendert(); } });
+  $("ftFarbe2").addEventListener("input", function(){ var o = ftAkt(); if (o) { o.farbe2 = this.value; ftGeaendert(); } });
+  [["ftVerlauf", "verlauf"], ["ftSchatten", "schatten"], ["ftKursiv", "kursiv"]].forEach(function(p){
+    $(p[0]).addEventListener("change", function(){ var o = ftAkt(); if (o) { o[p[1]] = this.checked; ftGeaendert(); } });
+  });
+  [["ftSchrift", "schrift"], ["ftBg", "bg"], ["ftAusr", "ausr"]].forEach(function(p){
     document.querySelectorAll("#" + p[0] + " button").forEach(function(b){
       b.onclick = function(){ var o = ftAkt(); if (!o) return; o[p[1]] = b.dataset.v; seg(p[0], b.dataset.v); ftGeaendert(); };
     });

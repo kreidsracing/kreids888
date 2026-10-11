@@ -173,6 +173,8 @@ body{background:var(--carbon)}
         <input type="text" id="rundenzeit" maxlength="12" placeholder="1:58.432"></div>
         <label for="footer">Fußzeile</label>
         <input type="text" id="footer" value="Konstanz schlägt Geschwindigkeit" maxlength="60">
+        <div class="sb-ftl" id="fussWoerter"></div>
+        <p class="sb-hint">Wort antippen: rot oder weiß.</p>
       </div>
       <div class="sb-panel">
         <div class="sb-h">6 · QR-Code (optional)</div>
@@ -221,10 +223,24 @@ body{background:var(--carbon)}
           </div>
           <label>Größe</label>
           <input type="range" id="ftSize" min="24" max="240" step="1">
+          <label>Ausrichtung (bei mehreren Zeilen)</label>
+          <div class="sb-seg" id="ftAusr">
+            <button type="button" data-v="links">Links</button>
+            <button type="button" data-v="mitte">Mitte</button>
+            <button type="button" data-v="rechts">Rechts</button>
+          </div>
+          <label>Buchstabenabstand</label>
+          <input type="range" id="ftAbstand" min="-5" max="40" step="1">
+          <div class="sb-row" style="margin-top:10px">
+            <label class="sb-chk"><input type="checkbox" id="ftSchatten"> Schatten</label>
+            <label class="sb-chk"><input type="checkbox" id="ftKursiv"> Schräg</label>
+            <label class="sb-chk"><input type="checkbox" id="ftVerlauf"> Farbverlauf</label>
+          </div>
           <div class="sb-farben">
             <div><label for="ftFarbe">Schrift</label><input type="color" id="ftFarbe"></div>
             <div><label for="ftRandFarbe">Rand / Glühen</label><input type="color" id="ftRandFarbe"></div>
             <div><label for="ftBgFarbe">Hintergrund</label><input type="color" id="ftBgFarbe"></div>
+            <div><label for="ftFarbe2">Verlauf bis</label><input type="color" id="ftFarbe2"></div>
           </div>
           <label>Umrandung (Dicke)</label>
           <input type="range" id="ftRand" min="0" max="16" step="1">
@@ -243,6 +259,8 @@ body{background:var(--carbon)}
           <input type="range" id="ftTempo" min="0.3" max="3" step="0.05">
           <label>Drehen</label>
           <input type="range" id="ftDreh" min="-30" max="30" step="1">
+          <label>Deckkraft Text</label>
+          <input type="range" id="ftDeck" min="10" max="100" step="1">
           <div class="sb-row" style="margin-top:12px">
             <button type="button" class="sb-mini" id="ftDup">Kopieren</button>
             <button type="button" class="sb-mini sb-err" id="ftDel">Text löschen</button>
@@ -325,6 +343,6 @@ body{background:var(--carbon)}
 <script src="https://cdn.jsdelivr.net/npm/mp4-muxer@5.2.2/build/mp4-muxer.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/mp4box@0.5.2/dist/mp4box.all.min.js"></script>
 <script src="overlays/overlays.js?v=202610111732"></script>
-<script src="social.js?v=202610111737"></script>
+<script src="social.js?v=202610111741"></script>
 </body>
 </html>
