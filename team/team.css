@@ -1518,3 +1518,8 @@ body:has(.td)::after{content:"";position:fixed;inset:0;z-index:-1;pointer-events
 /* Schalter: Knopf bei An sichtbar (weiß auf Rot) */
 .td .tm-switch .s::after{top:3px;width:16px;height:16px}
 .td .tm-switch input:checked+.s::after{background:#fff;box-shadow:0 1px 4px rgba(0,0,0,.4)}
+/* Seitenleiste scrollt für sich, die Seite bleibt stehen */
+.td-side{max-height:calc(100vh - 100px);overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin;scrollbar-color:rgba(255,255,255,.15) transparent}
+.td-side::-webkit-scrollbar{width:6px}
+.td-side::-webkit-scrollbar-thumb{background:rgba(255,255,255,.15);border-radius:6px}
+@media (max-width:860px){.td-side{max-height:none;overflow-y:visible;overscroll-behavior:auto}}
