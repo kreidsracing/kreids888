@@ -1500,3 +1500,9 @@ body:has(.td)::after{content:"";position:fixed;inset:0;z-index:-1;pointer-events
 .td-link.td-ev-top{font-size:14px}
 .td-link.td-ev-top+.td-link.td-ev:not(.td-ev-top),.td-link.td-ev-top+.td-ev-leer{margin-top:8px;position:relative}
 .td-link.td-ev-top+.td-link.td-ev:not(.td-ev-top)::after{content:"";position:absolute;left:10px;right:10px;top:-5px;height:1px;background:rgba(255,255,255,.07)}
+.sp-wunsch{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 12px}
+.sp-wunsch .sp-inl-f{padding:4px 6px 4px 14px;font-size:13.5px;color:#dfe3e9}
+.sp-wunsch .sp-inl-f>span{white-space:nowrap}
+.sp-wunsch .sp-seg button{padding:7px 12px}
+.sp-wtxt{color:#9fb6ff!important}
+.sp-flegende span.zuviel{border-color:rgba(255,176,32,.6);background:rgba(255,176,32,.1)}

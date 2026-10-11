@@ -274,6 +274,43 @@
     return ws.every(v => v === ws[0]) ? ws[0] : "mix";
   }
   const AVTXT = { ja: "Verfügbar", evtl: "Vielleicht", nein: "Nicht verfügbar", fehlt: "Verfügbarkeit fehlt" };
+  // Wunsch eines Fahrers: maximale Stints + Doppelstint ok?
+  function wunschVon(uid) { const a = S.av[uid] || {}; return { max: a.max || null, doppel: a.doppel === true ? true : a.doppel === false ? false : null }; }
+  const wunschText = (w) => [w.max ? "max. " + w.max + " Stints" : "", w.doppel === true ? "Doppelstint ok" : w.doppel === false ? "kein Doppelstint" : ""].filter(Boolean).join(" · ");
+  // Verstöße gegen die Wünsche im geplanten Ablauf
+  function wunschProbleme(c, rows) {
+    const out = [], zahl = {};
+    rows.forEach(x => { if (x.uid) zahl[x.uid] = (zahl[x.uid] || 0) + 1; });
+    const maxe = c.drivers.map(d => wunschVon(d.uid).max);
+    if (c.drivers.length && maxe.every(Boolean) && maxe.reduce((a, b) => a + b, 0) < rows.length) out.push("Zu wenig Fahrer: zusammen max. " + maxe.reduce((a, b) => a + b, 0) + " von " + rows.length + " Stints");
+    for (const [u, n] of Object.entries(zahl)) { const w = wunschVon(u); if (w.max && n > w.max) out.push(memberName(u) + " fährt " + n + " Stints, will max. " + w.max); }
+    rows.forEach((x, i) => { const v = rows[i - 1]; if (v && x.uid && v.uid === x.uid && !x.real && wunschVon(x.uid).doppel === false) out.push(memberName(x.uid) + ": Stint " + (v.i + 1) + "+" + (x.i + 1) + " hintereinander, will keinen Doppelstint"); });
+    return out;
+  }
+  // Fahrer automatisch verteilen: Verfügbarkeit, max. Stints, Doppelstint-Wunsch, gleichmäßig
+  function autoVerteilen(c) {
+    c.stints = (c.stints || []).map(x => ({ ...x, d: "" }));
+    for (let i = 0; i < 300; i++) {
+      const r = rechne(c, null);
+      if (r.fehler.length || i >= r.rows.length) break;
+      const row = r.rows[i];
+      if (row.real) continue;
+      const zahl = {};
+      r.rows.slice(0, i).forEach(x => { if (x.uid) zahl[x.uid] = (zahl[x.uid] || 0) + 1; });
+      const vor = r.rows[i - 1];
+      let best = null, bs = -Infinity;
+      for (const d of c.drivers) {
+        const v = verfuegbar(d.uid, row.von, row.bis), w = wunschVon(d.uid), n = zahl[d.uid] || 0;
+        let sc = v === 2 ? 100 : v === 1 ? 40 : v === -1 ? 10 : -1000;
+        if (w.max && n >= w.max) sc -= 500;
+        if (vor && vor.uid === d.uid) sc -= w.doppel === false ? 400 : w.doppel === true ? 0 : 25;
+        sc -= n * 15;
+        if (sc > bs) { bs = sc; best = d.uid; }
+      }
+      while (c.stints.length <= i) c.stints.push({ d: "", laps: 0, reifen: null });
+      c.stints[i].d = best || "";
+    }
+  }
   // Status + Liste, was fehlt und bei wem
   function carStatus(c, r) {
     const was = [];
@@ -287,6 +324,7 @@
     if (was.length) return ["fehlt", "Angaben fehlen", was];
     const konflikte = r.rows.filter(x => !x.real && x.uid && verfuegbar(x.uid, x.von, x.bis, c) !== 2)
       .map(x => { const v = verfuegbar(x.uid, x.von, x.bis, c); return "Stint " + (x.i + 1) + " (" + uhr(x.von) + "): " + memberName(x.uid) + " " + (v === 0 ? "nicht verfügbar" : v === 1 ? "nur vielleicht oder teils offen" : "nichts eingetragen"); });
+    konflikte.push(...wunschProbleme(c, r.rows));
     return konflikte.length ? ["arbeit", "In Arbeit", konflikte] : ["ok", "Plan vollständig", []];
   }
   const statusListe = (st) => st[2] && st[2].length ? `<ul class="sp-was">${st[2].slice(0, 6).map(x => `<li>${esc(x)}</li>`).join("")}${st[2].length > 6 ? `<li>… und ${st[2].length - 6} weitere</li>` : ""}</ul>` : "";
@@ -881,6 +919,7 @@
     const ohne = c.drivers.filter(d => d.uid !== S.me && !(d.pace > 0 && d.fuel > 0)).map(d => memberName(d.uid));
     if (ohne.length) out.push({ t: "Pace/Sprit fehlt: " + ohne.join(", "), b: "Ansehen", a: "werte" });
     if (r && !r.fehler.length) {
+      wunschProbleme(c, r.rows).forEach(t => out.push(/^Zu wenig Fahrer/.test(t) ? { t, b: "Fahrer eintragen", a: "werte" } : { t, b: "Automatisch verteilen", a: "verteilen" }));
       const k = r.rows.filter(x => !x.real && x.uid && verfuegbar(x.uid, x.von, x.bis) === 0);
       if (k.length) out.push({ t: k.length === 1 ? `Stint ${k[0].i + 1}: ${memberName(k[0].uid)} kann nicht` : `${k.length} Stints mit Fahrern, die nicht können`, b: "Fahrer tauschen", a: "plan" });
     }
@@ -952,6 +991,7 @@
     $$("[data-task]").forEach(b => b.onclick = () => {
       const t = tasks[Number(b.dataset.task)];
       if (t.a === "join") return mitfahren(true, b);
+      if (t.a === "verteilen") { autoVerteilen(c); dirty(); S.step = "plan"; zeichneKopf(); zeigeStep(); C.toast("Fahrer neu verteilt", true); return; }
       if (t.a === "kopf") { const s = $("#ck-car"); if (s) { s.focus(); s.classList.add("sp-blink"); } return; }
       S.step = t.a; zeichneKopf(); zeigeStep();
       const el = $("#sp-stepper"); if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -1042,6 +1082,7 @@
     const c = S.draft;
     const ich = c.drivers.some(d => d.uid === S.me);
     const meine = { ...(slotsVon(S.me) || {}) };
+    const wunsch = wunschVon(S.me);
     const { stints, cols } = spalten(c);
     const uids = c.drivers.map(d => d.uid);
     if (ich) { uids.splice(uids.indexOf(S.me), 1); uids.unshift(S.me); }
@@ -1055,12 +1096,16 @@
       const mein = uid === S.me;
       const a = mein ? meine : slotsVon(uid);
       const st = fahrerAv(uid, c);
-      return `<div class="sp-tl-row ${mein ? "ich" : ""}"><div class="sp-tl-who">${ava(uid, 34)}<div><b>${esc(memberName(uid))}${mein ? " (du)" : ""}</b><small class="${st}">${AVTXT[st]}</small></div></div>
+      return `<div class="sp-tl-row ${mein ? "ich" : ""}"><div class="sp-tl-who">${ava(uid, 34)}<div><b>${esc(memberName(uid))}${mein ? " (du)" : ""}</b><small class="${st}">${AVTXT[st]}</small>${wunschText(wunschVon(uid)) ? `<small class="sp-wtxt">${esc(wunschText(wunschVon(uid)))}</small>` : ""}</div></div>
         ${cols.map((col, i) => { const v = spaltenWert(a, col); return `<button type="button" class="${zelle(v, col.d === uid)}" ${mein ? `data-col="${i}"` : "disabled"} title="${titel(col, v)}">${v === undefined ? (mein ? "+" : "") : ICON[v]}</button>`; }).join("")}</div>`;
     };
     body.innerHTML = `
       ${ich ? `<div class="sp-verf-top"><p class="sp-kurz">Tippe auf deine ${stints ? "Stints" : "Stunden"}: <b>✓</b> kann · <b>?</b> vielleicht · <b>✕</b> kann nicht. Speichert automatisch.</p>
-        <div class="sp-inline">${C.btn("Ich kann alles", "sm", 'id="sp-all2"')}${C.btn("Leeren", "sm", 'id="sp-all0"')}</div></div>` : ""}
+        <div class="sp-inline">${C.btn("Ich kann alles", "sm", 'id="sp-all2"')}${C.btn("Leeren", "sm", 'id="sp-all0"')}</div></div>
+        <div class="sp-wunsch">
+          <label class="sp-inl-f"><span>Wie viele Stints maximal?</span><select class="tm-select" id="sp-max"><option value="">egal</option>${[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(n => `<option value="${n}" ${wunsch.max === n ? "selected" : ""}>${n}</option>`).join("")}</select></label>
+          <div class="sp-inl-f"><span>Doppelstint?</span><div class="sp-seg" id="sp-doppel"><button type="button" data-d="ja" class="${wunsch.doppel === true ? "on" : ""}">Ja</button><button type="button" data-d="egal" class="${wunsch.doppel === null ? "on" : ""}">Egal</button><button type="button" data-d="nein" class="${wunsch.doppel === false ? "on" : ""}">Nein</button></div></div>
+        </div>` : ""}
       ${uids.length ? `<div class="sp-tl-wrap"><div class="sp-tl" style="grid-template-columns:${raster}"><div class="sp-tl-head"><div class="sp-tl-corner">Fahrer</div>${kopf}</div>${uids.map(zeile).join("")}</div>
         <div class="sp-tl-legende"><span><i style="background:linear-gradient(135deg,#34d67a,#1fa85a)"></i>kann</span><span><i style="background:linear-gradient(135deg,#ffc24d,#f09a00)"></i>vielleicht</span><span><i style="background:linear-gradient(135deg,#ff4d5a,#c40f1e)"></i>kann nicht</span><span><i style="outline:2px solid #fff"></i>dort eingeplant</span></div></div>` : '<div class="tm-box"><p class="tm-muted">Noch keine Fahrer in diesem Fahrzeug.</p></div>'}
       <div id="sp-abs"></div>`;
@@ -1071,8 +1116,8 @@
       clearTimeout(avT);
       avT = setTimeout(async () => {
         try {
-          await C.api("/stint/avail", { method: "POST", body: { id: S.id, slots: meine, v: 2 } });
-          S.av[S.me] = { slots: { ...meine }, v: 2, at: Date.now() };
+          await C.api("/stint/avail", { method: "POST", body: { id: S.id, slots: meine, v: 2, max: wunsch.max, doppel: wunsch.doppel } });
+          S.av[S.me] = { slots: { ...meine }, v: 2, max: wunsch.max, doppel: wunsch.doppel, at: Date.now() };
           speicherStatus("✓ Gespeichert", "ok");
           zeichneKopf();
           const st = fahrerAv(S.me, c), sm = body.querySelector(".sp-tl-row.ich small");
@@ -1087,6 +1132,8 @@
       zeichne(b, true); speichern();
     });
     if (ich) {
+      $("#sp-max").onchange = (e) => { wunsch.max = Number(e.target.value) || null; speichern(); };
+      $$("#sp-doppel [data-d]").forEach(b => b.onclick = () => { wunsch.doppel = b.dataset.d === "ja" ? true : b.dataset.d === "nein" ? false : null; $$("#sp-doppel [data-d]").forEach(x => x.classList.toggle("on", x === b)); speichern(); });
       $("#sp-all2").onclick = () => { cols.forEach(col => setze(col, 2)); $$("[data-col]").forEach(b => zeichne(b, true)); speichern(); };
       $("#sp-all0").onclick = () => { cols.forEach(col => setze(col, undefined)); $$("[data-col]").forEach(b => zeichne(b)); speichern(); };
     }
@@ -1225,13 +1272,13 @@
         <label class="sp-check"><input type="checkbox" id="sp-par" ${c.pit.parallel ? "checked" : ""}> Tanken, Reifen und Fahrerwechsel laufen gleichzeitig (wie in iRacing)</label>
       </details>
       ${stintTabelle(c, r, false)}
-      ${r.rows.length ? `<div class="tm-actions" style="margin-top:14px">${C.btn("Fahrer reihum verteilen", "sm", 'id="sp-rot"')}${C.btn("Runden zurücksetzen", "sm", 'id="sp-reset"')}</div>
+      ${r.rows.length ? `<div class="tm-actions" style="margin-top:14px">${C.btn("Fahrer automatisch verteilen", "red sm", 'id="sp-rot"')}${C.btn("Runden zurücksetzen", "sm", 'id="sp-reset"')}</div>
         <p class="sp-kurz" style="margin-top:10px">Runden leer = so weit der Tank reicht. Speichert automatisch.</p>` : ""}`;
     $$("[data-pit]").forEach(i => i.onchange = () => { c.pit[i.dataset.pit] = Math.max(0, num(i.value, c.pit[i.dataset.pit])); c.pitHand = true; dirty(); stepPlan(body); $(".sp-pitbox").open = true; });
     $("#sp-par").onchange = (e) => { c.pit.parallel = e.target.checked; dirty(); stepPlan(body); $(".sp-pitbox").open = true; };
     bindStintEdit(body, c, stepPlan);
     const rot = $("#sp-rot");
-    if (rot) rot.onclick = () => { c.stints = c.stints.map(s => ({ ...s, d: "" })); dirty(); stepPlan(body); };
+    if (rot) rot.onclick = () => { autoVerteilen(c); dirty(); zeichneKopf(); stepPlan(body); C.toast("Fahrer nach Verfügbarkeit und Wünschen verteilt", true); };
     const rs = $("#sp-reset");
     if (rs) rs.onclick = () => { c.stints = c.stints.map(s => ({ ...s, laps: 0, reifen: null })); dirty(); stepPlan(body); };
   }
@@ -1274,7 +1321,7 @@
       <div class="sp-gachse"><span>${tagUhr(rows[0].von)}</span><span>Ziel ca. ${uhr(ende)}</span></div>` : "";
     return `
       ${gantt}
-      <div class="sp-flegende">${Object.entries(zeitFahrer).map(([u, ms]) => `<span style="--c:${farbe(u)}"><i></i>${ava(u, 22)}${esc(memberName(u))} · ${dauer(ms)}</span>`).join("")}</div>
+      <div class="sp-flegende">${Object.entries(zeitFahrer).map(([u, ms]) => { const n = rows.filter(x => x.uid === u).length, w = wunschVon(u), zuviel = w.max && n > w.max; return `<span class="${zuviel ? "zuviel" : ""}" style="--c:${farbe(u)}"><i></i>${ava(u, 22)}${esc(memberName(u))} · ${n} ${n === 1 ? "Stint" : "Stints"}${w.max ? " / max. " + w.max : ""} · ${dauer(ms)}</span>`; }).join("")}</div>
       <div class="wk-tiles sp-tiles">
         <div class="wk-tile"><small>Stints</small><b>${rows.length}</b></div>
         <div class="wk-tile"><small>Boxenstopps</small><b>${stopps}</b></div>
