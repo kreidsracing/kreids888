@@ -399,6 +399,14 @@
       : `<input class="tm-input" type="time" data-s="${pre}zf" value="${zeit}">`;
     return `<label class="sp-f"><span>Tag</span>${dFeld}</label><label class="sp-f"><span>Uhrzeit</span>${zFeld}</label>`;
   }
+  // Start passend zum Event: Tag außerhalb des Zeitraums -> erster Tag; Uhrzeit nicht in den Startzeiten -> erste Startzeit
+  function startAnpassen(start, ev, zeitAuch) {
+    const tage = tageVon(ev), zs = ev.zeiten || [];
+    let d = datumWert(start), z = zeitWert(start);
+    if (tage.length && !tage.includes(d)) d = tage[0];
+    if (zeitAuch && zs.length && !zs.includes(z)) z = zs[0];
+    return fromLocalInput(d + "T" + z) || start;
+  }
   function bindStartFelder(box, pre) {
     const z = box.querySelector(`[data-s="${pre}z"]`), zf = box.querySelector(`[data-s="${pre}zf"]`);
     if (z) z.onchange = () => { zf.hidden = z.value !== "andere"; };
@@ -494,9 +502,11 @@
         </div>
         <div class="tm-actions">${C.btn(p ? "Alles speichern" : "Event anlegen", "red", 'id="ev-save2"')}${p && S.canDelete ? C.btn("Event löschen", "sm", 'id="ev-del"') : ""}</div>`;
       $$("#ev-mode [data-m]").forEach(b => b.onclick = () => { sync(); ev.mode = b.dataset.m; zeichne(); });
-      ["ev-von", "ev-bis"].forEach(id => v(id).onchange = () => { sync(); zeichne(); });
-      v("ev-zadd").onclick = () => { sync(); const z = v("ev-zneu").value; if (!/^\d{2}:\d{2}$/.test(z)) return C.toast("Uhrzeit eingeben"); if (!ev.zeiten.includes(z)) ev.zeiten.push(z); ev.zeiten.sort(); zeichne(); };
-      $$("[data-zdel]").forEach(b => b.onclick = () => { sync(); ev.zeiten.splice(Number(b.dataset.zdel), 1); zeichne(); });
+      // Zeitraum/Startzeiten geändert: Fahrzeuge in den neuen Rahmen ziehen
+      const nachziehen = (zeitAuch) => cars.forEach(c => { if (!c._weg) c.start = startAnpassen(c.start, ev, zeitAuch); });
+      ["ev-von", "ev-bis"].forEach(id => v(id).onchange = () => { sync(); nachziehen(false); zeichne(); });
+      v("ev-zadd").onclick = () => { sync(); const z = v("ev-zneu").value; if (!/^\d{2}:\d{2}$/.test(z)) return C.toast("Uhrzeit eingeben"); const erste = !ev.zeiten.length; if (!ev.zeiten.includes(z)) ev.zeiten.push(z); ev.zeiten.sort(); if (erste) nachziehen(true); zeichne(); };
+      $$("[data-zdel]").forEach(b => b.onclick = () => { sync(); ev.zeiten.splice(Number(b.dataset.zdel), 1); nachziehen(true); zeichne(); });
       $$(".sp-ecar").forEach(box => bindStartFelder(box, "c" + box.dataset.i));
       $$("[data-e=team]").forEach(s => s.onchange = () => { sync(); zeichne(); });
       $$("[data-cdel]").forEach(b => b.onclick = () => {
@@ -701,7 +711,9 @@
     if (car && car.name && !teams.includes(car.name)) teams.unshift(car.name);
     const frei = teams.find(n => !vergeben(n));
     const vorlage = p.cars[p.cars.length - 1];
-    const c = car ? kopie(car) : { name: frei || "", carId: vorlage ? vorlage.carId : 0, carName: vorlage ? vorlage.carName : "", start: vorlage ? vorlage.start : (() => { const d = new Date(); d.setDate(d.getDate() + 7); d.setHours(14, 0, 0, 0); return d.getTime(); })(), pit: { ...(vorlage ? vorlage.pit : PIT_STD) }, drivers: [], stints: [] };
+    const grund = vorlage ? vorlage.start : (() => { const d = new Date(); d.setDate(d.getDate() + 7); d.setHours(14, 0, 0, 0); return d.getTime(); })();
+    // neues Fahrzeug startet im Event-Zeitraum zur ersten Startzeit
+    const c = car ? kopie(car) : { name: frei || "", carId: vorlage ? vorlage.carId : 0, carName: vorlage ? vorlage.carName : "", start: startAnpassen(grund, p, true), pit: { ...(vorlage ? vorlage.pit : PIT_STD) }, drivers: [], stints: [] };
     root.innerHTML = `
       <div class="sp-head"><a class="sp-back" href="#stint/${esc(p.id)}${car ? "/" + esc(car.key) : ""}">← Zurück</a>
         <div class="sp-title"><h3>${car ? "Fahrzeug bearbeiten" : "Fahrzeug anlegen"}</h3><small>${esc(p.name)}</small></div></div>
