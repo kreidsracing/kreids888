@@ -1797,7 +1797,7 @@
           <div><select class="tm-select" id="wp-ch"><option value="">– Kanal wählen –</option>${(d.channels || []).map(c => `<option value="${c.id}" ${c.id === (wp.channel || g.channel) ? "selected" : ""}># ${esc(c.name)}</option>`).join("")}</select></div></div>
         <div class="tm-row"><label for="wp-ping">Rolle pingen<small>z. B. Teamfahrer</small></label>
           <div><select class="tm-select" id="wp-ping"><option value="">– niemanden pingen –</option>${d.roles.map(r => `<option value="${r.id}" ${r.id === wp.ping ? "selected" : ""}>@${esc(r.name)}</option>`).join("")}</select></div></div>
-        <div class="tm-row"><div class="lbl">Automatisch posten<small>postet die abgeschlossene Vorwoche mit Kanal, Ping und Inhalt von oben · mit „Speichern" sichern</small></div>
+        <div class="tm-row"><div class="lbl">Automatisch posten<small>postet die neueste Woche mit Kanal, Ping und Inhalt von oben · mit „Speichern" sichern</small></div>
           <div class="tm-actions"><label class="tm-switch"><input type="checkbox" id="wpa-an" ${wpa.an ? "checked" : ""}><span class="s"></span>An</label>
             <select class="tm-select" id="wpa-tag" style="width:auto">${["Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag", "Sonntag"].map((t, i) => `<option value="${i + 1}" ${(wpa.tag || 1) === i + 1 ? "selected" : ""}>${t}</option>`).join("")}</select>
             <select class="tm-select" id="wpa-std" style="width:auto">${Array.from({ length: 24 }, (_, h) => `<option value="${h}" ${(wpa.stunde ?? 18) === h ? "selected" : ""}>${String(h).padStart(2, "0")}:00 Uhr</option>`).join("")}</select></div></div>
@@ -2034,7 +2034,7 @@
     api("/g61/woche").then(w => {
       if (!w.ready) { wpSel.innerHTML = '<option value="">Garage 61 nicht eingerichtet</option>'; return; }
       const last = w.wochen.length - 1;
-      wpSel.innerHTML = w.wochen.map((x, i) => `<option value="${i}" ${i === last - 1 ? "selected" : ""}>KW ${x.kw}${i === last ? " (läuft)" : ""} · ab ${fmtDay(x.start)} · ${Number(x.laps).toLocaleString("de-DE")} Runden</option>`).reverse().join("");
+      wpSel.innerHTML = w.wochen.map((x, i) => `<option value="${i}" ${i === last ? "selected" : ""}>KW ${x.kw}${i === last ? " (läuft)" : ""} · ab ${fmtDay(x.start)} · ${Number(x.laps).toLocaleString("de-DE")} Runden</option>`).reverse().join("");
     }).catch(() => { wpSel.innerHTML = '<option value="">Wochen nicht ladbar</option>'; });
 
     const wpBody = (vorschau) => ({
