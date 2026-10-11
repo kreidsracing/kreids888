@@ -61,6 +61,8 @@ body{background:var(--carbon)}
 .sb-ftl button.on{border-color:var(--red);color:#fff;box-shadow:0 0 12px var(--red-glow)}
 .sb-bv{display:flex;gap:10px;align-items:center;justify-content:center;flex-wrap:wrap}
 .sb-bv select{width:auto}
+.sb-ov-dl{width:100%;max-width:620px;border:1px solid var(--line);background:var(--panel);padding:14px 14px 4px;box-sizing:border-box}
+.sb-ov-dl .sb-btn{font-size:14px;padding:12px 18px}
 @media(max-width:900px){.sb-grid{grid-template-columns:1fr}.sb-prev{position:static;order:-1}}
 </style>
 </head>
@@ -276,6 +278,20 @@ body{background:var(--carbon)}
         </select>
         <button type="button" class="sb-btn ghost" id="bvdl"><span>Als Video speichern</span></button>
       </div>
+      <div class="sb-ov-dl">
+        <div class="sb-h" style="margin:0 0 8px">Als Overlay herunterladen (durchsichtig, 9:16)</div>
+        <div class="sb-bv">
+          <button type="button" class="sb-btn ghost" id="ovPng"><span>Bild (PNG)</span></button>
+          <select id="ovLen" aria-label="Länge Overlay-Video">
+            <option value="5">5 s</option>
+            <option value="10" selected>10 s</option>
+            <option value="15">15 s</option>
+            <option value="30">30 s</option>
+          </select>
+          <button type="button" class="sb-btn ghost" id="ovVid"><span>Video für Filmora (WebM)</span></button>
+        </div>
+        <p class="sb-hint" style="text-align:center">Ohne Hintergrundbild/-video: In Filmora einfach auf eine Spur über deinen Clip legen.</p>
+      </div>
       <p class="sb-hint" id="dlMsg"></p>
     </div>
   </div>
@@ -473,7 +489,7 @@ body{background:var(--carbon)}
       c.restore();
       return box;
     },
-    hatMedium: function(d){ return !!(d.img && (d.img.videoWidth || d.img.naturalWidth)); },
+    hatMedium: function(d){ return !!(S.transparent || d.img && (d.img.videoWidth || d.img.naturalWidth)); },
     wortGroesse: function(c, s, maxW, start, w, fam){
       var woerter = String(s || "").split(/\s+/).filter(Boolean), size = start;
       for (; size > 20; size -= 2) {
@@ -522,6 +538,7 @@ body{background:var(--carbon)}
       return { x: x, y: y, w: bw, h: bh };
     },
     bild: function(c, d, x, y, w, hh){
+      if (S.transparent) { c.clearRect(x, y, w, hh); return; } // Overlay-Export: Bildfläche bleibt durchsichtig
       c.save(); c.beginPath(); c.rect(x, y, w, hh); c.clip();
       if (h.hatMedium(d)) {
         // frei verschiebbar, auch ohne Zoom; frei gewordene Fläche bekommt den Standard-Hintergrund
@@ -1069,6 +1086,145 @@ body{background:var(--carbon)}
     if (!wcMoeglich()) return aufnehmenMR(dauer);
     aufnehmenWC(dauer);
   }
+  /* ---------- Overlay-Export (durchsichtig, immer 9:16) ----------
+     PNG: Bild mit Alpha. Video: WebM mit zwei VP9-Spuren (Farbe + Alpha als BlockAdditional, wie ffmpeg),
+     das liest Filmora als durchsichtiges Video. */
+  function nach916(){
+    if (S.H === 1920) return true;
+    document.querySelector('#fmt button[data-h="1920"]').click();
+    meldung("Overlays gibt es immer in 9:16. Format wurde umgestellt: Vorschau kurz prüfen und nochmal klicken.", true);
+    return false;
+  }
+  function overlayName(ext){ return dateiname().replace(/^kreids888-/, "kreids888-overlay-").replace(/\.jpg$/, "." + ext); }
+  function herunterladen(b, name){
+    var a = document.createElement("a"); a.href = URL.createObjectURL(b); a.download = name;
+    document.body.appendChild(a); a.click(); a.remove();
+  }
+  $("ovPng").onclick = function(){
+    if (aufnahme || !nach916()) return;
+    S.transparent = true; render(true);
+    cv.toBlob(function(b){
+      S.transparent = false; render();
+      if (b) { herunterladen(b, overlayName("png")); meldung("Gespeichert: " + overlayName("png")); }
+    }, "image/png");
+  };
+  // RGBA (gerade, nicht vormultipliziert) → I420 BT.709 begrenzt; Alpha → eigenes I420 (Y = Alpha, voller Bereich)
+  function zuI420(px, W, H, farbe, alpha){
+    var cw = W >> 1, ys = W * H, us = cw * (H >> 1);
+    for (var j = 0; j < H; j++) {
+      for (var i = 0; i < W; i++) {
+        var o = (j * W + i) * 4, r = px[o], g = px[o + 1], b = px[o + 2];
+        farbe[j * W + i] = 16 + ((46.559 * r + 156.629 * g + 15.812 * b) / 255 + 0.5 | 0);
+        alpha[j * W + i] = px[o + 3];
+      }
+    }
+    for (var y2 = 0; y2 < H >> 1; y2++) {
+      for (var x2 = 0; x2 < cw; x2++) {
+        var p = ((y2 * 2) * W + x2 * 2) * 4, q = p + W * 4;
+        var r2 = (px[p] + px[p + 4] + px[q] + px[q + 4]) / 4, g2 = (px[p + 1] + px[p + 5] + px[q + 1] + px[q + 5]) / 4, b2 = (px[p + 2] + px[p + 6] + px[q + 2] + px[q + 6]) / 4;
+        var k = y2 * cw + x2;
+        farbe[ys + k] = Math.round(128 + (-25.670 * r2 - 86.330 * g2 + 112 * b2) / 255);
+        farbe[ys + us + k] = Math.round(128 + (112 * r2 - 101.735 * g2 - 10.265 * b2) / 255);
+        alpha[ys + k] = 128; alpha[ys + us + k] = 128;
+      }
+    }
+  }
+  // Minimaler WebM-Schreiber (EBML) für eine VP9-Spur mit Alpha
+  function ebmlId(id){ var b = []; while (id > 0) { b.unshift(id & 255); id = Math.floor(id / 256); } return b; }
+  function ebmlLen(n){ var b = [1, 0, 0, 0, 0, 0, 0, 0]; for (var i = 7; i > 0; i--) { b[i] = n % 256; n = Math.floor(n / 256); } return b; }
+  function ebmlUint(n, fest){ var b = []; do { b.unshift(n % 256); n = Math.floor(n / 256); } while (n > 0); while (fest && b.length < fest) b.unshift(0); return new Uint8Array(b); }
+  function ebml(id, inhalt){
+    var teile = Array.isArray(inhalt) ? inhalt : [inhalt], len = 0;
+    teile = teile.filter(Boolean).map(function(t){ return t instanceof Uint8Array ? t : new Uint8Array(t); });
+    teile.forEach(function(t){ len += t.length; });
+    var kopf = ebmlId(id).concat(ebmlLen(len)), out = new Uint8Array(kopf.length + len), p = kopf.length;
+    out.set(kopf, 0); teile.forEach(function(t){ out.set(t, p); p += t.length; });
+    return out;
+  }
+  function ebmlStr(s){ return new TextEncoder().encode(s); }
+  function ebmlFloat(f){ var b = new Uint8Array(8); new DataView(b.buffer).setFloat64(0, f); return b; }
+  function webmAlpha(W, H, fps, farbChunks, alphaChunks){
+    var msProBild = 1000 / fps, n = farbChunks.length;
+    var info = ebml(0x1549A966, [ebml(0x2AD7B1, ebmlUint(1000000)), ebml(0x4489, ebmlFloat(n * msProBild)), ebml(0x4D80, ebmlStr("kreids888.com")), ebml(0x5741, ebmlStr("kreids888.com"))]);
+    var spur = ebml(0x1654AE6B, ebml(0xAE, [
+      ebml(0xD7, ebmlUint(1)), ebml(0x73C5, ebmlUint(1)), ebml(0x83, ebmlUint(1)), ebml(0x9C, ebmlUint(0)),
+      ebml(0x86, ebmlStr("V_VP9")), ebml(0x23E383, ebmlUint(Math.round(1e9 / fps))), ebml(0x55EE, ebmlUint(1)),
+      ebml(0xE0, [ebml(0xB0, ebmlUint(W)), ebml(0xBA, ebmlUint(H)), ebml(0x53C0, ebmlUint(1))])
+    ]));
+    // Cluster: neuer Cluster bei jedem Schlüsselbild
+    var cluster = [], cues = [], akt = null, start = 0;
+    for (var i = 0; i < n; i++) {
+      var ms = Math.round(i * msProBild), key = farbChunks[i].type === "key";
+      if (key || !akt) { if (akt) cluster.push(akt); akt = { ms: ms, bloecke: [] }; }
+      var rel = ms - akt.ms, kopf = new Uint8Array([0x81, (rel >> 8) & 255, rel & 255, 0]);
+      var block = [ebml(0xA1, [kopf, farbChunks[i].data])];
+      if (!key) { var ref = -Math.round(msProBild); block.push(ebml(0xFB, new Uint8Array([(ref >> 8) & 255, ref & 255]))); }
+      if (alphaChunks[i]) block.push(ebml(0x75A1, ebml(0xA6, [ebml(0xEE, ebmlUint(1)), ebml(0xA5, alphaChunks[i].data)])));
+      akt.bloecke.push(ebml(0xA0, block));
+    }
+    if (akt) cluster.push(akt);
+    var clusterBytes = cluster.map(function(c){ return ebml(0x1F43B675, [ebml(0xE7, ebmlUint(c.ms))].concat(c.bloecke)); });
+    // SeekHead mit fester Länge (8-Byte-Positionen), damit Positionen vorab berechnet werden können
+    function seek(pos){ return ebml(0x114D9B74, [
+      ebml(0x4DBB, [ebml(0x53AB, new Uint8Array(ebmlId(0x1549A966))), ebml(0x53AC, ebmlUint(pos.info, 8))]),
+      ebml(0x4DBB, [ebml(0x53AB, new Uint8Array(ebmlId(0x1654AE6B))), ebml(0x53AC, ebmlUint(pos.spur, 8))]),
+      ebml(0x4DBB, [ebml(0x53AB, new Uint8Array(ebmlId(0x1C53BB6B))), ebml(0x53AC, ebmlUint(pos.cues, 8))])
+    ]); }
+    var shLen = seek({ info: 0, spur: 0, cues: 0 }).length, pos = shLen;
+    var posInfo = pos; pos += info.length; var posSpur = pos; pos += spur.length;
+    clusterBytes.forEach(function(cb, k){ cues.push(ebml(0xBB, [ebml(0xB3, ebmlUint(cluster[k].ms)), ebml(0xB7, [ebml(0xF7, ebmlUint(1)), ebml(0xF1, ebmlUint(pos, 8))])])); pos += cb.length; });
+    var cuesBytes = ebml(0x1C53BB6B, cues);
+    var segment = ebml(0x18538067, [seek({ info: posInfo, spur: posSpur, cues: pos }), info, spur].concat(clusterBytes, [cuesBytes]));
+    var kopfEbml = ebml(0x1A45DFA3, [ebml(0x4286, ebmlUint(1)), ebml(0x42F7, ebmlUint(1)), ebml(0x42F2, ebmlUint(4)), ebml(0x42F3, ebmlUint(8)), ebml(0x4282, ebmlStr("webm")), ebml(0x4287, ebmlUint(4)), ebml(0x4285, ebmlUint(2))]);
+    return new Blob([kopfEbml, segment], { type: "video/webm" });
+  }
+  async function overlayVideo(dauer){
+    var W = 1080, H = 1920, fps = 30, gesamt = Math.round(dauer * fps);
+    var cfg = null, vl = ["vp09.00.40.08", "vp09.00.41.08", "vp09.00.50.08"];
+    for (var i = 0; i < vl.length && !cfg; i++) {
+      var c1 = { codec: vl[i], width: W, height: H, bitrate: 16000000, framerate: fps, latencyMode: "quality" };
+      try { if ((await VideoEncoder.isConfigSupported(c1)).supported) cfg = c1; } catch (e) {}
+    }
+    if (!cfg) throw new Error("Dieser Browser kann kein VP9. Bitte Chrome oder Edge nehmen.");
+    var farbe = [], alpha = [], fehler = null;
+    var encF = new VideoEncoder({ output: function(ch){ var d = new Uint8Array(ch.byteLength); ch.copyTo(d); farbe.push({ type: ch.type, data: d }); }, error: function(e){ fehler = e; } });
+    var encA = new VideoEncoder({ output: function(ch){ var d = new Uint8Array(ch.byteLength); ch.copyTo(d); alpha.push({ type: ch.type, data: d }); }, error: function(e){ fehler = e; } });
+    encF.configure(cfg);
+    encA.configure(Object.assign({}, cfg, { bitrate: 6000000 }));
+    var ctx2 = cv.getContext("2d"), bufF = new Uint8Array(W * H * 3 / 2), bufA = new Uint8Array(W * H * 3 / 2);
+    var csF = { primaries: "bt709", transfer: "bt709", matrix: "bt709", fullRange: false };
+    var csA = { primaries: "bt709", transfer: "bt709", matrix: "bt709", fullRange: true };
+    for (var n = 0; n < gesamt; n++) {
+      if (fehler) throw fehler;
+      aufnahme.zeit = n / fps; render();
+      zuI420(ctx2.getImageData(0, 0, W, H).data, W, H, bufF, bufA);
+      var ts = Math.round(n * 1e6 / fps), key = n % fps === 0;
+      var fF = new VideoFrame(bufF, { format: "I420", codedWidth: W, codedHeight: H, timestamp: ts, duration: Math.round(1e6 / fps), colorSpace: csF });
+      var fA = new VideoFrame(bufA, { format: "I420", codedWidth: W, codedHeight: H, timestamp: ts, duration: Math.round(1e6 / fps), colorSpace: csA });
+      encF.encode(fF, { keyFrame: key }); encA.encode(fA, { keyFrame: key }); fF.close(); fA.close();
+      while (encF.encodeQueueSize > 6 || encA.encodeQueueSize > 6) await warte(4);
+      if (n % 10 === 0) { meldung("Overlay wird gebaut … " + Math.round(n / gesamt * 100) + " %"); await warte(0); }
+    }
+    await encF.flush(); await encA.flush(); encF.close(); encA.close();
+    if (fehler) throw fehler;
+    if (farbe.length !== alpha.length || !farbe.length) throw new Error("Kodierung unvollständig (" + farbe.length + "/" + alpha.length + ")");
+    return webmAlpha(W, H, fps, farbe, alpha);
+  }
+  $("ovVid").onclick = function(){
+    if (aufnahme || !nach916()) return;
+    if (!window.VideoEncoder || !window.VideoFrame) { meldung("Dieser Browser kann das nicht. Bitte Chrome oder Edge nehmen.", true); return; }
+    var dauer = +$("ovLen").value || 10;
+    aufnahme = { dauer: dauer, laeuft: true, offline: true, zeit: 0, t0: 0 };
+    S.transparent = true; knoepfe(true); meldung("Overlay wird vorbereitet …");
+    overlayVideo(dauer).then(function(b){
+      herunterladen(b, overlayName("webm"));
+      meldung("Gespeichert: " + overlayName("webm") + " (in Filmora auf eine Spur über deinen Clip ziehen)");
+    }).catch(function(e){
+      meldung("Overlay konnte nicht gespeichert werden: " + (e && e.message || e), true);
+    }).then(function(){
+      S.transparent = false; aufnahme = null; knoepfe(false); starteSchleife(); render();
+    });
+  };
   // alter Weg (MediaRecorder), nur falls der Browser kein WebCodecs kann
   function aufnehmenMR(dauer){
     if (aufnahme) return;
