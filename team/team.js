@@ -206,7 +206,6 @@
         <b class="tp-neu-h">Das erwartet dich:</b>
         <ul class="tp-neu-list">${items.map(([ic, t]) => `<li><span class="tp-neu-ic">${ic}</span><span>${t}</span></li>`).join("")}</ul>
         <button type="button" class="tp-neu-btn" data-scroll="tp-join">Jetzt bewerben und Platz sichern →</button>
-        <p class="tp-neu-knapp">Nur 10 bis 12 Plätze im Team</p>
       </div>`;
   }
 
