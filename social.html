@@ -467,11 +467,14 @@ body{background:var(--carbon)}
     bild: function(c, d, x, y, w, hh){
       c.save(); c.beginPath(); c.rect(x, y, w, hh); c.clip();
       if (h.hatMedium(d)) {
+        // frei verschiebbar, auch ohne Zoom; frei gewordene Fläche bekommt den Standard-Hintergrund
         var iw = d.img.videoWidth || d.img.naturalWidth, ih = d.img.videoHeight || d.img.naturalHeight;
         var s = Math.max(w / iw, hh / ih) * d.view.zoom, dw = iw * s, dh = ih * s;
-        var mx = (dw - w) / 2, my = (dh - hh) / 2;
+        var mx = (dw + w) / 2 - 60, my = (dh + hh) / 2 - 60;
         d.view.ox = Math.max(-mx, Math.min(mx, d.view.ox)); d.view.oy = Math.max(-my, Math.min(my, d.view.oy));
-        c.drawImage(d.img, x + (w - dw) / 2 + d.view.ox, y + (hh - dh) / 2 + d.view.oy, dw, dh);
+        var bx = x + (w - dw) / 2 + d.view.ox, by = y + (hh - dh) / 2 + d.view.oy;
+        if (bx > x || by > y || bx + dw < x + w || by + dh < y + hh) h.bild(c, { view: d.view }, x, y, w, hh);
+        c.drawImage(d.img, bx, by, dw, dh);
       } else {
         var g = c.createRadialGradient(x + w * 0.75, y + hh * 0.2, 20, x + w * 0.6, y + hh * 0.3, Math.max(w, hh));
         g.addColorStop(0, "#3a0a10"); g.addColorStop(0.45, "#14161d"); g.addColorStop(1, "#0a0b0e");
