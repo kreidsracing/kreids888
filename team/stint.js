@@ -803,7 +803,7 @@
             ${istDrin ? `<a class="tm-btn red sm sp-full" href="#stint/${esc(p.id)}/${esc(istDrin.key)}"><span>Mein Fahrzeug: ${esc(istDrin.name)}</span></a>
               <button type="button" class="tm-btn sm sp-full" id="sp-myav"><span>Meine Verfügbarkeit</span></button>` : `<p class="tm-muted">Du bist noch in keinem Fahrzeug. Öffne eins und klick auf „Mitfahren".</p>`}
             <a class="tm-btn sm sp-full" href="#stint/${esc(p.id)}/bearbeiten"><span>Event bearbeiten</span></a>
-            ${p.cars.length ? `<button type="button" class="tm-btn sm sp-full" id="sp-post" ${META.channel || p.channel ? "" : 'disabled title="Kein Discord-Kanal eingestellt"'}><span>Plan in Discord posten</span></button>` : ""}
+            ${p.cars.length ? `<button type="button" class="tm-btn sm sp-full" id="sp-post" ${META.channel || p.channel ? "" : 'disabled title="Kein Discord-Kanal eingestellt"'}><span>Plan in Discord posten</span></button><button type="button" class="tm-btn sm sp-full" id="sp-erinn"><span>Fehlende jetzt erinnern</span></button>` : ""}
           </div>
           <div class="tm-box sp-side"><h5>Nächste Termine</h5>
             ${naechste.length ? naechste.map(x => `<div class="sp-term"><b>${tagUhr(x.t)}</b><span>${esc(x.a)} · ${esc(x.b)}</span></div>`).join("") : '<p class="tm-muted">Keine Termine.</p>'}
@@ -826,6 +826,14 @@
     });
     const myav = $("#sp-myav");
     if (myav) myav.onclick = () => { S.nextStep = "verf"; S.key = null; location.hash = "stint/" + p.id + "/" + istDrin.key; };
+    const er = $("#sp-erinn");
+    if (er) er.onclick = async () => {
+      if (!confirm("Alle, bei denen noch Angaben fehlen, jetzt in Discord anpingen?")) return;
+      er.disabled = true;
+      try { const x = await C.api("/stint/erinnern", { method: "POST", body: { id: p.id } }); C.toast(x.info, true); }
+      catch (x) { C.toast(x.message); }
+      er.disabled = false;
+    };
     const po = $("#sp-post");
     if (po) po.onclick = async () => {
       po.disabled = true;

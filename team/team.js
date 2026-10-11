@@ -1800,8 +1800,12 @@
         <div class="tm-row"><div class="lbl">Pings</div>
           <div class="tm-actions">
             <label class="tm-switch"><input type="checkbox" id="sp-ping" ${(cfg.stint || {}).stintPing !== false ? "checked" : ""}><span class="s"></span>Fahrer vor seinem Stint anpingen</label>
-            <label class="tm-switch"><input type="checkbox" id="sp-av24" ${(cfg.stint || {}).avPing !== false ? "checked" : ""}><span class="s"></span>24 Std. vorher: fehlende Verfügbarkeit anmahnen</label>
+            <label class="tm-switch"><input type="checkbox" id="sp-av24" ${(cfg.stint || {}).avPing !== false ? "checked" : ""}><span class="s"></span>Fehlende Angaben automatisch erinnern</label>
           </div></div>
+        <div class="tm-row"><label for="sp-ek">Erinnerungs-Kanal<small>für alle Events</small></label>
+          <div><select class="tm-select" id="sp-ek"><option value="">wie Event-Kanal</option>${(d.channels || []).map(c => `<option value="${c.id}" ${c.id === (cfg.stint || {}).erinnKanal ? "selected" : ""}># ${esc(c.name)}</option>`).join("")}</select></div></div>
+        <div class="tm-row"><div class="lbl">Erinnern<small>vor dem Start, nur wer noch etwas offen hat</small></div>
+          <div class="tm-actions">${[14, 7, 5, 3, 2, 1].map(n => `<label class="tm-switch"><input type="checkbox" data-etag="${n}" ${((cfg.stint || {}).erinnTage || [7, 3, 1]).includes(n) ? "checked" : ""}><span class="s"></span>${n === 1 ? "1 Tag" : n + " Tage"}</label>`).join("")}</div></div>
         <div class="tm-row"><label for="sp-vor">Vorlauf Stint-Ping<small>wird alle 10 Min. geprüft</small></label>
           <div><select class="tm-select" id="sp-vor">${[10, 15, 20, 30, 45, 60].map(m => `<option value="${m}" ${m === ((cfg.stint || {}).vorlauf || 15) ? "selected" : ""}>${m} Minuten vorher</option>`).join("")}</select></div></div>
         <div class="tm-row"><div class="lbl">Teams<small>zur Auswahl bei jedem Auto</small></div>
@@ -1864,7 +1868,8 @@
         };
       });
     });
-    box.querySelectorAll("#g61-team,#g61-ziel,#g61-ch,#g61-on,#g61-rec,#rm-on,#rm-24,#rm-1,#rm-ch,#rm-ping,#ab-ch,#li-on,#li-90,#li-100,#li-ch,#li-ping,#sp-ch,#sp-vor").forEach(el => el.addEventListener("input", markDirty));
+    box.querySelectorAll("#g61-team,#g61-ziel,#g61-ch,#g61-on,#g61-rec,#rm-on,#rm-24,#rm-1,#rm-ch,#rm-ping,#ab-ch,#li-on,#li-90,#li-100,#li-ch,#li-ping,#sp-ch,#sp-vor,#sp-ek").forEach(el => el.addEventListener("input", markDirty));
+    box.querySelectorAll("[data-etag]").forEach(el => el.addEventListener("change", markDirty));
     box.querySelectorAll("#sp-ping,#sp-av24").forEach(el => el.addEventListener("change", markDirty));
     // Stintplaner-Teams: Liste mit Eingabefeldern, ✕ zum Entfernen
     let spTeams = [...((cfg.stint || {}).teams || [])];
@@ -1940,6 +1945,8 @@
           vorlauf: Number(document.getElementById("sp-vor").value) || 15,
           stintPing: document.getElementById("sp-ping").checked,
           avPing: document.getElementById("sp-av24").checked,
+          erinnKanal: document.getElementById("sp-ek").value,
+          erinnTage: [...document.querySelectorAll("[data-etag]:checked")].map(x => Number(x.dataset.etag)),
           teams: (spTeamsSync(), spTeams.map(t => t.trim()).filter(Boolean)),
         },
         limits: {
