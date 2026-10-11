@@ -133,20 +133,20 @@ window.K888_OVERLAYS = [
   /* ---------- 5) KLAR: Bild oben, ruhiges Textfeld unten ---------- */
   { id: "klar", name: "Klar", draw: function (c, W, H, d, h) {
     var M = 72, teil = Math.round(H * 0.58);
+    // Bildteil wird kleiner, wenn Titel + Text sonst nicht ganz reinpassen
+    var ti = h.passend(c, d.title.toUpperCase(), W - 2 * M, 3, 104, 64, 900, "Saira Condensed", 0.98);
+    if (H - M - 100 - (teil + 140 + ti.hoehe) < 90) ti = h.passend(c, d.title.toUpperCase(), W - 2 * M, 2, 104, 56, 900, "Saira Condensed", 0.98);
+    var t = String(d.text || "").trim() ? h.passend(c, d.text, W - 2 * M, 6, 40, 32, 500, "Barlow", 1.4) : null;
+    var noetig = 110 + ti.hoehe + 30 + (t ? t.hoehe : 0) + 100 + M;
+    if (H - teil < noetig) teil = Math.max(Math.round(H * 0.3), H - noetig);
     c.fillStyle = "#0e0f14"; c.fillRect(0, 0, W, H);
     h.bild(c, d, 0, 0, W, teil);
     h.verlauf(c, 0, teil - 220, 0, teil, [[0, "rgba(14,15,20,0)"], [1, "rgba(14,15,20,1)"]]);
     c.fillStyle = h.ROT; c.fillRect(M, teil - 6, 180, 6);
     h.text(c, d.kicker, M, teil + 70, h.f(800, h.passGroesse(c, d.kicker, W - 2 * M - 120, 38, 22, 800, 0.22)), h.ROT, "left", 0.22);
-    var ti = h.passend(c, d.title.toUpperCase(), W - 2 * M, 3, 104, 64, 900, "Saira Condensed", 0.98);
-    if (H - M - 100 - (teil + 140 + ti.hoehe) < 90) ti = h.passend(c, d.title.toUpperCase(), W - 2 * M, 2, 104, 56, 900, "Saira Condensed", 0.98);
     h.zeilen(c, ti, M, teil + 110, "#fff", 0.6);
     var ty = teil + 110 + ti.hoehe + 30;
-    var platz = H - M - 100 - ty;
-    if (platz >= 40) {
-      var t = h.passend(c, d.text, W - 2 * M, Math.max(1, Math.min(6, Math.floor((platz - 40) / 56) + 1)), 40, 32, 500, "Barlow", 1.4);
-      h.zeilen(c, t, M, ty, "#c9ced6");
-    }
+    if (t) h.zeilen(c, t, M, ty, "#c9ced6");
     h.fuss(c, M, W - M, H - M, d.footer);
     h.startnummer(c, W - M, 70, 76, "right");
     h.qr(c, d, M, 70, 180);
@@ -291,17 +291,18 @@ window.K888_OVERLAYS = [
     h.schraeg(c, W - M - kw - 10, 62, kw, 58, 12, h.ROT);
     h.text(c, d.kicker, W - M - 10 - kw / 2, 91 + ks * 0.36, h.f(900, ks), "#fff", "center", 0.08);
     var fy = 150, fh = gross ? 1100 : 560;
+    var px = M + 36, pw = W - 2 * M - 72, pb = H - M - 104;
+    var ti = h.passend(c, d.title.toUpperCase(), pw, gross ? 3 : 2, 84, 54, 900, "Saira Condensed", 0.98);
+    // Videofenster wird flacher, wenn der Text sonst nicht ganz reinpasst
+    var t = String(d.text || "").trim() ? h.passend(c, d.text, pw, gross ? 6 : 3, 36, 28, 500, "Barlow", 1.38) : null;
+    if (t) fh = Math.max(Math.round(W * 0.35), Math.min(fh, pb - fy - (6 + 34 + ti.hoehe + 22 + t.hoehe + 30)));
     h.fenster(c, d, M, fy, W - 2 * M, fh);
     h.linie(c, M, fy + fh, W - 2 * M, 6);
-    var px = M + 36, pw = W - 2 * M - 72, py = fy + fh + 6, pb = H - M - 104;
+    var py = fy + fh + 6;
     c.fillStyle = "#13151b"; c.fillRect(M, py, W - 2 * M, pb - py);
-    var ti = h.passend(c, d.title.toUpperCase(), pw, gross ? 3 : 2, 84, 54, 900, "Saira Condensed", 0.98);
     h.zeilen(c, ti, px, py + 34, "#fff", 0.6);
-    var ty = py + 34 + ti.hoehe + 22, platz = pb - 30 - ty;
-    if (platz > 36) {
-      var t = h.passend(c, d.text, pw, Math.max(1, Math.min(gross ? 6 : 3, Math.floor((platz - 36) / 50) + 1)), 36, 28, 500, "Barlow", 1.38);
-      h.zeilen(c, t, px, ty, "#c9ced6");
-    }
+    var ty = py + 34 + ti.hoehe + 22;
+    if (t) h.zeilen(c, t, px, ty, "#c9ced6");
     h.fuss(c, M, W - M, H - M, d.footer);
     h.qr(c, d, W - M - 30 - 200, fy + 30, 200);
   } },
@@ -340,6 +341,9 @@ window.K888_OVERLAYS = [
   /* ---------- 13) VIDEO KINO: Breitbild-Video in der Mitte, Hintergrund unscharf ---------- */
   { id: "kino", name: "Video Kino", draw: function (c, W, H, d, h) {
     var M = 72, gross = H > 1500, fh = Math.round(W * 9 / 16), fy = Math.round(H * (gross ? 0.34 : 0.26));
+    // Videofenster wird flacher, wenn der Text sonst nicht ganz reinpasst
+    var t = String(d.text || "").trim() ? h.passend(c, d.text, W - 2 * M, gross ? 7 : 3, 38, 30, 500, "Barlow", 1.38) : null;
+    if (t) fh = Math.max(Math.round(W * 0.35), Math.min(fh, H - M - 110 - 50 - t.hoehe - fy));
     c.fillStyle = "#0b0c10"; c.fillRect(0, 0, W, H);
     if (h.hatMedium(d)) {
       c.save(); c.filter = "blur(28px)";
@@ -353,11 +357,8 @@ window.K888_OVERLAYS = [
     var tiy = fy - 44 - ti.hoehe;
     h.zeilen(c, ti, M, tiy, "#fff", 0.6);
     h.text(c, d.kicker, M, tiy - 22, h.f(800, h.passGroesse(c, d.kicker, W - 2 * M, 36, 20, 800, 0.22)), "#ff4b55", "left", 0.22);
-    var ty = fy + fh + 50, platz = H - M - 110 - ty;
-    if (platz > 38) {
-      var t = h.passend(c, d.text, W - 2 * M, Math.max(1, Math.min(gross ? 7 : 3, Math.floor((platz - 38) / 52) + 1)), 38, 30, 500, "Barlow", 1.38);
-      h.zeilen(c, t, M, ty, "#dfe2e7");
-    }
+    var ty = fy + fh + 50;
+    if (t) h.zeilen(c, t, M, ty, "#dfe2e7");
     h.fuss(c, M, W - M, H - M, d.footer);
     h.qr(c, d, W - 40 - 200, fy + fh - 40 - 240, 200);
   } },

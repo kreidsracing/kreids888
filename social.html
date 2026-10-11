@@ -164,7 +164,7 @@ body{background:var(--carbon)}
       </div>
       <div class="sb-panel">
         <div class="sb-h">7 · Freie Texte (optional)</div>
-        <div class="sb-row"><button type="button" class="sb-file" id="ftNeu">+ Text hinzufügen</button></div>
+        <div class="sb-row"><button type="button" class="sb-file" id="ftNeu">+ Text mit Rahmen</button><button type="button" class="sb-file" id="ftNeuNormal">+ Normaler Text</button></div>
         <div class="sb-ftl" id="ftListe"></div>
         <div id="ftEdit" hidden>
           <label for="ftText">Text</label>
@@ -228,7 +228,7 @@ body{background:var(--carbon)}
 </main>
 
 <script src="overlays/qrcode.js"></script>
-<script src="overlays/overlays.js"></script>
+<script src="overlays/overlays.js?v=202610111300"></script>
 <script>
 (function(){
   var ROT = "#e11324";
@@ -304,7 +304,8 @@ body{background:var(--carbon)}
     },
     umbruch: function(c, s, maxW){
       var out = [];
-      String(s || "").split(/\n+/).forEach(function(abs){
+      String(s || "").replace(/\r/g, "").trim().replace(/\n\s*\n\s*/g, "\n\n").split("\n").forEach(function(abs){
+        if (!abs.trim()) { out.push(""); return; }
         var zeile = "";
         abs.split(/\s+/).filter(Boolean).forEach(function(wort){
           var test = zeile ? zeile + " " + wort : wort;
@@ -321,17 +322,20 @@ body{background:var(--carbon)}
       return out;
     },
     passend: function(c, s, maxW, maxZ, start, min, w, fam, lh){
+      // nie abschneiden: erst bis min verkleinern, dann weiter bis die geplante Höhe passt, sonst alle Zeilen zeigen
       var size = start, z;
       for (; size >= min; size -= 2) {
         c.font = h.f(w, size, fam); z = h.umbruch(c, s, maxW);
         if (z.length <= maxZ) break;
       }
-      size = Math.max(size, min); c.font = h.f(w, size, fam); z = h.umbruch(c, s, maxW);
-      if (z.length > maxZ) {
-        z = z.slice(0, maxZ); var l = z[maxZ - 1];
-        while (l.length && c.measureText(l + "…").width > maxW) l = l.slice(0, -1);
-        z[maxZ - 1] = l.replace(/[\s,.;:–-]+$/, "") + "…";
+      if (size < min) {
+        var budget = start * (1 + (maxZ - 1) * lh), boden = Math.max(22, Math.round(min * 0.75));
+        for (size = min; size > boden; size--) {
+          c.font = h.f(w, size, fam); z = h.umbruch(c, s, maxW);
+          if (size * (1 + (z.length - 1) * lh) <= budget) break;
+        }
       }
+      c.font = h.f(w, size, fam); z = h.umbruch(c, s, maxW);
       return { zeilen: z, groesse: size, lh: lh, w: w, fam: fam, hoehe: z.length ? size * (1 + (z.length - 1) * lh) : 0 };
     },
     zeilen: function(c, t, x, y, color, spacing, align){
@@ -705,11 +709,19 @@ body{background:var(--carbon)}
     seg("ftSchrift", o.schrift); seg("ftBg", o.bg);
   }
   function ftGeaendert(){ starteSchleife(); render(); }
-  $("ftNeu").onclick = function(){
+  function ftNeu(o){
     var n = S.texte.length;
-    S.texte.push({ t: "LIVE 20:00", size: 96, schrift: "saira", farbe: "#ffffff", rand: 0, randFarbe: "#e11324", bg: "schraeg", bgFarbe: "#e11324", bgAlpha: 1, effekt: "kein", tempo: 1, dreh: 0, x: 120 + n * 30, y: Math.round(S.H * 0.3) + n * 70 });
+    o.x = 120 + n * 30; o.y = Math.round(S.H * 0.3) + n * 70;
+    S.texte.push(o);
     S.akt = n; ftEditor(); ftGeaendert();
     $("ftText").focus(); $("ftText").select();
+  }
+  $("ftNeu").onclick = function(){
+    ftNeu({ t: "LIVE 20:00", size: 96, schrift: "saira", farbe: "#ffffff", rand: 0, randFarbe: "#e11324", bg: "schraeg", bgFarbe: "#e11324", bgAlpha: 1, effekt: "kein", tempo: 1, dreh: 0 });
+  };
+  // normaler Text: ohne Hintergrund, Farbe/Schrift/Rand trotzdem frei
+  $("ftNeuNormal").onclick = function(){
+    ftNeu({ t: "Dein Text", size: 56, schrift: "barlow", farbe: "#ffffff", rand: 0, randFarbe: "#e11324", bg: "kein", bgFarbe: "#0a0b0e", bgAlpha: 0.8, effekt: "kein", tempo: 1, dreh: 0 });
   };
   $("ftDup").onclick = function(){
     var o = ftAkt(); if (!o) return;
