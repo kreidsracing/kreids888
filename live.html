@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>KREIDS888 · Livetracking</title>
 <link rel="stylesheet" href="style.css">
-<meta name="description" content="Livetracking von Kreids888 — iRacing-Rennen in Echtzeit: Positionen, Abstände, Strafen.">
+<meta name="description" content="Livetracking von Kreids888 — iRacing-Rennen in Echtzeit: Positionen, Rundenzeiten, Strafen.">
 <link rel="canonical" href="https://kreids888.com/live.html">
 <meta name="robots" content="index, follow">
 <meta property="og:type" content="website">
@@ -67,22 +67,20 @@
     <!-- OFFLINE -->
     <div id="ltOffline" class="lt-offline">
       <h3>Gerade offline</h3>
-      <p id="ltOfflineMsg">Wenn ich ein Rennen fahre, siehst du hier Positionen, Abstände, Strafen und Ereignisse in Echtzeit.</p>
+      <p id="ltOfflineMsg">Wenn ich ein Rennen fahre, siehst du hier Positionen, Rundenzeiten, Strafen und Ereignisse in Echtzeit.</p>
     </div>
   </div>
 </main>
 <footer id="site-footer"></footer>
 <script src="components.js"></script>
 <script>
+/* Live-Timing: Daten kommen NUR vom eigenen Tool "Kreids Racecontrol"
+   ueber den Worker kreids888-racecontrol (nur lesen). */
 (function(){
-  var CHANNEL = (new URLSearchParams(location.search).get("ch") || "kreids888").toLowerCase().trim();
-  var SOURCES = {
-    liga:   "wss://racecontrol-api.snailpaceracing.org/rc/public",
-    einzel: "wss://spr-racecontrol-relay-einzel.sprl.workers.dev/rc/public"
-  };
+  var SOURCE = "wss://kreids888-racecontrol.kreids.workers.dev/public";
   var $ = function(id){ return document.getElementById(id); };
   var esc = function(s){ return String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); };
-  var conns = {}, liveSource = null, activeFlags = {};
+  var ws = null, retry = 2000;
 
   function fmtLap(sec){ sec=Number(sec)||0; if(sec<=0) return "–"; var m=Math.floor(sec/60), s=sec-m*60; return m+":"+(s<10?"0":"")+s.toFixed(3); }
   function fmtRemain(sec){ if(sec==null) return "–"; sec=Math.max(0,Math.floor(Number(sec))); var h=Math.floor(sec/3600),m=Math.floor((sec%3600)/60),s=sec%60,p=function(n){return(n<10?"0":"")+n;}; return (h?h+":"+p(m):m)+":"+p(s); }
@@ -100,26 +98,18 @@
     if(t.indexOf("full course yellow")>=0||t.indexOf("gelbe")>=0) return ["yellow","🟡"];
     if(t.indexOf("zielflagge")>=0) return ["chq","🏁"];
     if(t.indexOf("weisse")>=0||t.indexOf("weiße")>=0) return ["chq","⚪"];
-    if(t.indexOf("green")>=0||t.indexOf("grün")>=0) return ["green","🟢"];
+    if(t.indexOf("green")>=0||t.indexOf("grün")>=0||t.indexOf("runde bis")>=0) return ["green","🟢"];
     return ["yellow","🚩"];
   }
-  function trackFlags(events){
-    (events||[]).forEach(function(e){
-      if(e.type!=="flag") return;
-      var base=String(e.text||""), key=base.replace(/ (GESETZT|aufgehoben)$/,"");
-      if(/GESETZT$/.test(base)) activeFlags[key]=true;
-      else if(/aufgehoben$/.test(base)) delete activeFlags[key];
-      else if(/^Green Flag/.test(base)) activeFlags={};
-    });
-    if(activeFlags["Green Flag"]){ ["Rote Flagge","Full Course Yellow","Full Course Yellow (waving)","Gelbe Flagge"].forEach(function(k){delete activeFlags[k];}); }
-  }
-  function renderFlag(){
-    var order=["Rote Flagge","Full Course Yellow (waving)","Full Course Yellow","Gelbe Flagge","Zielflagge","Weisse Flagge (letzte Runde)","1 Runde bis Green","Green Flag"];
-    var cur=null; for(var i=0;i<order.length;i++){ if(activeFlags[order[i]]){cur=order[i];break;} }
+  function renderFlag(flag){
     var bar=$("ltFlag");
-    if(!cur){ bar.style.display="none"; return; }
-    var fc=flagClassFor(cur); bar.className="lt-flagbar "+fc[0]; bar.style.display="flex";
-    $("ltFlagIco").textContent=fc[1]; $("ltFlagTxt").textContent=cur.toUpperCase();
+    if(!flag){ bar.style.display="none"; return; }
+    var fc=flagClassFor(flag); bar.className="lt-flagbar "+fc[0]; bar.style.display="flex";
+    $("ltFlagIco").textContent=fc[1]; $("ltFlagTxt").textContent=String(flag).toUpperCase();
+  }
+  function panel(id, show){
+    var el=$(id); if(!el) return;
+    var p=el.closest(".lt-panel"); if(p) p.style.display = show ? "" : "none";
   }
 
   function render(state){
@@ -128,24 +118,27 @@
     if(!live){
       $("ltOfflineMsg").textContent = (state && state.reason==="disabled")
         ? "Die Live-Ansicht ist gerade deaktiviert. Schau später wieder vorbei!"
-        : "Sobald ein Rennen läuft, siehst du hier Positionen, Abstände, Strafen und Ereignisse in Echtzeit — direkt aus der SPR Race Control.";
+        : "Wenn ich ein Rennen fahre, siehst du hier Positionen, Rundenzeiten, Strafen und Ereignisse in Echtzeit.";
       return;
     }
     var s = state.session || {};
     $("sTrack").textContent = s.track || "–";
     $("sType").textContent = s.session_type || "–";
-    $("sLap").textContent = (s.leader_lap!=null ? s.leader_lap : "–");
+    $("sLap").textContent = (s.leader_lap!=null ? s.leader_lap + (s.laps_total ? " / "+s.laps_total : "") : "–");
     $("sRemain").textContent = fmtRemain(s.time_remain);
+    renderFlag(s.flag);
 
     // Grid
+    panel("ltGrid", Array.isArray(state.drivers));
     if(Array.isArray(state.drivers)){
       var ds = state.drivers.slice().sort(function(a,b){return (a.position||999)-(b.position||999);});
-      $("gridCnt").textContent = ds.length + " Fahrzeuge";
+      var n = ds.filter(function(d){return !d.left;}).length;
+      $("gridCnt").textContent = n + " Fahrzeuge";
       $("ltGrid").innerHTML = ds.map(function(d){
-        return "<tr>"+
+        return "<tr"+(d.left?' style="opacity:.45"':"")+">"+
           '<td class="pos">'+(d.position||"–")+"</td>"+
           '<td class="num">#'+esc(d.number)+"</td>"+
-          '<td>'+esc(d.name)+(d.on_pit?'<span class="pit-badge">PIT</span>':"")+"</td>"+
+          '<td>'+esc(d.name)+(d.on_pit?'<span class="pit-badge">PIT</span>':"")+(d.left?'<span class="pit-badge">OUT</span>':"")+"</td>"+
           '<td class="muted">'+esc(d.team||"")+"</td>"+
           '<td class="num">'+(d.lap!=null?d.lap:"–")+"</td>"+
           '<td class="num">'+fmtLap(d.last_lap)+"</td>"+
@@ -155,6 +148,7 @@
     }
 
     // Strafen
+    panel("ltPens", Array.isArray(state.penalties));
     if(Array.isArray(state.penalties)){
       $("penCnt").textContent = state.penalties.length ? state.penalties.length+"" : "";
       $("ltPens").innerHTML = state.penalties.slice().reverse().map(function(p){
@@ -166,48 +160,31 @@
           '<td class="num">'+(p.given_lap!=null?p.given_lap:"–")+"</td>"+
           '<td class="'+cls+'">'+esc(p.status)+"</td>"+
         "</tr>";
-      }).join("") || '<tr><td colspan="5" class="lt-empty">Bisher keine Strafen — sauberes Rennen! 🐌</td></tr>';
+      }).join("") || '<tr><td colspan="5" class="lt-empty">Bisher keine Strafen — sauberes Rennen!</td></tr>';
     }
 
-    // Flaggen + Ereignisse
+    // Ereignisse
+    panel("ltEvents", Array.isArray(state.events));
     if(Array.isArray(state.events)){
-      trackFlags(state.events); renderFlag();
-      $("ltEvents").innerHTML = state.events.slice().reverse().slice(0,25).map(function(e){
-        return '<div class="lt-ev"><span class="t">'+esc(e.wall_clock||"")+'</span><span>'+esc(e.text||"")+(e.car?' (#'+esc(e.car)+")":"")+"</span></div>";
+      $("ltEvents").innerHTML = state.events.slice().reverse().map(function(e){
+        return '<div class="lt-ev"><span class="t">'+esc(e.wall_clock||"")+'</span><span>'+esc(e.text||"")+"</span></div>";
       }).join("") || '<div class="lt-empty">Noch keine Ereignisse.</div>';
     }
   }
 
-  function pickAndRender(){
-    // die zuletzt "live" meldende Quelle gewinnt; sonst offline
-    var st = liveSource && conns[liveSource] ? conns[liveSource].last : null;
-    if(st && st.live){ render(st); return; }
-    // keine Quelle live -> letzte bekannte offline-Meldung
-    var any = conns.liga && conns.liga.last || conns.einzel && conns.einzel.last;
-    render(any || {live:false});
-  }
-
-  function connect(name){
-    var url = SOURCES[name] + "?ch=" + encodeURIComponent(CHANNEL);
-    var c = conns[name] = conns[name] || {last:null};
-    try { c.ws = new WebSocket(url); } catch(e){ setTimeout(function(){connect(name);}, 4000); return; }
-    c.ws.onmessage = function(ev){
+  function connect(){
+    try { ws = new WebSocket(SOURCE); } catch(e){ setTimeout(connect, retry); return; }
+    ws.onopen = function(){ retry = 2000; };
+    ws.onmessage = function(ev){
       var m; try{ m=JSON.parse(ev.data); }catch(e){ return; }
-      if(m.type==="meta"){ return; }
-      if(m.type==="state"){
-        c.last = m;
-        if(m.live) liveSource = name;
-        else if(liveSource===name) liveSource = null;
-        pickAndRender();
-      }
+      if(m.type==="state") render(m);
     };
-    c.ws.onclose = function(){ setTimeout(function(){connect(name);}, 4000); };
-    c.ws.onerror = function(){ try{c.ws.close();}catch(e){} };
+    ws.onclose = function(){ setTimeout(connect, retry); retry = Math.min(retry*2, 30000); };
+    ws.onerror = function(){ try{ws.close();}catch(e){} };
   }
 
   setLive(false);
-  connect("liga");
-  connect("einzel");
+  connect();
 })();
 </script>
 </body>
