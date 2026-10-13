@@ -1278,7 +1278,8 @@
     alles();
   };
   // Ich-Bilder (freigestellt, aus overlays/personen/)
-  var PERS = [["zeigt-auf-dich.webp", "Zeigt auf dich"], ["zeigt-zur-seite.webp", "Zeigt zur Seite"], ["arme-verschraenkt.webp", "Arme verschränkt"], ["facepalm.webp", "Facepalm"], ["schock.webp", "Schock"]];
+  var PERS = [["zeigt-auf-dich.webp", "Zeigt auf dich"], ["zeigt-zur-seite.webp", "Zeigt zur Seite"], ["arme-verschraenkt.webp", "Arme verschränkt"], ["facepalm.webp", "Facepalm"], ["schock.webp", "Schock"],
+    ["pose_01_arme_verschraenkt.png", "Arme verschränkt 2"], ["pose_02_zeigt_auf_dich.png", "Zeigt auf dich 2"], ["pose_03_nachdenklich.png", "Nachdenklich"], ["pose_04_daumen_hoch.png", "Daumen hoch"], ["pose_05_zwinkern_fingerguns.png", "Zwinkern Fingerguns"], ["pose_06_ernst_arme_verschraenkt.png", "Ernst, Arme verschränkt"], ["pose_07_jubel_faust.png", "Jubel Faust"], ["pose_08_idee_tippt_stirn.png", "Idee, tippt Stirn"]];
   $("persGal").innerHTML = PERS.map(function(b){ return '<button type="button" title="' + b[1] + '" data-src="' + BASE + 'overlays/personen/' + b[0] + '"><img src="' + BASE + 'overlays/personen/' + b[0] + '" alt="' + b[1] + '" loading="lazy"></button>'; }).join("");
   function setzePers(img, knopf){
     S.pers = img; S.persPos = null;
