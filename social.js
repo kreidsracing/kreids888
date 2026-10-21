@@ -709,9 +709,10 @@
     }
     if (!vcfg) return null;
     if (tonPuffer) {
-      var al = [["mp4a.40.2", "aac"], ["opus", "opus"]];
+      // AAC zuerst (TikTok/Instagram wollen AAC); Windows-AAC kann nur 96–192 kbit/s, darum mehrere Raten
+      var al = [["mp4a.40.2", "aac", 192000], ["mp4a.40.2", "aac", 160000], ["mp4a.40.2", "aac", 128000], ["opus", "opus", 256000]];
       for (var j = 0; j < al.length && !acfg; j++) {
-        var c2 = { codec: al[j][0], sampleRate: tonPuffer.sampleRate, numberOfChannels: 2, bitrate: 256000 };
+        var c2 = { codec: al[j][0], sampleRate: tonPuffer.sampleRate, numberOfChannels: 2, bitrate: al[j][2] };
         try { if ((await AudioEncoder.isConfigSupported(c2)).supported) { acfg = c2; aCodec = al[j][1]; } } catch (e) {}
       }
     }
@@ -722,6 +723,9 @@
       fastStart: "in-memory", firstTimestampBehavior: "offset"
     });
     var fehler = null, n = 0, key = Math.max(1, Math.round(fps));
+    // Bild selbst nach I420 BT.709 begrenzt wandeln (Canvas direkt ergibt Vollbereich/yuvj420p, das mag TikTok nicht)
+    var ctxV = cv.getContext("2d"), bufV = new Uint8Array(W * H * 3 / 2);
+    var csV = { primaries: "bt709", transfer: "bt709", matrix: "bt709", fullRange: false };
     var venc = new VideoEncoder({ output: function(ch, m){ muxer.addVideoChunk(ch, m); }, error: function(e){ fehler = e; } });
     venc.configure(vcfg);
     var aenc = null;
@@ -741,7 +745,8 @@
       fps: fps, tonCodec: aCodec,
       bild: async function(){
         if (fehler) throw fehler;
-        var f = new VideoFrame(cv, { timestamp: Math.round(n * 1e6 / fps), duration: Math.round(1e6 / fps) });
+        zuI420(ctxV.getImageData(0, 0, W, H).data, W, H, bufV, null);
+        var f = new VideoFrame(bufV, { format: "I420", codedWidth: W, codedHeight: H, timestamp: Math.round(n * 1e6 / fps), duration: Math.round(1e6 / fps), colorSpace: csV });
         venc.encode(f, { keyFrame: n % key === 0 }); f.close(); n++;
         while (venc.encodeQueueSize > 12) await warte(4);
       },
@@ -921,14 +926,14 @@
       if (b) { herunterladen(b, overlayName("png")); meldung("Gespeichert: " + overlayName("png")); }
     }, "image/png");
   };
-  // RGBA (gerade, nicht vormultipliziert) → I420 BT.709 begrenzt; Alpha → eigenes I420 (Y = Alpha, voller Bereich)
+  // RGBA (gerade, nicht vormultipliziert) → I420 BT.709 begrenzt; Alpha → eigenes I420 (Y = Alpha, voller Bereich), alpha = null: ohne Alpha
   function zuI420(px, W, H, farbe, alpha){
     var cw = W >> 1, ys = W * H, us = cw * (H >> 1);
     for (var j = 0; j < H; j++) {
       for (var i = 0; i < W; i++) {
         var o = (j * W + i) * 4, r = px[o], g = px[o + 1], b = px[o + 2];
         farbe[j * W + i] = 16 + ((46.559 * r + 156.629 * g + 15.812 * b) / 255 + 0.5 | 0);
-        alpha[j * W + i] = px[o + 3];
+        if (alpha) alpha[j * W + i] = px[o + 3];
       }
     }
     for (var y2 = 0; y2 < H >> 1; y2++) {
@@ -938,7 +943,7 @@
         var k = y2 * cw + x2;
         farbe[ys + k] = Math.round(128 + (-25.670 * r2 - 86.330 * g2 + 112 * b2) / 255);
         farbe[ys + us + k] = Math.round(128 + (112 * r2 - 101.735 * g2 - 10.265 * b2) / 255);
-        alpha[ys + k] = 128; alpha[ys + us + k] = 128;
+        if (alpha) { alpha[ys + k] = 128; alpha[ys + us + k] = 128; }
       }
     }
   }
