@@ -7,6 +7,8 @@
    Neues Design = neuen Eintrag in diese Liste.
    zwei: true = Design zeigt ein zweites Bild/Video (d.img2 / d.view2)
    =========================================================== */
+// fester Text eines Designs: im Programm änderbar oder ausblendbar („Feste Texte im Design“)
+window.K888T = function (h, k, s, info) { return h.t ? h.t(k, s, info) : s; };
 window.K888_OVERLAYS = [
 
   /* ---------- 1) RENNBERICHT: rotes Band oben, großer Titel unten ---------- */
@@ -16,10 +18,12 @@ window.K888_OVERLAYS = [
     h.verlauf(c, 0, H * 0.32, 0, H, [[0, "rgba(10,11,14,0)"], [0.45, "rgba(10,11,14,.82)"], [1, "rgba(10,11,14,.97)"]]);
     h.verlauf(c, 0, 0, 0, 260, [[0, "rgba(10,11,14,.6)"], [1, "rgba(10,11,14,0)"]]);
     // Band oben links
-    var ks = h.passGroesse(c, d.kicker, W - 2 * M - 300, 54, 26, 900);
-    var kw = c.measureText(d.kicker).width + 70;
-    h.schraeg(c, M - 20, 84, kw, 84, 22, h.ROT);
-    h.text(c, d.kicker, M + 14, 126 + ks * 0.33, h.f(900, ks), "#fff");
+    if (d.kicker) {
+      var ks = h.passGroesse(c, d.kicker, W - 2 * M - 300, 54, 26, 900);
+      var kw = c.measureText(d.kicker).width + 70;
+      h.schraeg(c, M - 20, 84, kw, 84, 22, h.ROT);
+      h.text(c, d.kicker, M + 14, 126 + ks * 0.33, h.f(900, ks), "#fff");
+    }
     h.startnummer(c, W - M, 84, 84, "right");
     h.qr(c, d, W - M - 190, 200, 190);
     // Block unten, von unten nach oben
@@ -30,7 +34,7 @@ window.K888_OVERLAYS = [
     h.zeilen(c, t, M + 30, ty, "#d5d9e0");
     var ti = h.passend(c, d.title.toUpperCase(), W - 2 * M - 30, 3, 124, 70, 900, "Saira Condensed", 0.96);
     var tiy = ty - 34 - ti.hoehe;
-    c.fillStyle = h.ROT; c.fillRect(M, tiy + 8, 10, ti.hoehe + t.hoehe + 30);
+    if (ti.zeilen.length || t.zeilen.length) { c.fillStyle = h.ROT; c.fillRect(M, tiy + 8, 10, ti.hoehe + t.hoehe + 30); }
     h.zeilen(c, ti, M + 30, tiy, "#fff", 0.6);
   } },
 
@@ -41,13 +45,15 @@ window.K888_OVERLAYS = [
     h.verlauf(c, 0, 0, W * 0.9, 0, [[0, "rgba(10,11,14,.88)"], [0.6, "rgba(10,11,14,.45)"], [1, "rgba(10,11,14,.1)"]]);
     // Kopfzeile des Towers
     var y = 92;
-    var ks = h.passGroesse(c, d.kicker, W - 2 * M - 330, 44, 24, 900);
-    var tb = Math.max(560, c.measureText(d.kicker).width + 160);
-    c.fillStyle = "rgba(10,11,14,.92)"; c.fillRect(M, y, tb, 78);
-    c.fillStyle = h.ROT; c.fillRect(M, y, 104, 78);
-    h.text(c, "P1", M + 52, y + 56, h.f(900, 50), "#fff", "center");
-    h.text(c, d.kicker, M + 130, y + 39 + ks * 0.38, h.f(900, ks), "#fff");
-    c.fillStyle = h.ROT; c.fillRect(M + tb, y, 8, 78);
+    var tp = K888T(h, "platz", "P1");
+    if (d.kicker || tp) {
+      var ks = h.passGroesse(c, d.kicker, W - 2 * M - 330, 44, 24, 900);
+      var tb = d.kicker ? Math.max(tp ? 560 : 0, c.measureText(d.kicker).width + (tp ? 160 : 60)) : 104;
+      c.fillStyle = "rgba(10,11,14,.92)"; c.fillRect(M, y, tb, 78);
+      if (tp) { c.fillStyle = h.ROT; c.fillRect(M, y, 104, 78); h.text(c, tp, M + 52, y + 56, h.f(900, h.passGroesse(c, tp, 92, 50, 20, 900)), "#fff", "center"); }
+      h.text(c, d.kicker, M + (tp ? 130 : 30), y + 39 + ks * 0.38, h.f(900, ks), "#fff");
+      c.fillStyle = h.ROT; c.fillRect(M + tb, y, 8, 78);
+    }
     h.qr(c, d, W - M - 190, 92, 190);
     // Titel: jede Zeile eine Box
     var ti = h.passend(c, d.title.toUpperCase(), W - 2 * M - 60, 4, 104, 64, 900, "Saira Condensed", 1);
@@ -63,7 +69,7 @@ window.K888_OVERLAYS = [
     // Text darunter
     var t = h.passend(c, d.text, W * 0.72, 5, 40, 32, 500, "Barlow", 1.38);
     y += 26;
-    c.fillStyle = "rgba(10,11,14,.78)"; c.fillRect(M, y - 10, W * 0.72 + 56, t.hoehe + 44);
+    if (t.zeilen.length) { c.fillStyle = "rgba(10,11,14,.78)"; c.fillRect(M, y - 10, W * 0.72 + 56, t.hoehe + 44); }
     h.zeilen(c, t, M + 28, y + 6, "#e6e8ec");
     // Fußleiste wie eine Timing-Zeile
     var fy = H - M - 72;
@@ -80,12 +86,15 @@ window.K888_OVERLAYS = [
     h.verlauf(c, 0, 0, 0, H, [[0, "rgba(10,11,14,.55)"], [0.35, "rgba(10,11,14,.15)"], [0.62, "rgba(10,11,14,.55)"], [1, "rgba(10,11,14,.95)"]]);
     h.ecken(c, M, M, W - 2 * M, H - 2 * M, 90, 8, h.ROT);
     // oben: REC + Kicker
-    c.fillStyle = h.ROT; c.beginPath(); c.arc(M + 70, M + 78, 14, 0, Math.PI * 2); c.fill();
-    h.text(c, "ONBOARD", M + 98, M + 92, h.f(800, 38), "#fff", "left", 0.16);
-    var ks = h.passGroesse(c, d.kicker, W - 2 * M - 420, 38, 20, 900);
-    var kw = c.measureText(d.kicker).width + 48;
-    h.schraeg(c, W - M - 60 - kw, M + 48, kw, 60, 12, h.ROT);
-    h.text(c, d.kicker, W - M - 60 - kw / 2, M + 78 + ks * 0.36, h.f(900, ks), "#fff", "center", 0.1);
+    var obt = K888T(h, "onboard", "ONBOARD");
+    if (obt) { c.fillStyle = h.ROT; c.beginPath(); c.arc(M + 70, M + 78, 14, 0, Math.PI * 2); c.fill(); }
+    h.text(c, obt, M + 98, M + 92, h.f(800, 38), "#fff", "left", 0.16);
+    if (d.kicker) {
+      var ks = h.passGroesse(c, d.kicker, W - 2 * M - 420, 38, 20, 900);
+      var kw = c.measureText(d.kicker).width + 48;
+      h.schraeg(c, W - M - 60 - kw, M + 48, kw, 60, 12, h.ROT);
+      h.text(c, d.kicker, W - M - 60 - kw / 2, M + 78 + ks * 0.36, h.f(900, ks), "#fff", "center", 0.1);
+    }
     h.qr(c, d, W - M - 60 - 180, M + 140, 180);
     // Mitte unten: Titel groß mit Glow
     var t = h.passend(c, d.text, W - 2 * M - 120, 4, 40, 32, 500, "Barlow", 1.38);
@@ -110,7 +119,7 @@ window.K888_OVERLAYS = [
     h.verlauf(c, 0, 0, 0, H, [[0, "rgba(10,11,14,.35)"], [0.45, "rgba(10,11,14,.55)"], [1, "rgba(10,11,14,.96)"]]);
     // 888 als Kontur
     c.save(); c.font = h.f(900, 520); c.textAlign = "right";
-    c.lineWidth = 5; c.strokeStyle = "rgba(255,255,255,.22)"; c.strokeText("888", W + 40, 470);
+    c.lineWidth = 5; c.strokeStyle = "rgba(255,255,255,.22)"; c.strokeText(K888T(h, "nummer", "888"), W + 40, 470);
     c.restore();
     // Rennstreifen oben rechts
     c.save(); c.translate(W - 250, -40); c.rotate(Math.PI / 4);
@@ -125,10 +134,12 @@ window.K888_OVERLAYS = [
     var tiy = ty - 36 - ti.hoehe;
     h.zeilen(c, ti, M, tiy, "#fff", 0.6);
     // Kicker-Chip über dem Titel
-    var ks = h.passGroesse(c, d.kicker, W - 2 * M - 60, 40, 22, 900);
-    var kw = c.measureText(d.kicker).width + 56;
-    h.schraeg(c, M, tiy - 92, kw, 62, 16, h.ROT);
-    h.text(c, d.kicker, M + 28, tiy - 61 + ks * 0.37, h.f(900, ks), "#fff");
+    if (d.kicker) {
+      var ks = h.passGroesse(c, d.kicker, W - 2 * M - 60, 40, 22, 900);
+      var kw = c.measureText(d.kicker).width + 56;
+      h.schraeg(c, M, tiy - 92, kw, 62, 16, h.ROT);
+      h.text(c, d.kicker, M + 28, tiy - 61 + ks * 0.37, h.f(900, ks), "#fff");
+    }
   } },
 
   /* ---------- 5) KLAR: Bild oben, ruhiges Textfeld unten ---------- */
@@ -158,7 +169,7 @@ window.K888_OVERLAYS = [
     var M = 72;
     h.bild(c, d, 0, 0, W, H);
     h.verlauf(c, 0, 0, 0, H, [[0, "rgba(5,6,9,.7)"], [0.3, "rgba(5,6,9,.2)"], [0.55, "rgba(5,6,9,.65)"], [1, "rgba(5,6,9,.97)"]]);
-    h.text(c, (d.wann || "NACHT").toUpperCase(), M, 130, h.f(900, 64), "#fff", "left", 0.04);
+    h.text(c, (d.wann || K888T(h, "wann", "NACHT")).toUpperCase(), M, 130, h.f(900, 64), "#fff", "left", 0.04);
     h.text(c, (d.strecke || "").toUpperCase(), M, 182, h.f(700, 34), "#9aa1ab", "left", 0.2);
     h.qr(c, d, W - M - 180, 70, 180);
     var fy = H - M;
@@ -190,18 +201,21 @@ window.K888_OVERLAYS = [
     var tiy = ty - 30 - ti.hoehe;
     h.zeilen(c, ti, M, tiy, "#fff", 0.6);
     // P + Zahl
-    var gy = tiy - 40;
+    var gy = tiy - 40, vp = K888T(h, "p", "P", "Steht vor der Platzierung");
+    var vpg = h.passGroesse(c, vp, 560, 200, 60, 900), nx = M + (vp ? Math.max(150, c.measureText(vp).width + 34) : 0);
     c.save(); c.font = h.f(900, 380);
     c.shadowColor = "rgba(225,19,36,.6)"; c.shadowBlur = 50;
-    c.fillStyle = "#fff"; c.textAlign = "left"; c.fillText(platz, M + 150, gy);
+    c.fillStyle = "#fff"; c.textAlign = "left"; c.fillText(platz, nx, gy);
     c.restore();
-    h.text(c, "P", M, gy - 20, h.f(900, 200), h.ROT);
-    var strecke = (d.strecke || "").toUpperCase();
-    var ks = h.passGroesse(c, d.kicker, (strecke ? W * 0.5 : W - 2 * M - 60), 40, 22, 900);
-    var kw = Math.max(c.measureText(d.kicker).width, 10) + 56;
-    h.schraeg(c, M, gy - 400, kw, 62, 16, h.ROT);
-    h.text(c, d.kicker, M + 28, gy - 369 + ks * 0.37, h.f(900, ks), "#fff");
-    if (strecke) h.text(c, strecke, M + kw + 30, gy - 354, h.f(800, 36), "#fff", "left", 0.14);
+    h.text(c, vp, M, gy - 20, h.f(900, vpg), h.ROT);
+    var strecke = (d.strecke || "").toUpperCase(), kw = 0;
+    if (d.kicker) {
+      var ks = h.passGroesse(c, d.kicker, (strecke ? W * 0.5 : W - 2 * M - 60), 40, 22, 900);
+      kw = Math.max(c.measureText(d.kicker).width, 10) + 56;
+      h.schraeg(c, M, gy - 400, kw, 62, 16, h.ROT);
+      h.text(c, d.kicker, M + 28, gy - 369 + ks * 0.37, h.f(900, ks), "#fff");
+    }
+    if (strecke) h.text(c, strecke, M + (kw ? kw + 30 : 0), gy - 354, h.f(800, 36), "#fff", "left", 0.14);
     h.qr(c, d, W - M - 180, 70, 180);
   } },
 
@@ -216,12 +230,12 @@ window.K888_OVERLAYS = [
     var ty = fy - 110 - t.hoehe;
     h.zeilen(c, t, M, ty, "#cfd3da");
     var y = ty - 70;
-    h.text(c, "GESCHWINDIGKEIT", M, y, h.f(900, 132), "#fff");
-    c.save(); c.font = h.f(900, 132); c.lineWidth = 3; c.strokeStyle = "rgba(255,255,255,.5)"; c.restore();
-    h.text(c, "SCHLÄGT", M, y - 130, h.f(900, 132), "#9aa1ab");
+    var mz0 = K888T(h, "ueber", "MEIN MOTTO"), mz1 = K888T(h, "zeile1", "KONSTANZ"), mz2 = K888T(h, "zeile2", "SCHLÄGT"), mz3 = K888T(h, "zeile3", "GESCHWINDIGKEIT");
+    h.text(c, mz3, M, y, h.f(900, h.passGroesse(c, mz3, W - 2 * M, 132, 50, 900)), "#fff");
+    h.text(c, mz2, M, y - 130, h.f(900, h.passGroesse(c, mz2, W - 2 * M, 132, 50, 900)), "#9aa1ab");
     c.save(); c.shadowColor = "rgba(225,19,36,.7)"; c.shadowBlur = 50;
-    h.text(c, "KONSTANZ", M, y - 260, h.f(900, 178), h.ROT); c.restore();
-    h.text(c, "MEIN MOTTO", M, y - 440, h.f(800, 34), "#fff", "left", 0.3);
+    h.text(c, mz1, M, y - 260, h.f(900, h.passGroesse(c, mz1, W - 2 * M, 178, 60, 900)), h.ROT); c.restore();
+    h.text(c, mz0, M, y - 440, h.f(800, 34), "#fff", "left", 0.3);
     h.startnummer(c, W - M, 84, 84, "right");
     h.qr(c, d, M, 84, 180);
   } },
@@ -232,10 +246,14 @@ window.K888_OVERLAYS = [
     h.bild(c, d, 0, 0, W, H);
     h.verlauf(c, 0, 0, 0, H, [[0, "rgba(10,11,14,.55)"], [0.35, "rgba(10,11,14,.25)"], [1, "rgba(10,11,14,.96)"]]);
     // LIVE-Plakette
-    c.save(); c.shadowColor = "rgba(225,19,36,.8)"; c.shadowBlur = 36;
-    h.schraeg(c, M, 84, 250, 96, 22, h.ROT); c.restore();
-    c.fillStyle = "#fff"; c.beginPath(); c.arc(M + 52, 132, 14, 0, Math.PI * 2); c.fill();
-    h.text(c, "LIVE", M + 80, 158, h.f(900, 72), "#fff", "left", 0.04);
+    var lv = K888T(h, "live", "LIVE");
+    if (lv) {
+      c.font = h.f(900, 72); var lvw = Math.max(250, Math.round(c.measureText(lv).width + lv.length * 3 + 125));
+      c.save(); c.shadowColor = "rgba(225,19,36,.8)"; c.shadowBlur = 36;
+      h.schraeg(c, M, 84, lvw, 96, 22, h.ROT); c.restore();
+      c.fillStyle = "#fff"; c.beginPath(); c.arc(M + 52, 132, 14, 0, Math.PI * 2); c.fill();
+      h.text(c, lv, M + 80, 158, h.f(900, 72), "#fff", "left", 0.04);
+    }
     h.qr(c, d, W - M - 190, 84, 190);
     var fy = H - M;
     h.fuss(c, M, W - M, fy, d.footer);
@@ -245,7 +263,7 @@ window.K888_OVERLAYS = [
     var ti = h.passend(c, d.title.toUpperCase(), W - 2 * M, 2, 96, 60, 900, "Saira Condensed", 0.96);
     var tiy = ty - 30 - ti.hoehe;
     h.zeilen(c, ti, M, tiy, "#fff", 0.6);
-    var wann = (d.wann || "MONTAG · 20:00 UHR").toUpperCase();
+    var wann = (d.wann || K888T(h, "wann", "MONTAG · 20:00 UHR")).toUpperCase();
     var w = h.passend(c, wann, W - 2 * M, 1, 130, 70, 900, "Saira Condensed", 1);
     var wy = tiy - 40 - w.hoehe;
     h.zeilen(c, w, M, wy, h.ROT);
@@ -258,12 +276,15 @@ window.K888_OVERLAYS = [
     h.bild(c, d, 0, 0, W, H);
     h.verlauf(c, 0, 0, 0, H, [[0, "rgba(10,11,14,.6)"], [0.3, "rgba(10,11,14,.1)"], [0.6, "rgba(10,11,14,.5)"], [1, "rgba(10,11,14,.97)"]]);
     // diagonales Band oben
-    c.save(); c.translate(W / 2, 170); c.rotate(-0.06);
-    c.fillStyle = h.ROT; c.fillRect(-W, -62, W * 2, 124);
-    c.fillStyle = "#fff"; c.fillRect(-W, 70, W * 2, 10);
-    c.font = h.f(900, 96); c.textAlign = "center"; c.fillStyle = "#fff";
-    c.fillText("KAMPF UM P" + String(d.platz || "1").replace(/^p/i, ""), 0, 34);
-    c.restore();
+    var band = K888T(h, "band", "KAMPF UM P" + String(d.platz || "1").replace(/^p/i, ""));
+    if (band) {
+      c.save(); c.translate(W / 2, 170); c.rotate(-0.06);
+      c.fillStyle = h.ROT; c.fillRect(-W, -62, W * 2, 124);
+      c.fillStyle = "#fff"; c.fillRect(-W, 70, W * 2, 10);
+      c.font = h.f(900, h.passGroesse(c, band, W - 80, 96, 40, 900)); c.textAlign = "center"; c.fillStyle = "#fff";
+      c.fillText(band, 0, 34);
+      c.restore();
+    }
     if (d.strecke) h.text(c, d.strecke.toUpperCase(), W / 2, 300, h.f(800, 36), "#fff", "center", 0.2);
     var fy = H - M;
     h.fuss(c, M, W - M, fy, d.footer);
@@ -287,10 +308,12 @@ window.K888_OVERLAYS = [
     c.fillStyle = g; c.fillRect(0, 0, W, H);
     h.linie(c, 0, 0, W, 10);
     h.logo(c, M, 108, 50);
-    var ks = h.passGroesse(c, d.kicker, W - 2 * M - 340, 36, 18, 900, 0.08);
-    var kw = c.measureText(d.kicker).width + 48;
-    h.schraeg(c, W - M - kw - 10, 62, kw, 58, 12, h.ROT);
-    h.text(c, d.kicker, W - M - 10 - kw / 2, 91 + ks * 0.36, h.f(900, ks), "#fff", "center", 0.08);
+    if (d.kicker) {
+      var ks = h.passGroesse(c, d.kicker, W - 2 * M - 340, 36, 18, 900, 0.08);
+      var kw = c.measureText(d.kicker).width + 48;
+      h.schraeg(c, W - M - kw - 10, 62, kw, 58, 12, h.ROT);
+      h.text(c, d.kicker, W - M - 10 - kw / 2, 91 + ks * 0.36, h.f(900, ks), "#fff", "center", 0.08);
+    }
     var fy = 150, fh = gross ? 1100 : 560;
     var px = M + 36, pw = W - 2 * M - 72, pb = H - M - 104;
     var ti = h.passend(c, d.title.toUpperCase(), pw, gross ? 3 : 2, 84, 54, 900, "Saira Condensed", 0.98);
@@ -319,10 +342,12 @@ window.K888_OVERLAYS = [
     h.logo(c, M, 100, 48);
     h.startnummer(c, W - M, 52, 72, "right");
     h.linie(c, 0, fh, W, 10);
-    var ks = h.passGroesse(c, d.kicker, W - 2 * M - 60, 40, 22, 900, 0.06);
-    var kw = c.measureText(d.kicker).width + 56;
-    h.schraeg(c, M, fh - 30, kw, 70, 16, "#fff");
-    h.text(c, d.kicker, M + kw / 2, fh + 5 + ks * 0.37, h.f(900, ks), "#0b0c10", "center", 0.06);
+    if (d.kicker) {
+      var ks = h.passGroesse(c, d.kicker, W - 2 * M - 60, 40, 22, 900, 0.06);
+      var kw = c.measureText(d.kicker).width + 56;
+      h.schraeg(c, M, fh - 30, kw, 70, 16, "#fff");
+      h.text(c, d.kicker, M + kw / 2, fh + 5 + ks * 0.37, h.f(900, ks), "#0b0c10", "center", 0.06);
+    }
     var fy = H - M - 72;
     var ti = h.passend(c, d.title.toUpperCase(), W - 2 * M, gross ? 3 : 2, 96, 60, 900, "Saira Condensed", 0.98);
     var tiy = fh + 76;
@@ -335,7 +360,7 @@ window.K888_OVERLAYS = [
     c.fillStyle = "#13151b"; c.fillRect(0, fy, W, H - fy);
     h.linie(c, 0, fy, W, 4);
     h.motto(c, d.footer, M, fy + 58, 36, "left");
-    h.text(c, "KREIDS888.COM", W - M, fy + 56, h.f(800, 30), "#9aa1ab", "right", 0.12);
+    h.text(c, K888T(h, "adresse", "KREIDS888.COM"), W - M, fy + 56, h.f(800, 30), "#9aa1ab", "right", 0.12);
     h.qr(c, d, W - M - 200, fh - 60 - 240, 200);
   } },
 
@@ -373,9 +398,11 @@ window.K888_OVERLAYS = [
     if (H > 1500) {
       var fy = 150, fh = H - fy - 300, fw = W - 2 * M;
       h.logo(c, M, 108, 50);
-      var ks = h.passGroesse(c, d.kicker, W - 2 * M - 340, 36, 18, 900, 0.08); kw = c.measureText(d.kicker).width + 48;
-      h.schraeg(c, W - M - kw - 10, 62, kw, 58, 12, h.ROT);
-      h.text(c, d.kicker, W - M - 10 - kw / 2, 91 + ks * 0.36, h.f(900, ks), "#fff", "center", 0.08);
+      if (d.kicker) {
+        var ks = h.passGroesse(c, d.kicker, W - 2 * M - 340, 36, 18, 900, 0.08); kw = c.measureText(d.kicker).width + 48;
+        h.schraeg(c, W - M - kw - 10, 62, kw, 58, 12, h.ROT);
+        h.text(c, d.kicker, W - M - 10 - kw / 2, 91 + ks * 0.36, h.f(900, ks), "#fff", "center", 0.08);
+      }
       h.fenster(c, d, M, fy, fw, fh);
       c.save(); c.beginPath(); c.rect(M, fy, fw, fh); c.clip();
       var g = c.createLinearGradient(0, fy + fh - 560, 0, fy + fh);
@@ -386,7 +413,7 @@ window.K888_OVERLAYS = [
       h.zeilen(c, t, M + 50, ty, "#dfe2e7");
       ti = h.passend(c, d.title.toUpperCase(), fw - 90, 3, 100, 60, 900, "Saira Condensed", 0.96);
       var tiy = ty - (t.hoehe ? 26 : 0) - ti.hoehe;
-      c.fillStyle = h.ROT; c.fillRect(M + 26, tiy + 6, 8, ti.hoehe + t.hoehe + 20);
+      if (ti.zeilen.length || t.zeilen.length) { c.fillStyle = h.ROT; c.fillRect(M + 26, tiy + 6, 8, ti.hoehe + t.hoehe + 20); }
       h.zeilen(c, ti, M + 50, tiy, "#fff", 0.6);
       h.linie(c, M, fy + fh, fw, 6);
       h.fuss(c, M, W - M, H - M, d.footer);
@@ -398,9 +425,11 @@ window.K888_OVERLAYS = [
       h.fenster(c, d, M, oy, ow, oh);
       h.linie(c, M, oy + oh, ow, 6);
       var cx = M + ow + 44, cw = W - M - cx;
-      var ks2 = h.passGroesse(c, d.kicker, cw - 60, 34, 16, 900, 0.06); kw = c.measureText(d.kicker).width + 44;
-      h.schraeg(c, cx + 12, oy, kw, 54, 12, h.ROT);
-      h.text(c, d.kicker, cx + 12 + kw / 2, oy + 27 + ks2 * 0.36, h.f(900, ks2), "#fff", "center", 0.06);
+      if (d.kicker) {
+        var ks2 = h.passGroesse(c, d.kicker, cw - 60, 34, 16, 900, 0.06); kw = c.measureText(d.kicker).width + 44;
+        h.schraeg(c, cx + 12, oy, kw, 54, 12, h.ROT);
+        h.text(c, d.kicker, cx + 12 + kw / 2, oy + 27 + ks2 * 0.36, h.f(900, ks2), "#fff", "center", 0.06);
+      }
       var titel = d.title.toUpperCase();
       ti = h.passend(c, titel, cw, 5, h.wortGroesse(c, titel, cw, 76, 900, "Saira Condensed"), 40, 900, "Saira Condensed", 0.98);
       h.zeilen(c, ti, cx, oy + 90, "#fff", 0.4);
@@ -433,9 +462,12 @@ window.K888_OVERLAYS = [
     c.fillStyle = "rgba(0,0,0,.22)"; for (var sy = 0; sy < H; sy += 6) c.fillRect(0, sy, W, 2);
     // Kopf: Terminal-Kicker
     var cur = Math.floor(t * 2) % 2 === 0 ? "_" : " ";
-    var ks = h.passGroesse(c, "> " + d.kicker + "_", W - 2 * M - 260, 44, 22, 800);
-    h.text(c, "> " + d.kicker + cur, M, 130, h.f(800, ks), "#00fff0", "left", 0.06);
-    h.text(c, "REC ● " + new Date(0, 0, 0, 0, 0, Math.floor(t)).toTimeString().slice(3, 8), M, 178, h.f(700, 28), "rgba(255,255,255,.7)", "left", 0.2);
+    if (d.kicker) {
+      var ks = h.passGroesse(c, "> " + d.kicker + "_", W - 2 * M - 260, 44, 22, 800);
+      h.text(c, "> " + d.kicker + cur, M, 130, h.f(800, ks), "#00fff0", "left", 0.06);
+    }
+    var rec = K888T(h, "rec", "REC ●");
+    if (rec) h.text(c, rec + " " + new Date(0, 0, 0, 0, 0, Math.floor(t)).toTimeString().slice(3, 8), M, 178, h.f(700, 28), "rgba(255,255,255,.7)", "left", 0.2);
     h.qr(c, d, W - M - 190, 80, 190);
     var fy = H - M;
     h.fuss(c, M, W - M, fy, d.footer);
@@ -482,11 +514,13 @@ window.K888_OVERLAYS = [
     var tiy = ty - 36 - ti.hoehe;
     c.save(); if (go) { c.shadowColor = "rgba(255,255,255,.8)"; c.shadowBlur = 30 * (1 - (t - 3.9) / 2.1); }
     h.zeilen(c, ti, M, tiy, "#fff", 0.6); c.restore();
-    var lo = go ? "LIGHTS OUT!" : d.kicker;
-    var ks = h.passGroesse(c, lo, W - 2 * M - 60, 46, 22, 900);
-    var kw = c.measureText(lo).width + 56;
-    h.schraeg(c, M, tiy - 96, kw, 66, 16, go ? "#fff" : h.ROT);
-    h.text(c, lo, M + 28, tiy - 63 + ks * 0.37, h.f(900, ks), go ? "#0b0c10" : "#fff");
+    var lout = K888T(h, "go", "LIGHTS OUT!"), lo = go && lout ? lout : d.kicker;
+    if (lo) {
+      var ks = h.passGroesse(c, lo, W - 2 * M - 60, 46, 22, 900);
+      var kw = c.measureText(lo).width + 56;
+      h.schraeg(c, M, tiy - 96, kw, 66, 16, go ? "#fff" : h.ROT);
+      h.text(c, lo, M + 28, tiy - 63 + ks * 0.37, h.f(900, ks), go ? "#0b0c10" : "#fff");
+    }
     h.qr(c, d, W - M - 190, gy + gh + 40, 190);
   } },
 
@@ -511,10 +545,11 @@ window.K888_OVERLAYS = [
     // Stoppuhr
     c.strokeStyle = "#fff"; c.lineWidth = 6; c.beginPath(); c.arc(M + 50, by + 40, 20, 0, Math.PI * 2); c.stroke();
     c.fillStyle = "#fff"; c.fillRect(M + 45, by + 8, 10, 8); c.fillRect(M + 48, by + 26, 4, 15);
-    h.text(c, "SCHNELLSTE RUNDE", M + 90, by + 54, h.f(900, 44), "#fff", "left", 0.08);
+    var fr = K888T(h, "titel", "SCHNELLSTE RUNDE");
+    h.text(c, fr, M + 90, by + 54, h.f(900, h.passGroesse(c, fr, bw - 120 - (d.strecke ? 320 : 0), 44, 22, 900, 0.08)), "#fff", "left", 0.08);
     if (d.strecke) h.text(c, d.strecke.toUpperCase(), M + bw - 30, by + 52, h.f(700, 30), "rgba(255,255,255,.85)", "right", 0.12);
     h.logo(c, M + 34, by + 150, 52);
-    h.text(c, "#888", M + 34, by + 200, h.f(800, 34), "#9aa1ab", "left", 0.1);
+    h.text(c, K888T(h, "startnummer", "#888"), M + 34, by + 200, h.f(800, 34), "#9aa1ab", "left", 0.1);
     // Rundenzeit tickt hoch und rastet ein
     var ziel = d.rundenzeit || "1:58.432", zeige = ziel;
     if (t < 1.6) {
@@ -530,7 +565,8 @@ window.K888_OVERLAYS = [
       var sx = M + 34 + i * (sw + 10), voll = Math.min(1, Math.max(0, (t - 0.5 - i * 0.35) / 0.35));
       c.fillStyle = "rgba(255,255,255,.1)"; c.fillRect(sx, by + 268, sw, 34);
       c.fillStyle = LILA; c.fillRect(sx, by + 268, sw * voll, 34);
-      h.text(c, "S" + (i + 1), sx + 12, by + 295, h.f(800, 26), "#fff", "left", 0.1);
+      var sk = K888T(h, "sektor", "S", "Buchstabe vor der Sektornummer");
+      if (sk) h.text(c, sk + (i + 1), sx + 12, by + 295, h.f(800, 26), "#fff", "left", 0.1);
     }
     c.restore();
     h.qr(c, d, W - M - 190, 80, 190);
@@ -598,10 +634,12 @@ window.K888_OVERLAYS = [
     c.save(); c.translate(M + 40, tiy); c.transform(1, 0, -0.18, 1, 0, 0);
     c.shadowColor = "rgba(225,19,36,.9)"; c.shadowOffsetX = 10; c.shadowOffsetY = 0; c.shadowBlur = 0;
     h.zeilen(c, ti, 0, 0, "#fff", 0.4); c.restore();
-    var ks = h.passGroesse(c, d.kicker, W - 2 * M - 60, 44, 22, 900);
-    var kw = c.measureText(d.kicker).width + 60;
-    h.schraeg(c, M, tiy - 90, kw, 64, 20, h.ROT);
-    h.text(c, d.kicker, M + 30, tiy - 58 + ks * 0.37, h.f(900, ks), "#fff");
+    if (d.kicker) {
+      var ks = h.passGroesse(c, d.kicker, W - 2 * M - 60, 44, 22, 900);
+      var kw = c.measureText(d.kicker).width + 60;
+      h.schraeg(c, M, tiy - 90, kw, 64, 20, h.ROT);
+      h.text(c, d.kicker, M + 30, tiy - 58 + ks * 0.37, h.f(900, ks), "#fff");
+    }
     h.qr(c, d, W - M - 190, 80, 190);
   } },
 
@@ -637,14 +675,14 @@ window.K888_OVERLAYS = [
     var g = c.createLinearGradient(cx - rad, 0, cx + rad, 0); g.addColorStop(0, "#00e5ff"); g.addColorStop(1, h.ROT);
     c.strokeStyle = g; c.beginPath(); c.arc(cx, cy, rad, a0, a0 + (a1 - a0) * Math.max(0.02, Math.min(1, wert))); c.stroke(); c.lineCap = "butt";
     h.text(c, String(kmh), cx, cy + 18, h.f(900, 76), "#fff", "center");
-    h.text(c, "KM/H", cx, cy + 60, h.f(700, 24), "#9aa1ab", "center", 0.2);
+    h.text(c, K888T(h, "kmh", "KM/H"), cx, cy + 60, h.f(700, 24), "#9aa1ab", "center", 0.2);
     // Gang
     var gx = M + 420;
     h.text(c, String(gang), gx + 70, hy + 270, h.f(900, 190), "#fff", "center");
-    h.text(c, "GANG", gx + 70, hy + 300, h.f(700, 24), "#9aa1ab", "center", 0.2);
+    h.text(c, K888T(h, "gang", "GANG"), gx + 70, hy + 300, h.f(700, 24), "#9aa1ab", "center", 0.2);
     // Gas / Bremse
     var bx = W - M - 230, bt = hy + 80, bhh = 210;
-    [["GAS", gas, "#22e06b"], ["BREMSE", bremse, "#ff1e2d"]].forEach(function (b, i) {
+    [[K888T(h, "gas", "GAS"), gas, "#22e06b"], [K888T(h, "bremse", "BREMSE"), bremse, "#ff1e2d"]].forEach(function (b, i) {
       var x = bx + i * 110;
       c.fillStyle = "#23262d"; c.fillRect(x, bt, 60, bhh);
       c.fillStyle = b[2]; c.fillRect(x, bt + bhh * (1 - b[1]), 60, bhh * b[1]);
@@ -683,8 +721,9 @@ window.K888_OVERLAYS = [
   // Breite inkl. Buchstabenabstand (wie h.text zeichnet)
   function breite(c, h, s, gr, w, sp) { c.save(); c.font = h.f(w, gr); if ("letterSpacing" in c) c.letterSpacing = Math.round(gr * (sp || 0)) + "px"; var b = c.measureText(s).width; c.restore(); return b; }
   function etikett(c, h, s, x, y, bg, fg, groesse) {
+    if (!s) return 0;
     var gs = groesse || 40;
-    c.font = h.f(900, gs); var w = c.measureText(s).width + gs * 1.3;
+    c.font = h.f(900, gs); var w = c.measureText(s).width + s.length * Math.round(gs * 0.06) + gs * 1.3;
     h.schraeg(c, x, y, w, gs * 1.5, gs * 0.35, bg);
     h.text(c, s, x + gs * 0.65, y + gs * 1.08, h.f(900, gs), fg || "#fff", "left", 0.06);
     return w;
@@ -736,14 +775,16 @@ window.K888_OVERLAYS = [
     c.save(); if (an) { c.shadowColor = "#ffc400"; c.shadowBlur = 30; }
     c.fillStyle = an ? "#ffc400" : "#7a6200"; c.beginPath(); c.moveTo(dx + 52, dy); c.lineTo(dx + 104, dy + 90); c.lineTo(dx, dy + 90); c.closePath(); c.fill(); c.restore();
     c.fillStyle = "#0b0c10"; c.fillRect(dx + 47, dy + 28, 10, 34); c.fillRect(dx + 47, dy + 68, 10, 10);
-    h.text(c, "UNFALL", dx + 128, dy + 78, h.f(900, 92), "#fff", "left", 0.04);
-    if (d.strecke) { var uw = breite(c, h, "UNFALL", 92, 900, 0.04); h.text(c, d.strecke.toUpperCase(), dx + 128 + uw + 28, dy + 76, h.f(700, 36), "#ffc400", "left", 0.1); }
+    var ut = K888T(h, "titel", "UNFALL"), ug = h.passGroesse(c, ut, W - dx - 128 - M - (d.strecke ? 300 : 0), 92, 40, 900, 0.04);
+    h.text(c, ut, dx + 128, dy + 78, h.f(900, ug), "#fff", "left", 0.04);
+    if (d.strecke) { var uw = ut ? breite(c, h, ut, ug, 900, 0.04) + 28 : 0; h.text(c, d.strecke.toUpperCase(), dx + 128 + uw, dy + 76, h.f(700, 36), "#ffc400", "left", 0.1); }
     c.restore();
     // Streckenposten-Lichter + REPLAY
     blinklicht(c, M + 26, 110, 22, d.zeit == null || Math.floor(t * 4) % 2 === 0, "#ffc400");
     blinklicht(c, M + 82, 110, 22, d.zeit != null && Math.floor(t * 4) % 2 === 1, "#ffc400");
-    if (d.zeit == null || Math.floor(t * 2) % 2 === 0) { c.fillStyle = "#ff2a35"; c.beginPath(); c.arc(W - M - 196, 110, 13, 0, Math.PI * 2); c.fill(); }
-    h.text(c, "REPLAY", W - M, 124, h.f(900, 42), "#fff", "right", 0.12);
+    var urp = K888T(h, "replay", "REPLAY");
+    if (urp && (d.zeit == null || Math.floor(t * 2) % 2 === 0)) { c.fillStyle = "#ff2a35"; c.beginPath(); c.arc(W - M - Math.round(breite(c, h, urp, 42, 900, 0.12) + 50.7), 110, 13, 0, Math.PI * 2); c.fill(); }
+    h.text(c, urp, W - M, 124, h.f(900, 42), "#fff", "right", 0.12);
     h.qr(c, d, W - M - 190, 170, 190);
   } },
 
@@ -769,11 +810,13 @@ window.K888_OVERLAYS = [
     var hupf = d.zeit == null ? 1 : 1 + Math.sin(Math.min(1, Math.max(0, (t - 0.3) / 0.7)) * Math.PI) * 0.18;
     var py = tiy - 60;
     c.save(); c.globalAlpha = ein; c.translate(M, py); c.scale(hupf, hupf);
-    c.font = h.f(900, 230); var pw = c.measureText("P" + pl).width;
-    h.text(c, "P", 0, 0, h.f(900, 230), h.ROT, "left", 0);
-    h.text(c, pl, c.measureText("P").width + 10, 0, h.f(900, 230), "#fff", "left", 0);
+    var vp = K888T(h, "p", "P", "Steht vor der Platzierung");
+    c.font = h.f(900, 230); var vpw = vp ? c.measureText(vp).width + 10 : 0, pw = c.measureText(vp + pl).width;
+    h.text(c, vp, 0, 0, h.f(900, 230), h.ROT, "left", 0);
+    h.text(c, pl, vpw, 0, h.f(900, 230), "#fff", "left", 0);
     c.restore();
-    h.text(c, "ZIELEINLAUF", M + pw * hupf + 40, py - 120, h.f(900, 56), "#fff", "left", 0.08);
+    var zt = K888T(h, "titel", "ZIELEINLAUF");
+    h.text(c, zt, M + pw * hupf + 40, py - 120, h.f(900, h.passGroesse(c, zt, W - M - (M + pw * hupf + 40), 56, 26, 900, 0.08)), "#fff", "left", 0.08);
     if (d.strecke) h.text(c, d.strecke.toUpperCase(), M + pw * hupf + 40, py - 66, h.f(700, 34), "rgba(255,255,255,.75)", "left", 0.14);
     if (d.zeit != null) konfetti(c, W, H, tl, 70, ["#e11324", "#ffffff", "#ffffff", "#1a1d24"], 0);
     h.qr(c, d, W - M - 190, 230, 190);
@@ -789,7 +832,8 @@ window.K888_OVERLAYS = [
     c.save(); c.globalAlpha = ein; c.translate(0, (1 - ein) * 60);
     c.fillStyle = "rgba(9,14,12,.93)"; c.fillRect(M, by, bw, bh);
     c.fillStyle = GRUEN; c.fillRect(M, by, bw, 70);
-    h.text(c, "PERSÖNLICHE BESTZEIT", M + 30, by + 51, h.f(900, 42), "#04140b", "left", 0.06);
+    var pbt = K888T(h, "titel", "PERSÖNLICHE BESTZEIT");
+    h.text(c, pbt, M + 30, by + 51, h.f(900, h.passGroesse(c, pbt, bw - 60 - (d.strecke ? 300 : 0), 42, 22, 900, 0.06)), "#04140b", "left", 0.06);
     if (d.strecke) h.text(c, d.strecke.toUpperCase(), M + bw - 30, by + 49, h.f(800, 30), "#04140b", "right", 0.1);
     // Mini-Strecke mit fahrendem Punkt
     var kx = M + 40, ky = by + 100, kw = 300, kh = 170;
@@ -818,7 +862,8 @@ window.K888_OVERLAYS = [
       var sx = M + kw + 86 + i * (sw + 8), voll = d.zeit == null ? 1 : ease((t - 0.3 - i * 0.6) / 0.5);
       c.fillStyle = "rgba(255,255,255,.1)"; c.fillRect(sx, by + 236, sw, 34);
       c.fillStyle = GRUEN; c.fillRect(sx, by + 236, sw * voll, 34);
-      h.text(c, "S" + (i + 1), sx + 10, by + 262, h.f(800, 24), "#04140b", "left", 0.1);
+      var sk = K888T(h, "sektor", "S", "Buchstabe vor der Sektornummer");
+      if (sk) h.text(c, sk + (i + 1), sx + 10, by + 262, h.f(800, 24), "#04140b", "left", 0.1);
     }
     c.restore();
     h.qr(c, d, W - M - 190, 80, 190);
@@ -842,9 +887,12 @@ window.K888_OVERLAYS = [
       c.fillStyle = s % 2 ? GELB : "#f5c000"; c.fillRect(wx, wy, fw / 15 + 1, fh);
     }
     var gx = fx + fw + 40;
-    c.fillStyle = GELB; c.font = h.f(900, 70); var gw = c.measureText("GELBE FLAGGE").width + 50;
-    h.schraeg(c, gx, fy + 4, gw, 92, 18, GELB);
-    h.text(c, "GELBE FLAGGE", gx + 25, fy + 76, h.f(900, 70), "#0b0c10", "left", 0.03);
+    var gft = K888T(h, "titel", "GELBE FLAGGE"), gfs = h.passGroesse(c, gft, W - M - gx - 60, 70, 30, 900, 0.03);
+    if (gft) {
+      c.fillStyle = GELB; c.font = h.f(900, gfs); var gw = c.measureText(gft).width + 50;
+      h.schraeg(c, gx, fy + 4, gw, 92, 18, GELB);
+      h.text(c, gft, gx + 25, fy + 76, h.f(900, gfs), "#0b0c10", "left", 0.03);
+    }
     if (d.strecke) h.text(c, d.strecke.toUpperCase(), gx + 6, fy + 136, h.f(800, 34), GELB, "left", 0.12);
     h.qr(c, d, W - M - 190, 200, 190);
   } },
@@ -867,8 +915,9 @@ window.K888_OVERLAYS = [
     c.fillStyle = GRUEN; c.fillRect(bx, by, 10, bh);
     c.save(); c.beginPath(); c.rect(bx, by, bw, bh); c.clip();
     var p = d.zeit == null ? 1 : ease((t - 0.6) / 0.6);
-    h.text(c, "P" + alt, bx + 50, by + 195 + p * bh, h.f(900, 190), "rgba(255,255,255,.5)", "left", 0);
-    h.text(c, "P" + neu, bx + 50, by + 195 - (1 - p) * bh, h.f(900, 190), "#fff", "left", 0);
+    var vp = K888T(h, "p", "P", "Steht vor der Platzierung"), vpg = h.passGroesse(c, vp + alt, bw - 70, 190, 60, 900);
+    h.text(c, vp + alt, bx + 50, by + 195 + p * bh, h.f(900, vpg), "rgba(255,255,255,.5)", "left", 0);
+    h.text(c, vp + neu, bx + 50, by + 195 - (1 - p) * bh, h.f(900, vpg), "#fff", "left", 0);
     c.restore();
     // Pfeil pulsiert
     var puls = d.zeit == null ? 1 : 1 + 0.12 * Math.sin(tl * 6);
@@ -876,8 +925,9 @@ window.K888_OVERLAYS = [
     c.shadowColor = GRUEN; c.shadowBlur = 30; c.fillStyle = GRUEN;
     c.beginPath(); c.moveTo(0, -80); c.lineTo(62, 0); c.lineTo(22, 0); c.lineTo(22, 70); c.lineTo(-22, 70); c.lineTo(-22, 0); c.lineTo(-62, 0); c.closePath(); c.fill();
     c.restore();
-    h.text(c, "POSITION", bx + bw + 180, by + 100, h.f(900, 54), "#fff", "left", 0.06);
-    h.text(c, "GEWONNEN", bx + bw + 180, by + 160, h.f(900, 54), GRUEN, "left", 0.06);
+    var ue1 = K888T(h, "zeile1", "POSITION"), ue2 = K888T(h, "zeile2", "GEWONNEN"), uem = W - M - (bx + bw + 180);
+    h.text(c, ue1, bx + bw + 180, by + 100, h.f(900, h.passGroesse(c, ue1, uem, 54, 22, 900, 0.06)), "#fff", "left", 0.06);
+    h.text(c, ue2, bx + bw + 180, by + 160, h.f(900, h.passGroesse(c, ue2, uem, 54, 22, 900, 0.06)), GRUEN, "left", 0.06);
     etikett(c, h, d.kicker, M, by - 96, h.ROT, "#fff", 36);
     h.qr(c, d, W - M - 190, 80, 190);
   } },
@@ -894,21 +944,24 @@ window.K888_OVERLAYS = [
     c.fillStyle = "#9aa1ab"; c.fillRect(-6, -60, 12, 60);
     c.fillStyle = "#0b0c10"; c.fillRect(-tw / 2, 0, tw, th);
     c.strokeStyle = "#e5e7eb"; c.lineWidth = 6; c.strokeRect(-tw / 2 + 3, 3, tw - 6, th - 6);
-    var zeilen = ["BOX", "P" + String(d.platz || "6").replace(/^p/i, ""), "888"];
-    zeilen.forEach(function (z, i) { h.text(c, z, 0, 92 + i * 100, h.f(900, 90), i === 0 ? "#ffd400" : "#fff", "center", 0.06); });
+    var zeilen = [K888T(h, "tafel1", "BOX"), K888T(h, "p", "P", "Steht vor der Platzierung") + String(d.platz || "6").replace(/^p/i, ""), K888T(h, "tafel3", "888")];
+    zeilen.forEach(function (z, i) { h.text(c, z, 0, 92 + i * 100, h.f(900, h.passGroesse(c, z, tw - 40, 90, 30, 900, 0.06)), i === 0 ? "#ffd400" : "#fff", "center", 0.06); });
     c.restore();
     // Standzeit läuft
     var ziel = parseFloat(String(d.rundenzeit || "24.8").replace(",", ".")) || 24.8;
     var s = d.zeit == null ? ziel : Math.min(ziel, ziel * ease(t / 3));
     var sx = tx + tw + 70, sy = ty + 20;
-    h.text(c, "STANDZEIT", sx, sy + 40, h.f(800, 34), "rgba(255,255,255,.75)", "left", 0.14);
+    h.text(c, K888T(h, "standzeit", "STANDZEIT"), sx, sy + 40, h.f(800, 34), "rgba(255,255,255,.75)", "left", 0.14);
     h.text(c, s.toFixed(1) + " s", sx, sy + 150, h.f(900, 120), "#fff", "left", 0.02);
     var bw2 = W - M - sx; c.fillStyle = "rgba(255,255,255,.12)"; c.fillRect(sx, sy + 180, bw2, 16);
     c.fillStyle = "#ffd400"; c.fillRect(sx, sy + 180, bw2 * (s / ziel), 16);
     // Pit-Limiter blinkt blau/gelb
     var an = d.zeit == null || Math.floor(tl * 3) % 2 === 0;
-    c.fillStyle = an ? "#1f6bff" : "#ffd400"; c.fillRect(sx, sy + 228, bw2, 70);
-    h.text(c, "PIT LIMITER 60", sx + bw2 / 2, sy + 276, h.f(900, 42), an ? "#fff" : "#0b0c10", "center", 0.08);
+    var lim = K888T(h, "limiter", "PIT LIMITER 60");
+    if (lim) {
+      c.fillStyle = an ? "#1f6bff" : "#ffd400"; c.fillRect(sx, sy + 228, bw2, 70);
+      h.text(c, lim, sx + bw2 / 2, sy + 276, h.f(900, h.passGroesse(c, lim, bw2 - 30, 42, 20, 900, 0.08)), an ? "#fff" : "#0b0c10", "center", 0.08);
+    }
     h.qr(c, d, W - M - 190, 80, 190);
   } },
 
@@ -932,9 +985,11 @@ window.K888_OVERLAYS = [
     c.save(); c.translate(mx, my); c.scale(sk, sk); c.globalAlpha = ein;
     var gg = c.createLinearGradient(0, -140, 0, 60); gg.addColorStop(0, "#fff3c4"); gg.addColorStop(0.5, GOLD); gg.addColorStop(1, "#b07a10");
     c.shadowColor = "rgba(255,200,58,.8)"; c.shadowBlur = 50;
-    c.font = h.f(900, 260); c.textAlign = "center"; c.fillStyle = gg; c.fillText("P" + pl, 0, 80);
+    var spl = K888T(h, "p", "P", "Steht vor der Platzierung") + pl;
+    c.font = h.f(900, h.passGroesse(c, spl, W - 2 * M, 260, 80, 900)); c.textAlign = "center"; c.fillStyle = gg; c.fillText(spl, 0, 80);
     c.restore();
-    h.text(c, "SIEG", mx, my + 150, h.f(900, 64), GOLD, "center", 0.3);
+    var sgt = K888T(h, "titel", "SIEG");
+    h.text(c, sgt, mx, my + 150, h.f(900, h.passGroesse(c, sgt, W - 2 * M, 64, 26, 900, 0.3)), GOLD, "center", 0.3);
     if (d.strecke) h.text(c, d.strecke.toUpperCase(), mx, my - 190, h.f(800, 36), "#fff", "center", 0.2);
     // Funkeln
     for (var k = 0; k < 14; k++) {
@@ -957,21 +1012,25 @@ window.K888_OVERLAYS = [
     // Eckwinkel
     h.ecken(c, 40, 40, W - 80, H - 80, 80, 8, "rgba(255,255,255,.85)");
     var an = d.zeit == null || Math.floor(tl * 2) % 2 === 0;
-    if (an) { c.fillStyle = "#ff2a35"; c.beginPath(); c.arc(M + 30, 110, 16, 0, Math.PI * 2); c.fill(); }
-    h.text(c, "REC", M + 60, 124, h.f(900, 42), "#fff", "left", 0.1);
+    var rpr = K888T(h, "rec", "REC");
+    if (an && rpr) { c.fillStyle = "#ff2a35"; c.beginPath(); c.arc(M + 30, 110, 16, 0, Math.PI * 2); c.fill(); }
+    h.text(c, rpr, M + 60, 124, h.f(900, 42), "#fff", "left", 0.1);
     var bild = Math.floor(tl * 25), tc = ["00", String(Math.floor(bild / 1500) % 60).padStart(2, "0"), String(Math.floor(bild / 25) % 60).padStart(2, "0"), String(bild % 25).padStart(2, "0")].join(":");
     h.text(c, tc, W - M - 10, 124, h.f(800, 40), "#fff", "right", 0.08);
-    h.text(c, "0.5×  ZEITLUPE", W - M - 10, 172, h.f(700, 28), "rgba(255,255,255,.75)", "right", 0.12);
+    h.text(c, K888T(h, "zeitlupe", "0.5×  ZEITLUPE"), W - M - 10, 172, h.f(700, 28), "rgba(255,255,255,.75)", "right", 0.12);
     var tiy = block(c, W, H, d, h, M, "#fff", 3);
     // REPLAY-Band mit Wischblende
-    var by = tiy - 150, wisch = d.zeit == null ? 1 : ease(t / 0.6);
-    c.save(); c.beginPath(); c.rect(0, by - 10, W * wisch + 60, 130); c.clip();
-    h.schraeg(c, -40, by, W * 0.78, 110, 30, h.ROT);
-    h.text(c, "REPLAY", M, by + 88, h.f(900, 96), "#fff", "left", 0.14);
-    var rw = breite(c, h, "REPLAY", 96, 900, 0.14) + 40;
-    if (d.strecke) h.text(c, d.strecke.toUpperCase(), M + rw, by + 82, h.f(800, 34), "rgba(255,255,255,.9)", "left", 0.12);
-    c.restore();
-    if (d.zeit != null && t < 0.6) { c.fillStyle = "#fff"; c.fillRect(W * wisch, by - 10, 18, 130); }
+    var by = tiy - 150, wisch = d.zeit == null ? 1 : ease(t / 0.6), rpt = K888T(h, "titel", "REPLAY");
+    if (rpt) {
+      var rgs = h.passGroesse(c, rpt, W * 0.62, 96, 40, 900, 0.14);
+      c.save(); c.beginPath(); c.rect(0, by - 10, W * wisch + 60, 130); c.clip();
+      h.schraeg(c, -40, by, W * 0.78, 110, 30, h.ROT);
+      h.text(c, rpt, M, by + 88, h.f(900, rgs), "#fff", "left", 0.14);
+      var rw = breite(c, h, rpt, rgs, 900, 0.14) + 40;
+      if (d.strecke) h.text(c, d.strecke.toUpperCase(), M + rw, by + 82, h.f(800, 34), "rgba(255,255,255,.9)", "left", 0.12);
+      c.restore();
+      if (d.zeit != null && t < 0.6) { c.fillStyle = "#fff"; c.fillRect(W * wisch, by - 10, 18, 130); }
+    }
     h.qr(c, d, W - M - 190, 220, 190);
   } },
 
@@ -983,7 +1042,7 @@ window.K888_OVERLAYS = [
     var fy = H - M;
     h.fuss(c, M, W - M, fy, d.footer);
     // Funk-Box mit Text als Funkspruch
-    var bw = W - 2 * M, tx = h.passend(c, d.text || "Box, box, box!", bw - 80, 5, 42, 32, 600, "Barlow", 1.36);
+    var bw = W - 2 * M, tx = h.passend(c, d.text || K888T(h, "funkspruch", "Box, box, box!"), bw - 80, 5, 42, 32, 600, "Barlow", 1.36);
     var bh = 150 + tx.hoehe + 50, by = fy - 110 - bh, ein = d.zeit == null ? 1 : ease(t / 0.5);
     c.save(); c.globalAlpha = ein; c.translate(0, (1 - ein) * 40);
     c.fillStyle = "rgba(10,11,14,.92)"; c.fillRect(M, by, bw, bh);
@@ -991,7 +1050,8 @@ window.K888_OVERLAYS = [
     // Headset-Symbol
     c.strokeStyle = "#fff"; c.lineWidth = 7; c.beginPath(); c.arc(M + 70, by + 70, 28, Math.PI, 0); c.stroke();
     c.fillStyle = "#fff"; c.fillRect(M + 36, by + 66, 14, 26); c.fillRect(M + 90, by + 66, 14, 26);
-    h.text(c, "TEAMFUNK", M + 124, by + 84, h.f(900, 48), "#fff", "left", 0.1);
+    var tft = K888T(h, "titel", "TEAMFUNK");
+    h.text(c, tft, M + 124, by + 84, h.f(900, h.passGroesse(c, tft, 280, 48, 22, 900, 0.1)), "#fff", "left", 0.1);
     // Ausschläge
     var n = 26, wx = M + 420, ww = bw - 420 - 40, sp = ww / n;
     for (var i = 0; i < n; i++) {
@@ -1067,16 +1127,18 @@ window.K888_OVERLAYS = [
     h.bild(c, d, 0, 0, W, H);
     h.verlauf(c, 0, 0, 0, H, [[0, "rgba(10,11,14,.35)"], [0.45, "rgba(10,11,14,.4)"], [1, "rgba(10,11,14,.97)"]]);
     var tiy = block(c, W, H, d, h, M, "#fff", 3);
-    var wann = (d.wann || "Sonntag · 20:00 Uhr").toUpperCase();
+    var wann = (d.wann || K888T(h, "wann", "Sonntag · 20:00 Uhr")).toUpperCase();
     var ws = h.passGroesse(c, wann, W - 2 * M, 110, 50, 900);
     h.text(c, wann, M, tiy - 40, h.f(900, ws), h.ROT, "left", 0.02);
-    etikett(c, h, "RENNANKÜNDIGUNG" + (d.strecke ? " · " + d.strecke.toUpperCase() : ""), M, tiy - 40 - ws - 100, "#fff", "#0b0c10", 36);
+    var ra = [K888T(h, "etikett", "RENNANKÜNDIGUNG"), d.strecke ? d.strecke.toUpperCase() : ""].filter(Boolean).join(" · ");
+    if (ra) etikett(c, h, ra, M, tiy - 40 - ws - 100, "#fff", "#0b0c10", 36);
     // Tor fährt hoch (0.6 s warten, dann 2 s)
     var auf = ease((t - 0.6) / 2), unten = (H + 30) * (1 - auf);
     lichtspalt(c, W, unten, auf > 0 && auf < 1 ? 1 : 0);
+    var torT = K888T(h, "tor", "RENNTAG");
     rolltor(c, W, H, h, unten, function (u) {
       h.logo(c, W / 2 - 170, u - 220, 92);
-      h.text(c, "RENNTAG", W / 2, u - 120, h.f(900, 64), "#ffc400", "center", 0.3);
+      h.text(c, torT, W / 2, u - 120, h.f(900, 64), "#ffc400", "center", 0.3);
     });
     c.fillStyle = "#16181d"; c.fillRect(0, 0, W, 70); c.fillStyle = "#2b2f38"; c.fillRect(0, 62, W, 8);
     rundumleuchte(c, W - 70, 120, tl, "rgba(255,170,0,.95)");
@@ -1090,11 +1152,11 @@ window.K888_OVERLAYS = [
     h.verlauf(c, 0, 0, 0, H, [[0, "rgba(10,11,14,.35)"], [0.45, "rgba(10,11,14,.4)"], [1, "rgba(10,11,14,.97)"]]);
     block(c, W, H, d, h, M, "#fff", 3);
     var zu = ease((t - 1.2) / 2.2), unten = (H + 30) * zu;
+    var pl = String(d.platz || "").replace(/^p/i, ""), rnd = K888T(h, "titel", "RENNENDE"), tpl = pl ? K888T(h, "p", "P", "Steht vor der Platzierung") + pl : "";
     rolltor(c, W, H, h, unten, function (u) {
-      var pl = String(d.platz || "").replace(/^p/i, "");
       var my = u - H / 2 - 40;
-      h.text(c, "RENNENDE", W / 2, my - 40, h.f(900, 120), "#fff", "center", 0.08);
-      if (pl) { h.text(c, "P" + pl, W / 2, my + 190, h.f(900, 220), h.ROT, "center", 0.02); }
+      h.text(c, rnd, W / 2, my - 40, h.f(900, h.passGroesse(c, rnd, W - 2 * M, 120, 44, 900, 0.08)), "#fff", "center", 0.08);
+      if (pl) h.text(c, tpl, W / 2, my + 190, h.f(900, h.passGroesse(c, tpl, W - 2 * M, 220, 70, 900, 0.02)), h.ROT, "center", 0.02);
       if (d.strecke) h.text(c, d.strecke.toUpperCase(), W / 2, my + (pl ? 260 : 40), h.f(800, 40), "#ffc400", "center", 0.2);
       h.logo(c, W / 2 - 115, u - 120, 62);
     });
@@ -1126,10 +1188,11 @@ window.K888_OVERLAYS = [
       c.fillStyle = h.ROT; c.fillRect(links ? x + w - 14 : x, 0, 14, H);
     }
     fluegel(0, halb, true); fluegel(W - halb, halb, false);
+    var fz1 = K888T(h, "zeile1", "START"), fz2 = K888T(h, "zeile2", "FREI");
     if (halb > 120) {
       c.save(); c.beginPath(); c.rect(0, 0, halb, H); c.rect(W - halb, 0, halb, H); c.clip();
-      h.text(c, "START", W / 2, H / 2 - 20, h.f(900, 170), "#fff", "center", 0.1);
-      h.text(c, "FREI", W / 2, H / 2 + 140, h.f(900, 170), h.ROT, "center", 0.1);
+      h.text(c, fz1, W / 2, H / 2 - 20, h.f(900, h.passGroesse(c, fz1, W - 80, 170, 60, 900, 0.1)), "#fff", "center", 0.1);
+      h.text(c, fz2, W / 2, H / 2 + 140, h.f(900, h.passGroesse(c, fz2, W - 80, 170, 60, 900, 0.1)), h.ROT, "center", 0.1);
       c.restore();
     }
     h.qr(c, d, W - M - 190, 80, 190);
@@ -1144,19 +1207,19 @@ window.K888_OVERLAYS = [
     var cx = W / 2, cy = Math.min(tiy - 300, H * 0.36), r = 210;
     c.save();
     c.strokeStyle = "rgba(255,255,255,.12)"; c.lineWidth = 26; c.beginPath(); c.arc(cx, cy, r, 0, Math.PI * 2); c.stroke();
-    var zahl, anteil;
-    if (t == null) { zahl = "LIVE"; anteil = 1; }
+    var zahl, anteil, cdLive = K888T(h, "live", "LIVE"), cdLos = K888T(h, "los", "LOS");
+    if (t == null) { zahl = cdLive; anteil = 1; }
     else if (t < 3) { zahl = String(3 - Math.floor(t)); anteil = 1 - (t % 1); }
-    else { zahl = "LOS"; anteil = 1; }
+    else { zahl = cdLos; anteil = 1; }
     c.strokeStyle = h.ROT; c.lineCap = "round"; c.shadowColor = h.ROT; c.shadowBlur = 30;
     c.beginPath(); c.arc(cx, cy, r, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * anteil); c.stroke();
     c.restore();
     var sk = t == null ? 1 : t < 3 ? 1 + 0.25 * Math.pow(1 - (t % 1), 4) : 1 + 0.08 * Math.sin((t - 3) * 12);
     c.save(); c.translate(cx, cy); c.scale(sk, sk);
-    var zs = zahl.length > 1 ? 150 : 240;
+    var zs = zahl.length > 1 ? Math.min(150, h.passGroesse(c, zahl, r * 1.6, 150, 40, 900)) : 240;
     h.text(c, zahl, 0, zs * 0.36, h.f(900, zs), t != null && t >= 3 ? h.ROT : "#fff", "center", 0.02);
     c.restore();
-    var unter = (d.wann || "Gleich geht's los").toUpperCase();
+    var unter = (d.wann || K888T(h, "unter", "Gleich geht's los")).toUpperCase();
     h.text(c, unter, cx, cy + r + 90, h.f(900, h.passGroesse(c, unter, W - 2 * M, 60, 30, 900)), "#fff", "center", 0.1);
     h.qr(c, d, W - M - 190, 80, 190);
   } },
@@ -1169,9 +1232,10 @@ window.K888_OVERLAYS = [
     var tiy = block(c, W, H, d, h, M, "#fff", 2);
     var mein = parseInt(String(d.platz || "3").replace(/\D/g, ""), 10) || 3;
     var plaetze = 8, oben = 200, unten = tiy - 70, zh = Math.min(120, (unten - oben) / (plaetze / 2 + 0.5));
-    h.text(c, "STARTAUFSTELLUNG", M, oben - 60, h.f(900, 54), "#fff", "left", 0.08);
+    var sat = K888T(h, "titel", "STARTAUFSTELLUNG");
+    h.text(c, sat, M, oben - 60, h.f(900, h.passGroesse(c, sat, W - 2 * M - (d.strecke ? 320 : 0), 54, 24, 900, 0.08)), "#fff", "left", 0.08);
     if (d.strecke) h.text(c, d.strecke.toUpperCase(), W - M, oben - 62, h.f(800, 32), "rgba(255,255,255,.75)", "right", 0.14);
-    var start = Math.max(1, Math.min(mein - 3, 99));
+    var start = Math.max(1, Math.min(mein - 3, 99)), ichTxt = K888T(h, "ich", "KREIDS888 #888"), vp = K888T(h, "p", "P", "Steht vor der Platzierung");
     for (var i = 0; i < plaetze; i++) {
       var p = start + i, links = i % 2 === 0, reihe = Math.floor(i / 2);
       var bw = (W - 2 * M - 40) / 2, bx = links ? M : M + bw + 40, by = oben + reihe * zh + (links ? 0 : zh * 0.5);
@@ -1182,8 +1246,8 @@ window.K888_OVERLAYS = [
       c.fillStyle = ich ? h.ROT : "rgba(20,22,28,.9)"; c.fillRect(bx, by, bw, zh - 14);
       if (ich && d.zeit != null) { c.shadowColor = h.ROT; c.shadowBlur = 20 + 20 * Math.sin(tl * 5); c.fillRect(bx, by, bw, zh - 14); c.shadowBlur = 0; }
       c.fillStyle = ich ? "#fff" : "rgba(255,255,255,.18)"; c.fillRect(bx, by, 8, zh - 14);
-      h.text(c, "P" + p, bx + 30, by + (zh - 14) * 0.68, h.f(900, (zh - 14) * 0.55), "#fff", "left", 0.02);
-      h.text(c, ich ? "KREIDS888 #888" : "", bx + bw - 24, by + (zh - 14) * 0.64, h.f(900, (zh - 14) * 0.3), "#fff", "right", 0.06);
+      h.text(c, vp + p, bx + 30, by + (zh - 14) * 0.68, h.f(900, Math.min((zh - 14) * 0.55, h.passGroesse(c, vp + p, bw * 0.45, (zh - 14) * 0.55, 16, 900, 0.02))), "#fff", "left", 0.02);
+      h.text(c, ich ? ichTxt : "", bx + bw - 24, by + (zh - 14) * 0.64, h.f(900, (zh - 14) * 0.3), "#fff", "right", 0.06);
       c.restore();
     }
     h.qr(c, d, W - M - 190, 80, 190);
@@ -1209,8 +1273,9 @@ window.K888_OVERLAYS = [
     c.shadowColor = BLAU; c.shadowBlur = 30; c.fillStyle = BLAU;
     c.beginPath(); c.moveTo(0, -55); c.bezierCurveTo(30, -15, 45, 5, 45, 25); c.arc(0, 25, 45, 0, Math.PI); c.bezierCurveTo(-45, 5, -30, -15, 0, -55); c.fill();
     c.restore();
-    h.text(c, "REGEN", M + 120, dy + 82, h.f(900, 104), "#fff", "left", 0.06);
-    if (d.strecke) h.text(c, d.strecke.toUpperCase(), M + 128 + breite(c, h, "REGEN", 104, 900, 0.06) + 20, dy + 78, h.f(800, 36), BLAU, "left", 0.12);
+    var rgt = K888T(h, "titel", "REGEN"), rgg = h.passGroesse(c, rgt, W - 2 * M - 120 - (d.strecke ? 300 : 0), 104, 40, 900, 0.06);
+    h.text(c, rgt, M + 120, dy + 82, h.f(900, rgg), "#fff", "left", 0.06);
+    if (d.strecke) h.text(c, d.strecke.toUpperCase(), M + 128 + (rgt ? breite(c, h, rgt, rgg, 900, 0.06) + 20 : 0), dy + 78, h.f(800, 36), BLAU, "left", 0.12);
     h.qr(c, d, W - M - 190, 80, 190);
   } },
 
@@ -1240,9 +1305,9 @@ window.K888_OVERLAYS = [
     var hh = Math.floor(sek / 3600), mm = Math.floor(sek % 3600 / 60), ss = Math.floor(sek % 60);
     var txt = (hh < 10 ? "0" : "") + hh + ":" + (mm < 10 ? "0" : "") + mm + ":" + (ss < 10 ? "0" : "") + ss;
     var tx = cx + r + 50;
-    h.text(c, "RENNZEIT", tx, cy - 70, h.f(800, 34), "rgba(255,255,255,.7)", "left", 0.16);
+    h.text(c, K888T(h, "rennzeit", "RENNZEIT"), tx, cy - 70, h.f(800, 34), "rgba(255,255,255,.7)", "left", 0.16);
     h.text(c, txt, tx, cy + 30, h.f(900, h.passGroesse(c, txt, W - M - tx, 110, 50, 900)), "#fff", "left", 0.02);
-    var unter = (d.wann || "24 h").toUpperCase() + (d.strecke ? " · " + d.strecke.toUpperCase() : "");
+    var unter = [(d.wann || K888T(h, "dauer", "24 h")).toUpperCase(), d.strecke ? d.strecke.toUpperCase() : ""].filter(Boolean).join(" · ");
     h.text(c, unter, tx, cy + 90, h.f(800, h.passGroesse(c, unter, W - M - tx, 38, 22, 800)), h.ROT, "left", 0.12);
     h.qr(c, d, W - M - 190, 80, 190);
   } },
@@ -1259,8 +1324,9 @@ window.K888_OVERLAYS = [
     var fy = tiy - 200;
     wehendeFlagge(c, M, fy, 170, 115, tl, "#e11324", "#c50f1e");
     var gx = M + 210;
-    h.text(c, "ROTE FLAGGE", gx, fy + 62, h.f(900, 80), "#fff", "left", 0.04);
-    h.text(c, "RENNABBRUCH" + (d.strecke ? " · " + d.strecke.toUpperCase() : ""), gx + 4, fy + 116, h.f(800, 36), "#ff4b55", "left", 0.14);
+    var rft = K888T(h, "titel", "ROTE FLAGGE"), rfu = [K888T(h, "unter", "RENNABBRUCH"), d.strecke ? d.strecke.toUpperCase() : ""].filter(Boolean).join(" · ");
+    h.text(c, rft, gx, fy + 62, h.f(900, h.passGroesse(c, rft, W - M - gx, 80, 30, 900, 0.04)), "#fff", "left", 0.04);
+    h.text(c, rfu, gx + 4, fy + 116, h.f(800, h.passGroesse(c, rfu, W - M - gx, 36, 18, 800, 0.14)), "#ff4b55", "left", 0.14);
     h.qr(c, d, W - M - 190, 200, 190);
   } },
 
@@ -1280,14 +1346,18 @@ window.K888_OVERLAYS = [
     var tiy = block(c, W, H, d, h, M, "#fff", 2);
     var ein = d.zeit == null ? 1 : ease(t / 0.7), by = tiy - 330;
     c.save(); c.globalAlpha = ein; c.translate(0, (1 - ein) * 50);
-    h.text(c, "POLE", M, by + 120, h.f(900, 150), "#fff", "left", 0.08);
-    h.text(c, "POSITION", M + breite(c, h, "POLE", 150, 900, 0.08) + 24, by + 120, h.f(900, 150), GOLD, "left", 0.08);
+    var pt = K888T(h, "titel", "POLE POSITION"), pteile = pt.split(/\s+/), pw1 = pteile.shift() || "", pw2 = pteile.join(" ");
+    var pgs = 150;
+    for (; pgs > 50; pgs -= 2) if (breite(c, h, pw1, pgs, 900, 0.08) + (pw2 ? pgs * 0.16 + breite(c, h, pw2, pgs, 900, 0.08) : 0) <= W - 2 * M + pgs * 0.08) break;
+    h.text(c, pw1, M, by + 120, h.f(900, pgs), "#fff", "left", 0.08);
+    if (pw2) h.text(c, pw2, M + breite(c, h, pw1, pgs, 900, 0.08) + pgs * 0.16, by + 120, h.f(900, pgs), GOLD, "left", 0.08);
     var zt = d.rundenzeit || "1:58.432";
     c.fillStyle = "rgba(10,11,14,.88)"; c.fillRect(M, by + 160, W - 2 * M, 120);
     c.fillStyle = GOLD; c.fillRect(M, by + 160, 12, 120);
-    h.text(c, "P1", M + 40, by + 248, h.f(900, 84), GOLD, "left", 0.02);
+    var ppl = K888T(h, "platz", "P1"), pplg = h.passGroesse(c, ppl, 260, 84, 30, 900, 0.02), pplw = ppl ? Math.max(120, breite(c, h, ppl, pplg, 900, 0.02) + 34) : 0;
+    h.text(c, ppl, M + 40, by + 248, h.f(900, pplg), GOLD, "left", 0.02);
     h.text(c, zt, W - M - 30, by + 250, h.f(900, h.passGroesse(c, zt, W - 2 * M - 300, 96, 40, 900)), "#fff", "right", 0.02);
-    if (d.strecke) h.text(c, d.strecke.toUpperCase(), M + 160, by + 236, h.f(800, 34), "rgba(255,255,255,.7)", "left", 0.14);
+    if (d.strecke) h.text(c, d.strecke.toUpperCase(), M + 40 + pplw, by + 236, h.f(800, 34), "rgba(255,255,255,.7)", "left", 0.14);
     c.restore();
     h.qr(c, d, W - M - 190, 80, 190);
   } }
@@ -1315,6 +1385,7 @@ window.K888_OVERLAYS = [
   // schräger Chip mit Text – gibt die Breite zurück (ausr: links / mitte / rechts)
   function chip(c, h, s, x, y, hh, farbe, tf, ausr) {
     s = String(s || "").toUpperCase();
+    if (!s.trim()) return 0;
     var size = h.passGroesse(c, s, 860, Math.round(hh * 0.6), 16, 900, 0.06);
     var w = c.measureText(s).width + s.length * size * 0.06 + hh * 0.9;
     var x0 = ausr === "rechts" ? x - w : ausr === "mitte" ? x - w / 2 : x;
@@ -1341,12 +1412,16 @@ window.K888_OVERLAYS = [
     var gross = H > 1500;
     var ti = h.passend(c, d.title.toUpperCase(), W - 2 * M - 40, gross ? 3 : 2, gross ? 92 : 72, 52, 900, "Saira Condensed", 0.96);
     var t = String(d.text || "").trim() ? h.passend(c, d.text, W - 2 * M - 40, gross ? 3 : 2, 36, 28, 500, "Barlow", 1.38) : null;
-    var bh = 52 + ti.hoehe + (t ? 26 + t.hoehe : 0) + 48, by = H - 120 - 40 - bh;
-    c.fillStyle = "rgba(10,11,14,.86)"; c.fillRect(M - 20, by, W - 2 * M + 40, bh);
-    c.fillStyle = h.ROT; c.fillRect(M - 20, by, 10, bh);
+    var by = H - 120 - 40;
+    if (ti.zeilen.length || t) {
+      var th = ti.zeilen.length ? ti.hoehe : 0, bh = 52 + th + (t ? (th ? 26 : 0) + t.hoehe : 0) + 48;
+      by -= bh;
+      c.fillStyle = "rgba(10,11,14,.86)"; c.fillRect(M - 20, by, W - 2 * M + 40, bh);
+      c.fillStyle = h.ROT; c.fillRect(M - 20, by, 10, bh);
+      h.zeilen(c, ti, M + 20, by + 52, "#fff", 0.6);
+      if (t) h.zeilen(c, t, M + 20, by + 52 + (th ? th + 26 : 0), "#d5d9e0");
+    }
     chip(c, h, d.kicker, M - 20, by - 66, 62, h.ROT);
-    h.zeilen(c, ti, M + 20, by + 52, "#fff", 0.6);
-    if (t) h.zeilen(c, t, M + 20, by + 52 + ti.hoehe + 26, "#d5d9e0");
     fussLeiste(c, h, W, H, M, d, 120);
     return by;
   }
@@ -1389,8 +1464,9 @@ window.K888_OVERLAYS = [
     c.fillStyle = h.ROT; c.fillRect(-W, -band / 2 - 12, W * 2, 12);
     c.fillStyle = "#fff"; c.fillRect(-W, band / 2, W * 2, 5);
     var kw = chip(c, h, d.kicker, -W / 2 + M - 10, -32, 64, h.ROT);
-    var ti = h.passend(c, d.title.toUpperCase(), W - 2 * M - kw - 30, 2, gross ? 76 : 60, 40, 900, "Saira Condensed", 0.95);
-    h.zeilen(c, ti, -W / 2 + M + kw + 20, -ti.hoehe / 2 - 4, "#fff", 0.6);
+    var kr = kw ? kw + 20 : 0;
+    var ti = h.passend(c, d.title.toUpperCase(), W - 2 * M - kr - 10, 2, gross ? 76 : 60, 40, 900, "Saira Condensed", 0.95);
+    h.zeilen(c, ti, -W / 2 + M + kr, -ti.hoehe / 2 - 4, "#fff", 0.6);
     c.restore();
     h.startnummer(c, W - M, 56, 72, "right");
     fussLeiste(c, h, W, H, M, d, 120);
@@ -1398,7 +1474,7 @@ window.K888_OVERLAYS = [
   } },
 
   /* ---------- DUELL: schräg geteilt, VS in der Mitte, zwei Namen ---------- */
-  { id: "duell", name: "Duell · VS", zwei: true, felder: ["strecke", "name1", "name2"], draw: function (c, W, H, d, h) {
+  { id: "duell", name: "Duell · VS", zwei: true, felder: ["strecke"], draw: function (c, W, H, d, h) {
     var M = 60, gross = H > 1500;
     var ti = h.passend(c, d.title.toUpperCase(), W - 2 * M, gross ? 2 : 1, gross ? 88 : 68, 50, 900, "Saira Condensed", 0.96);
     var pt = H - 36 - 116 - ti.hoehe - 96;
@@ -1409,23 +1485,26 @@ window.K888_OVERLAYS = [
     h.bild(c, m2(d, function (px, py) { return py < pt && py > yl + (yr - yl) * px / W; }), 0, yr, W, pt - yr); c.restore();
     c.save(); c.beginPath(); c.moveTo(-20, yl); c.lineTo(W + 20, yr);
     c.lineWidth = 30; c.strokeStyle = "#fff"; c.stroke(); c.lineWidth = 16; c.strokeStyle = h.ROT; c.stroke(); c.restore();
-    chip(c, h, d.name1 || "KREIDS888", M - 10, yl - 220, 76, h.ROT);
-    chip(c, h, d.name2 || "GEGNER", W - M + 10, yr + 140, 76, "#fff", "#0b0c10", "rechts");
+    var n1 = K888T(h, "name1", "KREIDS888"), n2 = K888T(h, "name2", "GEGNER"), vs = K888T(h, "vs", "VS");
+    if (n1) chip(c, h, n1, M - 10, yl - 220, 76, h.ROT);
+    if (n2) chip(c, h, n2, W - M + 10, yr + 140, 76, "#fff", "#0b0c10", "rechts");
     var cx = W / 2, cy = (yl + yr) / 2, s = gross ? 190 : 150;
-    c.save(); c.translate(cx, cy); c.rotate(Math.PI / 4);
-    c.shadowColor = "rgba(0,0,0,.6)"; c.shadowBlur = 30;
-    c.fillStyle = "#0b0c10"; c.fillRect(-s / 2, -s / 2, s, s); c.shadowBlur = 0;
-    c.lineWidth = 10; c.strokeStyle = h.ROT; c.strokeRect(-s / 2, -s / 2, s, s); c.restore();
-    h.text(c, "VS", cx, cy + s * 0.2, h.f(900, s * 0.56), "#fff", "center", 0.02);
+    if (vs) {
+      c.save(); c.translate(cx, cy); c.rotate(Math.PI / 4);
+      c.shadowColor = "rgba(0,0,0,.6)"; c.shadowBlur = 30;
+      c.fillStyle = "#0b0c10"; c.fillRect(-s / 2, -s / 2, s, s); c.shadowBlur = 0;
+      c.lineWidth = 10; c.strokeStyle = h.ROT; c.strokeRect(-s / 2, -s / 2, s, s); c.restore();
+      h.text(c, vs, cx, cy + s * 0.2, h.f(900, h.passGroesse(c, vs, s * 0.95, s * 0.56, 20, 900)), "#fff", "center", 0.02);
+    }
     c.fillStyle = "#0e0f14"; c.fillRect(0, pt, W, H - pt);
     h.linie(c, 0, pt, W, 8);
-    h.text(c, (d.kicker + (d.strecke ? "  ·  " + d.strecke : "")).toUpperCase(), M, pt + 66, h.f(800, 30), "#ff4b55", "left", 0.2);
+    h.text(c, [d.kicker, d.strecke].filter(Boolean).join("  ·  ").toUpperCase(), M, pt + 66, h.f(800, 30), "#ff4b55", "left", 0.2);
     h.zeilen(c, ti, M, pt + 88, "#fff", 0.6);
     h.fuss(c, M, W - M, H - 36, d.footer);
   } },
 
   /* ---------- BILD IM BILD: großes Medium + kleines Fenster (Onboard) ---------- */
-  { id: "pip", name: "Bild im Bild", zwei: true, felder: ["label2"], draw: function (c, W, H, d, h) {
+  { id: "pip", name: "Bild im Bild", zwei: true, draw: function (c, W, H, d, h) {
     var M = 60, gross = H > 1500;
     h.bild(c, d, 0, 0, W, H);
     var iw = Math.round(W * (gross ? 0.54 : 0.46)), ih = Math.round(iw * 9 / 16), ix = W - M - iw, iy = gross ? 150 : 120;
@@ -1433,37 +1512,44 @@ window.K888_OVERLAYS = [
     h.bild(c, m2(d), ix, iy, iw, ih);
     c.lineWidth = 8; c.strokeStyle = "#fff"; c.strokeRect(ix - 4, iy - 4, iw + 8, ih + 8);
     c.fillStyle = h.ROT; c.fillRect(ix - 10, iy - 10, 90, 10); c.fillRect(ix - 10, iy - 10, 10, 90);
-    var lab = (d.label2 || "ONBOARD").toUpperCase();
-    c.font = h.f(800, 28); var lw = c.measureText(lab).width + lab.length * 2.2 + 74;
-    c.fillStyle = "rgba(10,11,14,.9)"; c.fillRect(ix + 16, iy + ih - 64, lw, 48);
-    c.fillStyle = h.ROT; c.beginPath(); c.arc(ix + 42, iy + ih - 40, 9, 0, Math.PI * 2); c.fill();
-    h.text(c, lab, ix + 62, iy + ih - 30, h.f(800, 28), "#fff", "left", 0.08);
+    var lab = K888T(h, "label", "ONBOARD").toUpperCase();
+    if (lab) {
+      c.font = h.f(800, 28); var lw = c.measureText(lab).width + lab.length * 2.2 + 74;
+      c.fillStyle = "rgba(10,11,14,.9)"; c.fillRect(ix + 16, iy + ih - 64, lw, 48);
+      c.fillStyle = h.ROT; c.beginPath(); c.arc(ix + 42, iy + ih - 40, 9, 0, Math.PI * 2); c.fill();
+      h.text(c, lab, ix + 62, iy + ih - 30, h.f(800, 28), "#fff", "left", 0.08);
+    }
     h.startnummer(c, M, iy, 72, "left");
     bauchbinde(c, h, W, H, M, d);
   } },
 
   /* ---------- FACECAM RUND: Kreis-Cam unten links, Titelband oben ---------- */
-  { id: "pip_rund", name: "Facecam rund", zwei: true, felder: ["label2"], draw: function (c, W, H, d, h) {
+  { id: "pip_rund", name: "Facecam rund", zwei: true, draw: function (c, W, H, d, h) {
     var M = 60, gross = H > 1500;
     h.bild(c, d, 0, 0, W, H);
     var ti = h.passend(c, d.title.toUpperCase(), W - 2 * M, 2, gross ? 92 : 72, 52, 900, "Saira Condensed", 0.96);
     var by = gross ? 130 : 96, bh = ti.hoehe + 72;
-    c.fillStyle = "rgba(10,11,14,.9)"; c.fillRect(0, by, W, bh);
-    c.fillStyle = h.ROT; c.fillRect(0, by + bh, W, 8);
+    if (ti.zeilen.length) {
+      c.fillStyle = "rgba(10,11,14,.9)"; c.fillRect(0, by, W, bh);
+      c.fillStyle = h.ROT; c.fillRect(0, by + bh, W, 8);
+    }
     chip(c, h, d.kicker, M - 10, by - 34, 62, h.ROT);
     h.zeilen(c, ti, M, by + 42, "#fff", 0.6);
     var r = gross ? 215 : 150, cx = M + r + 14, cy = H - 120 - 56 - r;
     kreis(c, h, d, cx, cy, r, true);
-    var nx = cx + r + 36, ny = cy + r * 0.2;
-    c.fillStyle = "rgba(10,11,14,.9)"; c.fillRect(nx - 8, ny - 58, 128, 44);
-    c.fillStyle = h.ROT; c.beginPath(); c.arc(nx + 16, ny - 36, 9, 0, Math.PI * 2); c.fill();
-    h.text(c, "LIVE", nx + 34, ny - 25, h.f(900, 30), "#fff", "left", 0.1);
-    chip(c, h, d.label2 || "KREIDS888", nx - 8, ny, 72, h.ROT);
+    var nx = cx + r + 36, ny = cy + r * 0.2, fl = K888T(h, "live", "LIVE"), fn = K888T(h, "name", "KREIDS888");
+    if (fl) {
+      c.font = h.f(900, 30); var flw = Math.max(128, Math.round(c.measureText(fl).width + fl.length * 3 + 69));
+      c.fillStyle = "rgba(10,11,14,.9)"; c.fillRect(nx - 8, ny - 58, flw, 44);
+      c.fillStyle = h.ROT; c.beginPath(); c.arc(nx + 16, ny - 36, 9, 0, Math.PI * 2); c.fill();
+      h.text(c, fl, nx + 34, ny - 25, h.f(900, 30), "#fff", "left", 0.1);
+    }
+    if (fn) chip(c, h, fn, nx - 8, ny, 72, h.ROT);
     fussLeiste(c, h, W, H, M, d, 120);
   } },
 
   /* ---------- RÜCKSPIEGEL: zweites Medium im Spiegel oben ---------- */
-  { id: "pip_spiegel", name: "Rückspiegel", zwei: true, felder: ["label2"], draw: function (c, W, H, d, h) {
+  { id: "pip_spiegel", name: "Rückspiegel", zwei: true, draw: function (c, W, H, d, h) {
     var M = 60, gross = H > 1500;
     h.bild(c, d, 0, 0, W, H);
     var sw = Math.round(W * 0.8), sh = Math.round(sw * 0.3), sx = Math.round((W - sw) / 2), sy = gross ? 150 : 104, rr = Math.round(sh * 0.42);
@@ -1476,54 +1562,71 @@ window.K888_OVERLAYS = [
     g.addColorStop(0, "rgba(255,255,255,.2)"); g.addColorStop(0.4, "rgba(255,255,255,0)"); c.fillStyle = g; c.fillRect(sx, sy, sw, sh);
     c.restore();
     c.lineWidth = 4; c.strokeStyle = h.ROT; c.beginPath(); c.roundRect(sx, sy, sw, sh, rr); c.stroke();
-    chip(c, h, d.label2 || "Im Rückspiegel", W / 2, sy + sh + 40, 56, "rgba(10,11,14,.92)", "#fff", "mitte");
+    var spl = K888T(h, "label", "Im Rückspiegel");
+    if (spl) chip(c, h, spl, W / 2, sy + sh + 40, 56, "rgba(10,11,14,.92)", "#fff", "mitte");
     bauchbinde(c, h, W, H, M, d);
   } },
 
   /* ---------- TV-ÜBERTRAGUNG: LIVE, Position, Kommentator-Fenster, Laufband ---------- */
-  { id: "pip_tv", name: "TV-Übertragung", zwei: true, anim: true, felder: ["platz", "strecke", "label2"], draw: function (c, W, H, d, h) {
+  { id: "pip_tv", name: "TV-Übertragung", zwei: true, anim: true, felder: ["platz", "strecke"], draw: function (c, W, H, d, h) {
     var M = 48, gross = H > 1500, z = d.zeit == null ? null : d.zeit;
     h.bild(c, d, 0, 0, W, H);
-    c.fillStyle = h.ROT; c.fillRect(M, 56, 150, 60);
-    c.fillStyle = z == null || Math.floor(z * 1.6) % 2 === 0 ? "#fff" : "rgba(255,255,255,.35)";
-    c.beginPath(); c.arc(M + 34, 86, 10, 0, Math.PI * 2); c.fill();
-    h.text(c, "LIVE", M + 54, 99, h.f(900, 36), "#fff", "left", 0.08);
-    c.fillStyle = "rgba(10,11,14,.9)"; c.fillRect(M + 150, 56, 236, 60);
-    h.logo(c, M + 168, 101, 40);
-    var pl = "P" + String(d.platz || "1").replace(/^p/i, ""), st = (d.strecke || "").toUpperCase();
+    var tvl = K888T(h, "live", "LIVE"), tvlw = 0;
+    if (tvl) {
+      c.font = h.f(900, 36); tvlw = Math.max(150, c.measureText(tvl).width + tvl.length * 3 + 76);
+      c.fillStyle = h.ROT; c.fillRect(M, 56, tvlw, 60);
+      c.fillStyle = z == null || Math.floor(z * 1.6) % 2 === 0 ? "#fff" : "rgba(255,255,255,.35)";
+      c.beginPath(); c.arc(M + 34, 86, 10, 0, Math.PI * 2); c.fill();
+      h.text(c, tvl, M + 54, 99, h.f(900, 36), "#fff", "left", 0.08);
+    }
+    c.fillStyle = "rgba(10,11,14,.9)"; c.fillRect(M + tvlw, 56, 236, 60);
+    h.logo(c, M + tvlw + 18, 101, 40);
+    var pl = K888T(h, "p", "P", "Steht vor der Platzierung") + String(d.platz || "1").replace(/^p/i, ""), st = (d.strecke || "").toUpperCase();
     c.font = h.f(800, 26); var sw = st ? c.measureText(st).width + st.length * 2.6 + 44 : 0;
-    c.fillStyle = "rgba(10,11,14,.9)"; c.fillRect(W - M - 110 - sw, 56, 110 + sw, 60);
-    c.fillStyle = "#fff"; c.fillRect(W - M - 110 - sw, 56, 110, 60);
-    h.text(c, pl, W - M - 55 - sw, 102, h.f(900, 46), "#0b0c10", "center");
+    c.font = h.f(900, 46); var pbw = Math.max(110, c.measureText(pl).width + 44);
+    c.fillStyle = "rgba(10,11,14,.9)"; c.fillRect(W - M - pbw - sw, 56, pbw + sw, 60);
+    c.fillStyle = "#fff"; c.fillRect(W - M - pbw - sw, 56, pbw, 60);
+    h.text(c, pl, W - M - pbw / 2 - sw, 102, h.f(900, 46), "#0b0c10", "center");
     if (st) h.text(c, st, W - M - sw + 20, 96, h.f(800, 26), "#fff", "left", 0.1);
     // Laufband: läuft in der Vorschau und im Video durch
     var lb = 96, tick = String(d.text || "").replace(/\s*\n\s*/g, "  ·  ");
+    var tk = K888T(h, "ticker", "TICKER"), tkw = 0;
     c.fillStyle = "#0b0c10"; c.fillRect(0, H - lb, W, lb);
-    c.fillStyle = h.ROT; c.fillRect(0, H - lb, 210, lb); c.fillRect(0, H - lb - 5, W, 5);
-    h.text(c, "TICKER", 105, H - lb / 2 + 13, h.f(900, 36), "#fff", "center", 0.1);
-    c.save(); c.beginPath(); c.rect(230, H - lb, W - 230, lb); c.clip();
-    c.font = h.f(600, 32, "Barlow"); var tw = c.measureText(tick + "      ").width, tx = 240;
-    if (z != null && tw > W - 250) tx = 240 - ((z * 150) % tw);
+    c.fillStyle = h.ROT; c.fillRect(0, H - lb - 5, W, 5);
+    if (tk) {
+      c.font = h.f(900, 36); tkw = Math.max(210, c.measureText(tk).width + tk.length * 3.6 + 60);
+      c.fillStyle = h.ROT; c.fillRect(0, H - lb, tkw, lb);
+      h.text(c, tk, tkw / 2, H - lb / 2 + 13, h.f(900, 36), "#fff", "center", 0.1);
+    }
+    var tl0 = tkw + 20, tl1 = tl0 + 10;
+    c.save(); c.beginPath(); c.rect(tl0, H - lb, W - tl0, lb); c.clip();
+    c.font = h.f(600, 32, "Barlow"); var tw = c.measureText(tick + "      ").width, tx = tl1;
+    if (z != null && tw > W - tl1 - 10) tx = tl1 - ((z * 150) % tw);
     h.text(c, tick, tx, H - lb / 2 + 12, h.f(600, 32, "Barlow"), "#fff", "left");
-    if (z != null && tw > W - 250) h.text(c, tick, tx + tw, H - lb / 2 + 12, h.f(600, 32, "Barlow"), "#fff", "left");
+    if (z != null && tw > W - tl1 - 10) h.text(c, tick, tx + tw, H - lb / 2 + 12, h.f(600, 32, "Barlow"), "#fff", "left");
     c.restore();
     var kw = Math.round(W * (gross ? 0.44 : 0.36)), kh = Math.round(kw * 9 / 16), kx = W - M - kw, ky = H - lb - 40 - 54 - kh;
     c.save(); c.shadowColor = "rgba(0,0,0,.6)"; c.shadowBlur = 36; c.fillStyle = "#000"; c.fillRect(kx, ky, kw, kh); c.restore();
     grund(c, kx, ky, kw, kh); h.bild(c, m2(d), kx, ky, kw, kh);
     c.lineWidth = 4; c.strokeStyle = "#fff"; c.strokeRect(kx - 2, ky - 2, kw + 4, kh + 4);
-    c.fillStyle = "rgba(10,11,14,.95)"; c.fillRect(kx - 2, ky + kh + 2, kw + 4, 54);
-    c.fillStyle = h.ROT; c.fillRect(kx - 2, ky + kh + 2, 8, 54);
-    h.text(c, "KOMMENTAR", kx + 24, ky + kh + 37, h.f(800, 22), "#9aa1ab", "left", 0.16);
-    h.text(c, (d.label2 || "KREIDS888").toUpperCase(), kx + kw - 18, ky + kh + 40, h.f(900, 30), "#fff", "right", 0.04);
+    var kom = K888T(h, "kommentar", "KOMMENTAR"), kna = K888T(h, "name", "KREIDS888").toUpperCase();
+    if (kom || kna) {
+      c.fillStyle = "rgba(10,11,14,.95)"; c.fillRect(kx - 2, ky + kh + 2, kw + 4, 54);
+      c.fillStyle = h.ROT; c.fillRect(kx - 2, ky + kh + 2, 8, 54);
+      h.text(c, kom, kx + 24, ky + kh + 37, h.f(800, 22), "#9aa1ab", "left", 0.16);
+      h.text(c, kna, kx + kw - 18, ky + kh + 40, h.f(900, h.passGroesse(c, kna, kw - 60 - (kom ? 170 : 0), 30, 16, 900, 0.04)), "#fff", "right", 0.04);
+    }
     var ti = h.passend(c, d.title.toUpperCase(), W - 2 * M - 60, 2, gross ? 84 : 64, 48, 900, "Saira Condensed", 0.96);
     var ty = ky - 40 - ti.hoehe - 40;
-    c.fillStyle = "#fff"; c.fillRect(M, ty, W - 2 * M, ti.hoehe + 40);
-    c.fillStyle = h.ROT; c.fillRect(M, ty, 12, ti.hoehe + 40);
-    h.zeilen(c, ti, M + 34, ty + 20, "#0b0c10", 0.6);
+    if (ti.zeilen.length) {
+      c.fillStyle = "#fff"; c.fillRect(M, ty, W - 2 * M, ti.hoehe + 40);
+      c.fillStyle = h.ROT; c.fillRect(M, ty, 12, ti.hoehe + 40);
+      h.zeilen(c, ti, M + 34, ty + 20, "#0b0c10", 0.6);
+    }
   } },
 
   /* ---------- POLAROID: zweites Medium als schräges Sofortbild ---------- */
-  { id: "pip_polaroid", name: "Polaroid", zwei: true, felder: ["label2"], draw: function (c, W, H, d, h) {
+  { id: "pip_polaroid", name: "Polaroid", zwei: true, draw: function (c, W, H, d, h) {
     var M = 60, gross = H > 1500;
     h.bild(c, d, 0, 0, W, H);
     var pw = Math.round(W * (gross ? 0.58 : 0.44)), rand = Math.round(pw * 0.06), bild = pw - 2 * rand, ph = bild + rand + Math.round(pw * 0.2);
@@ -1532,14 +1635,14 @@ window.K888_OVERLAYS = [
     c.shadowColor = "rgba(0,0,0,.6)"; c.shadowBlur = 44; c.shadowOffsetY = 18;
     c.fillStyle = "#f7f5f0"; c.fillRect(-pw / 2, -ph / 2, pw, ph); c.shadowColor = "transparent";
     h.bild(c, m2(d), -pw / 2 + rand, -ph / 2 + rand, bild, bild);
-    h.text(c, (d.label2 || "Boxengasse").toUpperCase(), 0, ph / 2 - pw * 0.075, h.f(800, Math.round(pw * 0.066)), "#2a2d35", "center", 0.08);
+    h.text(c, K888T(h, "label", "Boxengasse").toUpperCase(), 0, ph / 2 - pw * 0.075, h.f(800, Math.round(pw * 0.066)), "#2a2d35", "center", 0.08);
     c.rotate(-0.13); c.fillStyle = "rgba(226,214,186,.8)"; c.fillRect(-pw * 0.16, -ph / 2 - 26, pw * 0.32, 56);
     c.restore();
     bauchbinde(c, h, W, H, M, d);
   } },
 
   /* ---------- LUPE: Detail im Kreis, Linie zeigt auf die Stelle (Zielpunkt mit der Maus verschieben) ---------- */
-  { id: "pip_lupe", name: "Lupe", zwei: true, felder: ["label2"], draw: function (c, W, H, d, h) {
+  { id: "pip_lupe", name: "Lupe", zwei: true, draw: function (c, W, H, d, h) {
     var M = 60, gross = H > 1500;
     h.bild(c, d, 0, 0, W, H);
     var r = gross ? 205 : 140, cx = W - M - r - 12, cy = (gross ? 170 : 110) + r;
@@ -1551,12 +1654,13 @@ window.K888_OVERLAYS = [
     c.fillStyle = "#fff"; c.beginPath(); c.arc(zx, zy, 10, 0, Math.PI * 2); c.fill(); c.restore();
     if (h.zielMelden) h.zielMelden(zx, zy, 46);
     kreis(c, h, d, cx, cy, r, false);
-    chip(c, h, d.label2 || "Scheitelpunkt", cx, cy + r + 34, 58, h.ROT, "#fff", "mitte");
+    var lpl = K888T(h, "label", "Scheitelpunkt");
+    if (lpl) chip(c, h, lpl, cx, cy + r + 34, 58, h.ROT, "#fff", "mitte");
     bauchbinde(c, h, W, H, M, d);
   } },
 
   /* ---------- VORHER / NACHHER: zwei Hälften mit Schieber ---------- */
-  { id: "vorher", name: "Vorher / Nachher", zwei: true, felder: ["label1", "label2"], draw: function (c, W, H, d, h) {
+  { id: "vorher", name: "Vorher / Nachher", zwei: true, draw: function (c, W, H, d, h) {
     var M = 60, gross = H > 1500;
     var ti = h.passend(c, d.title.toUpperCase(), W - 2 * M, 2, gross ? 92 : 72, 52, 900, "Saira Condensed", 0.96);
     var t = String(d.text || "").trim() ? h.passend(c, d.text, W - 2 * M, gross ? 3 : 2, 36, 28, 500, "Barlow", 1.38) : null;
@@ -1569,8 +1673,9 @@ window.K888_OVERLAYS = [
     c.fillStyle = "#0b0c10";
     c.beginPath(); c.moveTo(mx - 10, gy - 16); c.lineTo(mx - 30, gy); c.lineTo(mx - 10, gy + 16); c.closePath(); c.fill();
     c.beginPath(); c.moveTo(mx + 10, gy - 16); c.lineTo(mx + 30, gy); c.lineTo(mx + 10, gy + 16); c.closePath(); c.fill();
-    chip(c, h, d.label1 || "Vorher", M - 10, 70, 64, "#fff", "#0b0c10");
-    chip(c, h, d.label2 || "Nachher", W - M + 10, 70, 64, h.ROT, "#fff", "rechts");
+    var vl = K888T(h, "links", "Vorher"), vr = K888T(h, "rechts", "Nachher");
+    if (vl) chip(c, h, vl, M - 10, 70, 64, "#fff", "#0b0c10");
+    if (vr) chip(c, h, vr, W - M + 10, 70, 64, h.ROT, "#fff", "rechts");
     c.fillStyle = "#0e0f14"; c.fillRect(0, unten, W, H - unten);
     h.linie(c, 0, unten, W, 8);
     h.text(c, d.kicker, M, unten + 70, h.f(800, 30), "#ff4b55", "left", 0.2);
@@ -1587,7 +1692,7 @@ window.K888_OVERLAYS = [
     c.fillStyle = g; c.fillRect(0, 0, W, H);
     h.linie(c, 0, 0, W, 10);
     var kw = chip(c, h, d.kicker, M, 58, 60, h.ROT);
-    if (d.strecke) h.text(c, d.strecke.toUpperCase(), M + kw + 26, 101, h.f(800, 34), "#c9ced6", "left", 0.14);
+    if (d.strecke) h.text(c, d.strecke.toUpperCase(), M + (kw ? kw + 26 : 0), 101, h.f(800, 34), "#c9ced6", "left", 0.14);
     var ti = h.passend(c, d.title.toUpperCase(), W - 2 * M, 2, gross ? 84 : 60, 46, 900, "Saira Condensed", 0.96);
     h.zeilen(c, ti, M, 150, "#fff", 0.6);
     var fw = W - 2 * M, fh = Math.round(fw * 9 / 16), y1 = 150 + ti.hoehe + 44, luecke = 104;
@@ -1596,18 +1701,20 @@ window.K888_OVERLAYS = [
     var y2 = y1 + fh + luecke;
     h.fenster(c, d, M, y1, fw, fh);
     h.fenster(c, m2(d), M, y2, fw, fh);
-    var za = d.rundenzeit || "1:58.412", zb = d.rundenzeit2 || "1:57.998";
+    var za = d.rundenzeit || "1:58.412", zb = d.rundenzeit2 || "1:57.998", la = K888T(h, "a", "A"), lb2 = K888T(h, "b", "B");
     var sa = zeitSek(za), sb = zeitSek(zb), besser = sa != null && sb != null && sa !== sb ? (sb < sa ? 2 : 1) : 0;
     function zeitBox(x, y, lab, zeit, top) {
-      c.font = h.f(900, 46); var w = c.measureText(zeit).width + 172;
+      c.font = h.f(900, 38); var lw = lab ? Math.max(96, c.measureText(lab).width + 44) : 0;
+      c.font = h.f(900, 46); var w = c.measureText(zeit).width + lw + 76;
       c.fillStyle = "rgba(10,11,14,.92)"; c.fillRect(x, y, w, 72);
-      c.fillStyle = top ? "#9b3cf0" : "#3a3f4a"; c.fillRect(x, y, 96, 72);
-      h.text(c, lab, x + 48, y + 50, h.f(900, 38), "#fff", "center");
-      h.text(c, zeit, x + 120, y + 53, h.f(900, 46), "#fff", "left", 0.02);
+      if (lab) { c.fillStyle = top ? "#9b3cf0" : "#3a3f4a"; c.fillRect(x, y, lw, 72); h.text(c, lab, x + lw / 2, y + 50, h.f(900, 38), "#fff", "center"); }
+      else if (top) { c.fillStyle = "#9b3cf0"; c.fillRect(x, y, 10, 72); }
+      h.text(c, zeit, x + lw + 24, y + 53, h.f(900, 46), "#fff", "left", 0.02);
     }
-    zeitBox(M + 18, y1 + fh - 90, "A", za, besser === 1);
-    zeitBox(M + 18, y2 + fh - 90, "B", zb, besser === 2);
-    if (besser) chip(c, h, (besser === 2 ? "B " : "A ") + "−" + Math.abs(sa - sb).toFixed(3) + " S", W / 2, y1 + fh + (luecke - 64) / 2, 64, "#16a34a", "#fff", "mitte");
+    zeitBox(M + 18, y1 + fh - 90, la, za, besser === 1);
+    zeitBox(M + 18, y2 + fh - 90, lb2, zb, besser === 2);
+    var dl = K888T(h, "delta", "−{zeit} S", "{zeit} wird automatisch zum Zeitabstand");
+    if (besser && dl) chip(c, h, ((besser === 2 ? lb2 : la) + " " + dl.replace("{zeit}", Math.abs(sa - sb).toFixed(3))).trim(), W / 2, y1 + fh + (luecke - 64) / 2, 64, "#16a34a", "#fff", "mitte");
     h.fuss(c, M, W - M, H - 36, d.footer);
   } },
 
@@ -1617,20 +1724,24 @@ window.K888_OVERLAYS = [
     h.bild(c, d, 0, 0, W, H);
     h.verlauf(c, 0, H * 0.45, 0, H, [[0, "rgba(10,11,14,0)"], [1, "rgba(10,11,14,.88)"]]);
     c.save(); c.shadowColor = "rgba(0,0,0,.55)"; c.shadowBlur = 18;
-    h.text(c, "DAS SIM-RACING-MAGAZIN", M, 72, h.f(800, 26), "#fff", "left", 0.22);
+    h.text(c, K888T(h, "zeile", "DAS SIM-RACING-MAGAZIN"), M, 72, h.f(800, 26), "#fff", "left", 0.22);
     h.text(c, MONATE[jetzt.getMonth()] + " " + jetzt.getFullYear(), W - M, 72, h.f(800, 26), "#fff", "right", 0.22);
-    var ms = h.passGroesse(c, "KREIDS888", W - 2 * M, gross ? 330 : 280, 120, 900);
+    var kopf = K888T(h, "kopf", "KREIDS888"), kt = kopf.match(/^(.*?)(\d+)$/) || [kopf, kopf, ""];
+    var ms = h.passGroesse(c, kopf || "KREIDS888", W - 2 * M, gross ? 330 : 280, 80, 900);
     c.font = h.f(900, ms); c.textAlign = "left"; c.fillStyle = "#fff";
     var kx = M - ms * 0.02, ky = 72 + ms * 0.86;
-    c.fillText("KREIDS", kx, ky); var kwid = c.measureText("KREIDS").width; c.fillStyle = h.ROT; c.fillText("888", kx + kwid, ky);
+    c.fillText(kt[1], kx, ky); var kwid = c.measureText(kt[1]).width; c.fillStyle = h.ROT; c.fillText(kt[2], kx + kwid, ky);
     c.restore();
-    c.fillStyle = h.ROT; c.fillRect(M, ky + 18, W - 2 * M, 8);
-    var sx = W - M - 110, sy = ky + 150;
-    c.save(); c.translate(sx, sy); c.rotate(-0.22);
-    c.fillStyle = h.ROT; c.beginPath(); c.arc(0, 0, 104, 0, Math.PI * 2); c.fill();
-    c.lineWidth = 4; c.strokeStyle = "#fff"; c.beginPath(); c.arc(0, 0, 90, 0, Math.PI * 2); c.stroke();
-    h.text(c, "NEU", 0, -8, h.f(900, 64), "#fff", "center"); h.text(c, "IM HEFT", 0, 36, h.f(800, 28), "#fff", "center", 0.1);
-    c.restore();
+    if (kopf) { c.fillStyle = h.ROT; c.fillRect(M, ky + 18, W - 2 * M, 8); }
+    var sx = W - M - 110, sy = ky + 150, st1 = K888T(h, "sticker1", "NEU"), st2 = K888T(h, "sticker2", "IM HEFT");
+    if (st1 || st2) {
+      c.save(); c.translate(sx, sy); c.rotate(-0.22);
+      c.fillStyle = h.ROT; c.beginPath(); c.arc(0, 0, 104, 0, Math.PI * 2); c.fill();
+      c.lineWidth = 4; c.strokeStyle = "#fff"; c.beginPath(); c.arc(0, 0, 90, 0, Math.PI * 2); c.stroke();
+      h.text(c, st1, 0, st2 ? -8 : 22, h.f(900, h.passGroesse(c, st1, 160, 64, 24, 900)), "#fff", "center");
+      h.text(c, st2, 0, st1 ? 36 : 10, h.f(800, h.passGroesse(c, st2, 160, 28, 14, 800, 0.1)), "#fff", "center", 0.1);
+      c.restore();
+    }
     var themen = String(d.text || "").split(/\n+/).map(function (s) { return s.trim(); }).filter(Boolean).slice(0, 3);
     var ty = ky + 110;
     themen.forEach(function (s) {
@@ -1647,12 +1758,12 @@ window.K888_OVERLAYS = [
     c.fillStyle = "#fff"; c.fillRect(bx, by, bw, 150);
     c.fillStyle = "#0b0c10";
     for (var i = 0, x = bx + 14; x < bx + bw - 18; i++) { var st = [3, 1, 2, 1, 4, 2, 1, 3, 1, 2][i % 10]; c.fillRect(x, by + 14, st * 2, 92); x += st * 2 + [2, 3, 2, 4, 2][i % 5]; }
-    h.text(c, "KREIDS888.COM", bx + bw / 2, by + 136, h.f(800, 22), "#0b0c10", "center", 0.08);
+    h.text(c, K888T(h, "adresse", "KREIDS888.COM"), bx + bw / 2, by + 136, h.f(800, h.passGroesse(c, K888T(h, "adresse", "KREIDS888.COM"), bw - 16, 22, 12, 800, 0.08)), "#0b0c10", "center", 0.08);
     h.qr(c, d, W - M - 190, by - 250, 190);
   } },
 
   /* ---------- LIVERY-REVEAL: Spotlight, Lichtstreifen, große Kontur-Schrift ---------- */
-  { id: "reveal", name: "Livery-Reveal", felder: ["wann"], draw: function (c, W, H, d, h) {
+  { id: "reveal", name: "Livery-Reveal", draw: function (c, W, H, d, h) {
     var M = 64, gross = H > 1500;
     h.bild(c, d, 0, 0, W, H);
     var g = c.createRadialGradient(W / 2, H * 0.48, W * 0.12, W / 2, H * 0.48, H * 0.72);
@@ -1662,8 +1773,9 @@ window.K888_OVERLAYS = [
     lg.addColorStop(0, "rgba(255,255,255,0)"); lg.addColorStop(0.5, "rgba(255,255,255,.22)"); lg.addColorStop(1, "rgba(255,255,255,0)");
     c.globalCompositeOperation = "lighter"; c.fillStyle = lg; c.fillRect(-160, -H, 320, H * 2); c.restore();
     c.save(); c.font = h.f(900, gross ? 270 : 210); c.textAlign = "center";
-    c.lineWidth = 4; c.strokeStyle = "rgba(255,255,255,.3)"; c.strokeText("REVEAL", W / 2, gross ? 380 : 290); c.restore();
-    h.text(c, (d.wann || "SAISON 2027").toUpperCase(), W / 2, gross ? 470 : 360, h.f(800, 34), "#fff", "center", 0.4);
+    var rv = K888T(h, "gross", "REVEAL"); c.font = h.f(900, Math.min(gross ? 270 : 210, h.passGroesse(c, rv, W - 40, gross ? 270 : 210, 60, 900)));
+    c.lineWidth = 4; c.strokeStyle = "rgba(255,255,255,.3)"; c.strokeText(rv, W / 2, gross ? 380 : 290); c.restore();
+    h.text(c, K888T(h, "saison", "SAISON 2027").toUpperCase(), W / 2, gross ? 470 : 360, h.f(800, 34), "#fff", "center", 0.4);
     var ti = h.passend(c, d.title.toUpperCase(), W - 2 * M, 2, gross ? 116 : 88, 60, 900, "Saira Condensed", 0.94);
     var t = String(d.text || "").trim() ? h.passend(c, d.text, W - 2 * M, 2, 36, 28, 500, "Barlow", 1.38) : null;
     var tiy = H - M - 120 - (t ? t.hoehe + 26 : 0) - ti.hoehe;
@@ -1719,7 +1831,7 @@ window.K888_OVERLAYS = [
       c.fillStyle = "rgba(19,21,27,.92)"; c.fillRect(M, y, W - 2 * M, rh - 18);
       c.fillStyle = i === 0 ? h.ROT : "#262a34"; c.fillRect(M, y, 150, rh - 18);
       h.text(c, z.tag, M + 75, y + (rh - 18) / 2 + 4, h.f(900, gross ? 62 : 50), "#fff", "center");
-      if (z.zeit) h.text(c, z.zeit + " UHR", M + 75, y + (rh - 18) / 2 + (gross ? 46 : 38), h.f(800, gross ? 26 : 22), i === 0 ? "#fff" : "#9aa1ab", "center", 0.06);
+      if (z.zeit) h.text(c, (z.zeit + " " + K888T(h, "uhr", "UHR", "Steht hinter der Uhrzeit")).trim(), M + 75, y + (rh - 18) / 2 + (gross ? 46 : 38), h.f(800, gross ? 26 : 22), i === 0 ? "#fff" : "#9aa1ab", "center", 0.06);
       var tg = h.passGroesse(c, String(z.titel).toUpperCase(), W - 2 * M - 214, gross ? 52 : 42, 28, 900, 0.01);
       h.text(c, String(z.titel).toUpperCase(), M + 186, y + (rh - 18) / 2 - (z.sub ? 6 : -18), h.f(900, tg), "#fff", "left", 0.01);
       if (z.sub) h.text(c, z.sub, M + 186, y + (rh - 18) / 2 + (gross ? 42 : 34), h.f(500, gross ? 32 : 26, "Barlow"), "#c9ced6", "left");
