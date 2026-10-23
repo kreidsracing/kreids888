@@ -2,6 +2,7 @@
    TEAM-BEREICH  Flag to Flag Motorsport
    - öffentliche Teamseite (Vorstellung + Login)
    - Dashboard nach Discord-Login (Menü links, Bereiche, Tools, Admin)
+   - Rubrik „Website" (nur Admin): Dashboard vom Worker "kreids888-admin" eingebettet
    Spricht mit dem Worker "kreids888-team" unter /api/team
    =========================================================== */
 (function () {
@@ -48,6 +49,7 @@
     eye: I('<path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>'),
     stint: I('<path d="M4 4h16v16H4z"/><path d="M4 9h16M9 9v11M14 13h3M14 16h3"/><path d="M6.5 6.5h.01"/>'),
     gauge: I('<path d="M3.5 18a9 9 0 1 1 17 0"/><path d="M12 15l4.5-5.5"/><circle cx="12" cy="15" r="1.4" fill="currentColor"/>'),
+    globe: I('<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/>'),
   };
 
   // Bereiche im Dashboard (alle Teammitglieder) – vorerst Platzhalter
@@ -497,8 +499,71 @@
     if (a && document.getElementById("adm") && adminOeffnen(a.dataset.admteil)) e.preventDefault();
   });
 
+  /* ---------------- Website (nur Admin) ----------------
+     Das bestehende Dashboard vom Worker "kreids888-admin" läuft hier eingebettet.
+     Den Login holt der Team-Worker (Discord-Admin) – kein Passwort nötig. */
+  const WEB_URL = "https://kreids888-admin.kreids.workers.dev/";
+  const WEB_ORIGIN = "https://kreids888-admin.kreids.workers.dev";
+  const WEB_TEILE = [["ticker", "Ticker"], ["cal", "Streamkalender"], ["shorts", "Shorts"], ["news", "News"], ["welcome", "Willkommen"], ["setup", "Setup"], ["highlight", "Highlight"], ["social", "Social-Bild"]];
+  let WEB_LOGIN = null;   // Anmeldung beim Dashboard – einmal pro Seitenaufruf
+  let WEB_BEREIT = false; // Dashboard geladen und hört aufs Umschalten
+  const webTeil = (id) => { const k = id.split("/")[1] || ""; return WEB_TEILE.some(([x]) => x === k) ? k : "ticker"; };
+  window.addEventListener("message", (e) => {
+    const f = document.getElementById("tw-frame");
+    if (e.origin === WEB_ORIGIN && f && e.source === f.contentWindow && e.data && e.data.k888bereit) WEB_BEREIT = true;
+  });
+
+  // Dashboard füllt den Bildschirm unter der festen Leiste oben
+  function webPlatz(hinscrollen) {
+    const f = document.getElementById("tw-frame");
+    if (!f) return;
+    const nav = document.getElementById("site-nav");
+    const oben = (nav && getComputedStyle(nav).position === "sticky" ? nav.offsetHeight : 0) + 12;
+    const m = main();
+    const kopf = f.getBoundingClientRect().top - m.getBoundingClientRect().top; // Überschrift + Reiter
+    f.style.height = Math.max(420, window.innerHeight - oben - kopf - 16) + "px";
+    if (hinscrollen) window.scrollTo(0, Math.max(0, m.getBoundingClientRect().top + window.scrollY - oben));
+  }
+  window.addEventListener("resize", () => webPlatz(false));
+
+  async function renderWebsite(id) {
+    const teil = webTeil(id);
+    main().innerHTML = panelHead("globe", "Website", '<span class="tm-badge">Nur Admin</span>') + `
+      <div class="g6-tabs" id="tw-tabs">${WEB_TEILE.map(([k, t]) => `<button type="button" data-webtab="${k}" class="${k === teil ? "on" : ""}">${t}</button>`).join("")}</div>
+      <div id="tw-box"><div class="tm-loading"><span></span><span></span><span></span></div></div>`;
+    main().querySelectorAll("[data-webtab]").forEach(b => b.onclick = () => { location.hash = "#website/" + b.dataset.webtab; });
+    const box = document.getElementById("tw-box");
+    try {
+      WEB_LOGIN = WEB_LOGIN || api("/admin/website-login", { method: "POST" });
+      const { token } = await WEB_LOGIN;
+      if (!box.isConnected) return;
+      WEB_BEREIT = false;
+      box.innerHTML = `<iframe id="tw-frame" title="Website-Dashboard" allow="web-share; clipboard-write" style="display:block;width:100%;border:0" src="${WEB_URL}#embed=1&tab=${teil}&t=${encodeURIComponent(token)}"></iframe>`;
+      webPlatz(true);
+      // nach Einblend-Animation und Schriften nochmal genau anpassen
+      box.addEventListener("animationend", () => webPlatz(false));
+      if (document.fonts) document.fonts.ready.then(() => webPlatz(false));
+    } catch (e) {
+      WEB_LOGIN = null;
+      if (box.isConnected) box.innerHTML = `<div class="tm-box tm-err">${esc(e.message)}</div>`;
+    }
+  }
+
+  // Reiter wechseln: Dashboard bleibt geladen (nichts Ungespeichertes geht verloren)
+  function websiteWechsel(id) {
+    const f = document.getElementById("tw-frame");
+    if (!f || !f.contentWindow || !WEB_BEREIT) return false;
+    const teil = webTeil(id);
+    f.contentWindow.postMessage({ k888tab: teil }, WEB_ORIGIN);
+    document.querySelectorAll("#tw-tabs [data-webtab]").forEach(b => b.classList.toggle("on", b.dataset.webtab === teil));
+    merke("website");
+    return true;
+  }
+
   function renderShell() {
     const id = location.hash.replace("#", "");
+    const istWeb = id === "website" || id.startsWith("website/");
+    if (istWeb && ME.isAdmin && websiteWechsel(id)) return;
     const tools = Object.keys(PANELS).filter(p => ME.panels[p] && p !== "garage61" && p !== "links" && p !== "stint");
     const link = (hid, icon, label) => `<a class="td-link${id === hid || (hid && id.startsWith(hid + "/")) ? " on" : ""}" href="#${hid}">${ICONS[icon]}<span>${esc(label)}</span></a>`;
 
@@ -512,14 +577,16 @@
             ${ME.panels.links ? link("links", "link", "Links") : ""}
             ${ME.panels.stint ? `<div class="td-nav-h">Endurance Planung</div><div class="td-evnav" id="td-evnav">${evNavHtml(id)}</div>` : ""}
             <div class="td-nav-h">Tools</div>${link("abwesend", "clock", "Abwesenheiten")}${tools.map(p => link(p, p, PANELS[p].title)).join("")}
-            ${ME.isAdmin ? `<div class="td-nav-h">Verwaltung</div>${link("aktivitaet", "activity", "Aktivität")}${link("nutzung", "eye", "Nutzung")}${link("limits", "gauge", "Limits")}${link("posts", "trophy", "G61-Posts")}${link("news-schreiben", "news", "News schreiben")}${link("fahrerprofile", "helmet", "Fahrerprofile")}${link("kalender-admin", "calendar", "Rennkalender")}${link("admin", "admin", "Admin")}${id === "admin" || id.startsWith("admin/") ? `<div class="td-admsub">${ADMIN_TEILE.map(([k, l]) => `<a class="td-link td-ev td-ev-sub" href="#admin/${k}" data-admteil="${k}"><span>${esc(l)}</span></a>`).join("")}</div>` : ""}<a class="td-link" href="https://kreids888-admin.kreids.workers.dev/" target="_blank" rel="noopener">${ICONS.ext}<span>kreids888-Dashboard</span></a>` : ""}
+            ${ME.isAdmin ? `<div class="td-nav-h">Website</div>${link("website", "globe", "Inhalte pflegen")}` : ""}
+            ${ME.isAdmin ? `<div class="td-nav-h">Verwaltung</div>${link("aktivitaet", "activity", "Aktivität")}${link("nutzung", "eye", "Nutzung")}${link("limits", "gauge", "Limits")}${link("posts", "trophy", "G61-Posts")}${link("news-schreiben", "news", "News schreiben")}${link("fahrerprofile", "helmet", "Fahrerprofile")}${link("kalender-admin", "calendar", "Rennkalender")}${link("admin", "admin", "Admin")}${id === "admin" || id.startsWith("admin/") ? `<div class="td-admsub">${ADMIN_TEILE.map(([k, l]) => `<a class="td-link td-ev td-ev-sub" href="#admin/${k}" data-admteil="${k}"><span>${esc(l)}</span></a>`).join("")}</div>` : ""}` : ""}
           </nav>
         </aside>
         <div class="td-main" id="td-main"></div>
       </div>`;
 
     ladeEvNav(false);
-    if (id !== "garage61" && id !== "woche") merke(id.startsWith("stint/") ? "stint" : id || "dashboard");
+    if (id !== "garage61" && id !== "woche") merke(id.startsWith("stint/") ? "stint" : istWeb ? "website" : id || "dashboard");
+    if (istWeb && ME.isAdmin) return renderWebsite(id);
     if (id === "woche" && ME.panels.garage61) return renderG61("woche");
     if (id === "nutzung" && ME.isAdmin) return renderNutzung();
     if (id === "limits" && ME.isAdmin) return renderLimits();
@@ -1104,7 +1171,7 @@
     const tag = (iso) => new Date(iso).toLocaleDateString("de-DE", { weekday: "short", day: "2-digit", month: "2-digit" });
     const heute = new Date().toISOString().slice(0, 10);
     box.innerHTML = `
-      <p class="tm-muted" style="margin-bottom:12px">Alle kommenden Termine aus deinem Rennkalender (<a class="ka-link" href="https://kreids888-admin.kreids.workers.dev/" target="_blank" rel="noopener">kreids888-Dashboard</a>) und deine eigenen F2F-Einträge. Mit einem Klick legt der Bot daraus ein Discord-Event auf dem F2F-Server an.</p>
+      <p class="tm-muted" style="margin-bottom:12px">Alle kommenden Termine aus deinem Rennkalender (<a class="ka-link" href="#website/cal">Website · Streamkalender</a>) und deine eigenen F2F-Einträge. Mit einem Klick legt der Bot daraus ein Discord-Event auf dem F2F-Server an.</p>
       <div class="ta-list ka-list">${d.entries.length ? d.entries.map(e => `
         <div class="ka-row" data-key="${esc(e.key)}">
           <div class="ka-date"><b>${tag(e.at)}</b><small>${esc(e.time || "")} Uhr</small></div>
@@ -1297,7 +1364,7 @@
   const BEREICHE = {
     dashboard: "Dashboard", news: "Team News", fahrer: "Fahrerprofil", abwesend: "Abwesenheiten", links: "Links", trainer: "Trainer", stint: "Stintplaner",
     "g61-woche": "Wochenübersicht", "g61-fleiss": "Trainingsfleiß", "g61-trips": "Fahrtenbuch", "g61-board": "Bestenliste", "g61-ratings": "iRating", "g61-rennen": "Nächstes Rennen", "g61-training": "Training", "g61-bestzeiten": "Bestzeiten",
-    aktivitaet: "Aktivität", "news-schreiben": "News schreiben", fahrerprofile: "Fahrerprofile", "kalender-admin": "Rennkalender", admin: "Admin",
+    aktivitaet: "Aktivität", "news-schreiben": "News schreiben", fahrerprofile: "Fahrerprofile", "kalender-admin": "Rennkalender", admin: "Admin", website: "Website",
   };
   const fmtWann = (ms) => {
     const min = Math.floor((Date.now() - ms) / 6e4);
