@@ -37,15 +37,56 @@
         '<input type="range" id="zoom2" min="1" max="3" step="0.01" value="1">' +
       '</div>');
     var rz = $("rundenzeit") && $("rundenzeit").closest(".sb-feld");
-    if (rz && !$("label2")) rz.insertAdjacentHTML("afterend",
+    if (rz && !$("rundenzeit2")) rz.insertAdjacentHTML("afterend",
       '<div class="sb-feld" data-feld="rundenzeit2" hidden><label for="rundenzeit2">Rundenzeit B</label><input type="text" id="rundenzeit2" maxlength="12" placeholder="1:57.998"></div>' +
-      '<div class="sb-feld" data-feld="name1" hidden><label for="name1">Name oben</label><input type="text" id="name1" maxlength="30" placeholder="KREIDS888"></div>' +
-      '<div class="sb-feld" data-feld="name2" hidden><label for="name2">Name unten</label><input type="text" id="name2" maxlength="30" placeholder="GEGNER"></div>' +
-      '<div class="sb-feld" data-feld="label1" hidden><label for="label1">Beschriftung Bild 1</label><input type="text" id="label1" maxlength="30" placeholder="VORHER"></div>' +
-      '<div class="sb-feld" data-feld="label2" hidden><label for="label2">Beschriftung Bild 2</label><input type="text" id="label2" maxlength="30" placeholder="leer = Standard des Designs"></div>' +
       '<p class="sb-hint sb-feld" data-feld="kalenderhinweis" hidden>Text leer lassen: Die Termine dieser Woche kommen automatisch aus deinem Streamkalender. Eigene Zeilen gehen auch, z. B. „MO 20:00 Teamrennen – Spa“.</p>' +
-      '<p class="sb-hint sb-feld" data-feld="magazinhinweis" hidden>Jede Zeile im Text wird eine Schlagzeile links auf dem Cover (bis zu 3).</p>');
+      '<p class="sb-hint sb-feld" data-feld="magazinhinweis" hidden>Jede Zeile im Text wird eine Schlagzeile links auf dem Cover (bis zu 3).</p>' +
+      // feste Texte des gewählten Designs (z. B. „POLE POSITION“, „P1“, „Scheitelpunkt“): ändern oder ganz ausblenden
+      '<style>#festListe input[type=text]:disabled{opacity:.4;text-decoration:line-through}</style>' +
+      '<div id="festBox" hidden style="margin-top:14px">' +
+        '<label>Feste Texte im Design</label>' +
+        '<div id="festListe"></div>' +
+        '<p class="sb-hint" style="margin-top:2px">Ändern oder Haken bei „aus“ – dann ist der Text ganz weg. ↺ holt den Standard zurück. Gilt nur für dieses Design.</p>' +
+      '</div>');
   })();
+  /* ---------- Feste Texte je Design: { designId: { schluessel: { t: "eigener Text", aus: true/false } } } ---------- */
+  S.fest = {}; S._festNeu = []; S._ovId = null;
+  function festText(key, std, info){
+    var e = S.fest[S._ovId] && S.fest[S._ovId][key];
+    if (S._haupt && !S._festNeu.some(function(x){ return x.k === key; })) S._festNeu.push({ k: key, std: std, info: info || "" });
+    if (!e) return std;
+    if (e.aus) return "";
+    return e.t != null ? e.t : std;
+  }
+  var festSig = "";
+  function festListeBauen(id, liste){
+    var sig = id + "|" + liste.map(function(x){ return x.k + "=" + x.std; }).join("|");
+    if (sig === festSig) return;
+    festSig = sig;
+    $("festBox").hidden = !liste.length;
+    $("festListe").innerHTML = liste.map(function(x){
+      var e = S.fest[id] && S.fest[id][x.k], wert = e && e.t != null ? e.t : x.std, aus = !!(e && e.aus);
+      return '<div class="sb-row" style="flex-wrap:nowrap;gap:8px;margin:0 0 8px">' +
+        '<input type="text" data-fk="' + esc(x.k) + '" value="' + esc(wert) + '" placeholder="' + esc(x.std) + '" maxlength="60" style="flex:1;min-width:0"' + (aus ? " disabled" : "") + '>' +
+        '<button type="button" class="sb-mini" data-fstd="' + esc(x.k) + '" title="Standardtext zurückholen" style="text-decoration:none;font-size:18px">↺</button>' +
+        '<label class="sb-chk" style="margin:0;white-space:nowrap"><input type="checkbox" data-faus="' + esc(x.k) + '"' + (aus ? " checked" : "") + '> aus</label>' +
+      '</div>' + (x.info ? '<p class="sb-hint" style="margin:-4px 0 10px">' + esc(x.info) + '</p>' : '');
+    }).join("");
+    function eintrag(k){ var o = S.fest[id] = S.fest[id] || {}; return o[k] = o[k] || {}; }
+    $("festListe").querySelectorAll("[data-fk]").forEach(function(i){
+      i.addEventListener("input", function(){ eintrag(i.dataset.fk).t = i.value; alles(); });
+    });
+    $("festListe").querySelectorAll("[data-faus]").forEach(function(b){
+      b.addEventListener("change", function(){
+        eintrag(b.dataset.faus).aus = b.checked;
+        var inp = $("festListe").querySelector('[data-fk="' + b.dataset.faus + '"]'); if (inp) inp.disabled = b.checked;
+        alles();
+      });
+    });
+    $("festListe").querySelectorAll("[data-fstd]").forEach(function(b){
+      b.onclick = function(){ if (S.fest[id]) delete S.fest[id][b.dataset.fstd]; festSig = ""; alles(); };
+    });
+  }
   function wert(id){ var el = $(id); return el ? el.value.trim() : ""; }
   function zweiAktiv(){ return !!(OV[S.ov] && OV[S.ov].zwei); }
 
@@ -154,13 +195,16 @@
       var w = c.measureText("KREIDS").width;
       c.fillStyle = ROT; c.fillText("888", x + w, y); c.restore();
     },
+    // fester Text eines Designs (anpassbar/ausblendbar unter „Feste Texte im Design“)
+    t: function(key, std, info){ return festText(key, std, info); },
     startnummer: function(c, x, y, hh, align){
+      var nr = festText("startnummer", "#888"); if (!nr) return;
       c.save(); c.font = h.f(900, Math.round(hh * 0.62));
-      var w = c.measureText("#888").width + hh * 0.7;
+      var w = c.measureText(nr).width + hh * 0.7;
       var x0 = align === "right" ? x - w : x;
       c.fillStyle = "rgba(10,11,14,.85)"; c.fillRect(x0, y, w, hh);
       c.fillStyle = ROT; c.fillRect(x0, y, 8, hh);
-      c.fillStyle = "#fff"; c.textAlign = "center"; c.fillText("#888", x0 + w / 2 + 4, y + hh * 0.74);
+      c.fillStyle = "#fff"; c.textAlign = "center"; c.fillText(nr, x0 + w / 2 + 4, y + hh * 0.74);
       c.restore();
     },
     fuss: function(c, x1, x2, y, footer){
@@ -203,7 +247,7 @@
         }
       }
       c.font = h.f(w, size, fam); z = h.umbruch(c, s, maxW);
-      return { zeilen: z, groesse: size, lh: lh, w: w, fam: fam, hoehe: z.length ? size * (1 + (z.length - 1) * lh) : 0 };
+      return { zeilen: String(s || "").trim() ? z : [], groesse: size, lh: lh, w: w, fam: fam, hoehe: z.length ? size * (1 + (z.length - 1) * lh) : 0 };
     },
     zeilen: function(c, t, x, y, color, spacing, align){
       t.zeilen.forEach(function(z, i){
@@ -404,8 +448,9 @@
   function daten(haupt){
     // Vorschaubilder der Designs bekommen Kopien, damit sie die Verschiebung im Hauptbild nicht verändern
     var v1 = haupt ? S.view : { zoom: S.view.zoom, ox: S.view.ox, oy: S.view.oy }, v2 = haupt ? S.view2 : { zoom: S.view2.zoom, ox: S.view2.ox, oy: S.view2.oy };
-    return { kicker: ($("kicker").value || "NEWS").toUpperCase(), title: $("title").value || "Deine Überschrift", text: $("text").value || "", footer: $("footer").value || "", platz: $("platz").value.trim(), strecke: $("strecke").value.trim(), wann: $("wann").value.trim(), rundenzeit: $("rundenzeit").value.trim(), zeit: S.zeitJetzt, aufn: !!(aufnahme && aufnahme.laeuft), qr: $("qr").value.trim(), img: S.img, view: v1,
-      img2: S.img2, view2: v2, rundenzeit2: wert("rundenzeit2"), name1: wert("name1"), name2: wert("name2"), label1: wert("label1"), label2: wert("label2"), ziel: S.zielPos, woche: S.kalender };
+    // leeres Feld = Text ist weg (Beispiel-Überschrift nur, solange noch nichts eingetippt wurde)
+    return { kicker: $("kicker").value.trim().toUpperCase(), title: S.titelAnge ? $("title").value.trim() : ($("title").value.trim() || "Deine Überschrift"), text: $("text").value || "", footer: $("footer").value || "", platz: $("platz").value.trim(), strecke: $("strecke").value.trim(), wann: $("wann").value.trim(), rundenzeit: $("rundenzeit").value.trim(), zeit: S.zeitJetzt, aufn: !!(aufnahme && aufnahme.laeuft), qr: $("qr").value.trim(), img: S.img, view: v1,
+      img2: S.img2, view2: v2, rundenzeit2: wert("rundenzeit2"), ziel: S.zielPos, woche: S.kalender };
   }
   S.qrPos = null; S.sozPos = null; S.hit = {}; S.sozDir = "h"; S.texte = []; S.akt = -1; S.team = null; S.teamPos = null;
   function sozListe(){ return [].slice.call(document.querySelectorAll("#soz input:checked")).map(function(i){ return i.value; }); }
@@ -525,9 +570,9 @@
     c.clearRect(0, 0, W, H);
     var d = daten(haupt); h._qr = null;
     S._persBox = undefined;
-    S._haupt = !!haupt; S._bild2 = null; S._ziel = null;
+    S._haupt = !!haupt; S._bild2 = null; S._ziel = null; S._ovId = ov.id; S._festNeu = [];
     try { ov.draw(c, W, H, d, h); } catch (e) { console.error(e); }
-    if (haupt) { S.hit.bild2 = S._bild2; S.hit.ziel = S._ziel; }
+    if (haupt) { S.hit.bild2 = S._bild2; S.hit.ziel = S._ziel; festListeBauen(ov.id, S._festNeu); }
     S._haupt = false;
     var pb = S.persEbene === "hinten" && S._persBox !== undefined ? S._persBox : persZeichnen(c, W, H);
     if (haupt) S.hit.pers = pb;
@@ -588,7 +633,8 @@
   document.querySelectorAll("#soz input").forEach(function(i){ i.addEventListener("change", alles); });
   document.querySelectorAll("#sozDir button").forEach(function(b){ b.onclick = function(){ S.sozDir = b.dataset.d; document.querySelectorAll("#sozDir button").forEach(function(x){ x.classList.toggle("on", x === b); }); alles(); }; });
   ["qrSize", "sozSize", "teamSize"].forEach(function(id){ $(id).addEventListener("input", function(){ render(); }); $(id).addEventListener("change", renderThumbs); });
-  ["kicker", "title", "text", "footer", "platz", "strecke", "wann", "rundenzeit", "qr", "rundenzeit2", "name1", "name2", "label1", "label2"].forEach(function(id){ if ($(id)) $(id).addEventListener("input", alles); });
+  $("title").addEventListener("input", function(){ S.titelAnge = true; });
+  ["kicker", "title", "text", "footer", "platz", "strecke", "wann", "rundenzeit", "qr", "rundenzeit2"].forEach(function(id){ if ($(id)) $(id).addEventListener("input", alles); });
   // Fußzeile: Wörter antippen = rot/weiß
   S.fussRot = [true];
   function fussWoerter(){
