@@ -5,6 +5,7 @@
    d = { kicker, title, text, footer, img, view }
    H = Zeichen-Hilfen aus social.html
    Neues Design = neuen Eintrag in diese Liste.
+   zwei: true = Design zeigt ein zweites Bild/Video (d.img2 / d.view2)
    =========================================================== */
 window.K888_OVERLAYS = [
 
@@ -1289,6 +1290,442 @@ window.K888_OVERLAYS = [
     if (d.strecke) h.text(c, d.strecke.toUpperCase(), M + 160, by + 236, h.f(800, 34), "rgba(255,255,255,.7)", "left", 0.14);
     c.restore();
     h.qr(c, d, W - M - 190, 80, 190);
+  } }
+
+  );
+})();
+
+/* ===========================================================
+   OVERLAY-PAKET 3 (Okt 2026): ZWEI BILDER/VIDEOS + neue Designs
+   Split, Duell, Bild im Bild (6 Varianten), Vorher/Nachher,
+   Rundenvergleich, Magazin-Cover, Livery-Reveal, Retro-Poster, Wochenplan
+   zwei: true  = Design zeigt ein zweites Bild/Video (Feld „2b · Bild/Video 2“)
+   =========================================================== */
+(function () {
+  var MONATE = ["JANUAR", "FEBRUAR", "MÄRZ", "APRIL", "MAI", "JUNI", "JULI", "AUGUST", "SEPTEMBER", "OKTOBER", "NOVEMBER", "DEZEMBER"];
+  var TAGE = ["SO", "MO", "DI", "MI", "DO", "FR", "SA"];
+
+  // zweites Medium (zone = genaue Fläche zum Verschieben, wenn es keine Rechteck-Fläche ist)
+  function m2(d, zone) { return { img: d.img2, view: d.view2 || { zoom: 1, ox: 0, oy: 0 }, ohneVerlauf: true, zwei: true, zone: zone }; }
+  // dunkler Grund hinter freigestellten Bildern (z. B. Ich-Bilder als Facecam)
+  function grund(c, x, y, w, hh) {
+    var g = c.createRadialGradient(x + w / 2, y + hh * 0.3, 10, x + w / 2, y + hh / 2, Math.max(w, hh) * 0.75);
+    g.addColorStop(0, "#3a3f4a"); g.addColorStop(1, "#0e0f14"); c.fillStyle = g; c.fillRect(x, y, w, hh);
+  }
+  // schräger Chip mit Text – gibt die Breite zurück (ausr: links / mitte / rechts)
+  function chip(c, h, s, x, y, hh, farbe, tf, ausr) {
+    s = String(s || "").toUpperCase();
+    var size = h.passGroesse(c, s, 860, Math.round(hh * 0.6), 16, 900, 0.06);
+    var w = c.measureText(s).width + s.length * size * 0.06 + hh * 0.9;
+    var x0 = ausr === "rechts" ? x - w : ausr === "mitte" ? x - w / 2 : x;
+    h.schraeg(c, x0, y, w, hh, Math.round(hh * 0.2), farbe);
+    h.text(c, s, x0 + w / 2, y + hh / 2 + size * 0.35, h.f(900, size), tf || "#fff", "center", 0.06);
+    return w;
+  }
+  function logoAuf(c, h, x, y, size, farbe) {
+    c.save(); c.font = h.f(900, size); c.textAlign = "left"; c.fillStyle = farbe; c.fillText("KREIDS", x, y);
+    var w = c.measureText("KREIDS").width; c.fillStyle = h.ROT; c.fillText("888", x + w, y); c.restore();
+  }
+  function zeitSek(s) {
+    var m = String(s || "").trim().match(/^(?:(\d+):)?(\d+(?:[.,]\d+)?)$/);
+    return m ? (+(m[1] || 0)) * 60 + parseFloat(m[2].replace(",", ".")) : null;
+  }
+  function fussLeiste(c, h, W, H, M, d, hoehe) {
+    c.fillStyle = "rgba(10,11,14,.92)"; c.fillRect(0, H - hoehe, W, hoehe);
+    c.fillStyle = h.ROT; c.fillRect(0, H - hoehe, W, 5);
+    h.logo(c, M, H - hoehe / 2 + 16, 44);
+    h.motto(c, d.footer, W - M, H - hoehe / 2 + 14, 32, "right");
+  }
+  // Titel-Bauchbinde unten + Fußleiste
+  function bauchbinde(c, h, W, H, M, d) {
+    var gross = H > 1500;
+    var ti = h.passend(c, d.title.toUpperCase(), W - 2 * M - 40, gross ? 3 : 2, gross ? 92 : 72, 52, 900, "Saira Condensed", 0.96);
+    var t = String(d.text || "").trim() ? h.passend(c, d.text, W - 2 * M - 40, gross ? 3 : 2, 36, 28, 500, "Barlow", 1.38) : null;
+    var bh = 52 + ti.hoehe + (t ? 26 + t.hoehe : 0) + 48, by = H - 120 - 40 - bh;
+    c.fillStyle = "rgba(10,11,14,.86)"; c.fillRect(M - 20, by, W - 2 * M + 40, bh);
+    c.fillStyle = h.ROT; c.fillRect(M - 20, by, 10, bh);
+    chip(c, h, d.kicker, M - 20, by - 66, 62, h.ROT);
+    h.zeilen(c, ti, M + 20, by + 52, "#fff", 0.6);
+    if (t) h.zeilen(c, t, M + 20, by + 52 + ti.hoehe + 26, "#d5d9e0");
+    fussLeiste(c, h, W, H, M, d, 120);
+    return by;
+  }
+  // kreisrundes Fenster mit weißem + rotem Ring
+  function kreis(c, h, d, cx, cy, r, mitGrund) {
+    c.save(); c.shadowColor = "rgba(0,0,0,.65)"; c.shadowBlur = 44; c.fillStyle = "#fff"; c.beginPath(); c.arc(cx, cy, r + 16, 0, Math.PI * 2); c.fill(); c.restore();
+    c.fillStyle = h.ROT; c.beginPath(); c.arc(cx, cy, r + 9, 0, Math.PI * 2); c.fill();
+    c.save(); c.beginPath(); c.arc(cx, cy, r, 0, Math.PI * 2); c.clip();
+    if (mitGrund) grund(c, cx - r, cy - r, 2 * r, 2 * r);
+    h.bild(c, m2(d, function (px, py) { return (px - cx) * (px - cx) + (py - cy) * (py - cy) <= r * r; }), cx - r, cy - r, 2 * r, 2 * r);
+    c.restore();
+  }
+  // Termine der laufenden Woche aus dem Streamkalender (oder eigene Zeilen aus dem Text)
+  function wochenZeilen(d, max) {
+    var eigene = String(d.text || "").split(/\n+/).map(function (s) { return s.trim(); }).filter(Boolean);
+    if (eigene.length) return eigene.slice(0, max).map(function (z) {
+      var m = z.match(/^(\S+)\s+(\d{1,2}[:.]\d{2})\s+(.*)$/) || [null, "", "", z];
+      var teile = String(m[3]).split(/\s+[–|-]\s+/);
+      return { tag: String(m[1]).toUpperCase(), zeit: m[2], titel: teile[0], sub: teile.slice(1).join(" – ") };
+    });
+    var liste = d.woche && d.woche.liste || [];
+    var heute = new Date(), mo = new Date(heute.getFullYear(), heute.getMonth(), heute.getDate() - ((heute.getDay() + 6) % 7));
+    var bis = new Date(mo); bis.setDate(mo.getDate() + 7);
+    var iso = function (x) { return x.getFullYear() + "-" + String(x.getMonth() + 1).padStart(2, "0") + "-" + String(x.getDate()).padStart(2, "0"); };
+    return liste.filter(function (e) { return e.date >= iso(mo) && e.date < iso(bis) && e.racing !== false; }).slice(0, max).map(function (e) {
+      var dt = new Date(e.date + "T12:00:00");
+      return { tag: TAGE[dt.getDay()], zeit: e.time || "", titel: e.title || e.type || "Termin", sub: [e.track, e.series].filter(Boolean).join(" · ") };
+    });
+  }
+
+  window.K888_OVERLAYS.push(
+
+  /* ---------- SPLIT: zwei Bilder/Videos übereinander, Titel im schrägen Band ---------- */
+  { id: "split", name: "Split", zwei: true, draw: function (c, W, H, d, h) {
+    var M = 60, gross = H > 1500, mitte = Math.round(H / 2), band = gross ? 184 : 140;
+    h.bild(c, d, 0, 0, W, mitte);
+    h.bild(c, m2(d), 0, mitte, W, H - mitte);
+    c.save(); c.translate(W / 2, mitte); c.rotate(-0.035);
+    c.fillStyle = "rgba(10,11,14,.95)"; c.fillRect(-W, -band / 2, W * 2, band);
+    c.fillStyle = h.ROT; c.fillRect(-W, -band / 2 - 12, W * 2, 12);
+    c.fillStyle = "#fff"; c.fillRect(-W, band / 2, W * 2, 5);
+    var kw = chip(c, h, d.kicker, -W / 2 + M - 10, -32, 64, h.ROT);
+    var ti = h.passend(c, d.title.toUpperCase(), W - 2 * M - kw - 30, 2, gross ? 76 : 60, 40, 900, "Saira Condensed", 0.95);
+    h.zeilen(c, ti, -W / 2 + M + kw + 20, -ti.hoehe / 2 - 4, "#fff", 0.6);
+    c.restore();
+    h.startnummer(c, W - M, 56, 72, "right");
+    fussLeiste(c, h, W, H, M, d, 120);
+    h.qr(c, d, M, 56, 170);
+  } },
+
+  /* ---------- DUELL: schräg geteilt, VS in der Mitte, zwei Namen ---------- */
+  { id: "duell", name: "Duell · VS", zwei: true, felder: ["strecke", "name1", "name2"], draw: function (c, W, H, d, h) {
+    var M = 60, gross = H > 1500;
+    var ti = h.passend(c, d.title.toUpperCase(), W - 2 * M, gross ? 2 : 1, gross ? 88 : 68, 50, 900, "Saira Condensed", 0.96);
+    var pt = H - 36 - 116 - ti.hoehe - 96;
+    var yl = Math.round(pt * 0.6), yr = Math.round(pt * 0.42);
+    c.save(); c.beginPath(); c.moveTo(0, 0); c.lineTo(W, 0); c.lineTo(W, yr); c.lineTo(0, yl); c.closePath(); c.clip();
+    h.bild(c, d, 0, 0, W, yl); c.restore();
+    c.save(); c.beginPath(); c.moveTo(0, yl); c.lineTo(W, yr); c.lineTo(W, H); c.lineTo(0, H); c.closePath(); c.clip();
+    h.bild(c, m2(d, function (px, py) { return py < pt && py > yl + (yr - yl) * px / W; }), 0, yr, W, pt - yr); c.restore();
+    c.save(); c.beginPath(); c.moveTo(-20, yl); c.lineTo(W + 20, yr);
+    c.lineWidth = 30; c.strokeStyle = "#fff"; c.stroke(); c.lineWidth = 16; c.strokeStyle = h.ROT; c.stroke(); c.restore();
+    chip(c, h, d.name1 || "KREIDS888", M - 10, yl - 220, 76, h.ROT);
+    chip(c, h, d.name2 || "GEGNER", W - M + 10, yr + 140, 76, "#fff", "#0b0c10", "rechts");
+    var cx = W / 2, cy = (yl + yr) / 2, s = gross ? 190 : 150;
+    c.save(); c.translate(cx, cy); c.rotate(Math.PI / 4);
+    c.shadowColor = "rgba(0,0,0,.6)"; c.shadowBlur = 30;
+    c.fillStyle = "#0b0c10"; c.fillRect(-s / 2, -s / 2, s, s); c.shadowBlur = 0;
+    c.lineWidth = 10; c.strokeStyle = h.ROT; c.strokeRect(-s / 2, -s / 2, s, s); c.restore();
+    h.text(c, "VS", cx, cy + s * 0.2, h.f(900, s * 0.56), "#fff", "center", 0.02);
+    c.fillStyle = "#0e0f14"; c.fillRect(0, pt, W, H - pt);
+    h.linie(c, 0, pt, W, 8);
+    h.text(c, (d.kicker + (d.strecke ? "  ·  " + d.strecke : "")).toUpperCase(), M, pt + 66, h.f(800, 30), "#ff4b55", "left", 0.2);
+    h.zeilen(c, ti, M, pt + 88, "#fff", 0.6);
+    h.fuss(c, M, W - M, H - 36, d.footer);
+  } },
+
+  /* ---------- BILD IM BILD: großes Medium + kleines Fenster (Onboard) ---------- */
+  { id: "pip", name: "Bild im Bild", zwei: true, felder: ["label2"], draw: function (c, W, H, d, h) {
+    var M = 60, gross = H > 1500;
+    h.bild(c, d, 0, 0, W, H);
+    var iw = Math.round(W * (gross ? 0.54 : 0.46)), ih = Math.round(iw * 9 / 16), ix = W - M - iw, iy = gross ? 150 : 120;
+    c.save(); c.shadowColor = "rgba(0,0,0,.7)"; c.shadowBlur = 50; c.shadowOffsetY = 18; c.fillStyle = "#000"; c.fillRect(ix, iy, iw, ih); c.restore();
+    h.bild(c, m2(d), ix, iy, iw, ih);
+    c.lineWidth = 8; c.strokeStyle = "#fff"; c.strokeRect(ix - 4, iy - 4, iw + 8, ih + 8);
+    c.fillStyle = h.ROT; c.fillRect(ix - 10, iy - 10, 90, 10); c.fillRect(ix - 10, iy - 10, 10, 90);
+    var lab = (d.label2 || "ONBOARD").toUpperCase();
+    c.font = h.f(800, 28); var lw = c.measureText(lab).width + lab.length * 2.2 + 74;
+    c.fillStyle = "rgba(10,11,14,.9)"; c.fillRect(ix + 16, iy + ih - 64, lw, 48);
+    c.fillStyle = h.ROT; c.beginPath(); c.arc(ix + 42, iy + ih - 40, 9, 0, Math.PI * 2); c.fill();
+    h.text(c, lab, ix + 62, iy + ih - 30, h.f(800, 28), "#fff", "left", 0.08);
+    h.startnummer(c, M, iy, 72, "left");
+    bauchbinde(c, h, W, H, M, d);
+  } },
+
+  /* ---------- FACECAM RUND: Kreis-Cam unten links, Titelband oben ---------- */
+  { id: "pip_rund", name: "Facecam rund", zwei: true, felder: ["label2"], draw: function (c, W, H, d, h) {
+    var M = 60, gross = H > 1500;
+    h.bild(c, d, 0, 0, W, H);
+    var ti = h.passend(c, d.title.toUpperCase(), W - 2 * M, 2, gross ? 92 : 72, 52, 900, "Saira Condensed", 0.96);
+    var by = gross ? 130 : 96, bh = ti.hoehe + 72;
+    c.fillStyle = "rgba(10,11,14,.9)"; c.fillRect(0, by, W, bh);
+    c.fillStyle = h.ROT; c.fillRect(0, by + bh, W, 8);
+    chip(c, h, d.kicker, M - 10, by - 34, 62, h.ROT);
+    h.zeilen(c, ti, M, by + 42, "#fff", 0.6);
+    var r = gross ? 215 : 150, cx = M + r + 14, cy = H - 120 - 56 - r;
+    kreis(c, h, d, cx, cy, r, true);
+    var nx = cx + r + 36, ny = cy + r * 0.2;
+    c.fillStyle = "rgba(10,11,14,.9)"; c.fillRect(nx - 8, ny - 58, 128, 44);
+    c.fillStyle = h.ROT; c.beginPath(); c.arc(nx + 16, ny - 36, 9, 0, Math.PI * 2); c.fill();
+    h.text(c, "LIVE", nx + 34, ny - 25, h.f(900, 30), "#fff", "left", 0.1);
+    chip(c, h, d.label2 || "KREIDS888", nx - 8, ny, 72, h.ROT);
+    fussLeiste(c, h, W, H, M, d, 120);
+  } },
+
+  /* ---------- RÜCKSPIEGEL: zweites Medium im Spiegel oben ---------- */
+  { id: "pip_spiegel", name: "Rückspiegel", zwei: true, felder: ["label2"], draw: function (c, W, H, d, h) {
+    var M = 60, gross = H > 1500;
+    h.bild(c, d, 0, 0, W, H);
+    var sw = Math.round(W * 0.8), sh = Math.round(sw * 0.3), sx = Math.round((W - sw) / 2), sy = gross ? 150 : 104, rr = Math.round(sh * 0.42);
+    c.fillStyle = "#121318"; c.fillRect(W / 2 - 24, 0, 48, sy);
+    c.save(); c.shadowColor = "rgba(0,0,0,.75)"; c.shadowBlur = 44; c.shadowOffsetY = 16;
+    c.fillStyle = "#16181e"; c.beginPath(); c.roundRect(sx - 20, sy - 20, sw + 40, sh + 40, rr + 20); c.fill(); c.restore();
+    c.save(); c.beginPath(); c.roundRect(sx, sy, sw, sh, rr); c.clip();
+    h.bild(c, m2(d), sx, sy, sw, sh);
+    var g = c.createLinearGradient(sx, sy, sx + sw * 0.55, sy + sh);
+    g.addColorStop(0, "rgba(255,255,255,.2)"); g.addColorStop(0.4, "rgba(255,255,255,0)"); c.fillStyle = g; c.fillRect(sx, sy, sw, sh);
+    c.restore();
+    c.lineWidth = 4; c.strokeStyle = h.ROT; c.beginPath(); c.roundRect(sx, sy, sw, sh, rr); c.stroke();
+    chip(c, h, d.label2 || "Im Rückspiegel", W / 2, sy + sh + 40, 56, "rgba(10,11,14,.92)", "#fff", "mitte");
+    bauchbinde(c, h, W, H, M, d);
+  } },
+
+  /* ---------- TV-ÜBERTRAGUNG: LIVE, Position, Kommentator-Fenster, Laufband ---------- */
+  { id: "pip_tv", name: "TV-Übertragung", zwei: true, anim: true, felder: ["platz", "strecke", "label2"], draw: function (c, W, H, d, h) {
+    var M = 48, gross = H > 1500, z = d.zeit == null ? null : d.zeit;
+    h.bild(c, d, 0, 0, W, H);
+    c.fillStyle = h.ROT; c.fillRect(M, 56, 150, 60);
+    c.fillStyle = z == null || Math.floor(z * 1.6) % 2 === 0 ? "#fff" : "rgba(255,255,255,.35)";
+    c.beginPath(); c.arc(M + 34, 86, 10, 0, Math.PI * 2); c.fill();
+    h.text(c, "LIVE", M + 54, 99, h.f(900, 36), "#fff", "left", 0.08);
+    c.fillStyle = "rgba(10,11,14,.9)"; c.fillRect(M + 150, 56, 236, 60);
+    h.logo(c, M + 168, 101, 40);
+    var pl = "P" + String(d.platz || "1").replace(/^p/i, ""), st = (d.strecke || "").toUpperCase();
+    c.font = h.f(800, 26); var sw = st ? c.measureText(st).width + st.length * 2.6 + 44 : 0;
+    c.fillStyle = "rgba(10,11,14,.9)"; c.fillRect(W - M - 110 - sw, 56, 110 + sw, 60);
+    c.fillStyle = "#fff"; c.fillRect(W - M - 110 - sw, 56, 110, 60);
+    h.text(c, pl, W - M - 55 - sw, 102, h.f(900, 46), "#0b0c10", "center");
+    if (st) h.text(c, st, W - M - sw + 20, 96, h.f(800, 26), "#fff", "left", 0.1);
+    // Laufband: läuft in der Vorschau und im Video durch
+    var lb = 96, tick = String(d.text || "").replace(/\s*\n\s*/g, "  ·  ");
+    c.fillStyle = "#0b0c10"; c.fillRect(0, H - lb, W, lb);
+    c.fillStyle = h.ROT; c.fillRect(0, H - lb, 210, lb); c.fillRect(0, H - lb - 5, W, 5);
+    h.text(c, "TICKER", 105, H - lb / 2 + 13, h.f(900, 36), "#fff", "center", 0.1);
+    c.save(); c.beginPath(); c.rect(230, H - lb, W - 230, lb); c.clip();
+    c.font = h.f(600, 32, "Barlow"); var tw = c.measureText(tick + "      ").width, tx = 240;
+    if (z != null && tw > W - 250) tx = 240 - ((z * 150) % tw);
+    h.text(c, tick, tx, H - lb / 2 + 12, h.f(600, 32, "Barlow"), "#fff", "left");
+    if (z != null && tw > W - 250) h.text(c, tick, tx + tw, H - lb / 2 + 12, h.f(600, 32, "Barlow"), "#fff", "left");
+    c.restore();
+    var kw = Math.round(W * (gross ? 0.44 : 0.36)), kh = Math.round(kw * 9 / 16), kx = W - M - kw, ky = H - lb - 40 - 54 - kh;
+    c.save(); c.shadowColor = "rgba(0,0,0,.6)"; c.shadowBlur = 36; c.fillStyle = "#000"; c.fillRect(kx, ky, kw, kh); c.restore();
+    grund(c, kx, ky, kw, kh); h.bild(c, m2(d), kx, ky, kw, kh);
+    c.lineWidth = 4; c.strokeStyle = "#fff"; c.strokeRect(kx - 2, ky - 2, kw + 4, kh + 4);
+    c.fillStyle = "rgba(10,11,14,.95)"; c.fillRect(kx - 2, ky + kh + 2, kw + 4, 54);
+    c.fillStyle = h.ROT; c.fillRect(kx - 2, ky + kh + 2, 8, 54);
+    h.text(c, "KOMMENTAR", kx + 24, ky + kh + 37, h.f(800, 22), "#9aa1ab", "left", 0.16);
+    h.text(c, (d.label2 || "KREIDS888").toUpperCase(), kx + kw - 18, ky + kh + 40, h.f(900, 30), "#fff", "right", 0.04);
+    var ti = h.passend(c, d.title.toUpperCase(), W - 2 * M - 60, 2, gross ? 84 : 64, 48, 900, "Saira Condensed", 0.96);
+    var ty = ky - 40 - ti.hoehe - 40;
+    c.fillStyle = "#fff"; c.fillRect(M, ty, W - 2 * M, ti.hoehe + 40);
+    c.fillStyle = h.ROT; c.fillRect(M, ty, 12, ti.hoehe + 40);
+    h.zeilen(c, ti, M + 34, ty + 20, "#0b0c10", 0.6);
+  } },
+
+  /* ---------- POLAROID: zweites Medium als schräges Sofortbild ---------- */
+  { id: "pip_polaroid", name: "Polaroid", zwei: true, felder: ["label2"], draw: function (c, W, H, d, h) {
+    var M = 60, gross = H > 1500;
+    h.bild(c, d, 0, 0, W, H);
+    var pw = Math.round(W * (gross ? 0.58 : 0.44)), rand = Math.round(pw * 0.06), bild = pw - 2 * rand, ph = bild + rand + Math.round(pw * 0.2);
+    var mx = W - M - pw / 2 + 6, my = (gross ? 210 : 120) + ph / 2;
+    c.save(); c.translate(mx, my); c.rotate(0.07);
+    c.shadowColor = "rgba(0,0,0,.6)"; c.shadowBlur = 44; c.shadowOffsetY = 18;
+    c.fillStyle = "#f7f5f0"; c.fillRect(-pw / 2, -ph / 2, pw, ph); c.shadowColor = "transparent";
+    h.bild(c, m2(d), -pw / 2 + rand, -ph / 2 + rand, bild, bild);
+    h.text(c, (d.label2 || "Boxengasse").toUpperCase(), 0, ph / 2 - pw * 0.075, h.f(800, Math.round(pw * 0.066)), "#2a2d35", "center", 0.08);
+    c.rotate(-0.13); c.fillStyle = "rgba(226,214,186,.8)"; c.fillRect(-pw * 0.16, -ph / 2 - 26, pw * 0.32, 56);
+    c.restore();
+    bauchbinde(c, h, W, H, M, d);
+  } },
+
+  /* ---------- LUPE: Detail im Kreis, Linie zeigt auf die Stelle (Zielpunkt mit der Maus verschieben) ---------- */
+  { id: "pip_lupe", name: "Lupe", zwei: true, felder: ["label2"], draw: function (c, W, H, d, h) {
+    var M = 60, gross = H > 1500;
+    h.bild(c, d, 0, 0, W, H);
+    var r = gross ? 205 : 140, cx = W - M - r - 12, cy = (gross ? 170 : 110) + r;
+    var ziel = d.ziel || { x: Math.round(W * 0.3), y: Math.round(cy + r + (gross ? 330 : 150)) }, zx = ziel.x, zy = ziel.y;
+    var a = Math.atan2(zy - cy, zx - cx), ex = cx + Math.cos(a) * (r + 14), ey = cy + Math.sin(a) * (r + 14);
+    c.save(); c.shadowColor = "rgba(0,0,0,.6)"; c.shadowBlur = 12;
+    c.lineWidth = 6; c.strokeStyle = "#fff"; c.beginPath(); c.moveTo(zx, zy); c.lineTo(ex, ey); c.stroke();
+    c.lineWidth = 7; c.strokeStyle = h.ROT; c.beginPath(); c.arc(zx, zy, 36, 0, Math.PI * 2); c.stroke();
+    c.fillStyle = "#fff"; c.beginPath(); c.arc(zx, zy, 10, 0, Math.PI * 2); c.fill(); c.restore();
+    if (h.zielMelden) h.zielMelden(zx, zy, 46);
+    kreis(c, h, d, cx, cy, r, false);
+    chip(c, h, d.label2 || "Scheitelpunkt", cx, cy + r + 34, 58, h.ROT, "#fff", "mitte");
+    bauchbinde(c, h, W, H, M, d);
+  } },
+
+  /* ---------- VORHER / NACHHER: zwei Hälften mit Schieber ---------- */
+  { id: "vorher", name: "Vorher / Nachher", zwei: true, felder: ["label1", "label2"], draw: function (c, W, H, d, h) {
+    var M = 60, gross = H > 1500;
+    var ti = h.passend(c, d.title.toUpperCase(), W - 2 * M, 2, gross ? 92 : 72, 52, 900, "Saira Condensed", 0.96);
+    var t = String(d.text || "").trim() ? h.passend(c, d.text, W - 2 * M, gross ? 3 : 2, 36, 28, 500, "Barlow", 1.38) : null;
+    var unten = H - (M + 140 + ti.hoehe + (t ? t.hoehe + 24 : 0) + 70), mx = Math.round(W / 2);
+    h.bild(c, d, 0, 0, mx, unten);
+    h.bild(c, m2(d), mx, 0, W - mx, unten);
+    c.fillStyle = "#fff"; c.fillRect(mx - 4, 0, 8, unten);
+    var gy = Math.round(unten * 0.52);
+    c.save(); c.shadowColor = "rgba(0,0,0,.55)"; c.shadowBlur = 24; c.fillStyle = "#fff"; c.beginPath(); c.arc(mx, gy, 50, 0, Math.PI * 2); c.fill(); c.restore();
+    c.fillStyle = "#0b0c10";
+    c.beginPath(); c.moveTo(mx - 10, gy - 16); c.lineTo(mx - 30, gy); c.lineTo(mx - 10, gy + 16); c.closePath(); c.fill();
+    c.beginPath(); c.moveTo(mx + 10, gy - 16); c.lineTo(mx + 30, gy); c.lineTo(mx + 10, gy + 16); c.closePath(); c.fill();
+    chip(c, h, d.label1 || "Vorher", M - 10, 70, 64, "#fff", "#0b0c10");
+    chip(c, h, d.label2 || "Nachher", W - M + 10, 70, 64, h.ROT, "#fff", "rechts");
+    c.fillStyle = "#0e0f14"; c.fillRect(0, unten, W, H - unten);
+    h.linie(c, 0, unten, W, 8);
+    h.text(c, d.kicker, M, unten + 70, h.f(800, 30), "#ff4b55", "left", 0.2);
+    h.zeilen(c, ti, M, unten + 92, "#fff", 0.6);
+    if (t) h.zeilen(c, t, M, unten + 92 + ti.hoehe + 24, "#c9ced6");
+    h.fuss(c, M, W - M, H - 36, d.footer);
+  } },
+
+  /* ---------- RUNDENVERGLEICH: zwei Runden übereinander, Zeiten + Delta ---------- */
+  { id: "runden", name: "Rundenvergleich", zwei: true, felder: ["rundenzeit", "rundenzeit2", "strecke"], draw: function (c, W, H, d, h) {
+    var M = 48, gross = H > 1500;
+    c.fillStyle = "#0b0c10"; c.fillRect(0, 0, W, H);
+    var g = c.createRadialGradient(W * 0.9, 0, 10, W * 0.9, 0, W); g.addColorStop(0, "rgba(225,19,36,.22)"); g.addColorStop(1, "rgba(225,19,36,0)");
+    c.fillStyle = g; c.fillRect(0, 0, W, H);
+    h.linie(c, 0, 0, W, 10);
+    var kw = chip(c, h, d.kicker, M, 58, 60, h.ROT);
+    if (d.strecke) h.text(c, d.strecke.toUpperCase(), M + kw + 26, 101, h.f(800, 34), "#c9ced6", "left", 0.14);
+    var ti = h.passend(c, d.title.toUpperCase(), W - 2 * M, 2, gross ? 84 : 60, 46, 900, "Saira Condensed", 0.96);
+    h.zeilen(c, ti, M, 150, "#fff", 0.6);
+    var fw = W - 2 * M, fh = Math.round(fw * 9 / 16), y1 = 150 + ti.hoehe + 44, luecke = 104;
+    var platz = H - 150 - y1;
+    if (2 * fh + luecke > platz) fh = Math.floor((platz - luecke) / 2);
+    var y2 = y1 + fh + luecke;
+    h.fenster(c, d, M, y1, fw, fh);
+    h.fenster(c, m2(d), M, y2, fw, fh);
+    var za = d.rundenzeit || "1:58.412", zb = d.rundenzeit2 || "1:57.998";
+    var sa = zeitSek(za), sb = zeitSek(zb), besser = sa != null && sb != null && sa !== sb ? (sb < sa ? 2 : 1) : 0;
+    function zeitBox(x, y, lab, zeit, top) {
+      c.font = h.f(900, 46); var w = c.measureText(zeit).width + 172;
+      c.fillStyle = "rgba(10,11,14,.92)"; c.fillRect(x, y, w, 72);
+      c.fillStyle = top ? "#9b3cf0" : "#3a3f4a"; c.fillRect(x, y, 96, 72);
+      h.text(c, lab, x + 48, y + 50, h.f(900, 38), "#fff", "center");
+      h.text(c, zeit, x + 120, y + 53, h.f(900, 46), "#fff", "left", 0.02);
+    }
+    zeitBox(M + 18, y1 + fh - 90, "A", za, besser === 1);
+    zeitBox(M + 18, y2 + fh - 90, "B", zb, besser === 2);
+    if (besser) chip(c, h, (besser === 2 ? "B " : "A ") + "−" + Math.abs(sa - sb).toFixed(3) + " S", W / 2, y1 + fh + (luecke - 64) / 2, 64, "#16a34a", "#fff", "mitte");
+    h.fuss(c, M, W - M, H - 36, d.footer);
+  } },
+
+  /* ---------- MAGAZIN-COVER: großer Schriftzug wie ein Motorsport-Heft ---------- */
+  { id: "magazin", name: "Magazin-Cover", felder: ["magazinhinweis"], draw: function (c, W, H, d, h) {
+    var M = 56, gross = H > 1500, jetzt = new Date();
+    h.bild(c, d, 0, 0, W, H);
+    h.verlauf(c, 0, H * 0.45, 0, H, [[0, "rgba(10,11,14,0)"], [1, "rgba(10,11,14,.88)"]]);
+    c.save(); c.shadowColor = "rgba(0,0,0,.55)"; c.shadowBlur = 18;
+    h.text(c, "DAS SIM-RACING-MAGAZIN", M, 72, h.f(800, 26), "#fff", "left", 0.22);
+    h.text(c, MONATE[jetzt.getMonth()] + " " + jetzt.getFullYear(), W - M, 72, h.f(800, 26), "#fff", "right", 0.22);
+    var ms = h.passGroesse(c, "KREIDS888", W - 2 * M, gross ? 330 : 280, 120, 900);
+    c.font = h.f(900, ms); c.textAlign = "left"; c.fillStyle = "#fff";
+    var kx = M - ms * 0.02, ky = 72 + ms * 0.86;
+    c.fillText("KREIDS", kx, ky); var kwid = c.measureText("KREIDS").width; c.fillStyle = h.ROT; c.fillText("888", kx + kwid, ky);
+    c.restore();
+    c.fillStyle = h.ROT; c.fillRect(M, ky + 18, W - 2 * M, 8);
+    var sx = W - M - 110, sy = ky + 150;
+    c.save(); c.translate(sx, sy); c.rotate(-0.22);
+    c.fillStyle = h.ROT; c.beginPath(); c.arc(0, 0, 104, 0, Math.PI * 2); c.fill();
+    c.lineWidth = 4; c.strokeStyle = "#fff"; c.beginPath(); c.arc(0, 0, 90, 0, Math.PI * 2); c.stroke();
+    h.text(c, "NEU", 0, -8, h.f(900, 64), "#fff", "center"); h.text(c, "IM HEFT", 0, 36, h.f(800, 28), "#fff", "center", 0.1);
+    c.restore();
+    var themen = String(d.text || "").split(/\n+/).map(function (s) { return s.trim(); }).filter(Boolean).slice(0, 3);
+    var ty = ky + 110;
+    themen.forEach(function (s) {
+      var t = h.passend(c, s.toUpperCase(), W * 0.5, 2, 44, 32, 900, "Saira Condensed", 1.0);
+      c.fillStyle = h.ROT; c.fillRect(M, ty, 60, 6);
+      c.save(); c.shadowColor = "rgba(0,0,0,.6)"; c.shadowBlur = 14; h.zeilen(c, t, M, ty + 18, "#fff", 0.4); c.restore();
+      ty += 18 + t.hoehe + 44;
+    });
+    var ti = h.passend(c, d.title.toUpperCase(), W - 2 * M - 250, 3, gross ? 128 : 96, 64, 900, "Saira Condensed", 0.92);
+    var tiy = H - M - 40 - ti.hoehe;
+    chip(c, h, d.kicker, M - 6, tiy - 84, 60, h.ROT);
+    h.zeilen(c, ti, M, tiy, "#fff", 0.6);
+    var bw = 190, bx = W - M - bw, by = H - M - 150;
+    c.fillStyle = "#fff"; c.fillRect(bx, by, bw, 150);
+    c.fillStyle = "#0b0c10";
+    for (var i = 0, x = bx + 14; x < bx + bw - 18; i++) { var st = [3, 1, 2, 1, 4, 2, 1, 3, 1, 2][i % 10]; c.fillRect(x, by + 14, st * 2, 92); x += st * 2 + [2, 3, 2, 4, 2][i % 5]; }
+    h.text(c, "KREIDS888.COM", bx + bw / 2, by + 136, h.f(800, 22), "#0b0c10", "center", 0.08);
+    h.qr(c, d, W - M - 190, by - 250, 190);
+  } },
+
+  /* ---------- LIVERY-REVEAL: Spotlight, Lichtstreifen, große Kontur-Schrift ---------- */
+  { id: "reveal", name: "Livery-Reveal", felder: ["wann"], draw: function (c, W, H, d, h) {
+    var M = 64, gross = H > 1500;
+    h.bild(c, d, 0, 0, W, H);
+    var g = c.createRadialGradient(W / 2, H * 0.48, W * 0.12, W / 2, H * 0.48, H * 0.72);
+    g.addColorStop(0, "rgba(0,0,0,0)"); g.addColorStop(1, "rgba(0,0,0,.9)"); c.fillStyle = g; c.fillRect(0, 0, W, H);
+    c.save(); c.translate(W * 0.55, H * 0.45); c.rotate(-0.42);
+    var lg = c.createLinearGradient(-160, 0, 160, 0);
+    lg.addColorStop(0, "rgba(255,255,255,0)"); lg.addColorStop(0.5, "rgba(255,255,255,.22)"); lg.addColorStop(1, "rgba(255,255,255,0)");
+    c.globalCompositeOperation = "lighter"; c.fillStyle = lg; c.fillRect(-160, -H, 320, H * 2); c.restore();
+    c.save(); c.font = h.f(900, gross ? 270 : 210); c.textAlign = "center";
+    c.lineWidth = 4; c.strokeStyle = "rgba(255,255,255,.3)"; c.strokeText("REVEAL", W / 2, gross ? 380 : 290); c.restore();
+    h.text(c, (d.wann || "SAISON 2027").toUpperCase(), W / 2, gross ? 470 : 360, h.f(800, 34), "#fff", "center", 0.4);
+    var ti = h.passend(c, d.title.toUpperCase(), W - 2 * M, 2, gross ? 116 : 88, 60, 900, "Saira Condensed", 0.94);
+    var t = String(d.text || "").trim() ? h.passend(c, d.text, W - 2 * M, 2, 36, 28, 500, "Barlow", 1.38) : null;
+    var tiy = H - M - 120 - (t ? t.hoehe + 26 : 0) - ti.hoehe;
+    chip(c, h, d.kicker, W / 2, tiy - 92, 66, h.ROT, "#fff", "mitte");
+    h.zeilen(c, ti, W / 2, tiy, "#fff", 0.6, "center");
+    if (t) h.zeilen(c, t, W / 2, tiy + ti.hoehe + 26, "#d5d9e0", 0, "center");
+    h.fuss(c, M, W - M, H - 36, d.footer);
+  } },
+
+  /* ---------- RETRO-POSTER: helles Plakat im Stil alter Langstrecken-Plakate ---------- */
+  { id: "retro", name: "Retro-Poster", felder: ["strecke", "wann"], draw: function (c, W, H, d, h) {
+    var M = 64, gross = H > 1500, PAPIER = "#efe6d2", SCHWARZ = "#141416";
+    c.fillStyle = PAPIER; c.fillRect(0, 0, W, H);
+    c.fillStyle = "rgba(120,90,40,.05)";
+    for (var i = 0; i < 900; i++) c.fillRect((i * 7919) % W, (i * 104729) % H, 3, 3);
+    logoAuf(c, h, M, gross ? 132 : 104, gross ? 66 : 54, SCHWARZ);
+    h.text(c, d.kicker, W - M, gross ? 126 : 98, h.f(800, 30), h.ROT, "right", 0.26);
+    var bx = M, by = gross ? 190 : 150, bw = W - 2 * M, bh = Math.round(H * (gross ? 0.44 : 0.4));
+    c.fillStyle = SCHWARZ; c.fillRect(bx - 12, by - 12, bw + 24, bh + 24);
+    h.bild(c, d, bx, by, bw, bh);
+    c.save(); c.beginPath(); c.rect(0, 0, W, by + bh + 34); c.clip();
+    c.translate(W - 150, by + bh - 30); c.rotate(-0.75);
+    c.fillStyle = h.ROT; c.fillRect(-420, -46, 840, 46); c.fillStyle = SCHWARZ; c.fillRect(-420, 0, 840, 22); c.fillStyle = h.ROT; c.fillRect(-420, 22, 840, 14);
+    c.restore();
+    var ti = h.passend(c, d.title.toUpperCase(), W - 2 * M, 3, gross ? 156 : 112, 70, 900, "Saira Condensed", 0.88);
+    var ty = by + bh + (gross ? 76 : 52);
+    h.zeilen(c, ti, M - 4, ty, SCHWARZ, 0.1);
+    var info = [d.strecke, d.wann].filter(Boolean).join("   ·   ").toUpperCase();
+    if (info) h.text(c, info, M, ty + ti.hoehe + (gross ? 74 : 56), h.f(800, gross ? 46 : 36), h.ROT, "left", 0.06);
+    c.fillStyle = SCHWARZ; c.fillRect(0, H - 110, W, 110);
+    h.logo(c, M, H - 40, 44); h.motto(c, d.footer, W - M, H - 42, 32, "right");
+  } },
+
+  /* ---------- WOCHENPLAN: Rennen & Streams der Woche (automatisch aus dem Streamkalender) ---------- */
+  { id: "wochenplan", name: "Wochenplan", felder: ["kalenderhinweis"], draw: function (c, W, H, d, h) {
+    var M = 60, gross = H > 1500;
+    h.bild(c, d, 0, 0, W, H);
+    c.fillStyle = "rgba(10,11,14,.8)"; c.fillRect(0, 0, W, H);
+    h.linie(c, 0, 0, W, 10);
+    var heute = new Date(), mo = new Date(heute.getFullYear(), heute.getMonth(), heute.getDate() - ((heute.getDay() + 6) % 7));
+    var so = new Date(mo); so.setDate(mo.getDate() + 6);
+    var tm = function (x) { return String(x.getDate()).padStart(2, "0") + "." + String(x.getMonth() + 1).padStart(2, "0") + "."; };
+    chip(c, h, d.kicker, M - 6, 70, 62, h.ROT);
+    h.text(c, tm(mo) + " – " + tm(so), W - M, 114, h.f(800, 34), "#c9ced6", "right", 0.1);
+    var ti = h.passend(c, d.title.toUpperCase(), W - 2 * M, 2, gross ? 110 : 84, 56, 900, "Saira Condensed", 0.94);
+    h.zeilen(c, ti, M, 170, "#fff", 0.6);
+    var zeilen = wochenZeilen(d, gross ? 7 : 4);
+    var y = 170 + ti.hoehe + 60, rh = gross ? 168 : 132;
+    if (!zeilen.length) {
+      h.text(c, d.woche && d.woche.geladen ? "Diese Woche keine Termine" : "Termine werden geladen …", M, y + 60, h.f(800, 40), "#9aa1ab", "left", 0.04);
+    }
+    zeilen.forEach(function (z, i) {
+      c.fillStyle = "rgba(19,21,27,.92)"; c.fillRect(M, y, W - 2 * M, rh - 18);
+      c.fillStyle = i === 0 ? h.ROT : "#262a34"; c.fillRect(M, y, 150, rh - 18);
+      h.text(c, z.tag, M + 75, y + (rh - 18) / 2 + 4, h.f(900, gross ? 62 : 50), "#fff", "center");
+      if (z.zeit) h.text(c, z.zeit + " UHR", M + 75, y + (rh - 18) / 2 + (gross ? 46 : 38), h.f(800, gross ? 26 : 22), i === 0 ? "#fff" : "#9aa1ab", "center", 0.06);
+      var tg = h.passGroesse(c, String(z.titel).toUpperCase(), W - 2 * M - 214, gross ? 52 : 42, 28, 900, 0.01);
+      h.text(c, String(z.titel).toUpperCase(), M + 186, y + (rh - 18) / 2 - (z.sub ? 6 : -18), h.f(900, tg), "#fff", "left", 0.01);
+      if (z.sub) h.text(c, z.sub, M + 186, y + (rh - 18) / 2 + (gross ? 42 : 34), h.f(500, gross ? 32 : 26, "Barlow"), "#c9ced6", "left");
+      y += rh;
+    });
+    h.fuss(c, M, W - M, H - 36, d.footer);
   } }
 
   );
