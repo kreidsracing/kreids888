@@ -6,8 +6,48 @@
   var cv = $("cv"), ctx = cv.getContext("2d");
   var OV = window.K888_OVERLAYS || [];
   var S = { ov: 0, H: 1920, img: null, cover: "", view: { zoom: 1, ox: 0, oy: 0 } };
+  // Zweites Bild/Video (Designs mit „zwei: true“), Zielpunkt der Lupe, Termine für den Wochenplan
+  S.img2 = null; S.view2 = { zoom: 1, ox: 0, oy: 0 }; S.zielPos = null; S.kalender = { liste: [], geladen: false };
   // Format vom aktiven Knopf übernehmen (Bedienfelder und Programm passen so immer zusammen)
   var fmtAn = document.querySelector("#fmt button.on"); if (fmtAn) S.H = +fmtAn.dataset.h || 1920;
+  // Abdunkeln startet bei 0 %
+  if ($("dunkel")) { $("dunkel").value = 0; if ($("dunkelWert")) $("dunkelWert").textContent = "0 %"; }
+
+  /* ---------- Zusätzliche Bedienfelder (für Website und Dashboard gleich, darum hier erzeugt) ---------- */
+  (function(){
+    var hg = $("gal") && $("gal").closest(".sb-panel");
+    if (hg && !$("m2Panel")) hg.insertAdjacentHTML("afterend",
+      '<div class="sb-panel" id="m2Panel" hidden>' +
+        '<div class="sb-h">2b · Bild/Video 2</div>' +
+        '<p class="sb-hint" style="margin:0 0 12px">Dieses Design zeigt zwei Bilder oder Videos. Hier wählst du das zweite.</p>' +
+        '<div class="sb-gal" id="gal2" style="grid-template-columns:repeat(6,1fr)"></div>' +
+        '<div class="sb-gal team" id="persGal2" style="grid-template-columns:repeat(7,1fr)"></div>' +
+        '<div class="sb-row">' +
+          '<label class="sb-file">Bild vom PC<input type="file" id="file2" accept="image/*"></label>' +
+          '<label class="sb-file">Video vom PC<input type="file" id="vfile2" accept="video/*"></label>' +
+          '<button type="button" class="sb-mini" id="noImg2">ohne Bild 2</button>' +
+        '</div>' +
+        '<div id="vid2Box" hidden style="margin-top:10px">' +
+          '<div id="tonWahlBox" hidden><label>Ton im fertigen Video</label>' +
+          '<div class="sb-seg" id="tonWahl"><button type="button" data-v="1" class="on">Video 1</button><button type="button" data-v="2">Video 2</button><button type="button" data-v="beide">Beide</button><button type="button" data-v="aus">Aus</button></div></div>' +
+          '<span class="sb-hint" id="vid2Info"></span>' +
+        '</div>' +
+        '<p class="sb-hint" id="img2Hint">Bild 2 direkt in der Vorschau mit der Maus verschieben.</p>' +
+        '<label>Zoom Bild 2</label>' +
+        '<input type="range" id="zoom2" min="1" max="3" step="0.01" value="1">' +
+      '</div>');
+    var rz = $("rundenzeit") && $("rundenzeit").closest(".sb-feld");
+    if (rz && !$("label2")) rz.insertAdjacentHTML("afterend",
+      '<div class="sb-feld" data-feld="rundenzeit2" hidden><label for="rundenzeit2">Rundenzeit B</label><input type="text" id="rundenzeit2" maxlength="12" placeholder="1:57.998"></div>' +
+      '<div class="sb-feld" data-feld="name1" hidden><label for="name1">Name oben</label><input type="text" id="name1" maxlength="30" placeholder="KREIDS888"></div>' +
+      '<div class="sb-feld" data-feld="name2" hidden><label for="name2">Name unten</label><input type="text" id="name2" maxlength="30" placeholder="GEGNER"></div>' +
+      '<div class="sb-feld" data-feld="label1" hidden><label for="label1">Beschriftung Bild 1</label><input type="text" id="label1" maxlength="30" placeholder="VORHER"></div>' +
+      '<div class="sb-feld" data-feld="label2" hidden><label for="label2">Beschriftung Bild 2</label><input type="text" id="label2" maxlength="30" placeholder="leer = Standard des Designs"></div>' +
+      '<p class="sb-hint sb-feld" data-feld="kalenderhinweis" hidden>Text leer lassen: Die Termine dieser Woche kommen automatisch aus deinem Streamkalender. Eigene Zeilen gehen auch, z. B. „MO 20:00 Teamrennen – Spa“.</p>' +
+      '<p class="sb-hint sb-feld" data-feld="magazinhinweis" hidden>Jede Zeile im Text wird eine Schlagzeile links auf dem Cover (bis zu 3).</p>');
+  })();
+  function wert(id){ var el = $(id); return el ? el.value.trim() : ""; }
+  function zweiAktiv(){ return !!(OV[S.ov] && OV[S.ov].zwei); }
 
   /* ---------- Zeichen-Hilfen für die Overlays ---------- */
   var ICON = {"youtube": "M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12z", "tiktok": "M12.525.02c1.31-.02 2.61-.01 3.91-.02.08 1.53.63 3.09 1.75 4.17 1.12 1.11 2.7 1.62 4.24 1.79v4.03c-1.44-.05-2.89-.35-4.2-.97-.57-.26-1.1-.59-1.62-.93-.01 2.92.01 5.84-.02 8.75-.08 1.4-.54 2.79-1.35 3.94-1.31 1.92-3.58 3.17-5.91 3.21-1.43.08-2.86-.31-4.08-1.03-2.02-1.19-3.44-3.37-3.65-5.71-.02-.5-.03-1-.01-1.49.18-1.9 1.12-3.72 2.58-4.96 1.66-1.44 3.98-2.13 6.15-1.72.02 1.48-.04 2.96-.04 4.44-.99-.32-2.15-.23-3.02.37-.63.41-1.11 1.04-1.36 1.75-.21.51-.15 1.07-.14 1.61.24 1.64 1.82 3.02 3.5 2.87 1.12-.01 2.19-.66 2.77-1.61.19-.33.4-.67.41-1.06.1-1.79.06-3.57.07-5.36.01-4.03-.01-8.05.02-12.07z", "instagram": "M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zM12 0C8.741 0 8.333.014 7.053.072 2.695.272.273 2.69.073 7.052.014 8.333 0 8.741 0 12c0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98C8.333 23.986 8.741 24 12 24c3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98C15.668.014 15.259 0 12 0zm0 5.838a6.162 6.162 0 100 12.324 6.162 6.162 0 000-12.324zM12 16a4 4 0 110-8 4 4 0 010 8zm6.406-11.845a1.44 1.44 0 100 2.881 1.44 1.44 0 000-2.881z", "discord": "M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028c.462-.63.874-1.295 1.226-1.994a.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03zM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.956-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.956 2.418-2.157 2.418zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.955-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.946 2.418-2.157 2.418z"};
@@ -329,7 +369,15 @@
       c.restore();
       return { x: x, y: y, w: bw, h: bh };
     },
+    // Lupe: Zielpunkt melden, damit man ihn mit der Maus verschieben kann
+    zielMelden: function(x, y, r){ if (S._haupt) S._ziel = { x: x - r, y: y - r, w: 2 * r, h: 2 * r }; },
     bild: function(c, d, x, y, w, hh){
+      if (d.zwei && S._haupt) {
+        // Fläche von Bild 2 merken (auch gedreht), damit man es in der Vorschau verschieben kann
+        var mt = c.getTransform(), ecken = [[x, y], [x + w, y], [x, y + hh], [x + w, y + hh]].map(function(p){ return mt.transformPoint(new DOMPoint(p[0], p[1])); });
+        var xs = ecken.map(function(p){ return p.x; }), ys = ecken.map(function(p){ return p.y; }), x0 = Math.min.apply(null, xs), y0 = Math.min.apply(null, ys);
+        S._bild2 = { x: x0, y: y0, w: Math.max.apply(null, xs) - x0, h: Math.max.apply(null, ys) - y0, zone: d.zone || null };
+      }
       if (S.transparent) { c.clearRect(x, y, w, hh); eigenerVerlauf(c, x, y, w, hh); persHinten(c); return; } // Overlay-Export: Bildfläche bleibt durchsichtig
       c.save(); c.beginPath(); c.rect(x, y, w, hh); c.clip();
       if (h.hatMedium(d)) {
@@ -353,8 +401,11 @@
     }
   };
 
-  function daten(){
-    return { kicker: ($("kicker").value || "NEWS").toUpperCase(), title: $("title").value || "Deine Überschrift", text: $("text").value || "", footer: $("footer").value || "", platz: $("platz").value.trim(), strecke: $("strecke").value.trim(), wann: $("wann").value.trim(), rundenzeit: $("rundenzeit").value.trim(), zeit: S.zeitJetzt, aufn: !!(aufnahme && aufnahme.laeuft), qr: $("qr").value.trim(), img: S.img, view: S.view };
+  function daten(haupt){
+    // Vorschaubilder der Designs bekommen Kopien, damit sie die Verschiebung im Hauptbild nicht verändern
+    var v1 = haupt ? S.view : { zoom: S.view.zoom, ox: S.view.ox, oy: S.view.oy }, v2 = haupt ? S.view2 : { zoom: S.view2.zoom, ox: S.view2.ox, oy: S.view2.oy };
+    return { kicker: ($("kicker").value || "NEWS").toUpperCase(), title: $("title").value || "Deine Überschrift", text: $("text").value || "", footer: $("footer").value || "", platz: $("platz").value.trim(), strecke: $("strecke").value.trim(), wann: $("wann").value.trim(), rundenzeit: $("rundenzeit").value.trim(), zeit: S.zeitJetzt, aufn: !!(aufnahme && aufnahme.laeuft), qr: $("qr").value.trim(), img: S.img, view: v1,
+      img2: S.img2, view2: v2, rundenzeit2: wert("rundenzeit2"), name1: wert("name1"), name2: wert("name2"), label1: wert("label1"), label2: wert("label2"), ziel: S.zielPos, woche: S.kalender };
   }
   S.qrPos = null; S.sozPos = null; S.hit = {}; S.sozDir = "h"; S.texte = []; S.akt = -1; S.team = null; S.teamPos = null;
   function sozListe(){ return [].slice.call(document.querySelectorAll("#soz input:checked")).map(function(i){ return i.value; }); }
@@ -472,9 +523,12 @@
   function zeichne(c, ov, W, H, skala, haupt){
     c.setTransform(skala, 0, 0, skala, 0, 0);
     c.clearRect(0, 0, W, H);
-    var d = daten(); h._qr = null;
+    var d = daten(haupt); h._qr = null;
     S._persBox = undefined;
+    S._haupt = !!haupt; S._bild2 = null; S._ziel = null;
     try { ov.draw(c, W, H, d, h); } catch (e) { console.error(e); }
+    if (haupt) { S.hit.bild2 = S._bild2; S.hit.ziel = S._ziel; }
+    S._haupt = false;
     var pb = S.persEbene === "hinten" && S._persBox !== undefined ? S._persBox : persZeichnen(c, W, H);
     if (haupt) S.hit.pers = pb;
     var tb = teamZeichnen(c, W, H);
@@ -519,11 +573,11 @@
   $("ovList").innerHTML = OV.map(function(o, i){ return '<button type="button" data-i="' + i + '"' + (i === 0 ? ' class="on"' : '') + '><canvas></canvas>' + o.name + '</button>'; }).join("");
   thumbs = [].slice.call(document.querySelectorAll("#ovList canvas"));
   document.querySelectorAll("#ovList button").forEach(function(b){
-    b.onclick = function(){ S.ov = +b.dataset.i; document.querySelectorAll("#ovList button").forEach(function(x){ x.classList.toggle("on", x === b); }); S.qrPos = null; felderZeigen(); render(); starteSchleife(); };
+    b.onclick = function(){ S.ov = +b.dataset.i; document.querySelectorAll("#ovList button").forEach(function(x){ x.classList.toggle("on", x === b); }); S.qrPos = null; felderZeigen(); medium2Anzeigen(); render(); starteSchleife(); };
   });
   // Format
   document.querySelectorAll("#fmt button").forEach(function(b){
-    b.onclick = function(){ S.H = +b.dataset.h; S.qrPos = null; S.sozPos = null; document.querySelectorAll("#fmt button").forEach(function(x){ x.classList.toggle("on", x === b); }); alles(); };
+    b.onclick = function(){ S.H = +b.dataset.h; S.qrPos = null; S.sozPos = null; S.zielPos = null; document.querySelectorAll("#fmt button").forEach(function(x){ x.classList.toggle("on", x === b); }); alles(); };
   });
   // Texte
   function felderZeigen(){
@@ -534,7 +588,7 @@
   document.querySelectorAll("#soz input").forEach(function(i){ i.addEventListener("change", alles); });
   document.querySelectorAll("#sozDir button").forEach(function(b){ b.onclick = function(){ S.sozDir = b.dataset.d; document.querySelectorAll("#sozDir button").forEach(function(x){ x.classList.toggle("on", x === b); }); alles(); }; });
   ["qrSize", "sozSize", "teamSize"].forEach(function(id){ $(id).addEventListener("input", function(){ render(); }); $(id).addEventListener("change", renderThumbs); });
-  ["kicker", "title", "text", "footer", "platz", "strecke", "wann", "rundenzeit", "qr"].forEach(function(id){ $(id).addEventListener("input", alles); });
+  ["kicker", "title", "text", "footer", "platz", "strecke", "wann", "rundenzeit", "qr", "rundenzeit2", "name1", "name2", "label1", "label2"].forEach(function(id){ if ($(id)) $(id).addEventListener("input", alles); });
   // Fußzeile: Wörter antippen = rot/weiß
   S.fussRot = [true];
   function fussWoerter(){
@@ -549,12 +603,32 @@
 
   /* ---------- Video als Hintergrund ---------- */
   var MAXS = 30, ac = null, quelle = null, vorschau = null, recZiel = null, schleife = null, aufnahme = null, kannTeilen = false;
-  S.vid = null;
+  var ton1 = null, ton2 = null, quelle2 = null;
+  S.vid = null; S.vid2 = null;
   function meldung(t, fehler){ $("dlMsg").textContent = t; $("dlMsg").className = "sb-hint" + (fehler ? " sb-err" : ""); }
   function modus(){
-    var v = !!S.vid;
+    var v = !!S.vid || (!!S.vid2 && zweiAktiv());
     $("vidBox").hidden = !v; $("vdl").hidden = !v; $("dl").hidden = v; $("share").hidden = v || !kannTeilen; $("bvBox").hidden = v;
+    if ($("vid2Box")) { $("vid2Box").hidden = !S.vid2; $("tonWahlBox").hidden = !(S.vid && S.vid2); }
   }
+  // Ton: Anteil von Video 1 und Video 2 (Vorschau und fertiges Video)
+  function tonWahl(){ var b = document.querySelector("#tonWahl button.on"); return b ? b.dataset.v : "1"; }
+  function tonAnteile(){
+    if (!(zweiAktiv() && S.vid2)) return [1, 0];
+    if (!S.vid) return [0, 1];
+    var w = tonWahl();
+    return w === "2" ? [0, 1] : w === "beide" ? [0.8, 0.8] : w === "aus" ? [0, 0] : [1, 0];
+  }
+  function tonMischen(){ var a = tonAnteile(); if (ton1) ton1.gain.value = a[0]; if (ton2) ton2.gain.value = a[1]; }
+  function tonKnoten(){
+    ac = ac || new (window.AudioContext || window.webkitAudioContext)();
+    if (!recZiel) { recZiel = ac.createMediaStreamDestination(); vorschau = ac.createGain(); vorschau.connect(ac.destination); vorschau.gain.value = $("vidTon").checked ? 1 : 0; }
+    if (!ton1) { ton1 = ac.createGain(); ton1.connect(recZiel); ton1.connect(vorschau); }
+    if (!ton2) { ton2 = ac.createGain(); ton2.gain.value = 0; ton2.connect(recZiel); ton2.connect(vorschau); }
+  }
+  // Video mit der längsten Laufzeit gibt bei der Aufnahme den Takt vor
+  function zeitVideo(){ var a = S.vid, b = zweiAktiv() ? S.vid2 : null; if (a && b) return (b.duration || 0) > (a.duration || 0) ? b : a; return a || b; }
+  function videoDauer(){ var v = zeitVideo(); return Math.min(v && v.duration || MAXS, MAXS); }
   function videoStop(){
     if (!S.vid) return;
     var v = S.vid; S.vid = null;
@@ -567,27 +641,39 @@
   }
   function tonVerbinden(v){
     try {
-      ac = ac || new (window.AudioContext || window.webkitAudioContext)();
-      if (!recZiel) { recZiel = ac.createMediaStreamDestination(); vorschau = ac.createGain(); vorschau.connect(ac.destination); }
+      tonKnoten();
       quelle = ac.createMediaElementSource(v);
-      quelle.connect(recZiel); quelle.connect(vorschau);
+      quelle.connect(ton1);
       vorschau.gain.value = $("vidTon").checked ? 1 : 0;
       v.muted = false;
       if (ac.state === "suspended") ac.resume();
+      tonMischen();
     } catch (e) { quelle = null; v.muted = true; }
   }
-  function brauchtSchleife(){ return !!S.vid || !!aufnahme || !!(OV[S.ov] && OV[S.ov].anim) || S.texte.some(function(o){ return o.effekt && o.effekt !== "kein"; }) || (ctaAn() && $("ctaPuls").checked); }
+  function tonVerbinden2(v){
+    try {
+      tonKnoten();
+      quelle2 = ac.createMediaElementSource(v);
+      quelle2.connect(ton2);
+      v.muted = false;
+      if (ac.state === "suspended") ac.resume();
+      tonMischen();
+    } catch (e) { quelle2 = null; v.muted = true; }
+  }
+  function brauchtSchleife(){ return !!S.vid || (!!S.vid2 && zweiAktiv()) || !!aufnahme || !!(OV[S.ov] && OV[S.ov].anim) || S.texte.some(function(o){ return o.effekt && o.effekt !== "kein"; }) || (ctaAn() && $("ctaPuls").checked); }
   function starteSchleife(){
     if (schleife) return;
     (function bild(){
       if (!brauchtSchleife()) { schleife = null; render(); return; }
       if (aufnahme && aufnahme.offline) { schleife = requestAnimationFrame(bild); return; } // Bild-für-Bild-Export zeichnet selbst
-      var v = S.vid, t = null;
+      var v = zeitVideo(), t = null;
       if (aufnahme && aufnahme.laeuft) {
         t = v ? v.currentTime : (performance.now() - aufnahme.t0) / 1000;
         if (t >= aufnahme.dauer || (v && v.ended)) { aufnahmeStop(); t = null; }
         else meldung("Aufnahme läuft … " + Math.floor(t) + " / " + Math.round(aufnahme.dauer) + " s – Tab bitte offen lassen.");
-      } else if (v && !aufnahme && v.currentTime >= MAXS) { v.currentTime = 0; }
+      } else if (!aufnahme) {
+        [S.vid, S.vid2].forEach(function(x){ if (x && x.currentTime >= MAXS) x.currentTime = 0; });
+      }
       render();
       schleife = requestAnimationFrame(bild);
     })();
@@ -669,6 +755,60 @@
     if (vorschau) vorschau.gain.value = this.checked ? 1 : 0;
     if (ac && ac.state === "suspended") ac.resume();
   };
+
+  /* ---------- Bild/Video 2 (für Designs mit zwei Medien) ---------- */
+  function videoStop2(){
+    if (!S.vid2) return;
+    var v = S.vid2; S.vid2 = null;
+    try { v.pause(); } catch (e) {}
+    if (quelle2) { try { quelle2.disconnect(); } catch (e) {} quelle2 = null; }
+    URL.revokeObjectURL(v.src); v.removeAttribute("src"); try { v.load(); } catch (e) {}
+    if (S.img2 === v) S.img2 = null;
+    $("vid2Info").textContent = "";
+    modus(); tonMischen();
+  }
+  function setzeBild2(img, knopf){
+    if (S.vid2 && img !== S.vid2) videoStop2();
+    S.img2 = img; S.view2 = { zoom: 1, ox: 0, oy: 0 }; $("zoom2").value = 1;
+    document.querySelectorAll("#gal2 button, #persGal2 button").forEach(function(x){ x.classList.toggle("on", !!knopf && x === knopf); });
+    alles();
+  }
+  // Feld „2b“ nur bei Designs mit zwei Medien zeigen; Video 2 läuft nur dann mit
+  function medium2Anzeigen(){
+    var an = zweiAktiv();
+    $("m2Panel").hidden = !an;
+    if (S.vid2 && !aufnahme) { if (an) S.vid2.play().catch(function(){}); else S.vid2.pause(); }
+    tonMischen(); modus();
+  }
+  $("file2").onchange = function(){
+    var f = this.files && this.files[0]; this.value = ""; if (!f) return;
+    var img = new Image(); img.onload = function(){ setzeBild2(img, null); $("img2Hint").textContent = "Bild 2 direkt in der Vorschau mit der Maus verschieben."; $("img2Hint").className = "sb-hint"; };
+    img.src = URL.createObjectURL(f);
+  };
+  $("vfile2").onchange = function(){
+    var f = this.files && this.files[0]; this.value = ""; if (!f) return;
+    if (aufnahme) return;
+    videoStop2();
+    var v = document.createElement("video");
+    v.playsInline = true; v.loop = true; v.preload = "auto"; v.muted = true;
+    v.onloadeddata = function(){
+      v.onloadeddata = null;
+      S.vid2 = v; S.vid2File = f; S.vid2Fps = 30; tonVerbinden2(v); setzeBild2(v, null);
+      fpsAusDatei(f).then(function(fps){ if (S.vid2 === v && fps) S.vid2Fps = fps; });
+      var dauer = v.duration || 0;
+      $("vid2Info").textContent = dauer > MAXS + 0.5 ? "Video 2 ist " + Math.round(dauer) + " s lang – es werden die ersten 30 s genommen." : (dauer ? "Video 2: " + Math.round(dauer) + " s" : "");
+      $("img2Hint").textContent = "Bild 2 direkt in der Vorschau mit der Maus verschieben."; $("img2Hint").className = "sb-hint";
+      if (zweiAktiv()) v.play().catch(function(){});
+      tonMischen(); modus(); starteSchleife(); meldung("");
+    };
+    v.onerror = function(){ $("img2Hint").textContent = "Dieses Video kann der Browser nicht abspielen. Am besten MP4 (H.264) nehmen."; $("img2Hint").className = "sb-hint sb-err"; };
+    v.src = URL.createObjectURL(f);
+  };
+  $("noImg2").onclick = function(){ setzeBild2(null, null); };
+  $("zoom2").oninput = function(){ S.view2.zoom = +this.value; alles(); };
+  document.querySelectorAll("#tonWahl button").forEach(function(b){
+    b.onclick = function(){ seg("tonWahl", b.dataset.v); tonMischen(); if (ac && ac.state === "suspended") ac.resume(); };
+  });
   function vidTyp(){
     var l = ["video/mp4;codecs=avc1.640028,mp4a.40.2", "video/mp4;codecs=avc1.4D401F,mp4a.40.2", "video/mp4;codecs=avc1.42E01E,mp4a.40.2", "video/mp4;codecs=avc1,mp4a", "video/mp4", "video/webm;codecs=vp9,opus", "video/webm;codecs=vp8,opus", "video/webm"];
     for (var i = 0; i < l.length; i++) if (window.MediaRecorder && MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(l[i])) return l[i];
@@ -677,7 +817,7 @@
   function aufnahmeStop(){
     if (!aufnahme || aufnahme.stoppt) return;
     aufnahme.laeuft = false; aufnahme.stoppt = true;
-    try { S.vid && S.vid.pause(); } catch (e) {}
+    try { S.vid && S.vid.pause(); S.vid2 && S.vid2.pause(); } catch (e) {}
     if (aufnahme.rec && aufnahme.rec.state !== "inactive") aufnahme.rec.stop();
   }
   function knoepfe(laeuft){
@@ -692,6 +832,7 @@
     }
     aufnahme = null; knoepfe(false);
     if (S.vid) { S.vid.loop = true; S.vid.currentTime = 0; S.vid.play().catch(function(){}); }
+    if (S.vid2) { S.vid2.loop = true; S.vid2.currentTime = 0; if (zweiAktiv()) S.vid2.play().catch(function(){}); }
     starteSchleife(); render();
   }
   /* ---------- Normales MP4 (WebCodecs + mp4-muxer), Bild für Bild gerendert ----------
@@ -781,9 +922,7 @@
         if (!offen) return;
         if (!aufnahme) return ende();
         v.pause();
-        bisZeit(meta.mediaTime).then/* Social-Bild-Generator: läuft auf kreids888.com/social und im Dashboard (dort mit K888_SOCIAL_BASE = Proxy-Pfad, damit Bilder gleiche Herkunft haben) */
-(function(){
-  var BASE = window.K888_SOCIAL_BASE || "";
+        bisZeit(meta.mediaTime).then(function(){
           if (!offen) return;
           if (wc.anzahl() >= gesamt) return ende();
           v.requestVideoFrameCallback(cb);
@@ -814,9 +953,7 @@
         };
         mp.onSamples = function(id, u, s){ for (var i = 0; i < s.length; i++) proben.push(s[i]); };
         try { ab.fileStart = 0; mp.appendBuffer(ab); mp.flush(); } catch (e) { return ok(null); }
-        setTimeout/* Social-Bild-Generator: läuft auf kreids888.com/social und im Dashboard (dort mit K888_SOCIAL_BASE = Proxy-Pfad, damit Bilder gleiche Herkunft haben) */
-(function(){
-  var BASE = window.K888_SOCIAL_BASE || "";
+        setTimeout(function(){
           if (!spur || !proben.length) return ok(null);
           var desc = null, trak = mp.getTrackById(spur.id);
           (trak.mdia.minf.stbl.stsd.entries || []).forEach(function(en){
@@ -899,9 +1036,106 @@
       videoFertig(null);
     }
   }
+  /* ---------- Zwei Videos: beide Clips Bild für Bild gleichzeitig ----------
+     Jeder Clip wird selbst dekodiert (oder notfalls Bild für Bild angesprungen),
+     der kürzere bleibt am Ende auf seinem letzten Bild stehen. */
+  async function dekoderQuelle(file, dauer){
+    if (!file) return null;
+    var info = await mp4Lesen(file, dauer);
+    if (!info) return null;
+    var cfg = { codec: info.codec, codedWidth: info.w, codedHeight: info.h };
+    if (info.description) cfg.description = info.description;
+    try { if (!(await VideoDecoder.isConfigSupported(cfg)).supported) return null; } catch (e) { return null; }
+    var fc = document.createElement("canvas"); fc.width = info.w; fc.height = info.h;
+    fc.naturalWidth = info.w; fc.naturalHeight = info.h;
+    var fx = fc.getContext("2d"), schlange = [], fehler = null, i = 0, geleert = false, hatBild = false, naechste = null;
+    var dec = new VideoDecoder({ output: function(f){ schlange.push(f); }, error: function(e){ fehler = e; } });
+    dec.configure(cfg);
+    return {
+      bild: fc,
+      bis: async function(t, fps){
+        var grenze = t + 0.5 / fps;
+        for (;;) {
+          if (fehler) throw fehler;
+          if (!naechste) {
+            while (i < info.chunks.length && dec.decodeQueueSize < 6 && schlange.length < 4) dec.decode(info.chunks[i++]);
+            if (!schlange.length) {
+              if (i >= info.chunks.length) { if (!geleert) { geleert = true; await dec.flush(); continue; } return; }
+              await warte(2); continue;
+            }
+            naechste = schlange.shift();
+          }
+          if (!hatBild || naechste.timestamp / 1e6 <= grenze) { fx.drawImage(naechste, 0, 0, fc.width, fc.height); naechste.close(); naechste = null; hatBild = true; continue; }
+          return;
+        }
+      },
+      zu: function(){ schlange.forEach(function(f){ f.close(); }); if (naechste) { try { naechste.close(); } catch (e) {} } try { dec.close(); } catch (e) {} }
+    };
+  }
+  function springQuelle(v){
+    return {
+      bild: v, zu: function(){},
+      bis: function(t, fps){
+        return new Promise(function(fertig){
+          var ziel = Math.max(0, Math.min((v.duration || t + 1) - 0.05, t + 0.5 / fps));
+          if (Math.abs(v.currentTime - ziel) < 0.0005) return fertig();
+          var tm = setTimeout(fertig, 1500);
+          v.addEventListener("seeked", function(){ clearTimeout(tm); fertig(); }, { once: true });
+          v.currentTime = ziel;
+        });
+      }
+    };
+  }
+  // Ton fürs fertige Video nach der Auswahl (Video 1 / Video 2 / beide / aus)
+  async function tonFuerExport(){
+    var a = tonAnteile();
+    var p1 = a[0] > 0 && S.vid ? await tonAusDatei(S.vidFile) : null;
+    var p2 = a[1] > 0 && S.vid2 ? await tonAusDatei(S.vid2File) : null;
+    if (!p1 || !p2 || p1.sampleRate !== p2.sampleRate) return p1 || p2;
+    var len = Math.max(p1.length, p2.length), out = (ac || new (window.AudioContext || window.webkitAudioContext)()).createBuffer(2, len, p1.sampleRate);
+    for (var ch = 0; ch < 2; ch++) {
+      var o = out.getChannelData(ch), x1 = p1.getChannelData(Math.min(ch, p1.numberOfChannels - 1)), x2 = p2.getChannelData(Math.min(ch, p2.numberOfChannels - 1));
+      for (var i = 0; i < len; i++) { var s = (i < x1.length ? x1[i] * a[0] : 0) + (i < x2.length ? x2[i] * a[1] : 0); o[i] = s > 1 ? 1 : s < -1 ? -1 : s; }
+    }
+    return out;
+  }
+  async function aufnehmenWC2(dauer){
+    var v1 = S.vid, v2 = S.vid2, fps = v1 ? (S.vidFps || 30) : (S.vid2Fps || 30), gesamt = Math.max(1, Math.round(dauer * fps));
+    var alt1 = S.img, alt2 = S.img2, q1 = null, q2 = null;
+    aufnahme = { dauer: dauer, laeuft: true, offline: true, zeit: 0, t0: 0 };
+    knoepfe(true); meldung("Video wird vorbereitet …");
+    if (vorschau) vorschau.gain.value = 0;
+    function tonZurueck(){ if (vorschau) vorschau.gain.value = $("vidTon").checked ? 1 : 0; }
+    function aufraeumen(){ if (q1) q1.zu(); if (q2) q2.zu(); q1 = q2 = null; S.img = alt1; S.img2 = alt2; tonZurueck(); }
+    try {
+      var wc = await wcRekorder(fps, await tonFuerExport(), dauer);
+      if (!wc) { aufnahme = null; aufraeumen(); return aufnehmenMR(dauer); }
+      if (v1) v1.pause(); v2.pause();
+      q1 = v1 ? (await dekoderQuelle(S.vidFile, dauer) || springQuelle(v1)) : null;
+      q2 = await dekoderQuelle(S.vid2File, dauer) || springQuelle(v2);
+      if (q1) S.img = q1.bild; S.img2 = q2.bild;
+      for (var n = 0; n < gesamt; n++) {
+        var t = n / fps;
+        if (q1) await q1.bis(t, fps);
+        await q2.bis(t, fps);
+        aufnahme.zeit = t; render(); await wc.bild();
+        if (n % 10 === 0) { meldung("Video wird gebaut … " + Math.round(n / gesamt * 100) + " % (Tab bitte offen lassen)"); await warte(0); }
+      }
+      meldung("Video wird fertig gebaut …");
+      var blob = await wc.stop();
+      aufraeumen();
+      videoFertig(blob, "mp4");
+      if (wc.tonCodec === "opus") meldung($("dlMsg").textContent + " (Ton als Opus, dieser Browser kann kein AAC. Für Instagram am besten Chrome oder Edge nehmen.)");
+    } catch (e) {
+      aufraeumen();
+      meldung("Video konnte nicht gespeichert werden: " + (e && e.message || e), true);
+      videoFertig(null);
+    }
+  }
   function aufnehmen(dauer){
     if (aufnahme) return;
     if (!wcMoeglich()) return aufnehmenMR(dauer);
+    if (zweiAktiv() && S.vid2) return aufnehmenWC2(dauer);
     aufnehmenWC(dauer);
   }
   /* ---------- Overlay-Export (durchsichtig, immer 9:16) ----------
@@ -1039,9 +1273,7 @@
       meldung("Gespeichert: " + overlayName("webm") + " (in Filmora auf eine Spur über deinen Clip ziehen)");
     }).catch(function(e){
       meldung("Overlay konnte nicht gespeichert werden: " + (e && e.message || e), true);
-    }).then/* Social-Bild-Generator: läuft auf kreids888.com/social und im Dashboard (dort mit K888_SOCIAL_BASE = Proxy-Pfad, damit Bilder gleiche Herkunft haben) */
-(function(){
-  var BASE = window.K888_SOCIAL_BASE || "";
+    }).then(function(){
       S.transparent = false; aufnahme = null; knoepfe(false); starteSchleife(); render();
     });
   };
@@ -1049,12 +1281,12 @@
   function aufnehmenMR(dauer){
     if (aufnahme) return;
     if (!window.MediaRecorder || !cv.captureStream) { meldung("Video-Aufnahme klappt in diesem Browser nicht. Bitte Chrome oder Edge nehmen.", true); return; }
-    var v = S.vid, typ = vidTyp();
+    var v = S.vid, v2 = zweiAktiv() ? S.vid2 : null, typ = vidTyp();
     if (ac && ac.state === "suspended") ac.resume();
-    var stream = cv.captureStream(30);
-    if (v && recZiel && quelle) recZiel.stream.getAudioTracks().forEach(function(t){ stream.addTrack(t); });
+    var stream = cv.captureStream(30), mitTon = !!recZiel && (!!(v && quelle) || !!(v2 && quelle2));
+    if (mitTon) recZiel.stream.getAudioTracks().forEach(function(t){ stream.addTrack(t); });
     var rec, opt = { videoBitsPerSecond: 8000000 };
-    if (v && quelle) opt.audioBitsPerSecond = 192000;
+    if (mitTon) opt.audioBitsPerSecond = 192000;
     if (typ) opt.mimeType = typ;
     try { rec = new MediaRecorder(stream, opt); } catch (e) { meldung("Video-Aufnahme konnte nicht starten: " + e.message, true); return; }
     var teile = [];
@@ -1070,17 +1302,19 @@
     function los(){
       if (gestartet || !aufnahme) return; gestartet = true;
       rec.start(250); aufnahme.t0 = performance.now(); aufnahme.laeuft = true;
-      if (v) v.play().catch(function(e){ meldung("Video ließ sich nicht abspielen: " + e.message, true); aufnahmeStop(); });
+      [v, v2].forEach(function(x){ if (x) x.play().catch(function(e){ meldung("Video ließ sich nicht abspielen: " + e.message, true); aufnahmeStop(); }); });
       starteSchleife();
     }
-    if (v) {
-      v.pause(); v.loop = false;
-      v.addEventListener("seeked", los, { once: true });
+    var erst = v || v2;
+    if (erst) {
+      [v, v2].forEach(function(x){ if (x) { x.pause(); x.loop = false; } });
+      if (v && v2) v2.currentTime = 0;
+      erst.addEventListener("seeked", los, { once: true });
       setTimeout(los, 800);
-      v.currentTime = 0;
+      erst.currentTime = 0;
     } else los();
   }
-  $("vdl").onclick = function(){ if (S.vid) aufnehmen(Math.min(S.vid.duration || MAXS, MAXS)); };
+  $("vdl").onclick = function(){ if (S.vid || (S.vid2 && zweiAktiv())) aufnehmen(videoDauer()); };
   $("bvdl").onclick = function(){ aufnehmen(+$("bvLen").value || 10); };
 
   /* ---------- Freie Texte ---------- */
@@ -1182,20 +1416,24 @@
     return -1;
   }
   function punkt(e){ var r = cv.getBoundingClientRect(), k = cv.width / r.width; return { x: (e.clientX - r.left) * k, y: (e.clientY - r.top) * k, k: k }; }
+  // Bild 2: genaue Fläche (z. B. Kreis oder schräge Hälfte) oder Rechteck
+  function inBild2(x, y){ var b = S.hit.bild2; return !!(b && S.img2 && (b.zone ? b.zone(x, y) : inBox(b, x, y))); }
   cv.addEventListener("pointerdown", function(e){
     var p = punkt(e), fi = freiTreffer(p.x, p.y);
-    var was = inBox(S.hit.qr, p.x, p.y) ? "qr" : inBox(S.hit.soz, p.x, p.y) ? "soz" : inBox(S.hit.cta, p.x, p.y) ? "cta" : fi >= 0 ? "frei" : inBox(S.hit.team, p.x, p.y) ? "team" : inBox(S.hit.pers, p.x, p.y) ? "pers" : (S.img ? "bild" : null);
+    var was = inBox(S.hit.qr, p.x, p.y) ? "qr" : inBox(S.hit.soz, p.x, p.y) ? "soz" : inBox(S.hit.cta, p.x, p.y) ? "cta" : inBox(S.hit.ziel, p.x, p.y) ? "ziel" : fi >= 0 ? "frei" : inBox(S.hit.team, p.x, p.y) ? "team" : inBox(S.hit.pers, p.x, p.y) ? "pers" : inBild2(p.x, p.y) ? "bild2" : (S.img ? "bild" : null);
     if (!was) return;
     if (was === "frei" && S.akt !== fi) { S.akt = fi; ftEditor(); render(); }
-    var t = S.hit.team;
-    var start = was === "qr" ? { a: S.hit.qr.x, b: S.hit.qr.y } : was === "soz" ? { a: S.hit.soz.x, b: S.hit.soz.y } : was === "frei" ? { a: S.texte[fi].x, b: S.texte[fi].y } : was === "team" ? { a: t.x + t.w / 2, b: t.y + t.h / 2 } : was === "cta" ? { a: S.hit.cta.x + S.hit.cta.w / 2, b: S.hit.cta.y + S.hit.cta.h / 2 } : was === "pers" ? { a: S.hit.pers.x + S.hit.pers.w / 2, b: S.hit.pers.y + S.hit.pers.h / 2 } : { a: S.view.ox, b: S.view.oy };
+    var t = S.hit.team, z = S.hit.ziel;
+    var start = was === "qr" ? { a: S.hit.qr.x, b: S.hit.qr.y } : was === "soz" ? { a: S.hit.soz.x, b: S.hit.soz.y } : was === "frei" ? { a: S.texte[fi].x, b: S.texte[fi].y } : was === "team" ? { a: t.x + t.w / 2, b: t.y + t.h / 2 } : was === "cta" ? { a: S.hit.cta.x + S.hit.cta.w / 2, b: S.hit.cta.y + S.hit.cta.h / 2 } : was === "pers" ? { a: S.hit.pers.x + S.hit.pers.w / 2, b: S.hit.pers.y + S.hit.pers.h / 2 } : was === "ziel" ? { a: z.x + z.w / 2, b: z.y + z.h / 2 } : was === "bild2" ? { a: S.view2.ox, b: S.view2.oy } : { a: S.view.ox, b: S.view.oy };
     zieh = { was: was, x: e.clientX, y: e.clientY, a: start.a, b: start.b }; cv.setPointerCapture(e.pointerId);
   });
   cv.addEventListener("pointermove", function(e){
     var k = cv.width / cv.getBoundingClientRect().width;
-    if (!zieh) { var p = punkt(e); cv.style.cursor = (inBox(S.hit.qr, p.x, p.y) || inBox(S.hit.soz, p.x, p.y) || freiTreffer(p.x, p.y) >= 0 || inBox(S.hit.team, p.x, p.y) || inBox(S.hit.cta, p.x, p.y) || inBox(S.hit.pers, p.x, p.y)) ? "move" : (S.img ? "grab" : "default"); return; }
+    if (!zieh) { var p = punkt(e); cv.style.cursor = (inBox(S.hit.qr, p.x, p.y) || inBox(S.hit.soz, p.x, p.y) || inBox(S.hit.ziel, p.x, p.y) || freiTreffer(p.x, p.y) >= 0 || inBox(S.hit.team, p.x, p.y) || inBox(S.hit.cta, p.x, p.y) || inBox(S.hit.pers, p.x, p.y)) ? "move" : (S.img || inBild2(p.x, p.y) ? "grab" : "default"); return; }
     var nx = zieh.a + (e.clientX - zieh.x) * k, ny = zieh.b + (e.clientY - zieh.y) * k;
-    if (zieh.was === "qr") S.qrPos = { x: nx, y: ny };
+    if (zieh.was === "bild2") { S.view2.ox = nx; S.view2.oy = ny; }
+    else if (zieh.was === "ziel") S.zielPos = { x: Math.max(0, Math.min(cv.width, nx)), y: Math.max(0, Math.min(cv.height, ny)) };
+    else if (zieh.was === "qr") S.qrPos = { x: nx, y: ny };
     else if (zieh.was === "pers") S.persPos = { x: Math.max(0, Math.min(cv.width, nx)), y: Math.max(0, Math.min(cv.height, ny)) };
     else if (zieh.was === "cta") S.ctaPos = { x: Math.max(0, Math.min(cv.width, nx)), y: Math.max(0, Math.min(cv.height, ny)) };
     else if (zieh.was === "team") S.teamPos = { x: Math.max(0, Math.min(cv.width, nx)), y: Math.max(0, Math.min(cv.height, ny)) };
@@ -1247,7 +1485,17 @@
         img.src = b.dataset.src;
       };
     });
+    // dieselben Bilder auch für Bild 2
+    $("gal2").innerHTML = $("gal").innerHTML;
+    document.querySelectorAll("#gal2 button").forEach(function(b){
+      b.classList.remove("on");
+      b.onclick = function(){ var img = new Image(); img.onload = function(){ setzeBild2(img, b); }; img.src = b.dataset.src; };
+    });
   }).catch(function(){});
+  // Termine für den Wochenplan aus dem Streamkalender
+  fetch("https://kreids888-admin.kreids.workers.dev/api/calendar").then(function(r){ return r.json(); }).then(function(j){
+    S.kalender = { liste: j && j.entries || [], geladen: true }; alles();
+  }).catch(function(){ S.kalender = { liste: [], geladen: true }; });
   // Aufruf: Vorlagen + Regler
   var CTA = [
     ["Abonnieren", "ABONNIEREN", "um nix zu verpassen", "glocke"],
@@ -1293,6 +1541,11 @@
   }
   document.querySelectorAll("#persGal button").forEach(function(b){
     b.onclick = function(){ var img = new Image(); img.onload = function(){ setzePers(img, b); }; img.src = b.dataset.src; };
+  });
+  // Ich-Bilder auch als Bild 2 (z. B. Facecam, Kommentator)
+  $("persGal2").innerHTML = $("persGal").innerHTML;
+  document.querySelectorAll("#persGal2 button").forEach(function(b){
+    b.onclick = function(){ var img = new Image(); img.onload = function(){ setzeBild2(img, b); }; img.src = b.dataset.src; };
   });
   $("persFile").onchange = function(){
     var f = this.files && this.files[0]; this.value = ""; if (!f) return;
