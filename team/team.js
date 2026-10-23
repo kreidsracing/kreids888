@@ -2,7 +2,7 @@
    TEAM-BEREICH  Flag to Flag Motorsport
    - öffentliche Teamseite (Vorstellung + Login)
    - Dashboard nach Discord-Login (Menü links, Bereiche, Tools, Admin)
-   - Rubrik „Website" (nur Admin): Dashboard vom Worker "kreids888-admin" eingebettet
+   - Rubrik „Kreids Webseite" (nur Admin): Dashboard vom Worker "kreids888-admin" eingebettet
    Spricht mit dem Worker "kreids888-team" unter /api/team
    =========================================================== */
 (function () {
@@ -528,7 +528,7 @@
 
   async function renderWebsite(id) {
     const teil = webTeil(id);
-    main().innerHTML = panelHead("globe", "Website", '<span class="tm-badge">Nur Admin</span>') + `
+    main().innerHTML = panelHead("globe", "Kreids Webseite", '<span class="tm-badge">Nur Admin</span>') + `
       <div class="g6-tabs" id="tw-tabs">${WEB_TEILE.map(([k, t]) => `<button type="button" data-webtab="${k}" class="${k === teil ? "on" : ""}">${t}</button>`).join("")}</div>
       <div id="tw-box"><div class="tm-loading"><span></span><span></span><span></span></div></div>`;
     main().querySelectorAll("[data-webtab]").forEach(b => b.onclick = () => { location.hash = "#website/" + b.dataset.webtab; });
@@ -577,7 +577,7 @@
             ${ME.panels.links ? link("links", "link", "Links") : ""}
             ${ME.panels.stint ? `<div class="td-nav-h">Endurance Planung</div><div class="td-evnav" id="td-evnav">${evNavHtml(id)}</div>` : ""}
             <div class="td-nav-h">Tools</div>${link("abwesend", "clock", "Abwesenheiten")}${tools.map(p => link(p, p, PANELS[p].title)).join("")}
-            ${ME.isAdmin ? `<div class="td-nav-h">Website</div>${link("website", "globe", "Inhalte pflegen")}` : ""}
+            ${ME.isAdmin ? `<div class="td-nav-h">Kreids Webseite</div>${link("website", "globe", "Inhalte pflegen")}` : ""}
             ${ME.isAdmin ? `<div class="td-nav-h">Verwaltung</div>${link("aktivitaet", "activity", "Aktivität")}${link("nutzung", "eye", "Nutzung")}${link("limits", "gauge", "Limits")}${link("posts", "trophy", "G61-Posts")}${link("news-schreiben", "news", "News schreiben")}${link("fahrerprofile", "helmet", "Fahrerprofile")}${link("kalender-admin", "calendar", "Rennkalender")}${link("admin", "admin", "Admin")}${id === "admin" || id.startsWith("admin/") ? `<div class="td-admsub">${ADMIN_TEILE.map(([k, l]) => `<a class="td-link td-ev td-ev-sub" href="#admin/${k}" data-admteil="${k}"><span>${esc(l)}</span></a>`).join("")}</div>` : ""}` : ""}
           </nav>
         </aside>
