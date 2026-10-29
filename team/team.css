@@ -461,7 +461,7 @@ button.tm-chip.on::after{content:"✓";font-weight:800;color:var(--red);margin-l
 .g6-type.t2{border-color:rgba(241,196,15,.45);color:#f1c40f}
 
 /* ===========================================================
-   KREIDS-TRAINER v2 (Panel im Dashboard)
+   TEAM-TRAINER v2 (Panel im Dashboard)
    =========================================================== */
 .kt-off{display:grid;grid-template-columns:1.1fr 1fr;gap:16px}
 @media(max-width:900px){.kt-off{grid-template-columns:1fr}}
