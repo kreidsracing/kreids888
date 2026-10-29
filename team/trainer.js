@@ -1,5 +1,5 @@
 /* ===========================================================
-   KREIDS-TRAINER v2 – Oberfläche im Team-Dashboard
+   TEAM-TRAINER v2 – Oberfläche im Team-Dashboard
    Spricht mit dem lokalen Helfer (http://127.0.0.1:47888), der im
    Hintergrund iRacing liest und Töne/Ansagen abspielt.
    =========================================================== */
@@ -45,13 +45,13 @@
     pollT = offT = setupT = null;
   }
 
-  function unmount() { alive++; stopTimers(); root = null; }
+  function unmount() { alive++; stopTimers(); vgCleanup(); root = null; }
 
   async function mount(el, ctx) {
     unmount();
     C = ctx; root = el;
     const my = alive;
-    root.innerHTML = C.panelHead("trainer", "Kreids-Trainer", '<span class="tm-badge">v2</span>') +
+    root.innerHTML = C.panelHead("trainer", "Team-Trainer", '<span class="tm-badge">v2</span>') +
       '<div id="kt"><div class="tm-loading"><span></span><span></span><span></span></div></div>';
     try {
       st = await hcall("/status", {}, 2500);
@@ -91,7 +91,7 @@
         <div class="tm-box">
           <h5>Erstmalig einrichten</h5>
           <ol class="kt-steps">
-            <li>${info.ready ? `<a class="tm-btn sm" href="/api/team/trainer/download"><span>⬇ Kreids-Trainer v${C.esc(info.version)} herunterladen</span></a>` : '<span class="tm-muted">Download wird gerade eingerichtet …</span>'}</li>
+            <li>${info.ready ? `<a class="tm-btn sm" href="/api/team/trainer/download"><span>⬇ Team-Trainer v${C.esc(info.version)} herunterladen</span></a>` : '<span class="tm-muted">Download wird gerade eingerichtet …</span>'}</li>
             <li>ZIP entpacken, Ordner irgendwohin legen (z. B. auf den Desktop).</li>
             <li><b>start.bat</b> doppelklicken. Beim ersten Mal lädt er ein portables Python (ca. 45 MB) – das dauert ein paar Minuten.</li>
             <li>Das Dashboard öffnet sich, das Symbol erscheint unten rechts – fertig.</li>
@@ -128,7 +128,7 @@
         ${btn2("Helfer beenden", 'id="kt-quit"')}
       </div>
       <div class="g6-tabs kt-tabs">
-        ${[["live", "Live-Coach"], ["setup", "Setup-Berater"], ["strecke", "Streckenberater"], ["anleitung", "Anleitung"]]
+        ${[["live", "Live-Coach"], ["setup", "Setup-Berater"], ["strecke", "Streckenberater"], ["vergleich", "Streckenvergleich"], ["anleitung", "Anleitung"]]
           .map(([k, t]) => `<button type="button" data-kt="${k}" class="${tab === k ? "on" : ""}">${t}</button>`).join("")}
       </div>
       <div id="kt-tab"></div>`;
@@ -139,10 +139,12 @@
       stopTimers(); setTimeout(() => mount(root, C), 800);
     };
     clearInterval(setupT); setupT = null;
+    vgCleanup();
     lastLog = 0;
     if (tab === "live") renderLive();
     else if (tab === "setup") renderSetup();
     else if (tab === "strecke") renderStrecke();
+    else if (tab === "vergleich") renderVergleich();
     else renderGuide();
     startPoll();
   }
@@ -373,6 +375,13 @@
         <div>
           <div class="tm-box kt-card">
             <div class="kt-card-h"><h5>Was macht das Auto?</h5>${btn2("Zurücksetzen", 'id="kt-sreset"')}</div>
+            <div class="kt-ft">
+              <div class="kt-ft-row">
+                <input type="text" id="kt-ft-in" class="kt-ft-in" autocomplete="off" placeholder="Beschreib, was dich stört – z. B. „beim Einlenken schiebt die Front“">
+                ${btn2("Verstehen", 'id="kt-ft-go"', "sm red")}
+              </div>
+              <div class="kt-ft-out" id="kt-ft-out"></div>
+            </div>
             <p class="hint" id="kt-smain"></p>
             <div class="kt-syms">${groups}</div>
             <div class="kt-help" id="kt-help"></div>
@@ -396,7 +405,11 @@
       sev[k] = sev[k] === n ? 0 : n;
       paintSev(); advise();
     });
-    document.getElementById("kt-sreset").onclick = () => { Object.keys(sev).forEach(k => (sev[k] = 0)); paintSev(); advise(); };
+    document.getElementById("kt-sreset").onclick = () => { Object.keys(sev).forEach(k => (sev[k] = 0)); paintSev(); advise(); document.getElementById("kt-ft-out").innerHTML = ""; };
+    const ftIn = document.getElementById("kt-ft-in");
+    const ftGo = () => deuteFreitext(ftIn.value);
+    document.getElementById("kt-ft-go").onclick = ftGo;
+    ftIn.onkeydown = (e) => { if (e.key === "Enter") { e.preventDefault(); ftGo(); } };
     document.getElementById("kt-slive").onchange = async (e) => {
       try { const r = await post("/setup/live", { on: e.target.checked }); showSetup(r); } catch (x) { C.toast(x.message); }
     };
@@ -464,17 +477,53 @@
       </div>`).join("") + notes.map(n => `<p class="tm-muted kt-note">ⓘ ${C.esc(n)}</p>`).join("");
   }
 
+  /* ---- Freitext: „Beschreib, was dich stört" → Symptome ---- */
+  async function deuteFreitext(text) {
+    text = (text || "").trim();
+    const out = document.getElementById("kt-ft-out");
+    if (!text) { if (out) out.innerHTML = ""; return; }
+    let d;
+    try { d = await post("/setup/text", { text }); } catch (e) { C.toast(e.message); return; }
+    // Erkanntes in die bestehende Auswahl übernehmen – höhere Stärke gewinnt
+    (d.erkannt || []).forEach(x => { if ((sev[x.key] || 0) < x.staerke) sev[x.key] = x.staerke; });
+    paintSev(); advise();
+    zeigeFreitext(d, out);
+  }
+
+  const FT_STUFE = { 1: "leicht", 2: "mittel", 3: "stark" };
+  function zeigeFreitext(d, out) {
+    if (!out) return;
+    let h = "";
+    if (d.erkannt && d.erkannt.length) {
+      h += `<div class="kt-ft-tit">Übernommen:</div>` + d.erkannt.map(x =>
+        `<div class="kt-ft-hit"><span class="kt-ft-satz">„${C.esc(x.satz)}“</span><span class="kt-ft-pfeil">➜</span><b>${C.esc(x.name)}</b><em>${FT_STUFE[x.staerke] || ""}</em></div>`).join("");
+    }
+    if (d.fragen && d.fragen.length) {
+      h += `<div class="kt-ft-tit">Kurz nachgefragt:</div>` + d.fragen.map(f =>
+        `<div class="kt-ft-q"><p>„${C.esc(f.satz)}“ – ${C.esc(f.frage)}</p><div class="kt-ft-opts">${
+          f.optionen.map(o => `<button type="button" class="tm-btn sm" data-keys="${C.esc(o.key)}">${C.esc(o.text)}</button>`).join("")
+        }</div></div>`).join("");
+    }
+    if (d.unklar && d.unklar.length) {
+      h += d.unklar.map(s => `<p class="kt-ft-unklar">Nicht erkannt: „${C.esc(s)}“ – beschreib es, wie du es im Auto erlebst.</p>`).join("");
+    }
+    if (d.hilfe) h += `<p class="kt-ft-hilfe">ⓘ ${C.esc(d.hilfe)}</p>`;
+    out.innerHTML = h;
+    out.querySelectorAll("[data-keys]").forEach(b => b.onclick = () => {
+      b.dataset.keys.split("+").forEach(k => { if (k) sev[k] = Math.max(sev[k] || 0, 2); });
+      const q = b.closest(".kt-ft-q"); if (q) q.classList.add("done");
+      paintSev(); advise();
+    });
+  }
+
   /* ================================================================ STRECKENBERATER */
   async function renderStrecke() {
     const box = document.getElementById("kt-tab");
-    let r = { refs: [], eigene: [] };
-    try { r = await hcall("/laps"); } catch (e) { /* leer */ }
     box.innerHTML = `
       <div class="tm-box kt-bar">
         <b class="kt-bar-t">Runde von dieser Strecke:</b>
         ${btn2("Letzte eigene Runde", 'data-src="letzte"')}
         ${btn2("Aktuelle Referenzrunde", 'data-src="aktuell"')}
-        <select class="tm-select" id="kt-sr-sel" style="width:auto;max-width:300px">${rundenOptions(r, "Gespeicherte Runde …")}</select>
         <label class="tm-btn sm kt-file"><span>CSV hochladen</span><input type="file" accept=".csv" id="kt-sr-file" hidden></label>
       </div>
       <div id="kt-sr"><div class="tm-box tm-soon"><div class="big">Strecke vermessen</div><p>Lade eine Runde von dieser Strecke – daraus wird berechnet, wie viel Abtrieb die Strecke will, gilt auch für Layouts, die in keiner Liste stehen.</p></div></div>`;
@@ -482,7 +531,6 @@
       try { zeigeStrecke(await post("/strecke", body)); } catch (e) { C.toast(e.message); }
     };
     box.querySelectorAll("[data-src]").forEach(b => b.onclick = () => go({ typ: b.dataset.src }));
-    document.getElementById("kt-sr-sel").onchange = (e) => { const [typ, id] = e.target.value.split("|"); if (id) go({ typ, id }); };
     document.getElementById("kt-sr-file").onchange = async (e) => {
       const f = e.target.files[0];
       if (!f) return;
@@ -503,6 +551,359 @@
       </div>
       <div class="td-label">Was das fürs Setup heißt</div>
       ${d.tipps.map(t => `<div class="tm-box kt-tipp"><b>${C.esc(t.titel)}</b><p>${C.esc(t.text)}</p></div>`).join("")}`;
+  }
+
+  /* ================================================================ STRECKENVERGLEICH (Garage-61-Stil) */
+  const VG = { laps: { refs: [], eigene: [] }, d: null, channels: [], i0: 0, i1: 0, cur: -1, color: "delta",
+               mapGeom: null, chartGeom: null, drag: null, sel: null, spMinMax: [0, 1], col: null, docUp: null, raf: false };
+
+  function vgCleanup() { if (VG.docUp) { document.removeEventListener("mouseup", VG.docUp); VG.docUp = null; } VG.drag = VG.sel = null; }
+
+  function cssVar(n, fb) { try { const v = getComputedStyle(document.documentElement).getPropertyValue(n).trim(); return v || fb; } catch (e) { return fb; } }
+
+  function vgColors() {
+    return {
+      ref: "#9aa3b4", a: "#ff5c5c", b: "#6cc0ff", line: "#c792ea",
+      grid: "rgba(255,255,255,.07)", zero: "rgba(255,255,255,.22)",
+      panel: cssVar("--panel2", "#1a1d25"), txt: cssVar("--steel", "#8b93a7"),
+      good: "#22e07b", warn: "#ffb020", bad: "#ff5c5c",
+    };
+  }
+
+  function vgOptions(withQuick) {
+    const r = VG.laps;
+    const opt = x => `<option value="${x.typ}|${C.esc(x.id)}">${C.esc(x.name)}</option>`;
+    let h = withQuick ? `<option value="letzte|">Letzte eigene Runde</option><option value="aktuell|">Aktuelle Referenzrunde</option>` : "";
+    if (r.refs.length) h += `<optgroup label="Referenzrunden">${r.refs.map(opt).join("")}</optgroup>`;
+    if (r.eigene.length) h += `<optgroup label="Eigene Mitschnitte">${r.eigene.map(opt).join("")}</optgroup>`;
+    return h;
+  }
+
+  async function renderVergleich() {
+    vgCleanup();
+    const box = document.getElementById("kt-tab");
+    box.innerHTML = '<div class="tm-loading"><span></span><span></span><span></span></div>';
+    try { VG.laps = await hcall("/laps"); } catch (e) { VG.laps = { refs: [], eigene: [] }; }
+    box.innerHTML = `
+      <div class="tm-box kt-bar kv-bar">
+        <label class="kv-pick"><span class="kv-pick-l" style="color:#ff5c5c">🔴 Meine Runde</span>
+          <select class="tm-select" id="kv-a">${vgOptions(true)}</select></label>
+        <label class="kv-pick"><span class="kv-pick-l" style="color:#6cc0ff">🔵 Vergleich</span>
+          <select class="tm-select" id="kv-b">${vgOptions(true)}</select></label>
+        <label class="tm-btn sm kt-file"><span>CSV hochladen</span><input type="file" accept=".csv" id="kv-file" hidden></label>
+        <span class="kt-sp"></span>
+        ${btn2("Vergleichen", 'id="kv-go"', "red")}
+      </div>
+      ${VG.laps.eigene.length ? `<div class="kv-del tm-muted">Eigene Mitschnitte:
+        <select class="tm-select" id="kv-del-sel" style="width:auto;max-width:260px">${VG.laps.eigene.map(x => `<option value="${C.esc(x.id)}">${C.esc(x.name)}</option>`).join("")}</select>
+        ${btn2("Löschen", 'id="kv-del-one"')} · <button type="button" class="kv-link" id="kv-del-all">alle löschen</button></div>` : ""}
+      <div id="kv-view"><div class="tm-box tm-soon"><div class="big">Zwei Runden übereinanderlegen</div>
+        <p>Wähl deine Runde und eine Vergleichsrunde – meist deine letzte eigene gegen die geladene Referenz – und klick „Vergleichen“. Du siehst Streckenkarte, Delta und alle Kanäle wie im Garage-61-Analyzer.</p></div></div>`;
+
+    const aEl = document.getElementById("kv-a"), bEl = document.getElementById("kv-b");
+    aEl.value = "letzte|"; bEl.value = "aktuell|";
+    document.getElementById("kv-go").onclick = vergleichStart;
+    document.getElementById("kv-file").onchange = async (e) => {
+      const f = e.target.files[0]; if (!f) return;
+      try {
+        const r = await hcall("/lap/upload?zweck=vergleich", { raw: await f.arrayBuffer(), name: f.name }, 30000);
+        VG.laps = r.laps; refreshVgSelects(); document.getElementById("kv-b").value = "ref|" + r.id;
+        C.toast("Runde hochgeladen", true);
+      } catch (x) { C.toast(x.message); }
+      e.target.value = "";
+    };
+    const dsel = document.getElementById("kv-del-sel");
+    if (dsel) {
+      document.getElementById("kv-del-one").onclick = async () => {
+        if (!dsel.value || !confirm("Diesen eigenen Mitschnitt löschen?")) return;
+        try { await post("/lap/delete", { typ: "eigen", id: dsel.value }); C.toast("Gelöscht", true); VG.laps = await hcall("/laps"); refreshVgSelects(); }
+        catch (x) { C.toast(x.message); }
+      };
+      document.getElementById("kv-del-all").onclick = async () => {
+        if (!confirm("Alle eigenen Mitschnitte löschen?")) return;
+        try { const r = await post("/lap/delete", { alle_eigenen: true }); C.toast(r.geloescht + " gelöscht", true); VG.laps = await hcall("/laps"); refreshVgSelects(); }
+        catch (x) { C.toast(x.message); }
+      };
+    }
+  }
+
+  function refreshVgSelects() {
+    const aEl = document.getElementById("kv-a"), bEl = document.getElementById("kv-b");
+    const av = aEl && aEl.value, bv = bEl && bEl.value;
+    if (aEl) { aEl.innerHTML = vgOptions(true); aEl.value = av; if (!aEl.value) aEl.value = "letzte|"; }
+    if (bEl) { bEl.innerHTML = vgOptions(true); bEl.value = bv; if (!bEl.value) bEl.value = "aktuell|"; }
+    const dsel = document.getElementById("kv-del-sel");
+    if (dsel) dsel.innerHTML = VG.laps.eigene.map(x => `<option value="${C.esc(x.id)}">${C.esc(x.name)}</option>`).join("");
+  }
+
+  function vgRef(v) { const [typ, id] = (v || "").split("|"); return id ? { typ, id } : { typ }; }
+
+  async function vergleichStart() {
+    const go = document.getElementById("kv-go");
+    const a = vgRef(document.getElementById("kv-a").value), b = vgRef(document.getElementById("kv-b").value);
+    const view = document.getElementById("kv-view");
+    go.disabled = true;
+    view.innerHTML = '<div class="tm-loading"><span></span><span></span><span></span></div>';
+    try {
+      const d = await post("/vergleich", { a, b });
+      zeigeVergleich(d);
+    } catch (e) {
+      view.innerHTML = `<div class="tm-box tm-err">${C.esc(e.message)}</div>`;
+    } finally { go.disabled = false; }
+  }
+
+  function vgBuildChannels(d) {
+    const K = d.kanaele || {}, ch = [];
+    ch.push({ key: "delta", label: "Delta", unit: " s", a: d.delta, b: null, kind: "delta", dec: 2 });
+    if (K.speed) ch.push({ key: "speed", label: "Speed", unit: " km/h", a: K.speed[0], b: K.speed[1], kind: "line", dec: 0 });
+    if (K.gas) ch.push({ key: "gas", label: "Gas", unit: " %", a: K.gas[0], b: K.gas[1], kind: "line", dec: 0, min: 0, max: 100 });
+    if (K.bremse) ch.push({ key: "bremse", label: "Bremse", unit: " %", a: K.bremse[0], b: K.bremse[1], kind: "line", dec: 0, min: 0, max: 100 });
+    if (K.gang) ch.push({ key: "gang", label: "Gang", unit: "", a: K.gang[0], b: K.gang[1], kind: "line", dec: 0 });
+    if (K.lenkung) ch.push({ key: "lenkung", label: "Lenkung", unit: " °", a: K.lenkung[0], b: K.lenkung[1], kind: "line", dec: 0 });
+    if (d.linie) ch.push({ key: "linie", label: "Linie", unit: " m", a: d.linie, b: null, kind: "linie", dec: 2 });
+    return ch;
+  }
+
+  function zeigeVergleich(d) {
+    VG.d = d; VG.col = vgColors();
+    VG.channels = vgBuildChannels(d);
+    VG.i0 = 0; VG.i1 = d.m.length - 1; VG.cur = -1;
+    const sp = (d.kanaele && d.kanaele.speed) ? d.kanaele.speed[0].filter(v => v != null) : [0, 1];
+    VG.spMinMax = [Math.min.apply(null, sp), Math.max.apply(null, sp)];
+
+    const dc = deltaCls(d.gesamt);
+    let hint = "";
+    const q = d.karte && d.karte.linie_quelle;
+    if (!d.karte) hint = "Für die Streckenkarte braucht es eine Runde mit GPS oder einen neuen Mitschnitt – die Linie gibt es für neue Runden ab v2.2.";
+    else if (q === "berechnet") hint = "Deine Linie wurde aus Tempo und Fahrtrichtung zurückgerechnet (eigener Mitschnitt ab v2.2) – nah dran, aber nicht zentimetergenau.";
+    else if (!q) hint = "Für deine Runde gibt es noch keine Linie – die wird erst für neue Mitschnitte ab v2.2 mitgezeichnet. Die Referenz ist als Karte zu sehen.";
+
+    const krow = k => `<tr data-lo="${k.lo}" data-hi="${k.hi}">
+        <td><b>K${k.nr}</b><small>${k.m} m</small></td>
+        <td class="${deltaCls(k.dt)}">${fmtSign(k.dt, 2)}</td>
+        <td>${k.bremse_m == null ? "–" : fmtSign(k.bremse_m, 0) + " m"}</td>
+        <td>${k.gas_m == null ? "–" : fmtSign(k.gas_m, 0) + " m"}</td>
+        <td>${k.vmin[0] == null ? "–" : k.vmin[0]}<small>/${k.vmin[1] == null ? "–" : k.vmin[1]}</small></td>
+        <td>${k.vaus[0]}<small>/${k.vaus[1]}</small></td>
+        <td class="kv-tip">${C.esc(k.tipp)}</td></tr>`;
+
+    document.getElementById("kv-view").innerHTML = `
+      <div class="tm-box kv-head">
+        <div class="kv-head-l"><span class="kv-chip kv-cA">🔴 ${C.esc(d.a.label)} · ${C.esc(d.a.zeit)}</span>
+          <span class="kv-vs">gegen</span>
+          <span class="kv-chip kv-cB">🔵 ${C.esc(d.b.label)} · ${C.esc(d.b.zeit)}</span></div>
+        <div class="kv-head-r"><span class="kv-gesamt-l">Gesamt</span><b class="kv-gesamt ${dc}">${fmtSign(d.gesamt, 2)} s</b></div>
+      </div>
+      <div class="kv-main">
+        <div class="tm-box kv-mapbox">
+          <div class="kv-mh"><span class="tp-label">🗺 Streckenkarte</span>
+            <span class="kv-colbtns"><button type="button" data-col="delta" class="on">Delta</button><button type="button" data-col="speed">Speed</button></span></div>
+          <canvas id="kv-map"></canvas>
+          <div class="kv-mapleg"><span><i class="kv-l-a"></i> deine Linie (dick)</span><span><i class="kv-l-b"></i> Vergleich (dünn)</span></div>
+        </div>
+        <div class="tm-box kv-chartbox">
+          <div class="kv-read" id="kv-read"></div>
+          <canvas id="kv-charts"></canvas>
+        </div>
+      </div>
+      ${hint ? `<p class="kv-hint">ⓘ ${C.esc(hint)}</p>` : ""}
+      ${d.top.length ? `<div class="td-label">Top 3: hier liegt die Zeit</div>
+        <div class="kv-top3">${d.top.map((t, i) => `<div class="tm-box kv-t3"><div class="kv-t3-h"><span class="kt-nr">${i + 1}</span><b>Kurve ${t.nr}</b><em class="${deltaCls(t.dt)}">${fmtSign(t.dt, 2)} s</em></div><p>${C.esc(t.tipp)}</p></div>`).join("")}</div>` : ""}
+      <div class="td-label">Kurve für Kurve</div>
+      <div class="kv-tabwrap"><table class="kv-tab">
+        <thead><tr><th>Kurve</th><th>dt</th><th>Bremspunkt</th><th>Gaspunkt</th><th>Vmin A/B</th><th>V-Ausgang A/B</th><th>Tipp</th></tr></thead>
+        <tbody>${d.kurven.map(krow).join("")}</tbody></table>
+        <p class="tm-muted kv-tabnote">Bremspunkt/Gaspunkt: Minus = du früher als der Vergleich. Zeile anklicken zoomt auf die Kurve.</p></div>`;
+
+    updateReadout(-1);
+    document.querySelectorAll("[data-col]").forEach(b => b.onclick = () => {
+      VG.color = b.dataset.col;
+      document.querySelectorAll("[data-col]").forEach(x => x.classList.toggle("on", x === b));
+      drawMap();
+    });
+    document.querySelectorAll(".kv-tab tbody tr").forEach(tr => tr.onclick = () => {
+      const lo = Number(tr.dataset.lo), hi = Number(tr.dataset.hi), n = VG.d.m.length - 1;
+      VG.i0 = Math.max(0, Math.round(lo * n)); VG.i1 = Math.min(n, Math.round(hi * n));
+      if (VG.i1 - VG.i0 < 8) { VG.i0 = 0; VG.i1 = n; }
+      drawAll();
+    });
+    wireVgCanvas();
+    drawAll();
+  }
+
+  /* ---- Zeichnen ---- */
+  function prep(cv, W, H) {
+    const dpr = window.devicePixelRatio || 1;
+    cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr);
+    cv.style.width = W + "px"; cv.style.height = H + "px";
+    const ctx = cv.getContext("2d"); ctx.setTransform(dpr, 0, 0, dpr, 0, 0); return ctx;
+  }
+  const fmt = (v, d) => (v == null || !isFinite(v)) ? "–" : (d ? Number(v).toFixed(d) : String(Math.round(v)));
+  const fmtSign = (v, d) => (v == null || !isFinite(v)) ? "–" : (v > 0 ? "+" : "") + Number(v).toFixed(d);
+  const deltaCls = v => v == null ? "" : v > 0.1 ? "kv-bad" : v > 0.02 ? "kv-warn" : v < -0.02 ? "kv-good" : "";
+
+  function mix(h1, h2, t) {
+    const p = h => [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)];
+    const a = p(h1), b = p(h2); t = Math.max(0, Math.min(1, t));
+    return "rgb(" + a.map((v, i) => Math.round(v + (b[i] - v) * t)).join(",") + ")";
+  }
+  function segColor(i) {
+    const d = VG.d, C2 = VG.col;
+    if (VG.color === "speed") {
+      const v = d.kanaele.speed ? d.kanaele.speed[0][i] : null;
+      if (v == null) return C2.ref;
+      const [lo, hi] = VG.spMinMax;
+      return mix("#3b6cff", "#ffb020", (v - lo) / Math.max(hi - lo, 1));
+    }
+    const v = d.delta[i];
+    if (v == null) return C2.ref;
+    const t = Math.min(1, Math.abs(v) / 0.3);
+    return mix("#6b7280", v > 0 ? C2.bad : C2.good, t);
+  }
+
+  function drawMap() {
+    const cv = document.getElementById("kv-map"); if (!cv) return;
+    const W = Math.max(cv.parentElement.clientWidth - 24, 120), H = 300, C2 = VG.col;
+    const ctx = prep(cv, W, H); ctx.clearRect(0, 0, W, H);
+    const k = VG.d.karte;
+    if (!k) { ctx.fillStyle = C2.txt; ctx.font = "600 13px system-ui"; ctx.textAlign = "center"; ctx.fillText("Keine Streckenkarte – Linie gibt es für neue Runden ab v2.2", W / 2, H / 2); return; }
+    const rx = k.x, ry = k.y, mx = k.xa, my = k.ya;
+    let a = Infinity, b = -Infinity, c = Infinity, dmax = -Infinity;
+    const scan = (xs, ys) => { if (!xs) return; for (let i = 0; i < xs.length; i++) { const x = xs[i], y = ys[i]; if (x == null || y == null) continue; if (x < a) a = x; if (x > b) b = x; if (y < c) c = y; if (y > dmax) dmax = y; } };
+    scan(rx, ry); scan(mx, my);
+    if (!isFinite(a)) { ctx.fillStyle = C2.txt; ctx.font = "600 13px system-ui"; ctx.textAlign = "center"; ctx.fillText("Keine Streckenkarte verfügbar", W / 2, H / 2); return; }
+    const pad = 18, sc = Math.min((W - 2 * pad) / Math.max(b - a, 1), (H - 2 * pad) / Math.max(dmax - c, 1));
+    const ox = (W - (b - a) * sc) / 2, oy = (H - (dmax - c) * sc) / 2;
+    const PX = x => ox + (x - a) * sc, PY = y => H - (oy + (y - c) * sc);
+    VG.mapGeom = { PX, PY, rx, ry, mx, my };
+    // Referenzlinie dünn
+    if (rx) { ctx.lineWidth = 2; ctx.strokeStyle = C2.ref; ctx.lineJoin = "round"; ctx.beginPath(); let s = false; for (let i = 0; i < rx.length; i++) { if (rx[i] == null || ry[i] == null) { s = false; continue; } const px = PX(rx[i]), py = PY(ry[i]); if (!s) { ctx.moveTo(px, py); s = true; } else ctx.lineTo(px, py); } ctx.stroke(); }
+    // eigene Linie dick, eingefärbt
+    if (mx) { ctx.lineWidth = 4; ctx.lineJoin = "round"; ctx.lineCap = "round"; for (let i = 1; i < mx.length; i++) { if (mx[i - 1] == null || my[i - 1] == null || mx[i] == null || my[i] == null) continue; ctx.strokeStyle = segColor(i); ctx.beginPath(); ctx.moveTo(PX(mx[i - 1]), PY(my[i - 1])); ctx.lineTo(PX(mx[i]), PY(my[i])); ctx.stroke(); } }
+    // Cursor
+    if (VG.cur >= 0) {
+      const dot = (xs, ys, col, r) => { if (!xs || xs[VG.cur] == null) return; ctx.fillStyle = col; ctx.beginPath(); ctx.arc(PX(xs[VG.cur]), PY(ys[VG.cur]), r, 0, 7); ctx.fill(); };
+      dot(rx, ry, C2.b, 4); dot(mx, my, C2.a, 5);
+    }
+  }
+
+  function drawCharts() {
+    const cv = document.getElementById("kv-charts"); if (!cv) return;
+    const W = Math.max(cv.parentElement.clientWidth - 24, 160), C2 = VG.col;
+    const ch = VG.channels, rowH = 80, gap = 10, padT = 4;
+    const H = padT + ch.length * (rowH + gap);
+    const ctx = prep(cv, W, H); ctx.clearRect(0, 0, W, H);
+    const plotL = 54, plotR = W - 48, plotW = Math.max(plotR - plotL, 40);
+    const i0 = VG.i0, i1 = VG.i1, m = VG.d.m;
+    const xAt = i => plotL + ((i - i0) / Math.max(i1 - i0, 1)) * plotW;
+    VG.chartGeom = { plotL, plotR, plotW, rowH, gap, padT, i0, i1, xAt, rows: [] };
+
+    ch.forEach((c, idx) => {
+      const top = padT + idx * (rowH + gap), bot = top + rowH;
+      const [lo, hi] = chScale(c);
+      const yAt = v => bot - ((v - lo) / Math.max(hi - lo, 1e-6)) * rowH;
+      VG.chartGeom.rows.push({ top, bot, c, lo, hi, yAt });
+      // Panel
+      ctx.fillStyle = "rgba(255,255,255,.02)"; ctx.fillRect(plotL, top, plotW, rowH);
+      ctx.strokeStyle = C2.grid; ctx.lineWidth = 1;
+      ctx.strokeRect(plotL + .5, top + .5, plotW, rowH);
+      // Nulllinie
+      if (lo < 0 && hi > 0) { const zy = yAt(0); ctx.strokeStyle = C2.zero; ctx.beginPath(); ctx.moveTo(plotL, zy); ctx.lineTo(plotR, zy); ctx.stroke(); }
+      // Delta/Linie als Fläche
+      if (c.kind === "delta" || c.kind === "linie") {
+        const zy = (lo < 0 && hi > 0) ? yAt(0) : bot;
+        ctx.beginPath(); let s = false;
+        for (let i = i0; i <= i1; i++) { const v = c.a[i]; if (v == null || !isFinite(v)) { s = false; continue; } const px = xAt(i), py = yAt(v); if (!s) { ctx.moveTo(px, zy); ctx.lineTo(px, py); s = true; } else ctx.lineTo(px, py); if (i === i1) ctx.lineTo(px, zy); }
+        ctx.closePath();
+        ctx.fillStyle = c.kind === "delta" ? "rgba(255,92,92,.14)" : "rgba(199,146,234,.14)";
+        ctx.fill();
+        vgSeries(ctx, c.a, i0, i1, xAt, yAt, c.kind === "delta" ? C2.bad : C2.line, 2);
+      } else {
+        if (c.b) vgSeries(ctx, c.b, i0, i1, xAt, yAt, C2.b, 1.4);
+        vgSeries(ctx, c.a, i0, i1, xAt, yAt, C2.a, 2.2);
+      }
+      // Beschriftung: Kanalname links, Min/Max rechts neben dem Plot
+      ctx.textAlign = "left"; ctx.fillStyle = "#e6e9ef"; ctx.font = "700 12px " + cssVar("--disp", "system-ui");
+      ctx.fillText(c.label, 4, top + 14);
+      ctx.fillStyle = C2.txt; ctx.font = "600 10px system-ui"; ctx.textAlign = "left";
+      ctx.fillText(fmt(hi, c.dec) + c.unit, plotR + 5, top + 9);
+      ctx.fillText(fmt(lo, c.dec) + c.unit, plotR + 5, bot - 1);
+    });
+
+    // Distanzachse
+    ctx.fillStyle = C2.txt; ctx.font = "600 10px system-ui"; ctx.textAlign = "center";
+    for (let f = 0; f <= 1.0001; f += 0.25) { const i = Math.round(i0 + f * (i1 - i0)); const px = plotL + f * plotW; ctx.fillText(Math.round(m[i]) + " m", px, H - 2); }
+
+    // Crosshair
+    if (VG.cur >= i0 && VG.cur <= i1) { const px = xAt(VG.cur); ctx.strokeStyle = "rgba(255,255,255,.5)"; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(px, padT); ctx.lineTo(px, H - 12); ctx.stroke();
+      VG.chartGeom.rows.forEach(r => { const dot = (arr, col) => { if (!arr) return; const v = arr[VG.cur]; if (v == null || !isFinite(v)) return; ctx.fillStyle = col; ctx.beginPath(); ctx.arc(px, r.yAt(v), 2.6, 0, 7); ctx.fill(); }; if (r.c.kind === "delta" || r.c.kind === "linie") dot(r.c.a, r.c.kind === "delta" ? C2.bad : C2.line); else { dot(r.c.b, C2.b); dot(r.c.a, C2.a); } });
+    }
+    // Auswahlrechteck beim Ziehen
+    if (VG.sel) { const x1 = Math.min(VG.sel.a, VG.sel.b), x2 = Math.max(VG.sel.a, VG.sel.b); ctx.fillStyle = "rgba(108,192,255,.18)"; ctx.fillRect(x1, padT, x2 - x1, H - padT - 12); }
+  }
+
+  function vgSeries(ctx, arr, i0, i1, xAt, yAt, col, lw) {
+    ctx.strokeStyle = col; ctx.lineWidth = lw; ctx.lineJoin = "round"; ctx.beginPath();
+    let s = false;
+    for (let i = i0; i <= i1; i++) { const v = arr[i]; if (v == null || !isFinite(v)) { s = false; continue; } const px = xAt(i), py = yAt(v); if (!s) { ctx.moveTo(px, py); s = true; } else ctx.lineTo(px, py); }
+    ctx.stroke();
+  }
+
+  function chScale(c) {
+    if (c.min != null && c.max != null) return [c.min, c.max];
+    let lo = Infinity, hi = -Infinity;
+    const scan = a => { if (!a) return; for (const v of a) { if (v == null || !isFinite(v)) continue; if (v < lo) lo = v; if (v > hi) hi = v; } };
+    scan(c.a); scan(c.b);
+    if (!isFinite(lo)) return [0, 1];
+    if (c.kind === "delta" || c.kind === "linie") { const mx = Math.max(Math.abs(lo), Math.abs(hi), c.kind === "delta" ? 0.05 : 0.2); return [-mx, mx]; }
+    if (lo === hi) hi = lo + 1;
+    const p = (hi - lo) * 0.08; return [lo - p, hi + p];
+  }
+
+  function drawAll() { try { drawMap(); drawCharts(); } catch (e) { /* egal */ } }
+
+  function idxAtX(px) { const g = VG.chartGeom; if (!g) return -1; const i = Math.round(g.i0 + ((px - g.plotL) / g.plotW) * (g.i1 - g.i0)); return Math.max(g.i0, Math.min(g.i1, i)); }
+
+  function setCursor(i) { VG.cur = i; if (!VG.raf) { VG.raf = true; requestAnimationFrame(() => { VG.raf = false; drawCharts(); drawMap(); }); } updateReadout(i); }
+
+  function updateReadout(i) {
+    const el = document.getElementById("kv-read"); if (!el) return;
+    if (i < 0) { el.innerHTML = '<span class="kv-read-hint">Maus über die Kurven: Punkt erscheint auf der Karte · ziehen = zoomen · Doppelklick = zurück</span>'; return; }
+    const d = VG.d, parts = [`<b>${Math.round(d.m[i])} m</b>`, `Δ <b class="${deltaCls(d.delta[i])}">${fmtSign(d.delta[i], 2)} s</b>`];
+    VG.channels.forEach(c => {
+      if (c.key === "delta") return;
+      if (c.key === "linie") { parts.push(`Linie ${fmtSign(d.linie[i], 1)} m`); return; }
+      const av = c.a ? c.a[i] : null, bv = c.b ? c.b[i] : null;
+      parts.push(`${c.label} <b>${fmt(av, c.dec)}</b>${bv != null ? "/" + fmt(bv, c.dec) : ""}${c.unit}`);
+    });
+    el.innerHTML = parts.join(" · ");
+  }
+
+  function wireVgCanvas() {
+    const cv = document.getElementById("kv-charts"), mp = document.getElementById("kv-map");
+    if (cv) {
+      cv.onmousemove = e => { const r = cv.getBoundingClientRect(), px = e.clientX - r.left; if (VG.drag) VG.sel = { a: VG.drag.px, b: px }; setCursor(idxAtX(px)); };
+      cv.onmouseleave = () => { if (!VG.drag) setCursor(-1); };
+      cv.onmousedown = e => {
+        const r = cv.getBoundingClientRect(); VG.drag = { px: e.clientX - r.left }; VG.sel = { a: VG.drag.px, b: VG.drag.px };
+        VG.docUp = () => {
+          const sel = VG.sel; vgCleanup();
+          if (sel) { const ia = idxAtX(Math.min(sel.a, sel.b)), ib = idxAtX(Math.max(sel.a, sel.b)); if (ib - ia >= 8) { VG.i0 = ia; VG.i1 = ib; } }
+          drawAll();
+        };
+        document.addEventListener("mouseup", VG.docUp);
+      };
+      cv.ondblclick = () => { VG.i0 = 0; VG.i1 = VG.d.m.length - 1; drawAll(); };
+    }
+    if (mp) {
+      mp.onmousemove = e => {
+        const g = VG.mapGeom; if (!g) return; const r = mp.getBoundingClientRect(), px = e.clientX - r.left, py = e.clientY - r.top;
+        const xs = g.mx || g.rx, ys = g.my || g.ry; if (!xs) return;
+        let best = -1, bd = 1e9; for (let i = 0; i < xs.length; i += 2) { if (xs[i] == null) continue; const dx = g.PX(xs[i]) - px, dy = g.PY(ys[i]) - py, dd = dx * dx + dy * dy; if (dd < bd) { bd = dd; best = i; } }
+        if (best >= 0 && bd < 900) setCursor(best);
+      };
+      mp.onmouseleave = () => setCursor(-1);
+    }
   }
 
   /* ================================================================ ANLEITUNG */
@@ -555,7 +956,15 @@
     ]],
     ["Streckenberater", [
       ["Strecke vermessen", "Aus einer gefahrenen Runde wird berechnet, wie viel Vollgas, wie lang die längste Gerade und wie viele langsame Kurven die Strecke hat – daraus ergibt sich, ob sie wenig, mittel oder viel Abtrieb will."],
-      ["Welche Runde?", "Deine letzte eigene Runde (der Coach schreibt jede Runde mit), die aktuelle Referenzrunde, eine gespeicherte Runde oder eine hochgeladene CSV."],
+      ["Welche Runde?", "Deine letzte eigene Runde (der Coach schreibt jede Runde mit), die aktuelle Referenzrunde oder eine hochgeladene CSV."],
+    ]],
+    ["Streckenvergleich", [
+      ["Zwei Runden übereinander", "Wie der Garage-61-Analyzer: links deine Runde (rot), rechts die Vergleichsrunde (blau). Meist deine letzte eigene gegen die geladene Referenz. Oben steht, wie viel du über die ganze Runde verlierst oder gewinnst."],
+      ["Streckenkarte", "Deine Linie dick und eingefärbt (grün = schneller, rot = langsamer, oder nach Speed), die Vergleichslinie dünn. Fährst du mit der Maus über die Kurven unten, wandert der Punkt auf der Karte mit."],
+      ["Kanäle", "Delta, Speed, Gas, Bremse, Gang, Lenkung und die Fahrlinie – alle übereinander mit gemeinsamem Fadenkreuz. Ziehen zoomt in einen Abschnitt, Doppelklick zoomt zurück."],
+      ["Kurve für Kurve", "Die Tabelle zeigt je Kurve den Zeitverlust, Brems- und Gaspunkt, Kurven- und Ausgangstempo und einen Tipp. „Top 3“ nennt die drei Kurven, in denen am meisten Zeit liegt. Eine Zeile anklicken zoomt auf die Kurve."],
+      ["Fahrlinie", "Eigene Mitschnitte ab v2.2 zeichnen die Linie aus Fahrtrichtung und Beschleunigung mit (iRacing liefert live kein GPS). Bei älteren Runden fehlt die Linie – dann ist nur die Referenz als Karte zu sehen."],
+      ["Eigene Runden löschen", "Unter der Auswahl lassen sich einzelne eigene Mitschnitte oder alle auf einmal entfernen."],
     ]],
     ["Wenn etwas nicht geht", [
       ["„Helfer ist nicht gestartet“", "start.bat im Trainer-Ordner doppelklicken. Erscheint kein Symbol unten rechts, steht der Fehler in „fehler.log“ im Ordner."],
@@ -574,6 +983,12 @@
           : `<p>${C.esc(it)}</p>`).join("")}
       </div>`).join("");
   }
+
+  let vgResizeT = null;
+  window.addEventListener("resize", () => {
+    if (tab !== "vergleich" || !VG.d || !root) return;
+    clearTimeout(vgResizeT); vgResizeT = setTimeout(() => { if (tab === "vergleich" && VG.d) drawAll(); }, 150);
+  });
 
   window.F2FTrainer = { mount, unmount };
 })();
