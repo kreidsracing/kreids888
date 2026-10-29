@@ -589,7 +589,7 @@
         <label class="kv-pick"><span class="kv-pick-l" style="color:#ff5c5c">🔴 Meine Runde</span>
           <select class="tm-select" id="kv-a">${vgOptions(true)}</select></label>
         <label class="kv-pick"><span class="kv-pick-l" style="color:#6cc0ff">🔵 Vergleich</span>
-          <select class="tm-select" id="kv-b">${vgOptions(true)}</select></label>
+          <select class="tm-select" id="kv-b"><option value="">— nur ansehen (kein Vergleich) —</option>${vgOptions(true)}</select></label>
         <label class="tm-btn sm kt-file"><span>CSV hochladen</span><input type="file" accept=".csv" id="kv-file" hidden></label>
         <span class="kt-sp"></span>
         ${btn2("Vergleichen", 'id="kv-go"', "red")}
@@ -602,7 +602,10 @@
 
     const aEl = document.getElementById("kv-a"), bEl = document.getElementById("kv-b");
     aEl.value = "letzte|"; bEl.value = "aktuell|";
-    document.getElementById("kv-go").onclick = vergleichStart;
+    const goBtn = document.getElementById("kv-go");
+    const updGo = () => { const s = goBtn.querySelector("span"); if (s) s.textContent = bEl.value ? "Vergleichen" : "Ansehen"; };
+    bEl.onchange = updGo; updGo();
+    goBtn.onclick = vergleichStart;
     document.getElementById("kv-file").onchange = async (e) => {
       const f = e.target.files[0]; if (!f) return;
       try {
@@ -640,13 +643,14 @@
 
   async function vergleichStart() {
     const go = document.getElementById("kv-go");
-    const a = vgRef(document.getElementById("kv-a").value), b = vgRef(document.getElementById("kv-b").value);
+    const a = vgRef(document.getElementById("kv-a").value);
+    const bval = document.getElementById("kv-b").value;
     const view = document.getElementById("kv-view");
     go.disabled = true;
     view.innerHTML = '<div class="tm-loading"><span></span><span></span><span></span></div>';
     try {
-      const d = await post("/vergleich", { a, b });
-      zeigeVergleich(d);
+      if (!bval) zeigeEinzel(await post("/einzel", { a }));
+      else zeigeVergleich(await post("/vergleich", { a, b: vgRef(bval) }));
     } catch (e) {
       view.innerHTML = `<div class="tm-box tm-err">${C.esc(e.message)}</div>`;
     } finally { go.disabled = false; }
@@ -664,12 +668,90 @@
     return ch;
   }
 
+  function vgBuildChannelsEinzel(d) {
+    const K = d.kanaele || {}, ch = [];
+    if (K.speed) ch.push({ key: "speed", label: "Speed", unit: " km/h", a: K.speed, b: null, kind: "line", dec: 0 });
+    if (K.gas) ch.push({ key: "gas", label: "Gas", unit: " %", a: K.gas, b: null, kind: "line", dec: 0, min: 0, max: 100 });
+    if (K.bremse) ch.push({ key: "bremse", label: "Bremse", unit: " %", a: K.bremse, b: null, kind: "line", dec: 0, min: 0, max: 100 });
+    if (K.gang) ch.push({ key: "gang", label: "Gang", unit: "", a: K.gang, b: null, kind: "line", dec: 0 });
+    if (K.lenkung) ch.push({ key: "lenkung", label: "Lenkung", unit: " °", a: K.lenkung, b: null, kind: "line", dec: 0 });
+    return ch;
+  }
+
+  function zeigeEinzel(d) {
+    VG.d = d; VG.col = vgColors(); VG.single = true;
+    VG.channels = vgBuildChannelsEinzel(d);
+    VG.i0 = 0; VG.i1 = d.m.length - 1; VG.cur = -1;
+    const sp = (d.kanaele && d.kanaele.speed) ? d.kanaele.speed.filter(v => v != null) : [0, 1];
+    VG.spMinMax = [Math.min.apply(null, sp), Math.max.apply(null, sp)];
+    VG.mapMine = d.karte ? { x: d.karte.x, y: d.karte.y } : null;
+    VG.mapRef = null;
+    VG.speedArr = d.kanaele ? d.kanaele.speed : null;
+    VG.deltaArr = null; VG.color = "speed";
+
+    const q = d.karte && d.karte.quelle;
+    let hint = "";
+    if (!d.karte) hint = "Für diese Runde gibt es keine Streckenkarte – die Linie gibt es für GPS-Runden (Garage 61) oder neue Mitschnitte ab v2.2.";
+    else if (q === "berechnet") hint = "Die Linie wurde aus Fahrtrichtung und Tempo zurückgerechnet (eigener Mitschnitt ab v2.2) – nah dran, aber nicht zentimetergenau.";
+
+    const L = d.laenge || 1;
+    const krow = k => {
+      const lo = Math.max(0, (k.bremse_m - 120) / L), hi = Math.min(1, (k.gas_m + 120) / L);
+      return `<tr data-lo="${lo}" data-hi="${hi}">
+        <td><b>K${k.nr}</b><small>${k.m} m</small></td>
+        <td>${k.bremse_m} m</td>
+        <td>${k.gas_m} m</td>
+        <td>${k.v_ein} km/h</td>
+        <td><b>${k.vmin}</b> km/h</td>
+        <td>${k.gang}</td></tr>`;
+    };
+
+    document.getElementById("kv-view").innerHTML = `
+      <div class="tm-box kv-head">
+        <div class="kv-head-l"><span class="kv-chip kv-cA">🔴 ${C.esc(d.a.label)} · ${C.esc(d.a.zeit)}</span>
+          <span class="kv-vs">Einzelrunde ansehen</span><span class="tm-muted">${d.laenge} m</span></div>
+      </div>
+      <div class="kv-main">
+        <div class="tm-box kv-mapbox">
+          <div class="kv-mh"><span class="tp-label">🗺 Streckenkarte</span><span class="tm-muted" style="font-size:12px">eingefärbt nach Speed</span></div>
+          <canvas id="kv-map"></canvas>
+          <div class="kv-mapleg"><span><i class="kv-l-a"></i> deine Linie · blau = langsam, gelb = schnell</span></div>
+        </div>
+        <div class="tm-box kv-chartbox">
+          <div class="kv-read" id="kv-read"></div>
+          <canvas id="kv-charts"></canvas>
+        </div>
+      </div>
+      ${hint ? `<p class="kv-hint">ⓘ ${C.esc(hint)}</p>` : ""}
+      <div class="td-label">Kurve für Kurve</div>
+      <div class="kv-tabwrap"><table class="kv-tab">
+        <thead><tr><th>Kurve</th><th>Bremspunkt</th><th>Gaspunkt</th><th>V-Eingang</th><th>Vmin</th><th>Gang</th></tr></thead>
+        <tbody>${d.kurven.map(krow).join("")}</tbody></table>
+        <p class="tm-muted kv-tabnote">Bremspunkt/Gaspunkt in Metern ab Start/Ziel. Zeile anklicken zoomt auf die Kurve.</p></div>`;
+
+    updateReadout(-1);
+    document.querySelectorAll(".kv-tab tbody tr").forEach(tr => tr.onclick = () => {
+      const lo = Number(tr.dataset.lo), hi = Number(tr.dataset.hi), n = VG.d.m.length - 1;
+      VG.i0 = Math.max(0, Math.round(lo * n)); VG.i1 = Math.min(n, Math.round(hi * n));
+      if (VG.i1 - VG.i0 < 8) { VG.i0 = 0; VG.i1 = n; }
+      drawAll();
+    });
+    wireVgCanvas();
+    drawAll();
+  }
+
   function zeigeVergleich(d) {
     VG.d = d; VG.col = vgColors();
     VG.channels = vgBuildChannels(d);
     VG.i0 = 0; VG.i1 = d.m.length - 1; VG.cur = -1;
     const sp = (d.kanaele && d.kanaele.speed) ? d.kanaele.speed[0].filter(v => v != null) : [0, 1];
     VG.spMinMax = [Math.min.apply(null, sp), Math.max.apply(null, sp)];
+    VG.single = false;
+    const _k = d.karte;
+    VG.mapMine = _k ? (_k.xa ? { x: _k.xa, y: _k.ya } : { x: _k.x, y: _k.y }) : null;
+    VG.mapRef = (_k && _k.xa) ? { x: _k.x, y: _k.y } : null;
+    VG.speedArr = (d.kanaele && d.kanaele.speed) ? d.kanaele.speed[0] : null;
+    VG.deltaArr = d.delta;
 
     const dc = deltaCls(d.gesamt);
     let hint = "";
@@ -748,38 +830,39 @@
     return "rgb(" + a.map((v, i) => Math.round(v + (b[i] - v) * t)).join(",") + ")";
   }
   function segColor(i) {
-    const d = VG.d, C2 = VG.col;
-    if (VG.color === "speed") {
-      const v = d.kanaele.speed ? d.kanaele.speed[0][i] : null;
+    const C2 = VG.col;
+    if (VG.color === "delta" && VG.deltaArr) {
+      const v = VG.deltaArr[i];
       if (v == null) return C2.ref;
-      const [lo, hi] = VG.spMinMax;
-      return mix("#3b6cff", "#ffb020", (v - lo) / Math.max(hi - lo, 1));
+      const t = Math.min(1, Math.abs(v) / 0.3);
+      return mix("#6b7280", v > 0 ? C2.bad : C2.good, t);
     }
-    const v = d.delta[i];
+    const v = VG.speedArr ? VG.speedArr[i] : null;
     if (v == null) return C2.ref;
-    const t = Math.min(1, Math.abs(v) / 0.3);
-    return mix("#6b7280", v > 0 ? C2.bad : C2.good, t);
+    const [lo, hi] = VG.spMinMax;
+    return mix("#3b6cff", "#ffb020", (v - lo) / Math.max(hi - lo, 1));
   }
 
   function drawMap() {
     const cv = document.getElementById("kv-map"); if (!cv) return;
     const W = Math.max(cv.parentElement.clientWidth - 24, 120), H = 300, C2 = VG.col;
     const ctx = prep(cv, W, H); ctx.clearRect(0, 0, W, H);
-    const k = VG.d.karte;
-    if (!k) { ctx.fillStyle = C2.txt; ctx.font = "600 13px system-ui"; ctx.textAlign = "center"; ctx.fillText("Keine Streckenkarte – Linie gibt es für neue Runden ab v2.2", W / 2, H / 2); return; }
-    const rx = k.x, ry = k.y, mx = k.xa, my = k.ya;
+    const mine = VG.mapMine, ref = VG.mapRef;
+    if (!mine) { ctx.fillStyle = C2.txt; ctx.font = "600 13px system-ui"; ctx.textAlign = "center"; ctx.fillText("Keine Streckenkarte – Linie gibt es für neue Runden ab v2.2", W / 2, H / 2); return; }
+    const mx = mine.x, my = mine.y, rx = ref ? ref.x : null, ry = ref ? ref.y : null;
     let a = Infinity, b = -Infinity, c = Infinity, dmax = -Infinity;
     const scan = (xs, ys) => { if (!xs) return; for (let i = 0; i < xs.length; i++) { const x = xs[i], y = ys[i]; if (x == null || y == null) continue; if (x < a) a = x; if (x > b) b = x; if (y < c) c = y; if (y > dmax) dmax = y; } };
-    scan(rx, ry); scan(mx, my);
+    scan(mx, my); scan(rx, ry);
     if (!isFinite(a)) { ctx.fillStyle = C2.txt; ctx.font = "600 13px system-ui"; ctx.textAlign = "center"; ctx.fillText("Keine Streckenkarte verfügbar", W / 2, H / 2); return; }
     const pad = 18, sc = Math.min((W - 2 * pad) / Math.max(b - a, 1), (H - 2 * pad) / Math.max(dmax - c, 1));
     const ox = (W - (b - a) * sc) / 2, oy = (H - (dmax - c) * sc) / 2;
     const PX = x => ox + (x - a) * sc, PY = y => H - (oy + (y - c) * sc);
-    VG.mapGeom = { PX, PY, rx, ry, mx, my };
-    // Referenzlinie dünn
+    VG.mapGeom = { PX, PY, mx, my, rx, ry };
+    // Referenzlinie dünn (nur im Vergleich)
     if (rx) { ctx.lineWidth = 2; ctx.strokeStyle = C2.ref; ctx.lineJoin = "round"; ctx.beginPath(); let s = false; for (let i = 0; i < rx.length; i++) { if (rx[i] == null || ry[i] == null) { s = false; continue; } const px = PX(rx[i]), py = PY(ry[i]); if (!s) { ctx.moveTo(px, py); s = true; } else ctx.lineTo(px, py); } ctx.stroke(); }
-    // eigene Linie dick, eingefärbt
-    if (mx) { ctx.lineWidth = 4; ctx.lineJoin = "round"; ctx.lineCap = "round"; for (let i = 1; i < mx.length; i++) { if (mx[i - 1] == null || my[i - 1] == null || mx[i] == null || my[i] == null) continue; ctx.strokeStyle = segColor(i); ctx.beginPath(); ctx.moveTo(PX(mx[i - 1]), PY(my[i - 1])); ctx.lineTo(PX(mx[i]), PY(my[i])); ctx.stroke(); } }
+    // eigene / einzelne Linie dick, eingefärbt
+    ctx.lineWidth = 4; ctx.lineJoin = "round"; ctx.lineCap = "round";
+    for (let i = 1; i < mx.length; i++) { if (mx[i - 1] == null || my[i - 1] == null || mx[i] == null || my[i] == null) continue; ctx.strokeStyle = segColor(i); ctx.beginPath(); ctx.moveTo(PX(mx[i - 1]), PY(my[i - 1])); ctx.lineTo(PX(mx[i]), PY(my[i])); ctx.stroke(); }
     // Cursor
     if (VG.cur >= 0) {
       const dot = (xs, ys, col, r) => { if (!xs || xs[VG.cur] == null) return; ctx.fillStyle = col; ctx.beginPath(); ctx.arc(PX(xs[VG.cur]), PY(ys[VG.cur]), r, 0, 7); ctx.fill(); };
@@ -869,7 +952,8 @@
   function updateReadout(i) {
     const el = document.getElementById("kv-read"); if (!el) return;
     if (i < 0) { el.innerHTML = '<span class="kv-read-hint">Maus über die Kurven: Punkt erscheint auf der Karte · ziehen = zoomen · Doppelklick = zurück</span>'; return; }
-    const d = VG.d, parts = [`<b>${Math.round(d.m[i])} m</b>`, `Δ <b class="${deltaCls(d.delta[i])}">${fmtSign(d.delta[i], 2)} s</b>`];
+    const d = VG.d, parts = [`<b>${Math.round(d.m[i])} m</b>`];
+    if (!VG.single && d.delta) parts.push(`Δ <b class="${deltaCls(d.delta[i])}">${fmtSign(d.delta[i], 2)} s</b>`);
     VG.channels.forEach(c => {
       if (c.key === "delta") return;
       if (c.key === "linie") { parts.push(`Linie ${fmtSign(d.linie[i], 1)} m`); return; }
@@ -960,6 +1044,7 @@
     ]],
     ["Streckenvergleich", [
       ["Zwei Runden übereinander", "Wie der Garage-61-Analyzer: links deine Runde (rot), rechts die Vergleichsrunde (blau). Meist deine letzte eigene gegen die geladene Referenz. Oben steht, wie viel du über die ganze Runde verlierst oder gewinnst."],
+      ["Nur ansehen (ohne Vergleich)", "Stell „Vergleich“ auf „nur ansehen (kein Vergleich)“, dann siehst du die Telemetrie einer einzelnen Runde für sich – Streckenkarte, Speed, Gas, Bremse, Gang, Lenkung und je Kurve Bremspunkt, Gaspunkt, Eingangs- und Scheitelspeed."],
       ["Streckenkarte", "Deine Linie dick und eingefärbt (grün = schneller, rot = langsamer, oder nach Speed), die Vergleichslinie dünn. Fährst du mit der Maus über die Kurven unten, wandert der Punkt auf der Karte mit."],
       ["Kanäle", "Delta, Speed, Gas, Bremse, Gang, Lenkung und die Fahrlinie – alle übereinander mit gemeinsamem Fadenkreuz. Ziehen zoomt in einen Abschnitt, Doppelklick zoomt zurück."],
       ["Kurve für Kurve", "Die Tabelle zeigt je Kurve den Zeitverlust, Brems- und Gaspunkt, Kurven- und Ausgangstempo und einen Tipp. „Top 3“ nennt die drei Kurven, in denen am meisten Zeit liegt. Eine Zeile anklicken zoomt auf die Kurve."],
