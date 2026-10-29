@@ -695,9 +695,9 @@
     else if (q === "berechnet") hint = "Die Linie wurde aus Fahrtrichtung und Tempo zurückgerechnet (eigener Mitschnitt ab v2.2) – nah dran, aber nicht zentimetergenau.";
 
     const L = d.laenge || 1;
-    const krow = k => {
+    const krow = (k, i) => {
       const lo = Math.max(0, (k.bremse_m - 120) / L), hi = Math.min(1, (k.gas_m + 120) / L);
-      return `<tr data-lo="${lo}" data-hi="${hi}">
+      return `<tr data-idx="${i}" data-lo="${lo}" data-hi="${hi}">
         <td><b>K${k.nr}</b><small>${k.m} m</small></td>
         <td>${k.bremse_m} m</td>
         <td>${k.gas_m} m</td>
@@ -718,6 +718,7 @@
           <div class="kv-mapleg"><span><i class="kv-l-a"></i> deine Linie · blau = langsam, gelb = schnell</span></div>
         </div>
         <div class="tm-box kv-chartbox">
+          <div class="kv-seg"><button type="button" class="kv-seg-btn" id="kv-seg-prev" title="Abschnitt zurück">‹</button><b id="kv-seg-label">Ganze Runde</b><button type="button" class="kv-seg-btn" id="kv-seg-next" title="nächster Abschnitt">›</button></div>
           <div class="kv-read" id="kv-read"></div>
           <canvas id="kv-charts"></canvas>
         </div>
@@ -730,12 +731,8 @@
         <p class="tm-muted kv-tabnote">Bremspunkt/Gaspunkt in Metern ab Start/Ziel. Zeile anklicken zoomt auf die Kurve.</p></div>`;
 
     updateReadout(-1);
-    document.querySelectorAll(".kv-tab tbody tr").forEach(tr => tr.onclick = () => {
-      const lo = Number(tr.dataset.lo), hi = Number(tr.dataset.hi), n = VG.d.m.length - 1;
-      VG.i0 = Math.max(0, Math.round(lo * n)); VG.i1 = Math.min(n, Math.round(hi * n));
-      if (VG.i1 - VG.i0 < 8) { VG.i0 = 0; VG.i1 = n; }
-      drawAll();
-    });
+    document.querySelectorAll(".kv-tab tbody tr").forEach(tr => tr.onclick = () => vgApplySeg(Number(tr.dataset.idx)));
+    wireSeg();
     wireVgCanvas();
     drawAll();
   }
@@ -760,7 +757,7 @@
     else if (q === "berechnet") hint = "Deine Linie wurde aus Tempo und Fahrtrichtung zurückgerechnet (eigener Mitschnitt ab v2.2) – nah dran, aber nicht zentimetergenau.";
     else if (!q) hint = "Für deine Runde gibt es noch keine Linie – die wird erst für neue Mitschnitte ab v2.2 mitgezeichnet. Die Referenz ist als Karte zu sehen.";
 
-    const krow = k => `<tr data-lo="${k.lo}" data-hi="${k.hi}">
+    const krow = (k, i) => `<tr data-idx="${i}" data-lo="${k.lo}" data-hi="${k.hi}">
         <td><b>K${k.nr}</b><small>${k.m} m</small></td>
         <td class="${deltaCls(k.dt)}">${fmtSign(k.dt, 2)}</td>
         <td>${k.bremse_m == null ? "–" : fmtSign(k.bremse_m, 0) + " m"}</td>
@@ -784,6 +781,7 @@
           <div class="kv-mapleg"><span><i class="kv-l-a"></i> deine Linie (dick)</span><span><i class="kv-l-b"></i> Vergleich (dünn)</span></div>
         </div>
         <div class="tm-box kv-chartbox">
+          <div class="kv-seg"><button type="button" class="kv-seg-btn" id="kv-seg-prev" title="Abschnitt zurück">‹</button><b id="kv-seg-label">Ganze Runde</b><button type="button" class="kv-seg-btn" id="kv-seg-next" title="nächster Abschnitt">›</button></div>
           <div class="kv-read" id="kv-read"></div>
           <canvas id="kv-charts"></canvas>
         </div>
@@ -803,12 +801,8 @@
       document.querySelectorAll("[data-col]").forEach(x => x.classList.toggle("on", x === b));
       drawMap();
     });
-    document.querySelectorAll(".kv-tab tbody tr").forEach(tr => tr.onclick = () => {
-      const lo = Number(tr.dataset.lo), hi = Number(tr.dataset.hi), n = VG.d.m.length - 1;
-      VG.i0 = Math.max(0, Math.round(lo * n)); VG.i1 = Math.min(n, Math.round(hi * n));
-      if (VG.i1 - VG.i0 < 8) { VG.i0 = 0; VG.i1 = n; }
-      drawAll();
-    });
+    document.querySelectorAll(".kv-tab tbody tr").forEach(tr => tr.onclick = () => vgApplySeg(Number(tr.dataset.idx)));
+    wireSeg();
     wireVgCanvas();
     drawAll();
   }
@@ -945,6 +939,43 @@
 
   function drawAll() { try { drawMap(); drawCharts(); } catch (e) { /* egal */ } }
 
+  /* ---- Abschnitt für Abschnitt durchsteppen (wie Segment-Ansicht) ---- */
+  function vgSegRange(idx) {
+    const d = VG.d, n = d.m.length - 1;
+    if (idx < 0 || !d.kurven || !d.kurven[idx]) return [0, n];
+    const k = d.kurven[idx];
+    let lo, hi;
+    if (VG.single) { const L = d.laenge || 1; lo = (k.bremse_m - 120) / L; hi = (k.gas_m + 120) / L; }
+    else { lo = k.lo; hi = k.hi; }
+    let i0 = Math.max(0, Math.round(lo * n)), i1 = Math.min(n, Math.round(hi * n));
+    if (i1 - i0 < 8) { i0 = 0; i1 = n; }
+    return [i0, i1];
+  }
+  function vgSegLabelHTML(idx) {
+    const d = VG.d;
+    if (idx < 0 || !d.kurven || !d.kurven[idx]) return "Ganze Runde";
+    const k = d.kurven[idx];
+    if (VG.single) return `Kurve ${k.nr} · Vmin <b>${k.vmin}</b> km/h · Gang ${k.gang}`;
+    return `Kurve ${k.nr} · <span class="${deltaCls(k.dt)}">${fmtSign(k.dt, 2)} s</span>`;
+  }
+  function vgApplySeg(idx) {
+    const n = (VG.d.kurven || []).length;
+    if (idx < -1) idx = n - 1;
+    if (idx >= n) idx = -1;
+    VG.seg = idx;
+    const [i0, i1] = vgSegRange(idx); VG.i0 = i0; VG.i1 = i1;
+    const lab = document.getElementById("kv-seg-label");
+    if (lab) lab.innerHTML = vgSegLabelHTML(idx);
+    drawAll();
+  }
+  function wireSeg() {
+    VG.seg = -1;
+    const prev = document.getElementById("kv-seg-prev"), next = document.getElementById("kv-seg-next");
+    if (prev) prev.onclick = () => vgApplySeg(VG.seg - 1);
+    if (next) next.onclick = () => vgApplySeg(VG.seg + 1);
+  }
+  function vgSegReset() { VG.seg = -1; const lab = document.getElementById("kv-seg-label"); if (lab) lab.innerHTML = "Ganze Runde"; }
+
   function idxAtX(px) { const g = VG.chartGeom; if (!g) return -1; const i = Math.round(g.i0 + ((px - g.plotL) / g.plotW) * (g.i1 - g.i0)); return Math.max(g.i0, Math.min(g.i1, i)); }
 
   function setCursor(i) { VG.cur = i; if (!VG.raf) { VG.raf = true; requestAnimationFrame(() => { VG.raf = false; drawCharts(); drawMap(); }); } updateReadout(i); }
@@ -972,12 +1003,12 @@
         const r = cv.getBoundingClientRect(); VG.drag = { px: e.clientX - r.left }; VG.sel = { a: VG.drag.px, b: VG.drag.px };
         VG.docUp = () => {
           const sel = VG.sel; vgCleanup();
-          if (sel) { const ia = idxAtX(Math.min(sel.a, sel.b)), ib = idxAtX(Math.max(sel.a, sel.b)); if (ib - ia >= 8) { VG.i0 = ia; VG.i1 = ib; } }
+          if (sel) { const ia = idxAtX(Math.min(sel.a, sel.b)), ib = idxAtX(Math.max(sel.a, sel.b)); if (ib - ia >= 8) { VG.i0 = ia; VG.i1 = ib; vgSegReset(); } }
           drawAll();
         };
         document.addEventListener("mouseup", VG.docUp);
       };
-      cv.ondblclick = () => { VG.i0 = 0; VG.i1 = VG.d.m.length - 1; drawAll(); };
+      cv.ondblclick = () => { VG.i0 = 0; VG.i1 = VG.d.m.length - 1; vgSegReset(); drawAll(); };
     }
     if (mp) {
       mp.onmousemove = e => {
