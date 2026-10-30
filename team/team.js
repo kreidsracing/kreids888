@@ -58,7 +58,7 @@
 
   // Tools – sichtbar je nach Rolle (Admin vergibt)
   const PANELS = {
-    trainer:  { title: "Team-Trainer", desc: "Live-Coach, Setup-Berater, Streckenberater und Streckenvergleich – direkt im Dashboard.", live: true },
+    trainer:  { title: "Team-Trainer", desc: "Live-Coach, Setup-Berater und Streckenvergleich – direkt im Dashboard.", live: true },
     garage61: { title: "Garage 61", desc: "Team-Bestenliste und Bestzeit-Posts direkt in Discord.", live: true },
     links:    { title: "Links", desc: "Wichtige Links fürs Team.", live: true },
     stint:    { title: "Stintplaner", desc: "Stints, Sprit und Fahrer für Endurance-Rennen planen.", live: true },

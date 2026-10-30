@@ -1786,3 +1786,14 @@ body:has(.td)::after{content:"";position:fixed;inset:0;z-index:-1;pointer-events
 .gf-chip.on i{opacity:1}
 .gf-legend .gf-leg-mk{gap:6px}
 .gf-legend .gf-leg-mk b{font-size:12px;margin-left:4px}
+
+/* Streckenvergleich: Karte ziehen, Rückgängig, nur eine Runde zeigen */
+.gf-mapcol>#kv-map{cursor:grab}
+.gf-mapcol>#kv-map.zieht{cursor:grabbing}
+.gf-zahn:disabled{opacity:.28;cursor:default}
+.gf-seg-x{display:block;width:100%;margin:-2px 0 6px;border:1px solid rgba(255,255,255,.12);background:#16181d;color:#cfd3db;border-radius:999px;padding:5px 10px;font-size:11.5px;font-weight:600;cursor:pointer}
+.gf-seg-x:hover{color:#fff;border-color:rgba(255,255,255,.3)}
+.gf-seg-x[hidden]{display:none}
+.gf-sicht{display:flex;background:#0d0f13;border:1px solid rgba(255,255,255,.08);border-radius:999px;padding:4px;margin-left:auto}
+.gf-sicht button{border:0;background:none;color:#9aa0ad;font-weight:600;font-size:12.5px;line-height:1;padding:8px 14px;border-radius:999px;cursor:pointer;white-space:nowrap}
+.gf-sicht button.on{background:#fff;color:#000}
