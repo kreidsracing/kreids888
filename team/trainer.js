@@ -557,7 +557,7 @@
   const VG = { laps: { refs: [], eigene: [] }, d: null, channels: [], i0: 0, i1: 0, cur: -1, color: "delta",
                mapGeom: null, chartGeom: null, drag: null, sel: null, spMinMax: [0, 1], col: null, docUp: null, raf: false };
 
-  function vgCleanup() { if (VG.docUp) { document.removeEventListener("mouseup", VG.docUp); VG.docUp = null; } VG.drag = VG.sel = null; }
+  function vgCleanup() { if (VG.docUp) { document.removeEventListener("mouseup", VG.docUp); VG.docUp = null; } VG.drag = VG.sel = null; VG.playing = false; }
 
   function cssVar(n, fb) { try { const v = getComputedStyle(document.documentElement).getPropertyValue(n).trim(); return v || fb; } catch (e) { return fb; } }
 
@@ -721,6 +721,11 @@
           <div class="kv-seg"><button type="button" class="kv-seg-btn" id="kv-seg-prev" title="Abschnitt zurück">‹</button><b id="kv-seg-label">Ganze Runde</b><button type="button" class="kv-seg-btn" id="kv-seg-next" title="nächster Abschnitt">›</button></div>
           <div class="kv-read" id="kv-read"></div>
           <canvas id="kv-charts"></canvas>
+          <div class="kv-play">
+            <button type="button" class="kv-play-b" id="kv-play-btn" title="Abspielen">▶</button>
+            <input type="range" class="kv-scrub" id="kv-scrub" min="0" max="1000" value="0">
+            <span class="kv-play-t" id="kv-play-t">–</span>
+          </div>
         </div>
       </div>
       ${hint ? `<p class="kv-hint">ⓘ ${C.esc(hint)}</p>` : ""}
@@ -733,6 +738,7 @@
     updateReadout(-1);
     document.querySelectorAll(".kv-tab tbody tr").forEach(tr => tr.onclick = () => vgApplySeg(Number(tr.dataset.idx)));
     wireSeg();
+    wirePlay();
     wireVgCanvas();
     drawAll();
   }
@@ -784,6 +790,11 @@
           <div class="kv-seg"><button type="button" class="kv-seg-btn" id="kv-seg-prev" title="Abschnitt zurück">‹</button><b id="kv-seg-label">Ganze Runde</b><button type="button" class="kv-seg-btn" id="kv-seg-next" title="nächster Abschnitt">›</button></div>
           <div class="kv-read" id="kv-read"></div>
           <canvas id="kv-charts"></canvas>
+          <div class="kv-play">
+            <button type="button" class="kv-play-b" id="kv-play-btn" title="Abspielen">▶</button>
+            <input type="range" class="kv-scrub" id="kv-scrub" min="0" max="1000" value="0">
+            <span class="kv-play-t" id="kv-play-t">–</span>
+          </div>
         </div>
       </div>
       ${hint ? `<p class="kv-hint">ⓘ ${C.esc(hint)}</p>` : ""}
@@ -803,6 +814,7 @@
     });
     document.querySelectorAll(".kv-tab tbody tr").forEach(tr => tr.onclick = () => vgApplySeg(Number(tr.dataset.idx)));
     wireSeg();
+    wirePlay();
     wireVgCanvas();
     drawAll();
   }
@@ -823,6 +835,20 @@
     const a = p(h1), b = p(h2); t = Math.max(0, Math.min(1, t));
     return "rgb(" + a.map((v, i) => Math.round(v + (b[i] - v) * t)).join(",") + ")";
   }
+  // Farbe je Kanal (im Look des Garage-61-/GO-FAST-Analyzers)
+  const CH_COL = { speed: "#2ad4c8", gas: "#22e07b", bremse: "#ff4d4d", gang: "#5aa9ff", lenkung: "#cdd3df", rpm: "#ffb020", delta: "#b98bff", linie: "#c792ea" };
+  function hexA(h, a) { return "rgba(" + parseInt(h.slice(1, 3), 16) + "," + parseInt(h.slice(3, 5), 16) + "," + parseInt(h.slice(5, 7), 16) + "," + a + ")"; }
+  function fillArea(ctx, arr, i0, i1, xAt, yAt, top, base, col) {
+    let started = false, lastPx = null;
+    ctx.beginPath();
+    for (let i = i0; i <= i1; i++) { const v = arr[i]; if (v == null || !isFinite(v)) continue; const px = xAt(i), py = yAt(v); if (!started) { ctx.moveTo(px, base); ctx.lineTo(px, py); started = true; } else ctx.lineTo(px, py); lastPx = px; }
+    if (!started) return;
+    ctx.lineTo(lastPx, base); ctx.closePath();
+    const g = ctx.createLinearGradient(0, top, 0, base);
+    g.addColorStop(0, hexA(col, 0.34)); g.addColorStop(1, hexA(col, 0.03));
+    ctx.fillStyle = g; ctx.fill();
+  }
+  function vgSeriesDash(ctx, arr, i0, i1, xAt, yAt, col, lw) { ctx.save(); ctx.setLineDash([4, 3]); vgSeries(ctx, arr, i0, i1, xAt, yAt, col, lw); ctx.restore(); }
   function segColor(i) {
     const C2 = VG.col;
     if (VG.color === "delta" && VG.deltaArr) {
@@ -854,13 +880,20 @@
     VG.mapGeom = { PX, PY, mx, my, rx, ry };
     // Referenzlinie dünn (nur im Vergleich)
     if (rx) { ctx.lineWidth = 2; ctx.strokeStyle = C2.ref; ctx.lineJoin = "round"; ctx.beginPath(); let s = false; for (let i = 0; i < rx.length; i++) { if (rx[i] == null || ry[i] == null) { s = false; continue; } const px = PX(rx[i]), py = PY(ry[i]); if (!s) { ctx.moveTo(px, py); s = true; } else ctx.lineTo(px, py); } ctx.stroke(); }
-    // eigene / einzelne Linie dick, eingefärbt
-    ctx.lineWidth = 4; ctx.lineJoin = "round"; ctx.lineCap = "round";
+    // eigene / einzelne Linie dick, eingefärbt, mit sanftem Neon-Glow
+    ctx.lineWidth = 4.5; ctx.lineJoin = "round"; ctx.lineCap = "round";
+    ctx.shadowColor = "rgba(255,255,255,.35)"; ctx.shadowBlur = 6;
     for (let i = 1; i < mx.length; i++) { if (mx[i - 1] == null || my[i - 1] == null || mx[i] == null || my[i] == null) continue; ctx.strokeStyle = segColor(i); ctx.beginPath(); ctx.moveTo(PX(mx[i - 1]), PY(my[i - 1])); ctx.lineTo(PX(mx[i]), PY(my[i])); ctx.stroke(); }
-    // Cursor
+    ctx.shadowBlur = 0;
+    // Cursor: Referenzpunkt + „Auto" auf der eigenen Linie
     if (VG.cur >= 0) {
-      const dot = (xs, ys, col, r) => { if (!xs || xs[VG.cur] == null) return; ctx.fillStyle = col; ctx.beginPath(); ctx.arc(PX(xs[VG.cur]), PY(ys[VG.cur]), r, 0, 7); ctx.fill(); };
-      dot(rx, ry, C2.b, 4); dot(mx, my, C2.a, 5);
+      if (rx && rx[VG.cur] != null) { ctx.fillStyle = C2.b; ctx.beginPath(); ctx.arc(PX(rx[VG.cur]), PY(ry[VG.cur]), 4, 0, 7); ctx.fill(); }
+      if (mx[VG.cur] != null) {
+        const cx = PX(mx[VG.cur]), cy = PY(my[VG.cur]);
+        ctx.shadowColor = "rgba(255,255,255,.8)"; ctx.shadowBlur = 12;
+        ctx.fillStyle = "#fff"; ctx.beginPath(); ctx.arc(cx, cy, 5.5, 0, 7); ctx.fill();
+        ctx.shadowBlur = 0; ctx.lineWidth = 2; ctx.strokeStyle = segColor(Math.max(1, VG.cur)); ctx.stroke();
+      }
     }
   }
 
@@ -886,19 +919,12 @@
       ctx.strokeRect(plotL + .5, top + .5, plotW, rowH);
       // Nulllinie
       if (lo < 0 && hi > 0) { const zy = yAt(0); ctx.strokeStyle = C2.zero; ctx.beginPath(); ctx.moveTo(plotL, zy); ctx.lineTo(plotR, zy); ctx.stroke(); }
-      // Delta/Linie als Fläche
-      if (c.kind === "delta" || c.kind === "linie") {
-        const zy = (lo < 0 && hi > 0) ? yAt(0) : bot;
-        ctx.beginPath(); let s = false;
-        for (let i = i0; i <= i1; i++) { const v = c.a[i]; if (v == null || !isFinite(v)) { s = false; continue; } const px = xAt(i), py = yAt(v); if (!s) { ctx.moveTo(px, zy); ctx.lineTo(px, py); s = true; } else ctx.lineTo(px, py); if (i === i1) ctx.lineTo(px, zy); }
-        ctx.closePath();
-        ctx.fillStyle = c.kind === "delta" ? "rgba(255,92,92,.14)" : "rgba(199,146,234,.14)";
-        ctx.fill();
-        vgSeries(ctx, c.a, i0, i1, xAt, yAt, c.kind === "delta" ? C2.bad : C2.line, 2);
-      } else {
-        if (c.b) vgSeries(ctx, c.b, i0, i1, xAt, yAt, C2.b, 1.4);
-        vgSeries(ctx, c.a, i0, i1, xAt, yAt, C2.a, 2.2);
-      }
+      // Kanal als gefüllte Fläche in eigener Farbe; Vergleich als gestrichelte Linie
+      const col = CH_COL[c.key] || C2.a;
+      const base = (lo < 0 && hi > 0) ? yAt(0) : bot;
+      fillArea(ctx, c.a, i0, i1, xAt, yAt, top, base, col);
+      if (c.b) vgSeriesDash(ctx, c.b, i0, i1, xAt, yAt, "rgba(210,215,228,.85)", 1.3);
+      vgSeries(ctx, c.a, i0, i1, xAt, yAt, col, 2.2);
       // Beschriftung: Kanalname links, Min/Max rechts neben dem Plot
       ctx.textAlign = "left"; ctx.fillStyle = "#e6e9ef"; ctx.font = "700 12px " + cssVar("--disp", "system-ui");
       ctx.fillText(c.label, 4, top + 14);
@@ -911,9 +937,23 @@
     ctx.fillStyle = C2.txt; ctx.font = "600 10px system-ui"; ctx.textAlign = "center";
     for (let f = 0; f <= 1.0001; f += 0.25) { const i = Math.round(i0 + f * (i1 - i0)); const px = plotL + f * plotW; ctx.fillText(Math.round(m[i]) + " m", px, H - 2); }
 
-    // Crosshair
-    if (VG.cur >= i0 && VG.cur <= i1) { const px = xAt(VG.cur); ctx.strokeStyle = "rgba(255,255,255,.5)"; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(px, padT); ctx.lineTo(px, H - 12); ctx.stroke();
-      VG.chartGeom.rows.forEach(r => { const dot = (arr, col) => { if (!arr) return; const v = arr[VG.cur]; if (v == null || !isFinite(v)) return; ctx.fillStyle = col; ctx.beginPath(); ctx.arc(px, r.yAt(v), 2.6, 0, 7); ctx.fill(); }; if (r.c.kind === "delta" || r.c.kind === "linie") dot(r.c.a, r.c.kind === "delta" ? C2.bad : C2.line); else { dot(r.c.b, C2.b); dot(r.c.a, C2.a); } });
+    // Crosshair + Werte direkt am Cursor (du farbig, Vergleich hell)
+    if (VG.cur >= i0 && VG.cur <= i1) {
+      const px = xAt(VG.cur);
+      ctx.strokeStyle = "rgba(255,255,255,.5)"; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(px, padT); ctx.lineTo(px, H - 12); ctx.stroke();
+      const left = px > plotR - 64;
+      VG.chartGeom.rows.forEach(r => {
+        const c = r.c, col = CH_COL[c.key] || C2.a;
+        const av = c.a ? c.a[VG.cur] : null, bv = c.b ? c.b[VG.cur] : null;
+        if (bv != null && isFinite(bv)) { ctx.fillStyle = "rgba(210,215,228,.9)"; ctx.beginPath(); ctx.arc(px, r.yAt(bv), 2.4, 0, 7); ctx.fill(); }
+        if (av != null && isFinite(av)) { ctx.fillStyle = col; ctx.beginPath(); ctx.arc(px, r.yAt(av), 3, 0, 7); ctx.fill(); }
+        if (av != null && isFinite(av)) {
+          ctx.textAlign = left ? "right" : "left"; const lx = left ? px - 6 : px + 6;
+          ctx.font = "800 10px " + cssVar("--disp", "system-ui");
+          ctx.fillStyle = col; ctx.fillText(fmt(av, c.dec), lx, r.top + 11);
+          if (bv != null && isFinite(bv)) { ctx.fillStyle = "rgba(210,215,228,.9)"; ctx.fillText(fmt(bv, c.dec), lx, r.top + 22); }
+        }
+      });
     }
     // Auswahlrechteck beim Ziehen
     if (VG.sel) { const x1 = Math.min(VG.sel.a, VG.sel.b), x2 = Math.max(VG.sel.a, VG.sel.b); ctx.fillStyle = "rgba(108,192,255,.18)"; ctx.fillRect(x1, padT, x2 - x1, H - padT - 12); }
@@ -978,7 +1018,30 @@
 
   function idxAtX(px) { const g = VG.chartGeom; if (!g) return -1; const i = Math.round(g.i0 + ((px - g.plotL) / g.plotW) * (g.i1 - g.i0)); return Math.max(g.i0, Math.min(g.i1, i)); }
 
-  function setCursor(i) { VG.cur = i; if (!VG.raf) { VG.raf = true; requestAnimationFrame(() => { VG.raf = false; drawCharts(); drawMap(); }); } updateReadout(i); }
+  function setCursor(i) {
+    VG.cur = i;
+    if (!VG.raf) { VG.raf = true; requestAnimationFrame(() => { VG.raf = false; drawCharts(); drawMap(); }); }
+    updateReadout(i);
+    const sc = document.getElementById("kv-scrub");
+    if (sc && i >= 0 && VG.i1 > VG.i0) sc.value = Math.round((i - VG.i0) / (VG.i1 - VG.i0) * 1000);
+    const pt = document.getElementById("kv-play-t");
+    if (pt) pt.textContent = i >= 0 ? Math.round(VG.d.m[i]) + " m" : "–";
+  }
+  function vgPlayTick(ts) {
+    if (!VG.playing) return;
+    if (!VG.playT0) VG.playT0 = ts;
+    const span = Math.max(VG.i1 - VG.i0, 1), dur = Math.max(2500, span * 6);
+    const ph = ((ts - VG.playT0) / dur) % 1;
+    setCursor(Math.round(VG.i0 + ph * span));
+    requestAnimationFrame(vgPlayTick);
+  }
+  function vgPlayStop() { VG.playing = false; const b = document.getElementById("kv-play-btn"); if (b) b.textContent = "▶"; }
+  function wirePlay() {
+    VG.playing = false;
+    const btn = document.getElementById("kv-play-btn"), sc = document.getElementById("kv-scrub");
+    if (btn) btn.onclick = () => { VG.playing = !VG.playing; btn.textContent = VG.playing ? "⏸" : "▶"; if (VG.playing) { VG.playT0 = 0; requestAnimationFrame(vgPlayTick); } };
+    if (sc) sc.oninput = () => { vgPlayStop(); setCursor(Math.round(VG.i0 + (sc.value / 1000) * (VG.i1 - VG.i0))); };
+  }
 
   function updateReadout(i) {
     const el = document.getElementById("kv-read"); if (!el) return;
