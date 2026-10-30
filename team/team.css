@@ -4,6 +4,8 @@
    =========================================================== */
 .tm-page{padding:26px 0 70px}
 .tm-page .container,.tm-bar .container{max-width:1240px}
+/* Team-Dashboard (eingeloggt): breiter, nutzt große Bildschirme besser – Kopfleiste geht mit */
+.tm-page .container:has(.td),body:has(.td) .tm-bar .container{max-width:1640px;padding-left:clamp(16px,2vw,32px);padding-right:clamp(16px,2vw,32px)}
 /* Trainer: ganze Bildschirmbreite nutzen */
 .tm-page .container:has(#kt){max-width:none;padding-left:clamp(16px,2vw,40px);padding-right:clamp(16px,2vw,40px)}
 .r{color:var(--red)}
