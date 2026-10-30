@@ -128,7 +128,7 @@
         ${btn2("Helfer beenden", 'id="kt-quit"')}
       </div>
       <div class="g6-tabs kt-tabs">
-        ${[["live", "Live-Coach"], ["setup", "Setup-Berater"], ["vergleich", "Streckenvergleich"], ["anleitung", "Anleitung"]]
+        ${[["live", "Live-Coach"], ["setup", "Setup-Berater"], ["optimizer", "Setup-Optimizer"], ["vergleich", "Streckenvergleich"], ["anleitung", "Anleitung"]]
           .map(([k, t]) => `<button type="button" data-kt="${k}" class="${tab === k ? "on" : ""}">${t}</button>`).join("")}
       </div>
       <div id="kt-tab"></div>`;
@@ -143,6 +143,7 @@
     lastLog = 0;
     if (tab === "live") renderLive();
     else if (tab === "setup") renderSetup();
+    else if (tab === "optimizer") renderOptimizer();
     else if (tab === "vergleich") renderVergleich();
     else renderGuide();
     startPoll();
@@ -513,6 +514,248 @@
       const q = b.closest(".kt-ft-q"); if (q) q.classList.add("done");
       paintSev(); advise();
     });
+  }
+
+  /* ================================================================ SETUP-OPTIMIZER (Ablauf wie GO Fast: Problem → Wo → Tempo → Stärke, dann testen und Rückmeldung) */
+  const OPT_KEY = "kt-optimizer";
+  const OPT_PROBLEME = [
+    ["us", "Untersteuern", "Front schiebt, Auto dreht nicht ein", true],
+    ["os", "Übersteuern", "Heck kommt, Auto dreht zu stark", true],
+    ["lockup", "Räder blockieren", "beim Bremsen", false],
+    ["brake_stab", "Unruhig beim Bremsen", "zieht oder schlingert", false],
+    ["traction", "Räder drehen durch", "zu wenig Traktion am Ausgang", false],
+    ["kerbs", "Kerbs und Bodenwellen", "springt, verliert Grip", false],
+    ["hop", "Hoppelt oder setzt auf", "", false],
+    ["steer", "Lenkung träge", "reagiert zu spät", false],
+    ["nervous", "Zu nervös", "zuckig, schwer zu halten", false],
+    ["fast_stab", "Unsicher in schnellen Kurven", "", false],
+    ["straight", "Unruhig auf der Geraden", "", false],
+    ["direction", "Träge im Richtungswechsel", "Schikanen", false],
+    ["topspeed", "Zu langsam auf der Geraden", "", false],
+    ["grip", "Insgesamt zu wenig Grip", "", false],
+    ["tyres", "Reifen bauen ab", "über den Stint", false],
+  ];
+  const OPT_PHASEN = [["entry", "Eingang", "Bremsen und Einlenken"], ["mid", "Kurvenmitte", "am Scheitel"], ["exit", "Ausgang", "beim Gasgeben"], ["lift", "Gas weg", "beim Lupfen, Lastwechsel"]];
+  const OPT_TEMPO = [["langsam", "Langsame Kurven", "1. bis 3. Gang"], ["mittel", "Mittlere Kurven", "beides etwas"], ["schnell", "Schnelle Kurven", "Highspeed, Aero"]];
+  const OPT_ERG = { offen: ["offen", "Test läuft"], ok: ["ok", "gelöst"], gleich: ["gleich", "noch da, stärker"], anders: ["anders", "anderes Problem"], falsch: ["falsch", "zurückgenommen"] };
+  const OPT = { st: null, wahl: {}, schritt: 1, rows: null, notes: null, snap: null, zurueck: null, zurueckTitel: "", key: "" };
+
+  function optLaden() { try { return JSON.parse(localStorage.getItem(OPT_KEY) || "{}") || {}; } catch (e) { return {}; } }
+  function optDaten() { const all = optLaden(); return all[OPT.key] || { start: null, verlauf: [] }; }
+  function optSetzen(dat) { const all = optLaden(); all[OPT.key] = dat; try { localStorage.setItem(OPT_KEY, JSON.stringify(all)); } catch (e) { /* egal */ } }
+
+  // Einstellbare Werte aus der Setup-Anzeige – Messwerte (Temperaturen, Profil, Warmdruck) zählen nicht
+  function optWerte(groups) {
+    const out = {};
+    (groups || []).forEach(g => {
+      if (/nur Anzeige/i.test(g.name)) return;
+      g.items.forEach(([n, v]) => { if (!/zuletzt|Profil|temperatur|warm|Verschlei/i.test(n)) out[g.name + " › " + n] = v; });
+    });
+    return out;
+  }
+  function optDiff(alt, neu) {
+    alt = alt || {}; neu = neu || {};
+    return Object.keys(Object.assign({}, alt, neu)).filter(k => alt[k] !== neu[k])
+      .map(k => ({ k, a: alt[k] == null ? "–" : alt[k], b: neu[k] == null ? "–" : neu[k] }));
+  }
+  const optStufe = s => s <= 2 ? 1 : s === 3 ? 2 : 3;   // 1–5 auf die drei Stufen der Setup-Regeln
+  function optZiele(w) {
+    const sev = {}, L = optStufe(w.staerke), weniger = Math.max(1, L - 1);
+    const add = (k, v) => { if (meta && !meta.goals.some(g => g.key === k)) return; sev[k] = Math.max(sev[k] || 0, v); };
+    const p = w.problem;
+    if (p === "us" || p === "os") {
+      if (w.phase === "mid") {
+        if (w.tempo !== "schnell") add(p + "_mid_slow", w.tempo === "mittel" ? weniger : L);
+        if (w.tempo !== "langsam") add(p + "_mid_fast", w.tempo === "mittel" ? weniger : L);
+      } else {
+        add(p + "_" + w.phase, L);
+        if (w.tempo === "schnell") add(p + "_mid_fast", weniger);   // Highspeed: Aero-Balance mitnehmen
+        if (w.tempo === "langsam") add(p + "_mid_slow", weniger);   // langsam: mechanische Balance mitnehmen
+      }
+    } else add(p, L);
+    return sev;
+  }
+  const optBrauchtWo = w => w.problem === "us" || w.problem === "os";
+  function optText(w) {
+    const p = OPT_PROBLEME.find(x => x[0] === w.problem);
+    let t = p ? p[1] : (w.problem || "");
+    if (optBrauchtWo(w)) {
+      const ph = OPT_PHASEN.find(x => x[0] === w.phase), te = OPT_TEMPO.find(x => x[0] === w.tempo);
+      t += ` · ${ph ? ph[1] : "?"} · ${te ? te[1] : "?"}`;
+    }
+    return t + ` · Stärke ${w.staerke || "?"}/5`;
+  }
+
+  async function renderOptimizer() {
+    const box = document.getElementById("kt-tab");
+    box.innerHTML = '<div class="tm-loading"><span></span><span></span><span></span></div>';
+    let s, saved;
+    try {
+      if (!meta) meta = await hcall("/setup/meta");
+      [s, saved] = await Promise.all([hcall("/setup/state"), hcall("/setup/saved")]);
+    } catch (e) { box.innerHTML = `<div class="tm-box tm-err">${C.esc(e.message)}</div>`; return; }
+    box.innerHTML = `
+      <div class="tm-box kt-bar">
+        <label class="tm-switch"><input type="checkbox" id="ko-live" ${s.live ? "checked" : ""}><span class="s"></span><b>Setup live aus iRacing lesen</b></label>
+        <span class="kt-st"><span class="kt-dot" id="ko-dot"></span><span id="ko-stat"></span></span>
+        <span class="kt-sp"></span>
+        <select class="tm-select" id="ko-load" style="width:auto;max-width:280px"><option value="">Gemerktes Setup laden …</option>${saved.saved.map(n => `<option value="${C.esc(n)}">${C.esc(n.replace(/\.json$/, "").replace(/_/g, " "))}</option>`).join("")}</select>
+      </div>
+      <div class="ko">
+        <div class="tm-box ko-main" id="ko-main"></div>
+        <div class="tm-box ko-side"><div class="kt-card-h"><h5>Verlauf</h5></div><div id="ko-verlauf"></div></div>
+      </div>`;
+    document.getElementById("ko-live").onchange = async (e) => {
+      try { optStatus(await post("/setup/live", { on: e.target.checked })); } catch (x) { C.toast(x.message); }
+    };
+    document.getElementById("ko-load").onchange = async (e) => {
+      if (!e.target.value) return;
+      try { const r = await post("/setup/load", { name: e.target.value }); document.getElementById("ko-live").checked = false; optStatus(r); }
+      catch (x) { C.toast(x.message); }
+    };
+    optStatus(s, true);
+    const my = alive;
+    setupT = setInterval(async () => {
+      try { const r = await hcall("/setup/state", {}, 3000); if (my === alive && tab === "optimizer") optStatus(r); } catch (e) { /* Poll kümmert sich */ }
+    }, 1500);
+  }
+
+  function optStatus(s, neu) {
+    OPT.st = s;
+    const dot = document.getElementById("ko-dot"); if (!dot) return;
+    const t = (s.status || "").toLowerCase();
+    dot.className = "kt-dot " + (t.includes("fehl") ? "bad" : (t.includes("warte") || t.includes("starte") || t.includes("setz dich")) ? "warn" : t.startsWith("live:") ? "good" : "");
+    document.getElementById("ko-stat").textContent = s.has ? `${s.car} · ${s.track}${s.source ? " · " + s.source : ""}` : s.status;
+    const key = s.has ? s.car + "|" + s.track : "";
+    if (key !== OPT.key || neu) {
+      if (key !== OPT.key) { OPT.schritt = 1; OPT.wahl = {}; }
+      OPT.key = key; optMain(); optVerlauf();
+    } else optLive();
+  }
+
+  function optMain() {
+    const el = document.getElementById("ko-main"); if (!el) return;
+    if (!OPT.st || !OPT.st.has) {
+      el.innerHTML = `<div class="tm-soon"><div class="big">Erst ein Setup laden</div><p>Oben „Setup live aus iRacing lesen“ einschalten und ins Auto setzen – oder ein gemerktes Setup laden. Der Optimizer braucht die echten Werte, um dir konkrete Änderungen zu nennen.</p></div>`;
+      return;
+    }
+    const w = OPT.wahl;
+    if (OPT.schritt === "vorschlag") return optVorschlagZeigen(el);
+    if (OPT.schritt === "zurueck") return optZurueckZeigen(el);
+    const nr = OPT.schritt, wo = optBrauchtWo(w);
+    const stufen = (wo ? [1, 2, 3, 4] : [1, 4]).map((n, i) => `<span class="ko-st${n === nr ? " on" : n < nr ? " ok" : ""}"><b>${i + 1}</b>${["Problem", "Wo", "Tempo", "Stärke"][n - 1]}</span>`).join("");
+    const karte = (attr, wert, titel, sub, an) => `<button type="button" class="ko-card${an ? " on" : ""}" ${attr}="${wert}"><b>${C.esc(titel)}</b>${sub ? `<small>${C.esc(sub)}</small>` : ""}</button>`;
+    let inhalt = "";
+    if (nr === 1) inhalt = `<div class="ko-frage">Was stört dich?</div><div class="ko-grid">${OPT_PROBLEME.filter(p => !meta || meta.goals.some(g => g.key.startsWith(p[0]))).map(p => karte("data-p", p[0], p[1], p[2], w.problem === p[0])).join("")}</div>`;
+    else if (nr === 2) inhalt = `<div class="ko-frage">Wo in der Kurve?</div><div class="ko-grid">${OPT_PHASEN.map(p => karte("data-ph", p[0], p[1], p[2], w.phase === p[0])).join("")}</div>`;
+    else if (nr === 3) inhalt = `<div class="ko-frage">In welchen Kurven?</div><div class="ko-grid">${OPT_TEMPO.map(p => karte("data-te", p[0], p[1], p[2], w.tempo === p[0])).join("")}</div>`;
+    else inhalt = `<div class="ko-frage">Wie stark?</div><p class="hint">${C.esc(optText(Object.assign({}, w, { staerke: "?" })).replace(" · Stärke ?/5", ""))}</p>
+        <div class="ko-stark">${[1, 2, 3, 4, 5].map(n => `<button type="button" data-s="${n}" class="${w.staerke === n ? "on" : ""}">${n}</button>`).join("")}</div>
+        <div class="ko-stark-l"><span>kaum zu spüren</span><span>stört deutlich</span><span>unfahrbar</span></div>`;
+    el.innerHTML = `<div class="ko-steps">${stufen}</div>${inhalt}
+      <div class="ko-nav">${nr > 1 ? btn2("‹ Zurück", 'id="ko-back"') : "<span></span>"}
+        ${nr === 4 ? btn2("Vorschlag holen", `id="ko-go"${w.staerke ? "" : " disabled"}`, "red") : ""}</div>`;
+    el.querySelectorAll("[data-p]").forEach(b => b.onclick = () => { OPT.wahl = { problem: b.dataset.p }; OPT.schritt = optBrauchtWo(OPT.wahl) ? 2 : 4; optMain(); });
+    el.querySelectorAll("[data-ph]").forEach(b => b.onclick = () => { w.phase = b.dataset.ph; OPT.schritt = 3; optMain(); });
+    el.querySelectorAll("[data-te]").forEach(b => b.onclick = () => { w.tempo = b.dataset.te; OPT.schritt = 4; optMain(); });
+    el.querySelectorAll("[data-s]").forEach(b => b.onclick = () => { w.staerke = Number(b.dataset.s); optMain(); });
+    const back = document.getElementById("ko-back");
+    if (back) back.onclick = () => { OPT.schritt = nr === 4 ? (optBrauchtWo(w) ? 3 : 1) : nr - 1; optMain(); };
+    const go = document.getElementById("ko-go");
+    if (go) go.onclick = () => optVorschlag();
+  }
+
+  async function optVorschlag() {
+    const w = OPT.wahl;
+    let d;
+    try { d = await post("/setup/advise", { severity: optZiele(w) }); } catch (e) { C.toast(e.message); return; }
+    OPT.rows = d.rows; OPT.notes = d.notes; OPT.snap = optWerte(OPT.st.groups); OPT.schritt = "vorschlag";
+    const dat = optDaten();
+    if (!dat.start) dat.start = OPT.snap;
+    dat.verlauf.push({ wahl: Object.assign({}, w), rows: d.rows.map(r => ({ label: r.label, where: r.where, current: r.current, new: r.new })), snap: OPT.snap, erg: "offen", zeit: Date.now() });
+    optSetzen(dat); optMain(); optVerlauf();
+  }
+
+  function optVorschlagZeigen(el) {
+    const dat = optDaten(), rows = OPT.rows || [];
+    el.innerHTML = `
+      <div class="ko-kopf"><span class="kt-nr">${dat.verlauf.length}</span><b>${C.esc(optText(OPT.wahl))}</b></div>
+      ${rows.length ? rows.map((r, i) => `
+        <div class="kt-rec">
+          <div class="kt-rec-h"><span class="kt-nr">${i + 1}</span><b>${C.esc(r.label)}</b><small>${C.esc(r.where)}</small></div>
+          <div class="kt-rec-v"><s>${C.esc(r.current)}</s><span>➜</span><b>${C.esc(r.new)}</b></div>
+          <p>Warum: ${C.esc(r.why)}</p>
+          ${r.downside ? `<p class="kt-down">Nachteil: ${C.esc(r.downside)}</p>` : ""}
+        </div>`).join("") : `<p class="tm-muted">Für diese Angabe gibt es in diesem Setup keine passende Einstellung.</p>`}
+      ${(OPT.notes || []).map(n => `<p class="tm-muted kt-note">ⓘ ${C.esc(n)}</p>`).join("")}
+      <div class="ko-live"><div class="ko-live-h">Im Auto geändert <small id="ko-live-q"></small></div><div id="ko-diff"></div></div>
+      <div class="ko-test">Änderungen in der Garage eintragen, dann mindestens 3 Runden fahren. Wie ist es jetzt?</div>
+      <div class="ko-fb">
+        <button type="button" class="ok" data-fb="ok">✓ Problem gelöst<small>weiter mit dem nächsten Thema</small></button>
+        <button type="button" class="gleich" data-fb="gleich">↻ Gleiches Problem<small>ist noch da – nächster, stärkerer Schritt</small></button>
+        <button type="button" class="anders" data-fb="anders">⇄ Anderes Problem<small>das hier ist weg, dafür etwas Neues</small></button>
+        <button type="button" class="falsch" data-fb="falsch">↶ Falsche Richtung<small>wurde schlechter – Werte zurückstellen</small></button>
+      </div>`;
+    el.querySelectorAll("[data-fb]").forEach(b => b.onclick = () => optFeedback(b.dataset.fb));
+    optLive();
+  }
+
+  function optLive() {
+    const el = document.getElementById("ko-diff"); if (!el || !OPT.st) return;
+    const q = document.getElementById("ko-live-q");
+    if (q) q.textContent = OPT.st.live ? "(live aus iRacing)" : "(Live-Lesen ist aus – Änderungen sieht der Optimizer dann nicht)";
+    const diff = optDiff(OPT.snap, optWerte(OPT.st.groups));
+    el.innerHTML = diff.length ? diff.map(x => `<div class="ko-diff-z"><span>${C.esc(x.k)}</span><b><s>${C.esc(x.a)}</s> ➜ ${C.esc(x.b)}</b></div>`).join("")
+      : `<p class="tm-muted">Noch nichts geändert.</p>`;
+  }
+
+  function optFeedback(art) {
+    const dat = optDaten(), step = dat.verlauf[dat.verlauf.length - 1];
+    if (step) step.erg = art;
+    if (art === "falsch") {
+      let rueck = optDiff(OPT.snap, optWerte(OPT.st.groups)).map(x => ({ k: x.k, jetzt: x.b, auf: x.a }));
+      if (!rueck.length && step) rueck = step.rows.map(r => ({ k: `${r.where} › ${r.label}`, jetzt: r.new, auf: r.current }));
+      OPT.zurueck = rueck; OPT.zurueckTitel = "Falsche Richtung – so stellst du zurück"; OPT.schritt = "zurueck";
+    } else if (art === "gleich") {
+      optSetzen(dat);
+      OPT.wahl.staerke = Math.min(5, (OPT.wahl.staerke || 3) + 1);
+      optVorschlag(); return;
+    } else { OPT.schritt = 1; OPT.wahl = {}; }
+    optSetzen(dat); optMain(); optVerlauf();
+  }
+
+  function optZurueckZeigen(el) {
+    const z = OPT.zurueck || [];
+    el.innerHTML = `<div class="ko-frage">${C.esc(OPT.zurueckTitel)}</div>
+      ${z.length ? z.map(x => `<div class="ko-diff-z"><span>${C.esc(x.k)}</span><b>${C.esc(x.jetzt)} ➜ <span class="ko-auf">${C.esc(x.auf)}</span></b></div>`).join("")
+        : `<p class="tm-muted">Es ist nichts zurückzustellen – das Setup ist schon so.</p>`}
+      <p class="hint" style="margin-top:12px">In der Garage zurückstellen. Danach neu wählen – zum Beispiel eine andere Kurvenphase oder eine geringere Stärke.</p>
+      <div class="ko-nav"><span></span>${btn2("Neu wählen", 'id="ko-neu"', "red")}</div>`;
+    document.getElementById("ko-neu").onclick = () => {
+      const w = OPT.wahl;
+      OPT.schritt = w.problem ? (optBrauchtWo(w) ? 2 : 4) : 1;
+      optMain();
+    };
+  }
+
+  function optVerlauf() {
+    const el = document.getElementById("ko-verlauf"); if (!el) return;
+    if (!OPT.key) { el.innerHTML = `<p class="tm-muted">Noch kein Setup.</p>`; return; }
+    const dat = optDaten(), v = dat.verlauf;
+    el.innerHTML = (v.length ? v.map((s, i) => { const e = OPT_ERG[s.erg] || OPT_ERG.offen; return `
+        <div class="ko-v ko-v-${e[0]}"><span>${i + 1}</span><div><b>${C.esc(optText(s.wahl))}</b><small>${s.rows.length} Änderung${s.rows.length === 1 ? "" : "en"} · ${e[1]}</small></div></div>`; }).reverse().join("")
+        : `<p class="tm-muted">Noch keine Schritte für ${C.esc(OPT.key.replace("|", " · "))}.</p>`)
+      + (dat.start ? `${btn2("Alles zurück auf Start", 'id="ko-start"')}${btn2("Neu anfangen", 'id="ko-reset"')}` : "");
+    const st = document.getElementById("ko-start");
+    if (st) st.onclick = () => {
+      OPT.zurueck = optDiff(dat.start, optWerte(OPT.st.groups)).map(x => ({ k: x.k, jetzt: x.b, auf: x.a }));
+      OPT.zurueckTitel = "Zurück auf das Setup vom Start"; OPT.schritt = "zurueck"; optMain();
+    };
+    const rs = document.getElementById("ko-reset");
+    if (rs) rs.onclick = () => {
+      if (!confirm("Verlauf für dieses Auto und diese Strecke löschen und neu anfangen?")) return;
+      optSetzen({ start: null, verlauf: [] }); OPT.schritt = 1; OPT.wahl = {}; optMain(); optVerlauf();
+    };
   }
 
   /* ================================================================ STRECKENVERGLEICH – Look wie GO-FAST-Telemetrie, Funktionen wie Garage 61 */
@@ -1544,6 +1787,12 @@
       ["Setup merken / laden", "Speichert das Setup im Ordner „setups“ des Trainers – so geht die Beratung auch ohne laufendes iRacing."],
       ["Wie es entscheidet", "Mit festen Fahrwerksregeln, nicht mit einer KI. Immer ein vorsichtiger Schritt pro Änderung."],
       ["Tipp", "Immer nur 1–2 Änderungen gleichzeitig testen und ein paar Runden fahren."],
+    ]],
+    ["Setup-Optimizer", [
+      ["Wofür", "Schritt für Schritt zum passenden Setup, wie beim GO-Fast-Optimiser: Problem wählen, wo es in der Kurve passiert, in welchen Kurven und wie stark (1 bis 5). Dann kommen konkrete Änderungen mit aktuellem und neuem Wert. Der Setup-Berater bleibt daneben unverändert."],
+      ["Testen und Rückmeldung", "Änderungen in der Garage eintragen, mindestens 3 Runden fahren und dann sagen: Problem gelöst, gleiches Problem (nächster, stärkerer Schritt), anderes Problem oder falsche Richtung."],
+      ["Was du geändert hast", "Mit „Setup live lesen“ sieht der Optimizer, welche Werte du in der Garage wirklich verstellt hast. Bei „falsche Richtung“ zeigt er genau diese Werte zum Zurückstellen."],
+      ["Verlauf", "Rechts stehen alle Schritte für dieses Auto auf dieser Strecke mit Ergebnis. „Alles zurück auf Start“ listet, was du seit dem ersten Schritt verstellt hast. Gespeichert wird nur im Browser, keine Runden."],
     ]],
     ["Streckenvergleich", [
       ["Zwei Runden übereinander", "Aufgebaut wie die GO-Fast-Telemetrie: oben die beiden Fahrer mit Gas, Bremse, Tempo, Gang und Drehzahl an der aktuellen Stelle, links die Strecke, rechts die Kanäle. Deine Runde ist grün, die Vergleichsrunde weiß gepunktet. Fahrerkarte anklicken blendet die Runde aus und wieder ein."],

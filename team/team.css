@@ -1797,3 +1797,49 @@ body:has(.td)::after{content:"";position:fixed;inset:0;z-index:-1;pointer-events
 .gf-sicht{display:flex;background:#0d0f13;border:1px solid rgba(255,255,255,.08);border-radius:999px;padding:4px;margin-left:auto}
 .gf-sicht button{border:0;background:none;color:#9aa0ad;font-weight:600;font-size:12.5px;line-height:1;padding:8px 14px;border-radius:999px;cursor:pointer;white-space:nowrap}
 .gf-sicht button.on{background:#fff;color:#000}
+
+/* ===================== Setup-Optimizer ===================== */
+.ko{display:grid;grid-template-columns:minmax(0,1fr) 330px;gap:14px;align-items:start}
+.ko-steps{display:flex;gap:8px;margin-bottom:18px;flex-wrap:wrap}
+.ko-st{display:inline-flex;align-items:center;gap:8px;padding:7px 12px;border:1px solid var(--line);background:var(--panel2);color:var(--steel);font-family:var(--disp);font-weight:800;font-size:12px;letter-spacing:.08em;text-transform:uppercase}
+.ko-st b{width:20px;height:20px;display:grid;place-items:center;border-radius:50%;background:#2a2e39;color:#fff;font-size:11px}
+.ko-st.on{color:#fff;border-color:var(--red)}.ko-st.on b{background:var(--red)}
+.ko-st.ok{color:#d5d9e0}.ko-st.ok b{background:#22e07b;color:#0d0d10}
+.ko-frage{font-family:var(--disp);font-weight:900;font-size:22px;text-transform:uppercase;margin-bottom:12px}
+.ko-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:8px}
+.ko-card{text-align:left;padding:12px 14px;background:var(--panel2);border:1px solid var(--line);color:#e6e9ef;cursor:pointer;transition:border-color .12s,box-shadow .12s}
+.ko-card b{display:block;font-size:14px}
+.ko-card small{display:block;color:var(--steel);font-size:12px;margin-top:2px}
+.ko-card:hover{border-color:var(--steel-d)}
+.ko-card.on{border-color:var(--red);box-shadow:inset 3px 0 0 var(--red)}
+.ko-stark{display:flex;gap:8px;margin:8px 0 4px}
+.ko-stark button{flex:1;padding:14px 0;background:var(--panel2);border:1px solid var(--line);color:var(--steel);font-family:var(--disp);font-weight:900;font-size:22px;cursor:pointer}
+.ko-stark button:hover{color:#fff;border-color:var(--steel-d)}
+.ko-stark button.on{background:var(--red);border-color:var(--red);color:#fff}
+.ko-stark-l{display:flex;justify-content:space-between;color:var(--steel);font-size:12px;margin-bottom:6px}
+.ko-nav{display:flex;gap:8px;justify-content:space-between;align-items:center;margin-top:18px}
+.ko-nav .tm-btn[disabled]{opacity:.4;cursor:not-allowed}
+.ko-kopf{display:flex;align-items:center;gap:10px;margin-bottom:14px;font-size:15px}
+.ko-live{margin-top:14px;padding:10px 12px;background:var(--panel2);border:1px solid var(--line)}
+.ko-live-h{font-family:var(--disp);font-weight:800;font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--steel);margin-bottom:6px}
+.ko-live-h small{text-transform:none;letter-spacing:0;font-weight:500}
+.ko-diff-z{display:flex;justify-content:space-between;gap:12px;font-size:13px;padding:5px 0;border-top:1px solid rgba(255,255,255,.05)}
+.ko-diff-z span{color:#d5d9e0}
+.ko-diff-z b{white-space:nowrap;font-variant-numeric:tabular-nums}
+.ko-diff-z s{color:var(--steel-d)}
+.ko-auf{color:#22e07b}
+.ko-test{margin:16px 0 8px;color:#d5d9e0;font-size:14px}
+.ko-fb{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}
+.ko-fb button{padding:12px 14px;text-align:left;background:var(--panel2);border:1px solid var(--line);color:#e6e9ef;cursor:pointer;font-weight:700;font-size:14px}
+.ko-fb button:hover{border-color:var(--steel-d)}
+.ko-fb button small{display:block;color:var(--steel);font-weight:400;font-size:12px;margin-top:3px}
+.ko-fb .ok{border-left:3px solid #22e07b}.ko-fb .gleich{border-left:3px solid #ffb020}
+.ko-fb .anders{border-left:3px solid #6cc0ff}.ko-fb .falsch{border-left:3px solid var(--red)}
+.ko-v{display:flex;gap:10px;padding:9px 0;border-top:1px solid rgba(255,255,255,.05);font-size:13px}
+.ko-v span{width:22px;height:22px;flex:none;border-radius:50%;display:grid;place-items:center;font-weight:800;font-size:11px;background:#2a2e39}
+.ko-v b{font-weight:600}
+.ko-v small{display:block;color:var(--steel);margin-top:2px}
+.ko-v-ok span{background:#22e07b;color:#0d0d10}.ko-v-gleich span{background:#ffb020;color:#0d0d10}
+.ko-v-falsch span{background:var(--red)}.ko-v-anders span{background:#6cc0ff;color:#0d0d10}.ko-v-offen span{background:#3a3f4c}
+.ko-side .tm-btn{margin-top:10px;width:100%;justify-content:center}
+@media (max-width:980px){.ko{grid-template-columns:1fr}.ko-fb{grid-template-columns:1fr}}
