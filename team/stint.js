@@ -740,17 +740,25 @@
     const karte = ({ c, r, st }) => {
       const nx = r.rows.find(x => x.von >= now - 60000 && !x.real) || null;
       const ich = c.drivers.some(d => d.uid === S.me);
-      return `<div class="sp-vcard" data-open="${esc(c.key)}" tabindex="0" role="link" style="--team:${teamFarbe(c.name)[0]}">
-        <div class="sp-vcard-pic">${silhouette(c.name)}</div>
-        <div class="sp-vcard-team"><b>${esc(c.name)}</b><span>${esc(c.carName || "Fahrzeug offen")}</span><small>${C.ICONS.clock}${tagUhr(carStart(c))}</small></div>
-        <div class="sp-vcard-drv"><div class="sp-mini-h">Fahrer (${c.drivers.length})</div>
-          ${c.drivers.map(d => { const a = fahrerAv(d.uid, c); return `<div class="sp-drvline ${d.uid === S.me ? "ich" : ""}">${ava(d.uid, 22)}<i class="sp-av-dot ${a}"></i><span>${esc(memberName(d.uid))}</span><em class="${a}">${AVTXT[a]}</em></div>`; }).join("") || '<div class="tm-muted">Noch niemand eingetragen</div>'}
+      // Kopfzeile (Team, Auto, Start, Status) und darunter drei Spalten: Fahrer · nächster Stint · offene Punkte
+      const fahrer = c.drivers.map(d => { const a = fahrerAv(d.uid, c); return `<div class="sp-drvline ${d.uid === S.me ? "ich" : ""}">${ava(d.uid, 24)}<i class="sp-av-dot ${a}"></i><span>${esc(memberName(d.uid))}</span><em class="${a}">${AVTXT[a]}</em></div>`; }).join("") || '<div class="tm-muted">Noch niemand eingetragen</div>';
+      const offen = st[2] && st[2].length;
+      return `<div class="sp-vcard sp-vc2" data-open="${esc(c.key)}" tabindex="0" role="link" style="--team:${teamFarbe(c.name)[0]}">
+        <div class="sp-vc-kopf">
+          <div class="sp-vcard-pic">${silhouette(c.name)}</div>
+          <div class="sp-vc-titel"><b title="${esc(c.name)}">${esc(c.name)}</b>
+            <div class="sp-vc-fakten"><span>${C.ICONS.car}${esc(c.carName || "Fahrzeug offen")}</span><span>${C.ICONS.clock}${tagUhr(carStart(c))}</span></div></div>
+          <span class="sp-st ${st[0]}">${st[1]}</span>
+          <div class="sp-vcard-go">›</div>
         </div>
-        <div class="sp-vcard-st"><span class="sp-st ${st[0]}">${st[1]}</span>${statusListe(st)}
-          ${nx ? `<div class="sp-mini-h">Nächster Stint</div><div class="sp-nx">${C.ICONS.clock}<span>Stint ${nx.i + 1} · ${uhr(nx.von)} Uhr<br><small>Fahrer: <b>${esc(nx.name || "–")}</b></small></span></div>` : ""}
-          ${ich ? "" : `<button type="button" class="tm-btn sm" data-join="${esc(c.key)}"><span>Mitfahren</span></button>`}
+        <div class="sp-vc-teile">
+          <div class="sp-vc-teil"><div class="sp-mini-h">Fahrer (${c.drivers.length})</div>${fahrer}</div>
+          <div class="sp-vc-teil"><div class="sp-mini-h">Nächster Stint</div>${nx
+            ? `<div class="sp-nx">${C.ICONS.clock}<span><b>Stint ${nx.i + 1} · ${uhr(nx.von)} Uhr</b><br><small>Fahrer: <b>${esc(nx.name || "noch offen")}</b></small></span></div>`
+            : '<div class="tm-muted">Kein weiterer Stint</div>'}</div>
+          <div class="sp-vc-teil"><div class="sp-mini-h">${offen ? "Offen" : "Stand"}</div>${offen ? statusListe(st) : '<div class="sp-vc-ok">Alles eingetragen</div>'}
+            ${ich ? "" : `<button type="button" class="tm-btn sm" data-join="${esc(c.key)}"><span>Mitfahren</span></button>`}</div>
         </div>
-        <div class="sp-vcard-go">›</div>
       </div>`;
     };
     const zeitplan = () => {
