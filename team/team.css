@@ -1771,3 +1771,18 @@ body:has(.td)::after{content:"";position:fixed;inset:0;z-index:-1;pointer-events
 .gf-note{color:#7c8290;font-size:12px;margin-top:8px}
 @media (max-width:1100px){.gf-body{grid-template-columns:1fr;height:auto}.gf-mapcol{height:540px}.gf-tele{height:780px}.gf-lap{min-width:0;flex:1}.gf-maphint{display:none}}
 @media (max-width:640px){.gf-segcard{width:auto;right:14px}.gf-mini{display:none}.gf-top3{grid-template-columns:1fr}}
+
+/* Streckenvergleich: Anzeige-Menü (⚙) und Marker-Legende */
+.gf-tele{position:relative}
+.gf-tabs{position:relative}
+.gf-zahn{flex:none!important;width:36px;border:0;background:none;color:#7c8290;font-size:17px;cursor:pointer;padding:0 0 2px!important}
+.gf-zahn:hover,.gf-zahn.on{color:#fff}
+.gf-anz{position:absolute;top:52px;right:14px;z-index:5;width:min(420px,calc(100% - 28px));background:#0d0f13;border:1px solid rgba(255,255,255,.1);border-radius:14px;padding:12px 14px;box-shadow:0 18px 40px rgba(0,0,0,.55)}
+.gf-anz-h{font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#7c8290;margin:2px 0 8px}
+.gf-anz-r{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px}
+.gf-chip{display:inline-flex;align-items:center;gap:6px;border:1px solid rgba(255,255,255,.1);background:#15171c;color:#9aa0ad;border-radius:999px;padding:6px 11px;font-size:12px;font-weight:600;cursor:pointer}
+.gf-chip i{width:9px;height:9px;border-radius:50%;background:var(--c);opacity:.35}
+.gf-chip.on{color:#f3f4f7;border-color:var(--c)}
+.gf-chip.on i{opacity:1}
+.gf-legend .gf-leg-mk{gap:6px}
+.gf-legend .gf-leg-mk b{font-size:12px;margin-left:4px}

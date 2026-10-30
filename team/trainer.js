@@ -723,11 +723,68 @@
     return ch;
   }
 
+  /* ---- Anzeigen an/aus (gemerkt) + Brems-/Scheitel-/Gaspunkte ---- */
+  const ANZ_KEY = "kt-vg-anzeige";
+  const ANZ_MARKER = [["brems", "Bremspunkte", "#ff4b4b", "ib"], ["vmin", "Scheitel (Vmin)", "#ffd23f", "iv"], ["gas", "Gaspunkte", "#2fe39b", "ig"]];
+  const ANZ_KANAL = { delta: "Delta", gas: "Gas", bremse: "Bremse", speed: "Speed", lenkung: "Lenkung", gang: "Gang", rpm: "Drehzahl", linie: "Linie" };
+  VG.anz = (() => { try { return JSON.parse(localStorage.getItem(ANZ_KEY) || "{}") || {}; } catch (e) { return {}; } })();
+  const anzAn = k => VG.anz[k] !== false;
+  function anzSpeichern() { try { localStorage.setItem(ANZ_KEY, JSON.stringify(VG.anz)); } catch (e) { /* egal */ } }
+  function vgKanaeleAnwenden() { VG.channels = (VG.channelsAll || []).filter(c => anzAn("ch_" + c.key)); }
+
+  function idxAtM(m) {
+    const a = VG.d.m; if (m == null || !a.length) return -1;
+    let lo = 0, hi = a.length - 1;
+    while (lo < hi) { const mid = (lo + hi) >> 1; if (a[mid] < m) lo = mid + 1; else hi = mid; }
+    return lo;
+  }
+  function vgKurvenBereich(idx) {
+    const d = VG.d, n = d.m.length - 1, k = d.kurven[idx];
+    let lo, hi;
+    if (VG.single) { const L = d.laenge || 1; lo = (k.bremse_m - 120) / L; hi = (k.gas_m + 120) / L; } else { lo = k.lo; hi = k.hi; }
+    return [Math.max(0, Math.round(lo * n)), Math.min(n, Math.round(hi * n))];
+  }
+  // Bremspunkt = erstes Bremsen im Abschnitt, Scheitel = langsamste Stelle danach, Gaspunkt = erstes Gas (> 55 %) nach dem Scheitel
+  function vgPunkte(sp, br, gas, i0, i1) {
+    let ib = -1, iv = -1, ig = -1, vmin = Infinity;
+    if (br) for (let i = i0; i <= i1; i++) { const b = br[i]; if (b != null && b > 8) { ib = i; break; } }
+    if (sp) for (let i = ib >= 0 ? ib : i0; i <= i1; i++) { const v = sp[i]; if (v != null && v < vmin) { vmin = v; iv = i; } }
+    if (gas && iv >= 0) for (let i = iv; i <= i1; i++) { const g = gas[i]; if (g != null && g > 55) { ig = i; break; } }
+    return { ib, iv, ig };
+  }
+  function vgMarkerBerechnen() {
+    const d = VG.d, K = d.kanaele || {};
+    const ka = c => K[c] ? (VG.single ? K[c] : K[c][0]) : null, kb = c => (!VG.single && K[c]) ? K[c][1] : null;
+    VG.marker = (d.kurven || []).map((k, idx) => {
+      const [i0, i1] = vgKurvenBereich(idx);
+      if (i1 - i0 < 4) return null;
+      let a = vgPunkte(ka("speed"), ka("bremse"), ka("gas"), i0, i1);
+      if (VG.single) {   // Einzelrunde: Brems-/Gaspunkt genau wie in der Tabelle (vom Helfer gemessen)
+        const ib = idxAtM(k.bremse_m), ig = idxAtM(k.gas_m), sp = ka("speed");
+        let iv = -1, vmin = Infinity;
+        if (sp && ib >= 0 && ig >= ib) for (let i = ib; i <= ig; i++) { const v = sp[i]; if (v != null && v < vmin) { vmin = v; iv = i; } }
+        a = { ib, iv: iv >= 0 ? iv : a.iv, ig };
+      }
+      const b = VG.single ? null : vgPunkte(kb("speed"), kb("bremse"), kb("gas"), i0, i1);
+      return { a, b, ik: idxAtM(k.m) };
+    });
+  }
+  function renderAnz() {
+    const el = document.getElementById("gf-anz"); if (!el) return;
+    const chip = (k, t, col) => `<button type="button" class="gf-chip${anzAn(k) ? " on" : ""}" data-anz="${k}" style="--c:${col}"><i></i>${C.esc(t)}</button>`;
+    el.innerHTML = `<div class="gf-anz-h">Auf der Karte</div><div class="gf-anz-r">${ANZ_MARKER.map(([k, t, col]) => chip(k, t, col)).join("")}${chip("kurven", VG.single ? "Kurven-Nr. + Vmin" : "Kurven-Nr. + Zeit", "#e9ecf2")}</div>
+      <div class="gf-anz-h">Kanäle</div><div class="gf-anz-r">${(VG.channelsAll || []).map(c => chip("ch_" + c.key, ANZ_KANAL[c.key] || c.label, CH_COL[c.key] || "#e9ecf2")).join("")}</div>`;
+    el.querySelectorAll("[data-anz]").forEach(b => b.onclick = () => {
+      VG.anz[b.dataset.anz] = !anzAn(b.dataset.anz); anzSpeichern();
+      vgKanaeleAnwenden(); renderAnz(); vgLegend(); drawAll();
+    });
+  }
+
   /* ---- Ansicht aufbauen ---- */
   function zeigeAnalyse(d, single) {
     const n = d.m.length - 1, K = d.kanaele || {};
     const A = k => K[k] ? (single ? K[k] : K[k][0]) : null;
-    Object.assign(VG, { d, single, channels: vgChannels(d, single), i0: 0, i1: n, cur: -1, seg: -1, segMode: "kurven",
+    Object.assign(VG, { d, single, channelsAll: vgChannels(d, single), i0: 0, i1: n, cur: -1, seg: -1, segMode: "kurven",
       playing: false, showA: true, showB: !single, color: "pedale", ansicht: "tele",
       speedArr: A("speed"), gasArr: A("gas"), bremseArr: A("bremse"), deltaArr: single ? null : d.delta });
     if (VG.xmode === "zeit" && !d.t) VG.xmode = "dist";
@@ -736,6 +793,9 @@
     const k = d.karte;
     if (single) { VG.mapMine = k ? { x: k.x, y: k.y } : null; VG.mapRef = null; }
     else { VG.mapMine = (k && k.xa) ? { x: k.xa, y: k.ya } : null; VG.mapRef = k ? { x: k.x, y: k.y } : null; }
+    vgKanaeleAnwenden(); vgMarkerBerechnen();
+    const geo = VG.mapRef || VG.mapMine; VG.geoMitte = null;
+    if (geo) { let sx = 0, sy = 0, c = 0; for (let i = 0; i < geo.x.length; i += 5) if (geo.x[i] != null) { sx += geo.x[i]; sy += geo.y[i]; c++; } if (c) VG.geoMitte = { x: sx / c, y: sy / c }; }
 
     const ia = d.a, ib = d.b || {};
     const auto = ia.auto && ia.auto !== "?" ? ia.auto : "Runde";
@@ -816,7 +876,9 @@
             </div>
           </div>
           <div class="gf-tele">
-            <div class="gf-tabs"><button type="button" data-ansicht="tele" class="on">Telemetrie</button><button type="button" data-ansicht="kurven">Kurven</button></div>
+            <div class="gf-tabs"><button type="button" data-ansicht="tele" class="on">Telemetrie</button><button type="button" data-ansicht="kurven">Kurven</button>
+              <button type="button" class="gf-zahn" id="gf-anz-btn" title="Anzeige: Marker und Kanäle ein/aus">⚙</button></div>
+            <div class="gf-anz" id="gf-anz" hidden></div>
             <div class="gf-tele-in" id="gf-tele-in"><canvas id="kv-charts"></canvas></div>
             <div class="gf-kurven" id="gf-kurven" hidden>${kurvenHTML}</div>
             <div class="gf-timeline"><input type="range" id="kv-scrub" min="0" max="1000" value="0"></div>
@@ -836,6 +898,7 @@
       </div>`;
 
     wireAnalyse();
+    renderAnz();
     vgLegend();
     vgSegUpdate();
     vgInfo(-1);
@@ -885,6 +948,9 @@
       : VG.color === "delta" ? sw("#2fe39b", "Zeit gewonnen") + sw("#ff4b4b", "Zeit verloren")
       : sw("#3b6cff", "langsam") + sw("#ffb020", "schnell");
     if (!VG.single) el.innerHTML += `<span class="gf-leg-b"><i></i>Vergleich</span>`;
+    const sym = { brems: "■", vmin: "●", gas: "▲" };
+    const mk = ANZ_MARKER.filter(([k]) => anzAn(k));
+    if (mk.length) el.innerHTML += `<span class="gf-leg-mk">${mk.map(([k, t, col]) => `<b style="color:${col}">${sym[k]}</b>${C.esc(t.replace(" (Vmin)", ""))}`).join(" ")}${VG.single ? "" : " · gefüllt = du, hohl = Vergleich"}</span>`;
   }
 
   /* ---- Karte (Folge-Kamera wie GO FAST) ---- */
@@ -956,6 +1022,58 @@
     }
     // Segmentgrenzen
     if (VG.seg !== -1) { ctx.fillStyle = "#ff9f2e"; [VG.i0, VG.i1].forEach(i => { if (lineA.x[i] != null) dot(ctx, PX(lineA.x[i]), PY(lineA.y[i]), 4.2); }); }
+    // Brems-/Scheitel-/Gaspunkte: gefüllt = du, hohl = Vergleich
+    if (VG.marker) {
+      const r = Math.max(4, Math.min(9, 2.5 + sc * 0.35));
+      const form = (art, x, y, voll, col) => {
+        if (x < -20 || x > W + 20 || y < -20 || y > H + 20) return;
+        ctx.beginPath();
+        if (art === "brems") ctx.rect(x - r, y - r, 2 * r, 2 * r);
+        else if (art === "gas") { ctx.moveTo(x, y - r * 1.2); ctx.lineTo(x + r * 1.1, y + r * 0.9); ctx.lineTo(x - r * 1.1, y + r * 0.9); ctx.closePath(); }
+        else ctx.arc(x, y, r, 0, 7);
+        if (voll) { ctx.fillStyle = col; ctx.fill(); ctx.lineWidth = 1.2; ctx.strokeStyle = "rgba(0,0,0,.65)"; ctx.stroke(); }
+        else { ctx.lineWidth = 1.8; ctx.strokeStyle = col; ctx.stroke(); }
+      };
+      const arten = ANZ_MARKER.filter(([k]) => anzAn(k));
+      VG.marker.forEach(mk => {
+        if (!mk) return;
+        arten.forEach(([k, , col, feld]) => {
+          if (mk.b && ref && !VG.single && VG.showB) { const i = mk.b[feld]; if (i >= 0 && ref.x[i] != null) form(k, PX(ref.x[i]), PY(ref.y[i]), false, col); }
+          if (VG.showA) { const i = mk.a[feld]; if (i >= 0 && lineA.x[i] != null) form(k, PX(lineA.x[i]), PY(lineA.y[i]), true, col); }
+        });
+      });
+    }
+    // Kurven-Schilder (K3 +0.12) neben der Strecke, nach außen versetzt; anklickbar
+    VG.mapLabels = [];
+    if (VG.marker && anzAn("kurven")) {
+      const ks = VG.d.kurven || [], gm = VG.geoMitte || { x: cx, y: cy }, mxp = PX(gm.x), myp = PY(gm.y);
+      const fs = Math.round(Math.max(10.5, Math.min(13, 9.5 + sc * 0.25)));
+      ctx.font = `700 ${fs}px ${FONT}`; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+      const h = fs + 9;
+      ks.forEach((kk, idx) => {
+        const mk = VG.marker[idx], i = mk ? mk.ik : idxAtM(kk.m);
+        if (i < 0 || lineA.x[i] == null) return;
+        const j0 = Math.max(0, i - 4), j1 = Math.min(n, i + 4); if (lineA.x[j0] == null || lineA.x[j1] == null) return;
+        const px = PX(lineA.x[i]), py = PY(lineA.y[i]);
+        if (px < -60 || px > W + 60 || py < -60 || py > H + 60) return;
+        let tx = PX(lineA.x[j1]) - PX(lineA.x[j0]), ty = PY(lineA.y[j1]) - PY(lineA.y[j0]); const tl = Math.hypot(tx, ty) || 1; tx /= tl; ty /= tl;
+        let nx = -ty, ny = tx; if (nx * (px - mxp) + ny * (py - myp) < 0) { nx = -nx; ny = -ny; }
+        const txt = VG.single ? `K${kk.nr} · ${kk.vmin}` : `K${kk.nr} ${fmtSign(kk.dt, 2)}`;
+        const w = ctx.measureText(txt).width + 16;
+        let ok = null;
+        for (const sgn of [1, -1]) {
+          const dist = Math.min(band / 2, 70) + 12 + Math.abs(nx) * w / 2 + Math.abs(ny) * h / 2;
+          const bx = Math.max(4, Math.min(W - w - 4, px + sgn * nx * dist - w / 2)), by = Math.max(4, Math.min(H - h - 4, py + sgn * ny * dist - h / 2));
+          if (!VG.mapLabels.some(q => bx < q.x + q.w + 3 && bx + w + 3 > q.x && by < q.y + q.h + 3 && by + h + 3 > q.y)) { ok = { x: bx, y: by }; break; }
+        }
+        if (!ok) return;
+        VG.mapLabels.push({ x: ok.x, y: ok.y, w, h, idx });
+        rrect(ctx, ok.x, ok.y, w, h, h / 2); ctx.fillStyle = "rgba(11,12,15,.9)"; ctx.fill();
+        ctx.lineWidth = 1; ctx.strokeStyle = (!VG.single && kk.dt > 0.02) ? "rgba(255,75,75,.75)" : (!VG.single && kk.dt < -0.02) ? "rgba(47,227,155,.75)" : "rgba(255,255,255,.2)"; ctx.stroke();
+        ctx.fillStyle = "#e9ecf2"; ctx.fillText(txt, ok.x + w / 2, ok.y + h / 2 + 0.5);
+      });
+      ctx.textBaseline = "alphabetic";
+    }
     // Autos: Vergleich als Geister-Auto zur selben Zeit, eigenes Auto grün
     if (VG.autos) {
       const auto = (xs, ys, i, farbe) => {
@@ -1242,6 +1360,15 @@
       for (let i = VG.i0; i <= VG.i1; i += 2) { if (g.mx[i] == null) continue; const dx = g.PX(g.mx[i]) - px, dy = g.PY(g.my[i]) - py, dd = dx * dx + dy * dy; if (dd < bd) { bd = dd; best = i; } }
       if (best >= 0 && bd < 1600) setCursor(best);
     };
+    mp.onclick = e => {   // Kurven-Schild anklicken = diese Kurve ansehen
+      const r = mp.getBoundingClientRect(), px = e.clientX - r.left, py = e.clientY - r.top;
+      const l = (VG.mapLabels || []).find(q => px >= q.x && px <= q.x + q.w && py >= q.y && py <= q.y + q.h);
+      if (!l) return;
+      if (VG.segMode !== "kurven") { VG.segMode = "kurven"; document.querySelectorAll("[data-segmode]").forEach(x => x.classList.toggle("on", x.dataset.segmode === "kurven")); }
+      vgApplySeg(l.idx);
+    };
+    const anzBtn = document.getElementById("gf-anz-btn"), anzBox = document.getElementById("gf-anz");
+    anzBtn.onclick = e => { e.stopPropagation(); anzBox.hidden = !anzBox.hidden; anzBtn.classList.toggle("on", !anzBox.hidden); };
     const span = () => VG.view ? 2 * Math.min(VG.view.hw, VG.view.hh) : VG.zoomM;
     mp.addEventListener("wheel", e => { e.preventDefault(); vgZoom(span() * (e.deltaY < 0 ? 1 / 1.2 : 1.2)); }, { passive: false });
     mini.onclick = e => {
