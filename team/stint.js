@@ -1282,12 +1282,11 @@
 
   /* ---------- Schritt 3: Stintplan konfigurieren ---------- */
   const feld = (k, l, s, v, step = 1) => `<label class="sp-f"><span>${l}<small>${s}</small></span><input class="tm-input" type="number" min="0" step="${step}" data-pit="${k}" value="${v}"></label>`;
-  function stepPlan(body) {
-    const c = S.draft;
-    const r = rechne(c, null);
-    body.innerHTML = `
-      <details class="tm-box sp-pitbox" ${r.fehler.length ? "" : ""}><summary><h5>Boxenstopp-Werte</h5><span class="tm-muted">Tank ${c.pit.tank} L · Boxengasse ${c.pit.lane} s · Tanken ${c.pit.rate} L/s</span></summary>
-        <div class="sp-grid" style="margin-top:12px">
+  /* ---------- Schritt 3: Stintplan – Fahrer-Zeitstrahl (wer kann wann, wer fährt wann) + Stint-Liste ---------- */
+  const FAHRER_FARBEN = ["#e11324", "#3d8bfd", "#2ecc71", "#ffb020", "#b36bff", "#00c2c7", "#ff6bb5", "#9aa4b2"];
+  function pitBox(c) {
+    return `<details class="sp-pitbox2" id="sp-pitbox"><summary><b>Boxenstopp-Werte</b><span>Tank ${c.pit.tank} L · Boxengasse ${c.pit.lane} s · Tanken ${c.pit.rate} L/s · Reifen ${c.pit.reifenAlle > 0 ? "alle " + c.pit.reifenAlle + " Stopps" : "nie"}</span></summary>
+        <div class="sp-grid">
           ${feld("tank", "Tankgröße", "Liter", c.pit.tank)}
           ${feld("reserve", "Sprit-Reserve", "Liter pro Stint", c.pit.reserve, 0.1)}
           ${feld("rate", "Tanken", "Liter pro Sekunde", c.pit.rate, 0.1)}
@@ -1297,17 +1296,187 @@
           ${feld("reifenAlle", "Reifen wechseln", "alle X Stopps (0 = nie)", c.pit.reifenAlle)}
         </div>
         <label class="sp-check"><input type="checkbox" id="sp-par" ${c.pit.parallel ? "checked" : ""}> Tanken, Reifen und Fahrerwechsel laufen gleichzeitig (wie in iRacing)</label>
-      </details>
-      ${stintTabelle(c, r, false)}
-      ${r.rows.length ? `<div class="tm-actions" style="margin-top:14px">${C.btn("Fahrer automatisch verteilen", "red sm", 'id="sp-rot"')}${C.btn("Runden zurücksetzen", "sm", 'id="sp-reset"')}</div>
-        <p class="sp-kurz" style="margin-top:10px">Runden leer = so weit der Tank reicht. Speichert automatisch.</p>` : ""}`;
-    $$("[data-pit]").forEach(i => i.onchange = () => { c.pit[i.dataset.pit] = Math.max(0, num(i.value, c.pit[i.dataset.pit])); c.pitHand = true; dirty(); stepPlan(body); $(".sp-pitbox").open = true; });
-    $("#sp-par").onchange = (e) => { c.pit.parallel = e.target.checked; dirty(); stepPlan(body); $(".sp-pitbox").open = true; };
-    bindStintEdit(body, c, stepPlan);
-    const rot = $("#sp-rot");
-    if (rot) rot.onclick = () => { autoVerteilen(c); dirty(); zeichneKopf(); stepPlan(body); C.toast("Fahrer nach Verfügbarkeit und Wünschen verteilt", true); };
-    const rs = $("#sp-reset");
-    if (rs) rs.onclick = () => { c.stints = c.stints.map(s => ({ ...s, laps: 0, reifen: null })); dirty(); stepPlan(body); };
+      </details>`;
+  }
+  function bindPit(body, c) {
+    const offen = () => { const b = $("#sp-pitbox"); if (b) b.open = true; };
+    $$("[data-pit]").forEach(i => i.onchange = () => { c.pit[i.dataset.pit] = Math.max(0, num(i.value, c.pit[i.dataset.pit])); c.pitHand = true; dirty(); zeichneKopf(); stepPlan(body); offen(); });
+    const par = $("#sp-par");
+    if (par) par.onchange = (e) => { c.pit.parallel = e.target.checked; dirty(); stepPlan(body); offen(); };
+  }
+
+  function stepPlan(body) {
+    const c = S.draft;
+    const r = rechne(c, null);
+    if (r.fehler.length) {
+      body.innerHTML = `<div class="tm-box sp-warn"><h5>Noch nicht berechenbar</h5>${r.fehler.map(f => `<div>• ${esc(f)}</div>`).join("")}</div>${pitBox(c)}`;
+      return bindPit(body, c);
+    }
+    const rows = r.rows;
+    const farbe = (uid) => FAHRER_FARBEN[Math.max(0, c.drivers.findIndex(d => d.uid === uid)) % FAHRER_FARBEN.length];
+    const von0 = rows[0].von, bis0 = rows[rows.length - 1].bis, span = Math.max(1, bis0 - von0);
+    const pct = (t) => Math.max(0, Math.min(100, (t - von0) / span * 100));
+    const stopps = rows.filter(x => x.pit).length, runden = rows.reduce((a, x) => a + x.laps, 0), sprit = rows.reduce((a, x) => a + x.fuel, 0);
+    const sel = S.selStint;
+    const avKl = (v) => v === 2 ? "ja" : v === 1 ? "evtl" : v === 0 ? "nein" : "fehlt";
+    const avTx = (v) => v === 2 ? "kann" : v === 1 ? "vielleicht" : v === 0 ? "kann nicht" : "nichts eingetragen";
+
+    // Zeitachse: volle Stunden (bei langen Rennen jede 2. Stunde)
+    const schritt = span > 14 * 3600000 ? 2 * 3600000 : 3600000;
+    let ticks = "";
+    for (let t = Math.ceil(von0 / schritt) * schritt; t < bis0; t += schritt) ticks += `<span style="left:${pct(t)}%">${uhr(t)}</span>`;
+
+    // Verfügbarkeit eines Fahrers als Farbbänder in seiner Zeile
+    const baender = (uid) => {
+      const a = slotsVon(uid), out = [];
+      let lauf = null;
+      for (let t = Math.floor(von0 / Q) * Q; t < bis0; t += Q) {
+        const v = a ? a[t] : undefined, k = v === undefined ? "x" : String(v);
+        if (lauf && lauf.k === k) lauf.bis = t + Q; else { if (lauf) out.push(lauf); lauf = { k, von: t, bis: t + Q }; }
+      }
+      if (lauf) out.push(lauf);
+      return out.map(b => `<i class="sp-sw-av v${b.k}" style="left:${pct(b.von)}%;width:${pct(b.bis) - pct(b.von)}%"></i>`).join("");
+    };
+    const zahl = {}, zeit = {};
+    rows.forEach(x => { if (x.uid) { zahl[x.uid] = (zahl[x.uid] || 0) + 1; zeit[x.uid] = (zeit[x.uid] || 0) + (x.bis - x.von); } });
+    const zeile = (d) => {
+      const n = zahl[d.uid] || 0, w = wunschVon(d.uid), zuviel = w.max && n > w.max;
+      const bl = rows.filter(x => x.uid === d.uid).map(x => {
+        const v = x.real ? 2 : verfuegbar(x.uid, x.von, x.bis);
+        return `<div class="sp-sw-b ${x.real ? "real" : ""} ${sel === x.i ? "on" : ""} av-${avKl(v)}" data-st="${x.i}" style="left:${pct(x.von)}%;width:${Math.max(0.6, pct(x.bis) - pct(x.von))}%"
+          title="Stint ${x.i + 1}: ${uhr(x.von)} bis ${uhr(x.bis)} · ${x.laps} Runden · ${avTx(v)}"><b>${x.i + 1}</b></div>`;
+      }).join("");
+      return `<div class="sp-sw-row" data-row="${esc(d.uid)}" style="--c:${farbe(d.uid)}">
+          <div class="sp-sw-name">${ava(d.uid, 30)}<div><b>${esc(memberName(d.uid))}</b><small class="${zuviel ? "zuviel" : ""}">${n} ${n === 1 ? "Stint" : "Stints"}${w.max ? " / max. " + w.max : ""} · ${dauer(zeit[d.uid] || 0)}</small></div></div>
+          <div class="sp-sw-lane">${baender(d.uid)}${bl}</div>
+        </div>`;
+    };
+
+    // Stint-Liste
+    const fahrerKnopf = (x) => {
+      if (x.real) return `<div class="sp-dk fix">${x.uid ? ava(x.uid, 26) : ""}<span>${esc(x.name || "unbekannt")}</span></div>`;
+      const v = verfuegbar(x.uid, x.von, x.bis);
+      return `<button type="button" class="sp-dk" data-dk="${x.i}" style="--c:${farbe(x.uid)}">${ava(x.uid, 26)}<span>${esc(memberName(x.uid))}</span><i class="sp-av-dot ${avKl(v)}"></i><em>▾</em></button>`;
+    };
+    const stepper = (x) => {
+      if (x.real) return `<div class="sp-rs fix"><b>${x.laps}</b><span>Runden${x.real === "laufend" ? ", " + x.gefahren + " gefahren" : ""}</span></div>`;
+      const a = c.stints[x.i] || {}, voll = !(a.laps > 0);
+      return `<div class="sp-rs"><button type="button" data-rm="${x.i}" title="eine Runde weniger">−</button><b>${x.laps}</b><button type="button" data-rp="${x.i}" title="eine Runde mehr">+</button></div>
+        <button type="button" class="sp-voll ${voll ? "on" : ""}" data-rv="${x.i}" title="So viele Runden, wie der Tank reicht">Voll</button>`;
+    };
+    const hinweis = (x) => {
+      if (x.real) return `<span class="sp-hw real">${x.real === "laufend" ? "läuft" : "gefahren"}</span>`;
+      const v = verfuegbar(x.uid, x.von, x.bis);
+      return v === 2 ? "" : `<span class="sp-hw ${avKl(v)}">${avTx(v)}</span>`;
+    };
+    const boxZeile = (x) => {
+      if (!x.pit) return x.letzter ? `<div class="sp-sl-ziel">🏁 Ziel ca. ${uhr(x.bis)} Uhr</div>` : "";
+      if (x.pit.hand) return `<div class="sp-sl-pit"><span class="sp-pit-ic">⛽</span>Boxenstopp von Hand${x.pit.rein > 0 ? " · +" + x.pit.rein.toFixed(1) + " L" : ""}${x.pit.wechsel ? " · Fahrerwechsel" : ""}${x.pit.reifen ? " · Reifen" : ""}</div>`;
+      return `<div class="sp-sl-pit"><span class="sp-pit-ic">⛽</span>Box <b>${Math.round(x.pit.total)} s</b>${x.pit.rein > 0.05 ? ` · +${x.pit.rein.toFixed(1)} L` : ""}${x.pit.wechsel ? " · Fahrerwechsel" : ""}
+        <label class="sp-rf2" title="Reifen bei diesem Stopp wechseln"><input type="checkbox" data-sr="${x.i + 1}" ${x.pit.reifen ? "checked" : ""}><span>Reifen</span></label></div>`;
+    };
+    const liste = rows.map(x => `
+      <div class="sp-sl-row ${x.real ? "real" : ""} ${sel === x.i ? "on" : ""}" id="sp-st-${x.i}" style="--c:${farbe(x.uid)}">
+        <span class="sp-sl-nr">${x.i + 1}</span>
+        <div class="sp-sl-zeit"><b>${uhr(x.von)} bis ${uhr(x.bis)}</b><small>${dauer(x.bis - x.von)}</small></div>
+        <div class="sp-sl-fahrer">${fahrerKnopf(x)}</div>
+        <div class="sp-sl-runden">${stepper(x)}</div>
+        <div class="sp-sl-werte"><span>Ø ${fmtLap(x.pace)}</span><span>${x.fuel.toFixed(1)} L</span></div>
+        <div class="sp-sl-hw">${hinweis(x)}</div>
+      </div>${boxZeile(x)}`).join("");
+
+    body.innerHTML = `
+      <div class="sp-plan-kopf">
+        <div class="sp-pk-werte">
+          <span><b>${rows.length}</b>Stints</span><span><b>${stopps}</b>Stopps</span><span><b>${runden}</b>Runden</span>
+          <span><b>${Math.round(sprit)}</b>Liter</span><span><b>${uhr(bis0)}</b>Ziel ca.</span>
+        </div>
+        <div class="sp-pk-akt">${C.btn("Automatisch verteilen", "red sm", 'id="sp-rot"')}${C.btn("Runden zurücksetzen", "sm", 'id="sp-reset"')}</div>
+      </div>
+      <div class="sp-sw" id="sp-sw">
+        <div class="sp-sw-kopf"><div class="sp-sw-name"><small>Fahrer</small></div><div class="sp-sw-achse">${ticks}</div></div>
+        ${c.drivers.map(zeile).join("")}
+        <div class="sp-sw-fuss"><span><i class="v2"></i>kann</span><span><i class="v1"></i>vielleicht</span><span><i class="v0"></i>kann nicht</span><span><i class="vx"></i>nichts eingetragen</span>
+          <em>Stint in eine andere Fahrerzeile ziehen = Fahrer tauschen · anklicken = zum Stint springen</em></div>
+      </div>
+      <div class="sp-sl">${liste}</div>
+      ${pitBox(c)}
+      <div class="sp-pop" id="sp-pop" hidden></div>`;
+
+    // ---- Bedienung ----
+    const ensure = (i) => { while (c.stints.length <= i) c.stints.push({ d: "", laps: 0, reifen: null }); return c.stints[i]; };
+    const fixe = () => { rechne(c, null).rows.forEach(x => { if (x.real) return; const s = ensure(x.i); if (!s.d) s.d = x.uid; }); };
+    const neu = () => { dirty(); zeichneKopf(); stepPlan(body); };
+    const setzeFahrer = (i, uid) => { fixe(); ensure(i).d = uid; S.selStint = i; neu(); };
+    const waehle = (i, scroll) => {
+      S.selStint = i;
+      $$(".sp-sl-row.on,.sp-sw-b.on").forEach(e => e.classList.remove("on"));
+      const z = $("#sp-st-" + i); if (z) { z.classList.add("on"); if (scroll) z.scrollIntoView({ behavior: "smooth", block: "center" }); }
+      $$(`.sp-sw-b[data-st="${i}"]`).forEach(e => e.classList.add("on"));
+    };
+    // Runden
+    $$("[data-rm]").forEach(b => b.onclick = () => { const x = rows[Number(b.dataset.rm)]; fixe(); ensure(x.i).laps = Math.max(1, x.laps - 1); S.selStint = x.i; neu(); });
+    $$("[data-rp]").forEach(b => b.onclick = () => {
+      const x = rows[Number(b.dataset.rp)]; fixe(); ensure(x.i).laps = x.laps + 1; S.selStint = x.i;
+      const vorher = x.laps; dirty(); zeichneKopf(); stepPlan(body);
+      const jetzt = rechne(c, null).rows[x.i];
+      if (jetzt && jetzt.laps === vorher) { ensure(x.i).laps = vorher; C.toast("Mehr Runden reicht der Tank nicht"); }
+    });
+    $$("[data-rv]").forEach(b => b.onclick = () => { fixe(); ensure(Number(b.dataset.rv)).laps = 0; S.selStint = Number(b.dataset.rv); neu(); });
+    // Reifen
+    $$("[data-sr]").forEach(s => s.onchange = () => { fixe(); ensure(Number(s.dataset.sr)).reifen = s.checked; neu(); });
+    // Fahrer-Auswahl mit Verfügbarkeit genau für dieses Zeitfenster
+    const pop = $("#sp-pop");
+    const zu = () => { pop.hidden = true; };
+    $$("[data-dk]").forEach(b => b.onclick = (e) => {
+      e.stopPropagation();
+      const x = rows[Number(b.dataset.dk)];
+      pop.innerHTML = `<div class="sp-pop-h">Stint ${x.i + 1} · ${uhr(x.von)} bis ${uhr(x.bis)}</div>` + c.drivers.map(d => {
+        const v = verfuegbar(d.uid, x.von, x.bis), n = zahl[d.uid] || 0, w = wunschVon(d.uid);
+        return `<button type="button" class="sp-pop-f ${d.uid === x.uid ? "on" : ""}" data-pf="${esc(d.uid)}">${ava(d.uid, 26)}<span><b>${esc(memberName(d.uid))}</b><small>${n} Stints${w.max ? " / max. " + w.max : ""}</small></span><em class="${avKl(v)}"><i class="sp-av-dot ${avKl(v)}"></i>${avTx(v)}</em></button>`;
+      }).join("");
+      const rb = b.getBoundingClientRect(), rh = body.getBoundingClientRect();
+      pop.style.left = Math.min(rb.left - rh.left, rh.width - 320) + "px";
+      pop.style.top = (rb.bottom - rh.top + 6) + "px";
+      pop.hidden = false;
+      pop.querySelectorAll("[data-pf]").forEach(f => f.onclick = () => { zu(); if (f.dataset.pf !== x.uid) setzeFahrer(x.i, f.dataset.pf); });
+      waehle(x.i, false);
+    });
+    pop.onclick = (e) => e.stopPropagation();
+    if (S.popZu) document.removeEventListener("click", S.popZu);
+    S.popZu = zu; document.addEventListener("click", zu);
+    // Zeitstrahl: Stint anklicken = auswählen, in andere Fahrerzeile ziehen = Fahrer tauschen
+    $$(".sp-sw-b").forEach(bl => bl.onpointerdown = (e) => {
+      if (e.button !== 0) return;
+      const i = Number(bl.dataset.st), x = rows[i];
+      const y0 = e.clientY, x0 = e.clientX;
+      let zieht = false, ziel = null;
+      bl.setPointerCapture(e.pointerId);
+      bl.onpointermove = (ev) => {
+        if (x.real) return;
+        const dy = ev.clientY - y0;
+        if (!zieht && Math.hypot(dy, ev.clientX - x0) < 5) return;
+        zieht = true; bl.classList.add("zieht"); bl.style.transform = `translateY(${dy}px)`;
+        bl.style.pointerEvents = "none";
+        const unter = document.elementFromPoint(ev.clientX, ev.clientY);
+        bl.style.pointerEvents = "";
+        const row = unter && unter.closest(".sp-sw-row");
+        $$(".sp-sw-row.ziel").forEach(z => z.classList.remove("ziel"));
+        ziel = row && row.dataset.row !== x.uid ? row : null;
+        if (ziel) ziel.classList.add("ziel");
+      };
+      bl.onpointerup = () => {
+        bl.onpointermove = bl.onpointerup = null;
+        bl.classList.remove("zieht"); bl.style.transform = "";
+        $$(".sp-sw-row.ziel").forEach(z => z.classList.remove("ziel"));
+        if (zieht && ziel) setzeFahrer(i, ziel.dataset.row);
+        else if (!zieht) waehle(i, true);
+      };
+    });
+    // Kopf-Knöpfe + Boxenstopp-Werte
+    $("#sp-rot").onclick = () => { autoVerteilen(c); dirty(); zeichneKopf(); stepPlan(body); C.toast("Fahrer nach Verfügbarkeit und Wünschen verteilt", true); };
+    $("#sp-reset").onclick = () => { c.stints = c.stints.map(s => ({ ...s, laps: 0, reifen: null })); dirty(); zeichneKopf(); stepPlan(body); };
+    bindPit(body, c);
   }
 
   function stintTabelle(c, r, live) {
