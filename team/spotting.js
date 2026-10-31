@@ -32,9 +32,9 @@
   ];
   // 12 Spalten, Zeilen à 46 px
   const STANDARD = {
-    auto: { x: 0, y: 0, w: 4, h: 10 }, karte: { x: 4, y: 0, w: 4, h: 10 }, duell: { x: 8, y: 0, w: 4, h: 4 },
-    strategie: { x: 8, y: 4, w: 4, h: 6 }, gegner: { x: 0, y: 10, w: 4, h: 5 }, feld: { x: 4, y: 10, w: 8, h: 12 },
-    relativ: { x: 0, y: 15, w: 4, h: 6 }, rl: { x: 0, y: 21, w: 4, h: 9 },
+    karte: { x: 0, y: 0, w: 4, h: 10 }, rl: { x: 4, y: 0, w: 2, h: 10 }, feld: { x: 6, y: 0, w: 6, h: 26 },
+    auto: { x: 0, y: 10, w: 3, h: 10 }, duell: { x: 3, y: 10, w: 3, h: 4 }, strategie: { x: 3, y: 14, w: 3, h: 7 },
+    gegner: { x: 0, y: 20, w: 3, h: 6 }, relativ: { x: 3, y: 21, w: 3, h: 5 },
   };
   const SPALTEN = 12, ZEILE = 46, LUECKE = 12;
   // Anordnung kommt vom Server und gilt für alle; ändern (schieben, Größe, aus-/einblenden) darf nur ein Admin

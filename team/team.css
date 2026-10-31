@@ -2260,3 +2260,6 @@ body:has(.td)::after{content:"";position:fixed;inset:0;z-index:-1;pointer-events
 .vw-gear{display:inline-grid;place-items:center;width:30px;height:30px;border-radius:8px;background:rgba(255,255,255,.06);color:var(--steel)}
 .vw-gear:hover{background:rgba(255,255,255,.12);color:#fff}
 .vw-gear svg{width:15px;height:15px}
+/* Spotting: ganze Bildschirmbreite, damit das Feld breit genug für alle Spalten wird */
+.tm-page .container:has(#spt-gitter){max-width:none;padding-left:clamp(16px,2vw,40px);padding-right:clamp(16px,2vw,40px)}
+.spt-tab th,.spt-tab td{padding-left:6px;padding-right:6px}
