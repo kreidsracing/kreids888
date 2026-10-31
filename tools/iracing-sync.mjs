@@ -375,7 +375,8 @@ if (quelle === "pdf") {
     if (!p) continue;
     genutzt.add(p);
     if (p.team) s.team = true;
-    s.cat = s.cat || p.cat; s.cls = s.cls || p.cls; s.cars = s.cars || p.cars; s.takt = s.takt || p.takt;
+    // Fahrzeuge: das PDF nennt die einzelnen Autos, die API oft nur Klassen („GT3 Class")
+    s.cat = s.cat || p.cat; s.cls = s.cls || p.cls; s.cars = p.cars || s.cars; s.takt = s.takt || p.takt;
     for (const w of s.w) {
       const tag = Date.parse(w.d + "T00:00:00Z");
       const pw = p.w.find(x => Math.abs(Date.parse(x.d + "T00:00:00Z") - tag) <= 3 * 864e5);
