@@ -483,7 +483,7 @@
   }
   window.F2FEvNav = { refresh: () => ladeEvNav(true) };
 
-  const ADMIN_TEILE = [["status", "Status"], ["zugang", "Zugang"], ["panels", "Panels"], ["g61", "Garage 61 → Discord"], ["woche", "Wochen-Post"], ["abw", "Abwesenheiten"], ["stint", "Stintplaner"], ["links", "Links"], ["erinn", "Renn-Erinnerungen"], ["limits", "Limit-Warnung"], ["ergebnisse", "Rennergebnisse"]];
+  const ADMIN_TEILE = [["status", "Status"], ["zugang", "Zugang"], ["panels", "Panels"], ["g61", "Garage 61 → Discord"], ["woche", "Wochen-Post"], ["abw", "Abwesenheiten"], ["stint", "Stintplaner"], ["links", "Links"], ["erinn", "Renn-Erinnerungen"], ["limits", "Limit-Warnung"], ["ergebnisse", "Rennergebnisse"], ["spotting", "Spotting"]];
   // Admin-Kasten öffnen und hinscrollen (ohne neu zu laden, damit nichts Ungespeichertes verloren geht)
   function adminOeffnen(teil) {
     const el = document.getElementById("adm-" + teil);
@@ -1898,6 +1898,20 @@
         <div class="tm-row"><div class="lbl">Testen<small>erst speichern</small></div><div class="tm-actions">${btn("Test-Ergebnis posten", "sm", 'id="er-test"')}</div></div>
       </div>
 
+      <div class="tm-box">
+        <h5>Spotting · Live-Meldung</h5>
+        <p class="hint">Geht jemand mit FF Overlay bzw. der Toolbox live, postet der Bot eine Meldung mit Strecke, Session, Team, Auto, Startnummer und Klassen-SOF und einem Knopf zum Live-Spotting. Wechselt die Session (Training → Rennen), wird der Post angepasst, am Ende steht „Beendet" dran.</p>
+        <div class="tm-row"><div class="lbl">Live-Meldung</div>
+          <div class="tm-actions"><label class="tm-switch"><input type="checkbox" id="spl-an" ${(cfg.spotting || {}).an ? "checked" : ""}><span class="s"></span>An</label></div></div>
+        <div class="tm-row"><label for="spl-nur">Wann</label>
+          <div><select class="tm-select" id="spl-nur"><option value="team" ${(cfg.spotting || {}).nur !== "alle" ? "selected" : ""}>Nur bei Teamrennen</option><option value="alle" ${(cfg.spotting || {}).nur === "alle" ? "selected" : ""}>Bei jeder Session (auch Training, Dailys)</option></select></div></div>
+        <div class="tm-row"><label for="spl-ch">Discord-Kanal</label>
+          <div><select class="tm-select" id="spl-ch"><option value="">– Kanal wählen –</option>${(d.channels || []).map(c => `<option value="${c.id}" ${c.id === (cfg.spotting || {}).channel ? "selected" : ""}># ${esc(c.name)}</option>`).join("")}</select></div></div>
+        <div class="tm-row"><label for="spl-ping">Ping<small>Rolle, die erwähnt wird</small></label>
+          <div><select class="tm-select" id="spl-ping"><option value="">– niemanden pingen –</option>${d.roles.map(r => `<option value="${r.id}" ${r.id === (cfg.spotting || {}).ping ? "selected" : ""}>@${esc(r.name)}</option>`).join("")}</select></div></div>
+        <div class="tm-row"><div class="lbl">Testen<small>erst speichern</small></div><div class="tm-actions">${btn("Test-Meldung posten", "sm", 'id="spl-test"')}</div></div>
+      </div>
+
       <div class="tm-savebar" id="savebar"><span>Alles gespeichert</span>${btn("Speichern", "red", 'id="tm-save"')}</div>`;
 
     // jeden Kasten einklappbar machen (Inhalte werden nur verschoben, Eingaben bleiben erhalten)
@@ -2016,6 +2030,12 @@
           erinnTage: [...document.querySelectorAll("[data-etag]:checked")].map(x => Number(x.dataset.etag)),
           teams: (spTeamsSync(), spTeams.map(t => t.trim()).filter(Boolean)),
         },
+        spotting: {
+          an: document.getElementById("spl-an").checked,
+          nur: document.getElementById("spl-nur").value,
+          channel: document.getElementById("spl-ch").value,
+          ping: document.getElementById("spl-ping").value,
+        },
         ergebnisse: {
           an: document.getElementById("er-an").checked,
           channel: document.getElementById("er-ch").value,
@@ -2064,6 +2084,7 @@
     action("ab-cmds", "/admin/discord/commands");
     action("li-test", "/admin/limits/test");
     action("er-test", "/admin/ergebnis/test");
+    action("spl-test", "/admin/spotting/test");
 
     // ---- Wochen-Post ----
     const wpSel = document.getElementById("wp-w");

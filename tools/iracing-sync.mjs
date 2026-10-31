@@ -309,6 +309,8 @@ async function ausApi(key) {
       felder.serie = Object.keys(s); felder.saison = Object.keys(cs);
       felder.kategorie = s.category && typeof s.category === "object" ? Object.keys(s.category) : typeof s.category;
       const sc0 = liste(cs.schedules, "data")[0]; if (sc0) felder.woche = Object.keys(sc0);
+      // Strecken-Angaben mitschreiben (gibt es offizielle iRacing-Karten, z. B. track_map?), lange Werte gekürzt
+      if (sc0 && sc0.track && typeof sc0.track === "object") felder.strecke = Object.fromEntries(Object.entries(sc0.track).map(([k, v]) => [k, typeof v === "object" ? JSON.stringify(v).slice(0, 300) : String(v).slice(0, 200)]));
     }
     const kl0 = liste(cs.car_classes, "data")[0];
     if (kl0 && !felder.klasse) { felder.klasse = Object.keys(kl0); const a0 = liste(kl0.cars, "data")[0]; if (a0) felder.auto = Object.keys(a0); }
