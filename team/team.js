@@ -1875,14 +1875,22 @@
 
       <div class="tm-box">
         <h5>Rennergebnisse</h5>
-        <p class="hint">Nach einem Rennen schicken FF Overlay bzw. die Toolbox das offizielle Ergebnis, der Bot postet es hier. Dafür einmal im Programm „Mit F2F verbinden" klicken. Fahren mehrere aus dem Team im selben Rennen, kommt nur ein Post, der um weitere F2F-Autos ergänzt wird.</p>
+        <p class="hint">Nach einem Rennen schicken FF Overlay bzw. die Toolbox das offizielle Ergebnis, der Bot postet es hier. Dafür einmal im Programm „Mit F2F verbinden" klicken. Fahren mehrere im selben Rennen, kommt nur ein Post, der um weitere Autos ergänzt wird.</p>
         <div class="tm-row"><div class="lbl">Posten</div>
           <div class="tm-actions"><label class="tm-switch"><input type="checkbox" id="er-an" ${(cfg.ergebnisse || {}).an ? "checked" : ""}><span class="s"></span>An</label></div></div>
-        <div class="tm-row"><label for="er-nur">Welche Rennen</label>
-          <div><select class="tm-select" id="er-nur"><option value="team" ${(cfg.ergebnisse || {}).nur !== "alle" ? "selected" : ""}>Nur Teamrennen und Special Events</option><option value="alle" ${(cfg.ergebnisse || {}).nur === "alle" ? "selected" : ""}>Alle offiziellen Rennen von Teammitgliedern</option></select></div></div>
-        <div class="tm-row"><label for="er-ch">Discord-Kanal</label>
+        <div class="tm-row"><label for="er-ch">Discord-Kanal<small>für Teamrennen und als Standard</small></label>
           <div><select class="tm-select" id="er-ch"><option value="">– Kanal wählen –</option>${(d.channels || []).map(c => `<option value="${c.id}" ${c.id === (cfg.ergebnisse || {}).channel ? "selected" : ""}># ${esc(c.name)}</option>`).join("")}</select></div></div>
-        <div class="tm-row"><label for="er-ping">Ping<small>Rolle, die erwähnt wird</small></label>
+        <div class="tm-row"><div class="lbl">Welche Rennen<small>mehrere möglich</small></div>
+          <div style="display:flex;flex-direction:column;gap:12px">
+            <label class="tm-switch"><input type="checkbox" id="er-team" ${(cfg.ergebnisse || {}).team !== false ? "checked" : ""}><span class="s"></span>Teamrennen und Special Events (F2F-Teams)</label>
+            <label class="tm-switch"><input type="checkbox" id="er-alle" ${(cfg.ergebnisse || {}).alle || (cfg.ergebnisse || {}).nur === "alle" ? "checked" : ""}><span class="s"></span>Alle anderen offiziellen Rennen von Teammitgliedern</label>
+            <label class="tm-switch"><input type="checkbox" id="er-ov" ${(cfg.ergebnisse || {}).overlay ? "checked" : ""}><span class="s"></span>Rennen von allen, die FF Overlay nutzen (auch ohne Team-Rolle)</label>
+          </div></div>
+        <div class="tm-row"><label for="er-ch-alle">Kanal für andere Rennen<small>Teammitglieder, leer = wie oben</small></label>
+          <div><select class="tm-select" id="er-ch-alle"><option value="">wie oben</option>${(d.channels || []).map(c => `<option value="${c.id}" ${c.id === (cfg.ergebnisse || {}).kanalAlle ? "selected" : ""}># ${esc(c.name)}</option>`).join("")}</select></div></div>
+        <div class="tm-row"><label for="er-ch-ov">Kanal für Overlay-Nutzer<small>ohne Team-Rolle, leer = wie oben</small></label>
+          <div><select class="tm-select" id="er-ch-ov"><option value="">wie oben</option>${(d.channels || []).map(c => `<option value="${c.id}" ${c.id === (cfg.ergebnisse || {}).kanalOverlay ? "selected" : ""}># ${esc(c.name)}</option>`).join("")}</select></div></div>
+        <div class="tm-row"><label for="er-ping">Ping<small>nur bei Teamrennen und Specials</small></label>
           <div><select class="tm-select" id="er-ping"><option value="">– niemanden pingen –</option>${d.roles.map(r => `<option value="${r.id}" ${r.id === (cfg.ergebnisse || {}).ping ? "selected" : ""}>@${esc(r.name)}</option>`).join("")}</select></div></div>
         <div class="tm-row"><div class="lbl">Testen<small>erst speichern</small></div><div class="tm-actions">${btn("Test-Ergebnis posten", "sm", 'id="er-test"')}</div></div>
       </div>
@@ -2007,9 +2015,13 @@
         },
         ergebnisse: {
           an: document.getElementById("er-an").checked,
-          nur: document.getElementById("er-nur").value,
           channel: document.getElementById("er-ch").value,
           ping: document.getElementById("er-ping").value,
+          team: document.getElementById("er-team").checked,
+          alle: document.getElementById("er-alle").checked,
+          overlay: document.getElementById("er-ov").checked,
+          kanalAlle: document.getElementById("er-ch-alle").value,
+          kanalOverlay: document.getElementById("er-ch-ov").value,
         },
         limits: {
           enabled: document.getElementById("li-on").checked,
