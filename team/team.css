@@ -2263,3 +2263,4 @@ body:has(.td)::after{content:"";position:fixed;inset:0;z-index:-1;pointer-events
 /* Spotting: ganze Bildschirmbreite, damit das Feld breit genug für alle Spalten wird */
 .tm-page .container:has(#spt-gitter){max-width:none;padding-left:clamp(16px,2vw,40px);padding-right:clamp(16px,2vw,40px)}
 .spt-tab th,.spt-tab td{padding-left:6px;padding-right:6px}
+.spt-k small{white-space:normal}

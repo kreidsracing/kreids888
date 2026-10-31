@@ -467,33 +467,35 @@
 
   function strategie(st, a) {
     const s = st.session, sp = S.sprit;
-    let html = "";
+    let html = "", kacheln = "", notizen = "";
     // Rundenzeit und Restrunden aus den sauberen Runden (für jedes Auto, auch ohne Spritdaten)
     const lap = (a && (a.o5 || (a.last > 0 ? a.last : a.best))) || estKlasse(st, a && a.k) || 0;
     const restRd = s.rest > 0 && s.rest < 1e6 && lap > 0 ? Math.ceil(s.rest / lap) : s.runden_rest > 0 && s.runden_rest < 32767 ? s.runden_rest : null;
     if (a) {
-      html += `<div class="spt-kacheln">
+      kacheln += `
         <div class="spt-k"><small>Ø Rundenzeit</small><b>${a.o5 ? zeit(a.o5) + '<small> gemessen</small>' : "–"}</b></div>
         <div class="spt-k"><small>Restrunden</small><b>${restRd != null ? "~" + restRd : "–"}</b></div>
-        <div class="spt-k"><small>Saubere Runden</small><b>${a.sr ?? "–"}</b></div>
-      </div>${a.o5 && s.rest > 0 && s.rest < 1e6 ? `<p class="tm-muted spt-klein">Restzeit ${dauer(s.rest)} ÷ ${zeit(a.o5)} = ${(s.rest / a.o5).toFixed(1).replace(".", ",")} → aufgerundet ${restRd} Runden. Ø aus den letzten 5 sauberen Runden (ohne Box, Abflug, Start, Ausreißer).</p>` : ""}`;
+        <div class="spt-k"><small>Saubere Runden</small><b>${a.sr ?? "–"}</b></div>`;
+      notizen += `${a.o5 && s.rest > 0 && s.rest < 1e6 ? `<p class="tm-muted spt-klein">Restzeit ${dauer(s.rest)} ÷ ${zeit(a.o5)} = ${(s.rest / a.o5).toFixed(1).replace(".", ",")} → aufgerundet ${restRd} Runden. Ø aus den letzten 5 sauberen Runden (ohne Box, Abflug, Start, Ausreißer).</p>` : ""}`;
     }
     if (sp && sp.sprit != null && (!a || sp.idx === a.i)) {
       const alt = Math.round((Date.now() - sp.t) / 1000);
       const bisLeer = sp.verbrauch ? Math.floor(sp.sprit / sp.verbrauch) : null;
       const noetig = restRd != null && sp.verbrauch ? restRd * sp.verbrauch : null;
       const stopps = noetig != null && sp.tank ? Math.max(0, Math.ceil((noetig - sp.sprit) / (sp.tank * 0.98))) : null;
-      html += `<div class="spt-kacheln">
+      kacheln += `
         <div class="spt-k"><small>Sprit</small><b>${sp.sprit.toFixed(1)} L${sp.tank ? `<small> / ${sp.tank.toFixed(0)}</small>` : ""}</b></div>
         <div class="spt-k"><small>Verbrauch</small><b>${sp.verbrauch ? sp.verbrauch.toFixed(2).replace(".", ",") + "<small> L/Rd.</small>" : "–"}</b></div>
         <div class="spt-k${bisLeer != null && bisLeer <= 3 ? " warn" : ""}"><small>Runden bis leer</small><b>${bisLeer ?? "–"}</b></div>
         <div class="spt-k"><small>Sprit bis Ende</small><b>${noetig != null ? noetig.toFixed(0) + "<small> L</small>" : "–"}</b></div>
         <div class="spt-k"><small>Stopps nötig</small><b>${stopps ?? "–"}</b></div>
-        <div class="spt-k"><small>Nächster Stopp</small><b>${bisLeer != null && sp.runde != null ? "Rd. " + (sp.runde + bisLeer) : "–"}</b></div>
-      </div>${alt > 20 ? `<p class="tm-muted spt-klein">Spritstand von vor ${dauer(alt)}, der Fahrer am Steuer sendet gerade nicht.</p>` : ""}`;
+        <div class="spt-k"><small>Nächster Stopp</small><b>${bisLeer != null && sp.runde != null ? "Rd. " + (sp.runde + bisLeer) : "–"}</b></div>`;
+      notizen += `${alt > 20 ? `<p class="tm-muted spt-klein">Spritstand von vor ${dauer(alt)}, der Fahrer am Steuer sendet gerade nicht.</p>` : ""}`;
     } else {
-      html += `<p class="tm-muted spt-klein">Sprit und Verbrauch kommen nur, wenn der Fahrer am Steuer FF Overlay bzw. die Toolbox laufen hat und sendet.</p>`;
+      notizen += `<p class="tm-muted spt-klein">Sprit und Verbrauch kommen nur, wenn der Fahrer am Steuer FF Overlay bzw. die Toolbox laufen hat und sendet.</p>`;
     }
+    // alle Werte in einem Raster nebeneinander, Erklärungen darunter
+    html += (kacheln ? `<div class="spt-kacheln">${kacheln}</div>` : "") + notizen;
     // Plan aus dem Stintplaner: Fahrzeug mit gleichem Teamnamen, nächste Stints
     const p = S.plan;
     if (p) {
