@@ -1909,6 +1909,8 @@
           <div><select class="tm-select" id="spl-ch"><option value="">– Kanal wählen –</option>${(d.channels || []).map(c => `<option value="${c.id}" ${c.id === (cfg.spotting || {}).channel ? "selected" : ""}># ${esc(c.name)}</option>`).join("")}</select></div></div>
         <div class="tm-row"><label for="spl-ping">Ping<small>Rolle, die erwähnt wird</small></label>
           <div><select class="tm-select" id="spl-ping"><option value="">– niemanden pingen –</option>${d.roles.map(r => `<option value="${r.id}" ${r.id === (cfg.spotting || {}).ping ? "selected" : ""}>@${esc(r.name)}</option>`).join("")}</select></div></div>
+        <div class="tm-row"><div class="lbl">Offline-Testfahrten<small>für alle: erscheinen im Spotting und lösen die Live-Meldung aus</small></div>
+          <div class="tm-actions"><label class="tm-switch"><input type="checkbox" id="spl-offline" ${(cfg.spotting || {}).test ? "checked" : ""}><span class="s"></span>An</label></div></div>
         <div class="tm-row"><div class="lbl">Testen<small>erst speichern</small></div><div class="tm-actions">${btn("Test-Meldung posten", "sm", 'id="spl-test"')}</div></div>
       </div>
 
@@ -2035,6 +2037,7 @@
           nur: document.getElementById("spl-nur").value,
           channel: document.getElementById("spl-ch").value,
           ping: document.getElementById("spl-ping").value,
+          test: document.getElementById("spl-offline").checked,
         },
         ergebnisse: {
           an: document.getElementById("er-an").checked,
