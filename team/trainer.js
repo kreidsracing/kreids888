@@ -806,6 +806,119 @@
   }
   const vgOptionsB = () => `<option value="">— nur ansehen (kein Vergleich) —</option>` + vgOptions(true);
 
+  /* ---- Runden aus Garage 61: Vergleich auch ohne eigenen Mitschnitt ---- */
+  const G61V = { kombis: null, fahrer: [], ich: "", kombi: "", wer: null, runden: null, fehler: "", auto: false };
+  const g61Zeit = s => { const m = Math.floor(s / 60), r = s - m * 60; return m + ":" + (r < 10 ? "0" : "") + r.toFixed(3); };
+  async function vgG61Oeffnen(nurAuf) {
+    const el = document.getElementById("kv-g61");
+    if (!el) return;
+    if (!el.hidden && !nurAuf) { el.hidden = true; return; }
+    el.hidden = false;
+    if (!G61V.kombis) {
+      el.innerHTML = '<div class="tm-loading"><span></span><span></span><span></span></div>';
+      try {
+        const d = await C.api("/trainer/g61/kombis");
+        if (!d.ready) { el.innerHTML = '<p class="tm-muted">Garage 61 ist im Dashboard noch nicht eingerichtet.</p>'; return; }
+        Object.assign(G61V, { kombis: d.kombis || [], fahrer: d.fahrer || [], ich: d.ich || "" });
+      } catch (e) { el.innerHTML = `<div class="tm-box tm-err">${C.esc(e.message)}</div>`; return; }
+      if (G61V.wer === null) G61V.wer = G61V.ich;
+      // zuletzt gefahrene Strecke mit Auto automatisch wählen (eigene, sonst die des Teams)
+      const k = vgG61Zuletzt()[0] || G61V.kombis[0];
+      G61V.kombi = k ? k.t + "|" + k.c : "";
+      // ohne eigenen Mitschnitt: letzte eigene Runde und schnellste Teamrunde gleich laden und vergleichen
+      G61V.auto = !!nurAuf && !!G61V.ich;
+    }
+    vgG61Zeichnen();
+    if (!G61V.runden) vgG61Runden();
+  }
+  // eigene Kombis, die zuletzt gefahrene zuerst
+  const vgG61Zuletzt = () => G61V.kombis.filter(x => G61V.ich && x.zuletzt && x.zuletzt[G61V.ich]).sort((a, b) => b.zuletzt[G61V.ich].localeCompare(a.zuletzt[G61V.ich]));
+  const vgG61Neueste = () => (G61V.runden || []).filter(r => r.slug === G61V.ich).sort((a, b) => String(b.at).localeCompare(String(a.at)))[0];
+  function vgG61Zeichnen() {
+    const el = document.getElementById("kv-g61");
+    if (!el || el.hidden || !G61V.kombis) return;
+    const ich = G61V.ich;
+    const tag = s => s ? new Date(s).toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "2-digit" }) : "";
+    const opt = x => `<option value="${x.t}|${x.c}">${C.esc(x.tn)} · ${C.esc(x.cn)}</option>`;
+    const meine = vgG61Zuletzt(), andere = G61V.kombis.filter(x => !meine.includes(x));
+    const neu = vgG61Neueste(), kz = meine[0];
+    const fahrerName = s => (G61V.fahrer.find(f => f.slug === s) || {}).name || s;
+    const liste = (G61V.runden || []).filter(r => !G61V.wer || r.slug === G61V.wer).slice(0, 40);
+    el.innerHTML = `
+      <div class="gf-g61-kopf">
+        <b>Runden aus Garage 61</b>${kz ? `<span class="gf-g61-zuletzt">Zuletzt gefahren: ${C.esc(kz.tn)} · ${C.esc(kz.cn)} (${tag(kz.zuletzt[ich])})</span>` : ""}<small>Für den Vergleich muss der Coach nicht gelaufen sein. Es wird nichts gespeichert, beim Schließen des Helfers ist alles wieder weg.</small>
+      </div>
+      <div class="gf-g61-wahl">
+        <label><span>Strecke und Auto</span><select class="tm-select" id="g61-kombi">
+          ${meine.length ? `<optgroup label="Von dir gefahren">${meine.map(opt).join("")}</optgroup>` : ""}
+          ${andere.length ? `<optgroup label="Vom Team gefahren">${andere.map(opt).join("")}</optgroup>` : ""}
+        </select></label>
+        <label><span>Fahrer</span><select class="tm-select" id="g61-wer">
+          <option value="">Alle im Team</option>
+          ${G61V.fahrer.map(f => `<option value="${C.esc(f.slug)}">${C.esc(f.name)}${f.slug === ich ? " (du)" : ""}</option>`).join("")}
+        </select></label>
+      </div>
+      ${G61V.fehler ? `<div class="tm-box tm-err">${C.esc(G61V.fehler)}</div>`
+        : !G61V.runden ? '<div class="tm-loading"><span></span><span></span><span></span></div>'
+        : liste.length ? `<div class="gf-g61-liste">${liste.map((r, i) => `
+          <div class="gf-g61-z">
+            <span class="gf-g61-nr">${i + 1}</span><b class="gf-g61-zeit">${g61Zeit(r.zeit)}</b>
+            <span class="gf-g61-wer">${C.esc(r.fahrer || fahrerName(r.slug))}</span>
+            <small>${tag(r.at)}</small>
+            <span class="gf-g61-tags">${neu && r.id === neu.id ? '<i class="neu">zuletzt gefahren</i>' : ""}${r.sauber ? '<i class="ok">sauber</i>' : ""}${r.abflug ? "<i>Abflug</i>" : ""}${r.box ? "<i>Box</i>" : ""}${r.nass ? "<i>nass</i>" : ""}</span>
+            <span class="gf-g61-knopf"><button type="button" class="gf-mini-btn a" data-g61="${C.esc(r.id)}" data-ziel="a">Meine Runde</button><button type="button" class="gf-mini-btn b" data-g61="${C.esc(r.id)}" data-ziel="b">Vergleich</button></span>
+          </div>`).join("")}</div>`
+        : `<p class="tm-muted">${G61V.wer ? "Von diesem Fahrer gibt es hier keine Runde mit Telemetrie. Stell „Fahrer“ auf „Alle im Team“." : "Keine Runden mit Telemetrie für diese Kombination."}</p>`}`;
+    const ks = document.getElementById("g61-kombi"), ws = document.getElementById("g61-wer");
+    ks.value = G61V.kombi; ws.value = G61V.wer || "";
+    ks.onchange = () => { G61V.kombi = ks.value; G61V.runden = null; vgG61Zeichnen(); vgG61Runden(); };
+    ws.onchange = () => { G61V.wer = ws.value; vgG61Zeichnen(); };
+    el.querySelectorAll("[data-g61]").forEach(b => b.onclick = () => vgG61Laden(b.dataset.g61, b.dataset.ziel, b));
+  }
+  async function vgG61Runden() {
+    const [t, c] = (G61V.kombi || "").split("|");
+    G61V.fehler = "";
+    if (!t || !c) { G61V.runden = []; return vgG61Zeichnen(); }
+    const fuer = G61V.kombi;
+    try {
+      const d = await C.api(`/trainer/g61/runden?track=${encodeURIComponent(t)}&car=${encodeURIComponent(c)}`);
+      if (fuer !== G61V.kombi) return;
+      G61V.runden = d.runden || [];
+    } catch (e) { if (fuer === G61V.kombi) { G61V.runden = []; G61V.fehler = e.message; } }
+    vgG61Zeichnen();
+    if (G61V.auto && G61V.runden.length) {
+      G61V.auto = false;
+      const a = vgG61Neueste(), b = G61V.runden.find(r => !a || r.id !== a.id);
+      if (!a) return;
+      if (!(await vgG61Laden(a.id, "a"))) return;
+      if (b && await vgG61Laden(b.id, "b")) vergleichStart();
+    }
+  }
+  async function vgG61Laden(id, ziel, btn) {
+    const r = (G61V.runden || []).find(x => x.id === id);
+    const k = (G61V.kombis || []).find(x => x.t + "|" + x.c === G61V.kombi) || {};
+    if (!r) return false;
+    const alt = btn ? btn.textContent : "";
+    if (btn) { btn.disabled = true; btn.textContent = "lädt …"; }
+    try {
+      const res = await fetch("/api/team/trainer/g61/csv?id=" + encodeURIComponent(id), { credentials: "same-origin" });
+      if (!res.ok) { let m = "Fehler " + res.status; try { m = (await res.json()).error || m; } catch (e) { /* leer */ } throw new Error(m); }
+      const raw = await res.arrayBuffer();
+      // Name im Garage-61-Muster (Fahrer - Auto - Strecke - Zeit), daraus liest der Helfer Auto, Strecke und Zeit
+      const teil = s => String(s || "").replace(/\s+-\s+/g, " ").replace(/[\\/:*?"<>|]/g, " ").trim();
+      const name = `G61 - ${teil(r.fahrer)} - ${teil(k.cn)} - ${teil(k.tn)} - ${g61Zeit(r.zeit).replace(":", ".")}.csv`;
+      let up;
+      try { up = await hcall("/lap/upload?zweck=vergleich", { raw, name }, 30000); }
+      catch (e) { throw new Error(e.status ? e.message : "Der Helfer läuft nicht. Starte den Team-Trainer, dann klappt das Laden."); }
+      VG.laps = up.laps; refreshVgSelects();
+      const sel = document.getElementById(ziel === "a" ? "kv-a" : "kv-b");
+      if (sel) { sel.value = "ref|" + up.id; if (sel.onchange) sel.onchange(); }
+      C.toast(`${r.fahrer} ${g61Zeit(r.zeit)} als ${ziel === "a" ? "„Meine Runde“" : "„Vergleich“"} geladen`, true);
+      return true;
+    } catch (e) { C.toast(e.message); return false; }
+    finally { if (btn) { btn.disabled = false; btn.textContent = alt; } }
+  }
+
   async function renderVergleich() {
     vgCleanup();
     const box = document.getElementById("kt-tab");
@@ -818,12 +931,14 @@
         <span class="gf-vs">vs</span>
         <label class="kv-pick"><span class="kv-pick-l gf-b">● Vergleich</span>
           <select class="tm-select" id="kv-b">${vgOptionsB()}</select></label>
+        <button type="button" class="tm-btn sm" id="kv-g61-btn" title="Runden aus Garage 61 laden, auch ohne eigenen Mitschnitt"><span>Aus Garage 61</span></button>
         <label class="tm-btn sm kt-file"><span>CSV hochladen</span><input type="file" accept=".csv" id="kv-file" hidden></label>
         ${VG.laps.eigene.length ? `<span class="gf-del"><select class="tm-select" id="kv-del-sel">${VG.laps.eigene.map(x => `<option value="${C.esc(x.id)}">${C.esc(x.name)}</option>`).join("")}</select>
           <button type="button" class="gf-mini-btn" id="kv-del-one" title="Diesen eigenen Mitschnitt löschen">Löschen</button><button type="button" class="kv-link" id="kv-del-all">alle</button></span>` : ""}
         <span class="kt-sp"></span>
         ${btn2("Vergleichen", 'id="kv-go"', "red")}
       </div>
+      <div class="gf-g61" id="kv-g61" hidden></div>
       <div id="kv-view"><div class="gf gf-leer"><div class="gf-leer-in">${ICON.rad}<b>Runde wählen und auf „Vergleichen“ klicken</b>
         <p>Deine Runde gegen eine Referenz – oder unter „Vergleich“ auf „nur ansehen“ stellen, dann siehst du eine einzelne Runde: Streckenkarte mit Linie, wo gebremst und Gas gegeben wird, und alle Kanäle.</p></div></div></div>`;
 
@@ -833,6 +948,9 @@
     const updGo = () => { const s = goBtn.querySelector("span"); if (s) s.textContent = bEl.value ? "Vergleichen" : "Ansehen"; };
     bEl.onchange = updGo; updGo();
     goBtn.onclick = vergleichStart;
+    document.getElementById("kv-g61-btn").onclick = () => vgG61Oeffnen();
+    // ohne eigenen Mitschnitt gleich die Garage-61-Runden zeigen
+    if (!VG.laps.eigene.length) { vgG61Oeffnen(true); if (VG.laps.refs.length) aEl.value = "ref|" + VG.laps.refs[0].id; }
     document.getElementById("kv-file").onchange = async (e) => {
       const f = e.target.files[0]; if (!f) return;
       try {
