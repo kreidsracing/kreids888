@@ -2197,3 +2197,6 @@ body:has(.td)::after{content:"";position:fixed;inset:0;z-index:-1;pointer-events
 .spt-map circle.spt-spitze{fill:none}
 .spt-map text.spt-krone{fill:#ffd166}
 .spt-ev-rd{color:var(--steel);font-size:12px}
+.spt-klpos{color:var(--steel);font-size:11.5px}
+.spt-admin-hinweis{color:#ffcf5c;font-size:12px;margin-right:4px}
+.spt-gitter.fest .spt-fh{cursor:default}
