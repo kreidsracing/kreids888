@@ -2264,3 +2264,13 @@ body:has(.td)::after{content:"";position:fixed;inset:0;z-index:-1;pointer-events
 .tm-page .container:has(#spt-gitter){max-width:none;padding-left:clamp(16px,2vw,40px);padding-right:clamp(16px,2vw,40px)}
 .spt-tab th,.spt-tab td{padding-left:6px;padding-right:6px}
 .spt-k small{white-space:normal}
+/* Spotting Rennleitung: Filter und neue Ereignisse (Incidents, Abflug, Strafen) */
+.spt-rlf{display:flex;flex-wrap:wrap;gap:4px;margin:0 0 8px;position:sticky;top:-10px;background:#14161c;padding:2px 0 6px;z-index:2}
+.spt-rlf button{border:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.04);color:var(--steel);font-size:11.5px;font-weight:700;padding:4px 9px;border-radius:999px;cursor:pointer}
+.spt-rlf button.on{background:var(--red);border-color:transparent;color:#fff}
+.spt-rl li.spt-ev-inc{border-left-color:#ff8a3d}
+.spt-rl li.spt-ev-abflug{border-left-color:#e7c35a}
+.spt-rl li.spt-ev-schwarz,.spt-rl li.spt-ev-dq{border-left-color:#fff;background:rgba(255,255,255,.08)}
+.spt-rl li.spt-ev-repair{border-left-color:#ff7a00}
+.spt-rl li.spt-ev-debris{border-left-color:#ff9f40}
+.spt-rl li.spt-ev-weiss,.spt-rl li.spt-ev-ziel{border-left-color:#e6e9ef}

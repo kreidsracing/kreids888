@@ -361,7 +361,7 @@
         ${kachel("Letzte", zeit(a.last))}${kachel("Beste", zeit(a.best))}
         ${kachel("Stint", a.stint_s != null ? dauer(a.stint_s) + (a.stint_r != null ? `<small> · ${a.stint_r} Rd.</small>` : "") : "–")}${kachel("Stopps", a.stopps || 0)}
         ${kachel("Start", a.kstart ? "P" + a.kstart + (a.start && a.start !== a.kstart ? `<small> · ges. P${a.start}</small>` : "") : "–")}${kachel("Ø 5 Runden", zeit(a.o5))}
-        ${kachel("Reifen", reifenName(st, a))}
+        ${kachel("Reifen", reifenName(st, a))}${incVon(st, a) != null ? kachel("Incidents", incVon(st, a) + "x" + (st.ich && st.ich.idx === a.i && st.ich.inc_ich != null ? `<small> · Fahrer ${st.ich.inc_ich}x</small>` : "")) : ""}
       </div>${a.box ? '<div class="spt-box-an">In der Box</div>' : ""}` : leer("Kein F2F-Auto in diesem Rennen gefunden.")}`);
     root.querySelectorAll("[data-auto]").forEach(b => b.onclick = () => { S.auto = Number(b.dataset.auto); zeichne(); });
 
@@ -449,10 +449,23 @@
       setze("relativ", `<ul class="spt-relativ">${vor.map(zeile).join("")}${zeile(null)}${hin.map(zeile).join("")}</ul>`);
     } else setze("relativ", leer(a ? "Unser Auto ist gerade nicht auf der Strecke." : "Kein F2F-Auto ausgewählt."));
 
-    // Rennleitung
-    const ev = [...S.ereignisse.values()].filter(e => Date.now() - e.w < 10 * 60000 || S.ereignisse.size < 15).sort((x, y) => y.w - x.w).slice(0, 25);
+    // Rennleitung: Filter Alle / Flaggen und Strafen / unsere Klasse / nur F2F
+    const RLF = [["alle", "Alle"], ["flaggen", "Flaggen & Strafen"], ["klasse", "Unsere Klasse"], ["f2f", "F2F"]];
+    const FLAGG = new Set(["gruen", "gelb", "fcy", "rot", "debris", "weiss", "ziel", "schwarz", "repair", "dq"]);
+    const rlf = S.rlFilter || "alle";
+    const passt = (e) => {
+      const x = e.i != null ? st.autos.find(y => y.i === e.i) : null;
+      if (rlf === "flaggen") return FLAGG.has(e.art);
+      if (rlf === "klasse") return !x || (a && x.k === a.k);
+      if (rlf === "f2f") return !x || istF2F(x, st);
+      return true;
+    };
+    const ev = [...S.ereignisse.values()].filter(passt).sort((x, y) => y.w - x.w).slice(0, 60);
     const autoName = (i) => name(st.autos.find(x => x.i === i));
-    setze("rl", ev.length ? `<ul class="spt-rl">${ev.map(e => `<li class="spt-ev-${esc(e.art)}${e.i != null && istF2F(st.autos.find(x => x.i === e.i), st) ? " unser" : ""}"><small>${uhr(e.w)}</small>${e.i != null ? `<b>${esc(autoName(e.i))}</b> ` : ""}${esc(e.text)}${e.r ? ` <span class="spt-ev-rd">(Runde ${e.r})</span>` : ""}</li>`).join("")}</ul>` : leer("Noch nichts los."));
+    const rlKnoepfe = `<div class="spt-rlf">${RLF.map(([k, l]) => `<button type="button" data-rlf="${k}" class="${k === rlf ? "on" : ""}">${l}</button>`).join("")}</div>`;
+    setze("rl", rlKnoepfe + (ev.length ? `<ul class="spt-rl">${ev.map(e => `<li class="spt-ev-${esc(e.art)}${e.i != null && istF2F(st.autos.find(x => x.i === e.i), st) ? " unser" : ""}"><small>${uhr(e.w)}</small>${e.i != null ? `<b>${esc(autoName(e.i))}</b> ` : ""}${esc(e.text)}${e.r ? ` <span class="spt-ev-rd">(Runde ${e.r})</span>` : ""}</li>`).join("")}</ul>` : leer("Noch nichts los.")));
+    const rlBox = root.querySelector("#spt-f-rl");
+    if (rlBox && !rlBox._rlf) { rlBox._rlf = true; rlBox.addEventListener("click", (e) => { const b = e.target.closest("[data-rlf]"); if (b) { S.rlFilter = b.dataset.rlf; zeichne(); } }); }
 
     zeichneKarte();
   }
@@ -465,6 +478,11 @@
     el.scrollTop = oben; el.scrollLeft = links;
   }
 
+  // Incident-Punkte: eigenes Auto aus der Telemetrie des Senders, sonst aus den Fahrerdaten (wenn iRacing sie liefert)
+  function incVon(st, a) {
+    if (st.ich && st.ich.idx === a.i && st.ich.inc != null) return st.ich.inc;
+    return a.inc > 0 ? a.inc : null;
+  }
   function strategie(st, a) {
     const s = st.session, sp = S.sprit;
     let html = "", kacheln = "", notizen = "";
