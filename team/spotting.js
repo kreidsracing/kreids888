@@ -27,12 +27,14 @@
   /* ---------------- Fenster und Anordnung ---------------- */
   const FENSTER = [
     { id: "auto", titel: "Unser Auto" }, { id: "karte", titel: "Streckenkarte" }, { id: "duell", titel: "Vorder- & Hintermann" },
-    { id: "strategie", titel: "Strategie" }, { id: "gegner", titel: "Gegner deiner Klasse" }, { id: "feld", titel: "Feld" }, { id: "rl", titel: "Rennleitung" },
+    { id: "strategie", titel: "Strategie" }, { id: "gegner", titel: "Gegner deiner Klasse" }, { id: "feld", titel: "Feld" },
+    { id: "relativ", titel: "Relativ" }, { id: "rl", titel: "Rennleitung" },
   ];
   // 12 Spalten, Zeilen à 46 px
   const STANDARD = {
-    auto: { x: 0, y: 0, w: 4, h: 7 }, karte: { x: 4, y: 0, w: 4, h: 10 }, duell: { x: 8, y: 0, w: 4, h: 4 },
-    strategie: { x: 8, y: 4, w: 4, h: 6 }, gegner: { x: 0, y: 7, w: 4, h: 5 }, feld: { x: 4, y: 10, w: 8, h: 12 }, rl: { x: 0, y: 12, w: 4, h: 10 },
+    auto: { x: 0, y: 0, w: 4, h: 8 }, karte: { x: 4, y: 0, w: 4, h: 10 }, duell: { x: 8, y: 0, w: 4, h: 4 },
+    strategie: { x: 8, y: 4, w: 4, h: 6 }, gegner: { x: 0, y: 8, w: 4, h: 5 }, feld: { x: 4, y: 10, w: 8, h: 12 },
+    relativ: { x: 0, y: 13, w: 4, h: 6 }, rl: { x: 0, y: 19, w: 4, h: 9 },
   };
   const SPALTEN = 12, ZEILE = 46, LUECKE = 12, LAYOUT_KEY = "f2f_spotting_layout_v1";
   let LAYOUT = null;
@@ -194,20 +196,19 @@
     if (j.ich && j.ich.sprit != null) S.sprit = { ...j.ich, t: j.t, runde: (j.autos.find(a => a.i === j.ich.idx) || {}).runde };
     const unsere = j.autos.filter(a => istF2F(a, j));
     if (S.auto == null || !j.autos.some(a => a.i === S.auto)) S.auto = (unsere[0] || j.autos[0] || {}).i ?? null;
-    // Abstandsverlauf zu Vorder- und Hintermann merken (für den Trend)
-    const f = klassenFeld(j), a = j.autos.find(x => x.i === S.auto);
-    if (a) {
-      const liste = f[a.k] || [], n = liste.indexOf(a);
-      for (const o of [liste[n - 1], liste[n + 1]]) {
-        if (!o) continue;
-        const key = a.i + ":" + o.i, g = abstandSek(o === liste[n - 1] ? a : o, o === liste[n - 1] ? o : a, j);
+    // Abstandsverlauf jedes Autos zu seinem Vordermann in der Klasse merken (Schlüssel hinten:vorne, für ± Vorne/Hinten)
+    const f = klassenFeld(j);
+    for (const liste of Object.values(f)) {
+      for (let n = 1; n < liste.length; n++) {
+        const hinten = liste[n], vorne = liste[n - 1], g = abstandSek(hinten, vorne, j);
         if (g == null) continue;
-        const v = S.verlauf.get(key) || [];
+        const key = hinten.i + ":" + vorne.i, v = S.verlauf.get(key) || [];
         v.push({ t: j.t, g });
         while (v.length > 120) v.shift();
         S.verlauf.set(key, v);
       }
     }
+    if (S.verlauf.size > 400) for (const [k, v] of S.verlauf) if (j.t - v[v.length - 1].t > 5 * 60000) S.verlauf.delete(k);
     if (erster) planLaden(false);
   }
 
@@ -235,7 +236,7 @@
     const rd = ((ref.runde || 0) + (ref.pct || 0)) - ((a.runde || 0) + (a.pct || 0));
     if (rd >= 1) return "+" + Math.floor(rd) + " Rd.";
     const g = abstandSek(a, ref, st);
-    return g != null ? "+" + g.toFixed(1) + " s" : "–";
+    return g != null ? "+" + g.toFixed(1).replace(".", ",") + " s" : "–";
   }
   // Trend über ungefähr die letzten zwei Runden: Sekunden pro Runde (minus = Abstand schrumpft)
   function trend(key, est) {
@@ -247,6 +248,30 @@
     if (jetzt.t === alt.t) return null;
     return (jetzt.g - alt.g) / ((jetzt.t - alt.t) / 1000) * est;
   }
+  // ± Vorne: wie sich der Abstand zum Vordermann ändert (minus = holt auf); ± Hinten: zum Hintermann (plus = baut aus)
+  function plusMinus(x, liste, st) {
+    const n = liste.indexOf(x), est = estKlasse(st, x.k) || x.best;
+    return { vorne: n > 0 ? trend(x.i + ":" + liste[n - 1].i, est) : null, hinten: liste[n + 1] ? trend(liste[n + 1].i + ":" + x.i, est) : null };
+  }
+  const pmZahl = (t, gutWennPlus) => t == null ? "" : `<span class="spt-pm ${Math.abs(t) < 0.05 ? "" : (t > 0) === gutWennPlus ? "gut" : "schlecht"}">${t > 0 ? "+" : t < 0 ? "−" : "±"}${Math.abs(t).toFixed(1).replace(".", ",")}</span>`;
+  // Relativ auf der Strecke: Sekunden von „von" bis „zu" (plus = zu fährt vor uns), über die Rundenlänge gefaltet
+  function relativSek(von, zu, st) {
+    const lap = estKlasse(st, von.k) || von.best || 0;
+    if (!(lap > 0) || !(von.est >= 0) || !(zu.est >= 0)) return null;
+    let d = zu.est - von.est;
+    if (d > lap / 2) d -= lap;
+    if (d < -lap / 2) d += lap;
+    return d;
+  }
+  const NASS = ["", "Trocken", "Trocken", "Feucht", "Feucht", "Nass", "Nass", "Nass"];
+  const reifenName = (st, x) => {
+    if (x.rf == null) return "–";
+    const alle = st.session.reifen || [], n = (alle.find(r => r.i === x.rf) || {}).n || "";
+    if (/wet|rain/i.test(n)) return "Regen";
+    if (!n) return x.rf === 0 ? "Slick" : "Typ " + x.rf;
+    if (alle.filter(r => !/wet|rain/i.test(r.n)).length <= 1) return "Slick"; // nur eine Trockenmischung: einfach Slick
+    return { hard: "Hart", medium: "Mittel", soft: "Weich" }[n.toLowerCase()] || n;
+  };
 
   /* ---------------- Stintplaner (Plan zum laufenden Rennen) ---------------- */
   async function planLaden(still) {
@@ -272,9 +297,16 @@
     const sender = S.sender.find(x => x.aktiv);
     const aus = FENSTER.filter(f => LAYOUT[f.id].aus);
     const wetter = s ? [s.luft != null ? s.luft + " °C Luft" : "", s.asphalt != null ? s.asphalt + " °C Asphalt" : "", s.nass_erklaert ? "Nass erklärt" : ""].filter(Boolean).join(" · ") : "";
+    const nass = s ? NASS[s.nass] || "" : "";
+    const laenge = !s ? "" : Number(s.runden_gesamt) > 0 ? "Renndauer " + s.runden_gesamt + " Runden" : s.dauer > 0 && s.dauer < 1e5 ? "Renndauer " + Math.floor(s.dauer / 60) + ":" + pad(Math.round(s.dauer % 60)) + " h" : "";
+    const unsere = st ? st.autos.filter(a => istF2F(a, st)) : [];
+    const unsereKl = [...new Set(unsere.map(a => String(a.k)))];
+    const klName = (id) => ((s && s.klassen || []).find(k => String(k.id) === id) || {}).name || "";
+    const klFarbe = (id) => { const f = String(((s && s.klassen || []).find(k => String(k.id) === id) || {}).farbe || "").replace(/^0x/, "#"); return /^#[0-9a-f]{6}$/i.test(f) ? f : "#e11324"; };
     const html = `<div class="spt-kopf">
-      ${s ? `<span class="tm-badge live">${esc(TYP[s.typ] || s.typ || "Session")}</span><h3>${esc(s.strecke)}${s.variante ? ` <small>${esc(s.variante)}</small>` : ""}</h3>
-        <span class="spt-meta">${st.autos.length} Autos · ${(s.klassen || []).map(k => esc(k.name)).join(", ")}${wetter ? " · " + esc(wetter) : ""}</span>` : "<h3>Verbinde …</h3>"}
+      ${s ? `<span class="tm-badge live">${esc(TYP[s.typ] || s.typ || "Session")}</span>${nass ? `<span class="spt-wx ${nass.toLowerCase()}">${nass}</span>` : ""}<h3>${esc(s.strecke)}${s.variante ? ` <small>${esc(s.variante)}</small>` : ""}</h3>
+        <span class="spt-meta">${[laenge, st.autos.length + " Teilnehmer", "Klassen " + (s.klassen || []).map(k => esc(k.name)).join(", "), esc(wetter)].filter(Boolean).join(" · ")}</span>
+        ${unsere.length ? `<div class="spt-unsere">${unsereKl.map(k => `<span class="spt-kl" style="--k:${klFarbe(k)}">${esc(klName(k))}</span>`).join("")}<small>= unsere Autos</small><b>${unsere.length} F2F-${unsere.length === 1 ? "Auto" : "Autos"} in dieser Session</b></div>` : ""}` : "<h3>Verbinde …</h3>"}
       <span class="spt-quelle"><i class="${S.verbunden ? "an" : ""}"></i>${st ? `Daten von ${esc(sender ? sender.name : st.von || "?")} · <span id="spt-alter"></span>` : S.verbunden ? "verbunden, warte auf Daten" : "getrennt"}</span>
       <span class="spt-werkzeug">${aus.length ? `<select class="tm-select" id="spt-wieder"><option value="">+ Fenster (${aus.length})</option>${aus.map(f => `<option value="${f.id}">${esc(f.titel)}</option>`).join("")}</select>` : ""}${C.btn("Standard", "sm", 'id="spt-std" title="Fenster wieder wie am Anfang anordnen"')}</span>
     </div>`;
@@ -307,13 +339,16 @@
 
     // Unser Auto
     setze("auto", `${unsere.length > 1 ? `<div class="sp-seg spt-autowahl">${unsere.map(u => `<button type="button" data-auto="${u.i}" class="${u.i === S.auto ? "on" : ""}">${esc(u.team || u.fahrer)}</button>`).join("")}</div>` : ""}
-      ${a ? `<div class="spt-auto-n"><span class="spt-kl" style="--k:${farbe(a.k)}">${esc(kl(a.k).name)}</span><b>${esc(name(a))}</b><small>am Steuer: ${esc(a.fahrer)}</small></div>
+      ${a ? `<div class="spt-auto-n"><span class="spt-kl" style="--k:${farbe(a.k)}">${esc(kl(a.k).name)}</span><b>${esc(name(a))}</b><small>am Steuer: ${esc(a.fahrer)}</small>
+        ${(a.fahrerAlle || []).filter(n => n !== a.fahrer).length ? `<small class="spt-dabei">dabei: ${esc(a.fahrerAlle.filter(n => n !== a.fahrer).join(", "))}</small>` : ""}${a.auto ? `<small class="spt-dabei">${esc(a.auto)}</small>` : ""}</div>
       <div class="spt-kacheln">
         ${kachel("Pos. gesamt", "P" + (a.pos || "–") + `<small>/${st.autos.length}</small>`)}${kachel("Pos. Klasse", "P" + (a.kpos || "–") + `<small>/${(felder[a.k] || []).length}</small>`, " unser")}
         ${kachel("Klassenspitze", esc(a._gap))}${kachel("Runde", a.runde ?? "–")}
         ${kachel("Rennzeit", dauer(s.gruen != null ? s.zeit - s.gruen : s.zeit))}${kachel("Restzeit", rest)}
         ${kachel("Letzte", zeit(a.last))}${kachel("Beste", zeit(a.best))}
         ${kachel("Stint", a.stint_s != null ? dauer(a.stint_s) + (a.stint_r != null ? `<small> · ${a.stint_r} Rd.</small>` : "") : "–")}${kachel("Stopps", a.stopps || 0)}
+        ${kachel("Start", a.kstart ? "P" + a.kstart + (a.start && a.start !== a.kstart ? `<small> · ges. P${a.start}</small>` : "") : "–")}${kachel("Ø 5 Runden", zeit(a.o5))}
+        ${kachel("Reifen", reifenName(st, a))}
       </div>${a.box ? '<div class="spt-box-an">In der Box</div>' : ""}` : leer("Kein F2F-Auto in diesem Rennen gefunden.")}`);
     root.querySelectorAll("[data-auto]").forEach(b => b.onclick = () => { S.auto = Number(b.dataset.auto); zeichne(); });
 
@@ -322,7 +357,7 @@
       const liste = felder[a.k] || [], n = liste.indexOf(a), vor = liste[n - 1], hinter = liste[n + 1], est = estKlasse(st, a.k) || a.best;
       const zeile = (o, vorne) => {
         if (!o) return `<div class="spt-duell leer">${vorne ? "Niemand vor dir – Klassenspitze" : "Niemand hinter dir"}</div>`;
-        const g = vorne ? abstandSek(a, o, st) : abstandSek(o, a, st), t = trend(a.i + ":" + o.i, est);
+        const g = vorne ? abstandSek(a, o, st) : abstandSek(o, a, st), t = trend(vorne ? a.i + ":" + o.i : o.i + ":" + a.i, est);
         const tt = t == null ? "Trend nach ca. 2 Runden" : Math.abs(t) < 0.05 ? "± 0,0 s/Rd. – gleich schnell"
           : vorne ? (t < 0 ? `▲ holst ${Math.abs(t).toFixed(1).replace(".", ",")} s/Rd. auf` : `▼ verlierst ${t.toFixed(1).replace(".", ",")} s/Rd.`)
             : (t < 0 ? `▼ kommt ${Math.abs(t).toFixed(1).replace(".", ",")} s/Rd. näher` : `▲ du baust ${t.toFixed(1).replace(".", ",")} s/Rd. aus`);
@@ -351,21 +386,53 @@
 
     // Feld
     if (!S.klasse || !felder[S.klasse]) S.klasse = String((a || st.autos[0] || {}).k ?? "");
-    const fz = (x) => `<tr class="${istF2F(x, st) ? "unser" : ""}${x.box ? " inbox" : ""}">
+    // Relativ zu unserem Auto (gleiche Klasse: Abstand nach Position, sonst über die Strecke)
+    const zuUns = (x) => {
+      if (!a || x === a) return x === a ? "wir" : "";
+      const rd = ((x.runde || 0) + (x.pct || 0)) - ((a.runde || 0) + (a.pct || 0));
+      if (Math.abs(rd) >= 1) return (rd > 0 ? "+" : "−") + Math.floor(Math.abs(rd)) + " Rd.";
+      const g = rd > 0 ? abstandSek(a, x, st) : abstandSek(x, a, st);
+      return g == null ? "–" : (rd > 0 ? "+" : "−") + g.toFixed(1).replace(".", ",") + " s";
+    };
+    const klListe = felder[S.klasse] || [];
+    const fz = (x) => {
+      const pm = plusMinus(x, klListe, st);
+      return `<tr class="${istF2F(x, st) ? "unser" : ""}${x.box ? " inbox" : ""}">
       <td><b>${x.kpos || "–"}</b></td><td>${esc(x.nr)}</td>
       <td class="spt-name">${x.team ? `<b>${esc(x.team)}</b><small>${esc(x.fahrer)}</small>` : `<b>${esc(x.fahrer)}</b>`}</td>
-      <td>${x.runde ?? "–"}</td><td>${esc(x._gap)}</td><td>${esc(x._int)}</td><td>${zeit(x.last)}</td><td>${zeit(x.best)}</td>
+      <td>${x.runde ?? "–"}</td><td>${esc(x._gap)}</td><td>${esc(x._int)}</td><td class="spt-rel">${zuUns(x)}</td>
+      <td>${zeit(x.last)}</td><td>${zeit(x.o5)}</td><td>${pmZahl(pm.vorne, false)}</td><td>${pmZahl(pm.hinten, true)}</td><td>${zeit(x.best)}</td>
+      <td>${esc(reifenName(st, x))}</td><td>${x.kstart ? "P" + x.kstart : "–"}</td>
       <td>${x.stint_s != null ? dauer(x.stint_s) + (x.stint_r != null ? " · " + x.stint_r + " Rd." : "") : "–"}</td><td>${x.stopps || 0}</td>
       <td>${x.box ? '<span class="tm-badge">Box</span>' : x.fl === -1 ? '<span class="tm-badge grey">weg</span>' : ""}</td></tr>`;
+    };
     setze("feld", `<div class="sp-seg spt-klassen">${Object.keys(felder).map(k => `<button type="button" data-kl="${esc(k)}" class="${k === S.klasse ? "on" : ""}">${esc(kl(k).name || "Klasse")}</button>`).join("")}</div>
-      <table class="spt-tab"><thead><tr><th>Pos</th><th>#</th><th>Team / Fahrer</th><th>Rd.</th><th>Abstand</th><th>Intervall</th><th>Letzte</th><th>Beste</th><th>Stint</th><th>Stopps</th><th></th></tr></thead>
-      <tbody>${(felder[S.klasse] || []).map(fz).join("")}</tbody></table>`);
+      <table class="spt-tab"><thead><tr><th>Pos</th><th>#</th><th>Team / Fahrer</th><th>Rd.</th><th>Abst. Kl.</th><th>Intervall</th><th>Relativ</th><th>Letzte</th><th title="Schnitt der letzten 5 sauberen Runden">Ø 5 Rd.</th><th title="Abstand zum Vordermann, Sekunden pro Runde (minus = holt auf)">± Vorne</th><th title="Abstand zum Hintermann, Sekunden pro Runde (plus = baut aus)">± Hinten</th><th>Beste</th><th>Reifen</th><th>Start</th><th>Stint</th><th>Stopps</th><th></th></tr></thead>
+      <tbody>${klListe.map(fz).join("")}</tbody></table>
+      <p class="tm-muted spt-klein">Ø 5 Rd. = letzte 5 saubere Runden (ohne Box, Abflug, Start, Ausreißer). ± in Sekunden pro Runde über etwa 2 Runden. Schaden gibt iRacing für andere Autos nicht heraus.</p>`);
     root.querySelectorAll("[data-kl]").forEach(b => b.onclick = () => { S.klasse = b.dataset.kl; zeichne(); });
+
+    // Relativ: wer auf der Strecke direkt vor und hinter uns fährt (alle Klassen, wie im iRacing-Relative)
+    if (a && a.est >= 0 && a.fl !== -1) {
+      const um = st.autos.filter(x => x !== a && x.fl !== -1 && x.pct >= 0).map(x => ({ x, d: relativSek(a, x, st) })).filter(o => o.d != null);
+      const vor = um.filter(o => o.d > 0).sort((p, q) => p.d - q.d).slice(0, 4).reverse();
+      const hin = um.filter(o => o.d <= 0).sort((p, q) => q.d - p.d).slice(0, 4);
+      const zeile = (o) => {
+        const x = o ? o.x : a, d = o ? o.d : 0;
+        const rd = Math.round(((x.runde || 0) + (x.pct || 0)) - ((a.runde || 0) + (a.pct || 0)) - (o ? d / (estKlasse(st, a.k) || a.best || 1) : 0));
+        return `<li class="${x === a ? "ich" : istF2F(x, st) ? "unser" : ""}${x.box ? " inbox" : ""}">
+          <em>${x === a ? "" : (d > 0 ? "+" : "−") + Math.abs(d).toFixed(1).replace(".", ",") + " s"}</em>
+          <span class="spt-kl" style="--k:${farbe(x.k)}">${esc(kl(x.k).name)}</span><b>${x.nr ? "#" + esc(x.nr) : ""}</b>
+          <span class="spt-rel-n">${esc(x === a ? name(a) : x.team || x.fahrer)}</span>
+          <small>${rd > 0 ? '<span class="spt-rd vor">+' + rd + " Rd.</span>" : rd < 0 ? '<span class="spt-rd zurueck">' + rd + " Rd.</span>" : ""}${x.box ? '<span class="tm-badge">Box</span>' : ""}</small></li>`;
+      };
+      setze("relativ", `<ul class="spt-relativ">${vor.map(zeile).join("")}${zeile(null)}${hin.map(zeile).join("")}</ul>`);
+    } else setze("relativ", leer(a ? "Unser Auto ist gerade nicht auf der Strecke." : "Kein F2F-Auto ausgewählt."));
 
     // Rennleitung
     const ev = [...S.ereignisse.values()].filter(e => Date.now() - e.w < 10 * 60000 || S.ereignisse.size < 15).sort((x, y) => y.w - x.w).slice(0, 25);
     const autoName = (i) => name(st.autos.find(x => x.i === i));
-    setze("rl", ev.length ? `<ul class="spt-rl">${ev.map(e => `<li class="spt-ev-${esc(e.art)}${e.i != null && istF2F(st.autos.find(x => x.i === e.i), st) ? " unser" : ""}"><small>${uhr(e.w)}</small>${e.i != null ? `<b>${esc(autoName(e.i))}</b> ` : ""}${esc(e.text)}</li>`).join("")}</ul>` : leer("Noch nichts los."));
+    setze("rl", ev.length ? `<ul class="spt-rl">${ev.map(e => `<li class="spt-ev-${esc(e.art)}${e.i != null && istF2F(st.autos.find(x => x.i === e.i), st) ? " unser" : ""}"><small>${uhr(e.w)}</small>${e.i != null ? `<b>${esc(autoName(e.i))}</b> ` : ""}${esc(e.text)}${e.r ? ` <span class="spt-ev-rd">(Runde ${e.r})</span>` : ""}</li>`).join("")}</ul>` : leer("Noch nichts los."));
 
     zeichneKarte();
   }
@@ -381,18 +448,26 @@
   function strategie(st, a) {
     const s = st.session, sp = S.sprit;
     let html = "";
+    // Rundenzeit und Restrunden aus den sauberen Runden (für jedes Auto, auch ohne Spritdaten)
+    const lap = (a && (a.o5 || (a.last > 0 ? a.last : a.best))) || estKlasse(st, a && a.k) || 0;
+    const restRd = s.rest > 0 && s.rest < 1e6 && lap > 0 ? Math.ceil(s.rest / lap) : s.runden_rest > 0 && s.runden_rest < 32767 ? s.runden_rest : null;
+    if (a) {
+      html += `<div class="spt-kacheln">
+        <div class="spt-k"><small>Ø Rundenzeit</small><b>${a.o5 ? zeit(a.o5) + '<small> gemessen</small>' : "–"}</b></div>
+        <div class="spt-k"><small>Restrunden</small><b>${restRd != null ? "~" + restRd : "–"}</b></div>
+        <div class="spt-k"><small>Saubere Runden</small><b>${a.sr ?? "–"}</b></div>
+      </div>${a.o5 && s.rest > 0 && s.rest < 1e6 ? `<p class="tm-muted spt-klein">Restzeit ${dauer(s.rest)} ÷ ${zeit(a.o5)} = ${(s.rest / a.o5).toFixed(1).replace(".", ",")} → aufgerundet ${restRd} Runden. Ø aus den letzten 5 sauberen Runden (ohne Box, Abflug, Start, Ausreißer).</p>` : ""}`;
+    }
     if (sp && sp.sprit != null && (!a || sp.idx === a.i)) {
       const alt = Math.round((Date.now() - sp.t) / 1000);
       const bisLeer = sp.verbrauch ? Math.floor(sp.sprit / sp.verbrauch) : null;
-      const lap = (a && (a.last > 0 ? a.last : a.best)) || estKlasse(st, a && a.k) || 0;
-      const restRd = s.rest > 0 && s.rest < 1e6 && lap > 0 ? Math.ceil(s.rest / lap) : s.runden_rest > 0 && s.runden_rest < 32767 ? s.runden_rest : null;
       const noetig = restRd != null && sp.verbrauch ? restRd * sp.verbrauch : null;
       const stopps = noetig != null && sp.tank ? Math.max(0, Math.ceil((noetig - sp.sprit) / (sp.tank * 0.98))) : null;
       html += `<div class="spt-kacheln">
         <div class="spt-k"><small>Sprit</small><b>${sp.sprit.toFixed(1)} L${sp.tank ? `<small> / ${sp.tank.toFixed(0)}</small>` : ""}</b></div>
         <div class="spt-k"><small>Verbrauch</small><b>${sp.verbrauch ? sp.verbrauch.toFixed(2).replace(".", ",") + "<small> L/Rd.</small>" : "–"}</b></div>
         <div class="spt-k${bisLeer != null && bisLeer <= 3 ? " warn" : ""}"><small>Runden bis leer</small><b>${bisLeer ?? "–"}</b></div>
-        <div class="spt-k"><small>Noch zu fahren</small><b>${restRd != null ? "~" + restRd + "<small> Rd.</small>" : "–"}</b></div>
+        <div class="spt-k"><small>Sprit bis Ende</small><b>${noetig != null ? noetig.toFixed(0) + "<small> L</small>" : "–"}</b></div>
         <div class="spt-k"><small>Stopps nötig</small><b>${stopps ?? "–"}</b></div>
         <div class="spt-k"><small>Nächster Stopp</small><b>${bisLeer != null && sp.runde != null ? "Rd. " + (sp.runde + bisLeer) : "–"}</b></div>
       </div>${alt > 20 ? `<p class="tm-muted spt-klein">Spritstand von vor ${dauer(alt)}, der Fahrer am Steuer sendet gerade nicht.</p>` : ""}`;
@@ -443,10 +518,14 @@
     const farbe = (id) => { const f = String((klassen.find(k => String(k.id) === String(id)) || {}).farbe || "").replace(/^0x/, "#"); return /^#[0-9a-f]{6}$/i.test(f) ? f : "#9aa3ad"; };
     const autos = st.autos.filter(x => x.pct != null && x.pct >= 0 && x.fl !== -1).sort((x, y) => istF2F(x, st) - istF2F(y, st));
     const vbz = vb.split(" ").map(Number), mitteX = vbz[0] + vbz[2] / 2; // Beschriftung rechts der Mitte nach links, sonst abgeschnitten
+    const kNamen = [...new Set(autos.map(x => String(x.k)))];
+    const legende = `<div class="spt-legende">${kNamen.map(k => `<span><i style="background:${farbe(k)}"></i>${esc((klassen.find(c => String(c.id) === k) || {}).name || "Klasse")}</span>`).join("")}
+      <span><i style="background:#e11324"></i>unser Auto</span><span><i class="ring"></i>Klassenspitze</span><span>♛ führt gesamt</span>
+      <span class="q">${S.strecke && S.strecke.quelle === "g61" ? "Streckenform aus Garage 61" : pkt ? "Streckenform aus dem GPS des Fahrers" : ""}</span></div>`;
     box.innerHTML = `<svg class="spt-map" viewBox="${vb}" preserveAspectRatio="xMidYMid meet">
       <path d="${pfad}" class="spt-bahn" style="stroke-width:${groesse * 1.6}"/><path d="${pfad}" class="spt-bahn2" style="stroke-width:${groesse * 0.5}"/>
-      ${autos.map(x => { const [px, py] = pos(x.pct), u = istF2F(x, st); return `<g class="${u ? "unser" : ""}${x.box ? " box" : ""}"><circle cx="${px.toFixed(1)}" cy="${py.toFixed(1)}" r="${(u ? 1.5 : 1) * groesse}" style="fill:${u ? "#e11324" : farbe(x.k)}"/>${u ? `<text x="${(px + (px > mitteX ? -2 : 2) * groesse).toFixed(1)}" y="${(py + groesse * 0.6).toFixed(1)}" text-anchor="${px > mitteX ? "end" : "start"}" style="font-size:${groesse * 2.6}px">${esc((x.team || x.fahrer).split(" ").pop())}${x.nr ? " #" + esc(x.nr) : ""}</text>` : ""}</g>`; }).join("")}
-    </svg>${pkt ? "" : '<p class="tm-muted spt-klein">Streckenform folgt, sobald der Fahrer eine Runde gefahren ist.</p>'}`;
+      ${autos.map(x => { const [px, py] = pos(x.pct), u = istF2F(x, st); return `<g class="${u ? "unser" : ""}${x.box ? " box" : ""}">${x.kpos === 1 ? `<circle cx="${px.toFixed(1)}" cy="${py.toFixed(1)}" r="${(u ? 2.3 : 1.8) * groesse}" class="spt-spitze" style="stroke:${farbe(x.k)};stroke-width:${groesse * 0.35}"/>` : ""}<circle cx="${px.toFixed(1)}" cy="${py.toFixed(1)}" r="${(u ? 1.5 : 1) * groesse}" style="fill:${u ? "#e11324" : farbe(x.k)}"/>${x.pos === 1 ? `<text class="spt-krone" x="${px.toFixed(1)}" y="${(py - groesse * 2.2).toFixed(1)}" text-anchor="middle" style="font-size:${groesse * 2.6}px">♛</text>` : ""}${u ? `<text x="${(px + (px > mitteX ? -2 : 2) * groesse).toFixed(1)}" y="${(py + groesse * 0.6).toFixed(1)}" text-anchor="${px > mitteX ? "end" : "start"}" style="font-size:${groesse * 2.6}px">${esc((x.team || x.fahrer).split(" ").pop())}${x.nr ? " #" + esc(x.nr) : ""}</text>` : ""}</g>`; }).join("")}
+    </svg>${legende}${pkt ? "" : '<p class="tm-muted spt-klein">Streckenform folgt, sobald der Fahrer eine Runde gefahren ist.</p>'}`;
   }
 
   window.F2FSpotting = { mount };
