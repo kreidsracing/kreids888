@@ -22,7 +22,7 @@
   const istF2F = (a, st) => !!a && ((st.ich && a.i === st.ich.idx) || (st.session.meineTeams || []).includes(a.team) || /\bf2f\b|flag ?to ?flag/i.test(a.team || ""));
   const TYP = { "Race": "Rennen", "Lone Qualify": "Quali", "Open Qualify": "Quali", "Qualify": "Quali", "Practice": "Training", "Lone Practice": "Training", "Warmup": "Warm-up", "Offline Testing": "Testfahrt" };
 
-  const HINWEIS = `<div class="spt-hinweis"><b>So kommen Rennen hierher:</b> Wer fährt, braucht <b>FF Overlay</b> (oder die kreids888 Toolbox) offen und oben rechts mit <b>„Mit F2F verbinden"</b> angemeldet. Dann erscheint jede Online-Session (Training, Quali, Rennen) hier automatisch, auch wenn mehrere von euch gleichzeitig in verschiedenen Rennen sind. Sprit und Strategie sieht man nur, wenn der Fahrer am Steuer das Programm laufen hat. Offline-Testfahrten erscheinen nur, wenn sie im Admin-Bereich freigegeben sind.</div>`;
+  const HINWEIS = `<div class="spt-hinweis"><b>So kommen Rennen hierher:</b> Wer fährt, braucht <b>FF Overlay</b> (oder die kreids888 Toolbox) offen und oben rechts mit <b>„Mit F2F verbinden"</b> angemeldet. Dann erscheint die Session hier automatisch, auch wenn mehrere von euch gleichzeitig in verschiedenen Rennen sind. Sprit und Strategie sieht man nur, wenn der Fahrer am Steuer das Programm laufen hat. Welche Sessions hier erscheinen (Teamrennen, Einzelrennen, Offline-Testfahrten), legt der Admin fest.</div>`;
 
   /* ---------------- Fenster und Anordnung ---------------- */
   const FENSTER = [

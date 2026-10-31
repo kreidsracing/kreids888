@@ -1900,7 +1900,13 @@
 
       <div class="tm-box">
         <h5>Spotting · Live-Meldung</h5>
-        <p class="hint">Geht jemand mit FF Overlay bzw. der Toolbox live, postet der Bot eine Meldung mit Strecke, Session, Team, Auto, Startnummer und Klassen-SOF und einem Knopf zum Live-Spotting. Wechselt die Session (Training → Rennen), wird der Post angepasst, am Ende steht „Beendet" dran.</p>
+        <p class="hint">Hier legst du für alle fest, welche Sessions FF Overlay bzw. die Toolbox ins Spotting schicken dürfen. Geht jemand live, postet der Bot außerdem eine Meldung mit Strecke, Session, Team, Auto, Startnummer und Klassen-SOF und einem Knopf zum Live-Spotting. Wechselt die Session (Training → Rennen), wird der Post angepasst, am Ende steht „Beendet" dran.</p>
+        <div class="tm-row"><div class="lbl">Im Spotting zeigen<small>für alle, mehrere möglich</small></div>
+          <div style="display:flex;flex-direction:column;gap:12px">
+            <label class="tm-switch"><input type="checkbox" id="spl-team" ${(cfg.spotting || {}).team !== false ? "checked" : ""}><span class="s"></span>Teamrennen und Special Events</label>
+            <label class="tm-switch"><input type="checkbox" id="spl-einzel" ${(cfg.spotting || {}).einzel !== false ? "checked" : ""}><span class="s"></span>Einzelrennen (Dailys, Training, Quali)</label>
+            <label class="tm-switch"><input type="checkbox" id="spl-offline" ${(cfg.spotting || {}).test ? "checked" : ""}><span class="s"></span>Offline-Testfahrten (lösen auch die Live-Meldung aus)</label>
+          </div></div>
         <div class="tm-row"><div class="lbl">Live-Meldung</div>
           <div class="tm-actions"><label class="tm-switch"><input type="checkbox" id="spl-an" ${(cfg.spotting || {}).an ? "checked" : ""}><span class="s"></span>An</label></div></div>
         <div class="tm-row"><label for="spl-nur">Wann</label>
@@ -1909,8 +1915,6 @@
           <div><select class="tm-select" id="spl-ch"><option value="">– Kanal wählen –</option>${(d.channels || []).map(c => `<option value="${c.id}" ${c.id === (cfg.spotting || {}).channel ? "selected" : ""}># ${esc(c.name)}</option>`).join("")}</select></div></div>
         <div class="tm-row"><label for="spl-ping">Ping<small>Rolle, die erwähnt wird</small></label>
           <div><select class="tm-select" id="spl-ping"><option value="">– niemanden pingen –</option>${d.roles.map(r => `<option value="${r.id}" ${r.id === (cfg.spotting || {}).ping ? "selected" : ""}>@${esc(r.name)}</option>`).join("")}</select></div></div>
-        <div class="tm-row"><div class="lbl">Offline-Testfahrten<small>für alle: erscheinen im Spotting und lösen die Live-Meldung aus</small></div>
-          <div class="tm-actions"><label class="tm-switch"><input type="checkbox" id="spl-offline" ${(cfg.spotting || {}).test ? "checked" : ""}><span class="s"></span>An</label></div></div>
         <div class="tm-row"><div class="lbl">Testen<small>erst speichern</small></div><div class="tm-actions">${btn("Test-Meldung posten", "sm", 'id="spl-test"')}</div></div>
       </div>
 
@@ -2037,6 +2041,8 @@
           nur: document.getElementById("spl-nur").value,
           channel: document.getElementById("spl-ch").value,
           ping: document.getElementById("spl-ping").value,
+          team: document.getElementById("spl-team").checked,
+          einzel: document.getElementById("spl-einzel").checked,
           test: document.getElementById("spl-offline").checked,
         },
         ergebnisse: {
