@@ -1844,6 +1844,9 @@
 
 
   /* ---------------- Admin ---------------- */
+  // Live-Meldung: für welche Sessions gepostet wird (wie spotPostArten im Worker; alte Einstellung nur/test als Standard)
+  const postArten = (sp) => { sp = sp || {}; const p = sp.post || {}, alle = sp.nur === "alle"; return { team: p.team ?? true, daily: p.daily ?? alle, training: p.training ?? alle, test: p.test ?? !!sp.test }; };
+
   // „Was der Bot automatisch postet": eine Zeile pro Post mit Wann, Kanal, Ping, Status (Stand der gespeicherten Einstellungen)
   function postUebersicht(cfg, d, dp) {
     const kanal = (id, rest) => id ? `<span class="vw-kanal">#${esc(((d.channels || []).find(c => c.id === id) || {}).name || "unbekannt")}</span>${rest || ""}` : '<span class="tm-muted">kein Kanal</span>';
@@ -1875,7 +1878,7 @@
       ${zeile("⏰ Renn-Erinnerungen", (und([rm.h24 && "24 h", rm.h1 && "1 h"]) || "–") + " vor dem Start", kanal(rm.channel), rolle(rm.ping), !!rm.enabled, "erinn")}
       ${zeile("🗓️ Stintplaner", "Einteilungen und Stint-Erinnerungen (" + (si.vorlauf || 15) + " Min. vorher)", kanal(si.channel, '<small class="tm-muted"> · pro Event änderbar</small>'), si.stintPing ? "Fahrer" : "–", !!si.channel, "#team-zugang/stint")}
       ${zeile("🏁 Rennergebnisse", "nach der Zielflagge: " + (und([er.team !== false && "Teamrennen", er.alle && "Rennen der Mitglieder", er.overlay && "Overlay-Nutzer"]) || "–"), kanal(er.channel), er.ping ? rolle(er.ping) + " (nur Teamrennen)" : "–", !!er.an, "ergebnisse")}
-      ${zeile("🔴 Spotting · Live-Meldung", (sp.nur === "alle" ? "bei jeder Session" : "bei Teamrennen") + (sp.test ? " und Offline-Testfahrten" : ""), kanal(sp.channel), rolle(sp.ping), !!sp.an, "spotlive")}
+      ${zeile("🔴 Spotting · Live-Meldung", "wenn jemand live geht: " + (Object.entries({ team: "Teamrennen", daily: "Dailys", training: "Training/Quali", test: "Offline-Testfahrten" }).filter(([k]) => postArten(sp)[k]).map(([, t]) => t).join(", ") || "–"), kanal(sp.channel), rolle(sp.ping), !!sp.an, "spotlive")}
       ${gruppe("Team")}
       ${zeile("📰 Team News", "beim Veröffentlichen", '<span class="tm-muted">wird beim Schreiben gewählt</span>', "je News", null, "#inhalte/news")}
       ${zeile("🏖️ Abwesenheiten", "wenn jemand eine Abwesenheit einträgt", kanal(ab.channel), "–", !!ab.channel, "#team-zugang/abw")}
@@ -2078,8 +2081,13 @@
         <p class="hint">Geht jemand mit FF Overlay bzw. der Toolbox live, postet der Bot eine Meldung mit Strecke, Session, Team, Auto, Startnummer und Klassen-SOF und einem Knopf zum Live-Spotting. Wechselt die Session (Training → Rennen), wird der Post angepasst, am Ende steht „Beendet" dran. Welche Sessions überhaupt ins Spotting kommen, steht unter Team &amp; Zugang → Spotting.</p>
         <div class="tm-row"><div class="lbl">Live-Meldung</div>
           <div class="tm-actions"><label class="tm-switch"><input type="checkbox" id="spl-an" ${(cfg.spotting || {}).an ? "checked" : ""}><span class="s"></span>An</label></div></div>
-        <div class="tm-row"><label for="spl-nur">Wann</label>
-          <div><select class="tm-select" id="spl-nur"><option value="team" ${(cfg.spotting || {}).nur !== "alle" ? "selected" : ""}>Nur bei Teamrennen</option><option value="alle" ${(cfg.spotting || {}).nur === "alle" ? "selected" : ""}>Bei jeder Session (auch Training, Dailys)</option></select></div></div>
+        <div class="tm-row"><div class="lbl">Wann<small>mehrere möglich · wechselt die Session (Training → Rennen), wird neu geprüft</small></div>
+          <div style="display:flex;flex-direction:column;gap:12px">
+            <label class="tm-switch"><input type="checkbox" id="spl-p-team" ${postArten(cfg.spotting).team ? "checked" : ""}><span class="s"></span>Teamrennen und Special Events (alle Sessions)</label>
+            <label class="tm-switch"><input type="checkbox" id="spl-p-daily" ${postArten(cfg.spotting).daily ? "checked" : ""}><span class="s"></span>Dailys / Einzelrennen (Rennen ohne Team)</label>
+            <label class="tm-switch"><input type="checkbox" id="spl-p-training" ${postArten(cfg.spotting).training ? "checked" : ""}><span class="s"></span>Training und Quali (ohne Team)</label>
+            <label class="tm-switch"><input type="checkbox" id="spl-p-test" ${postArten(cfg.spotting).test ? "checked" : ""}><span class="s"></span>Offline-Testfahrten</label>
+          </div></div>
         <div class="tm-row"><label for="spl-ch">Discord-Kanal</label>
           <div><select class="tm-select" id="spl-ch"><option value="">– Kanal wählen –</option>${(d.channels || []).map(c => `<option value="${c.id}" ${c.id === (cfg.spotting || {}).channel ? "selected" : ""}># ${esc(c.name)}</option>`).join("")}</select></div></div>
         <div class="tm-row"><label for="spl-ping">Ping<small>Rolle, die erwähnt wird</small></label>
@@ -2094,7 +2102,7 @@
           <div style="display:flex;flex-direction:column;gap:12px">
             <label class="tm-switch"><input type="checkbox" id="spl-team" ${(cfg.spotting || {}).team !== false ? "checked" : ""}><span class="s"></span>Teamrennen und Special Events</label>
             <label class="tm-switch"><input type="checkbox" id="spl-einzel" ${(cfg.spotting || {}).einzel !== false ? "checked" : ""}><span class="s"></span>Einzelrennen (Dailys, Training, Quali)</label>
-            <label class="tm-switch"><input type="checkbox" id="spl-offline" ${(cfg.spotting || {}).test ? "checked" : ""}><span class="s"></span>Offline-Testfahrten (lösen auch die Live-Meldung aus)</label>
+            <label class="tm-switch"><input type="checkbox" id="spl-offline" ${(cfg.spotting || {}).test ? "checked" : ""}><span class="s"></span>Offline-Testfahrten</label>
           </div></div>
       </div>
 
@@ -2220,7 +2228,8 @@
         },
         spotting: {
           an: document.getElementById("spl-an").checked,
-          nur: document.getElementById("spl-nur").value,
+          nur: ["spl-p-daily", "spl-p-training"].some(k => document.getElementById(k).checked) ? "alle" : "team",
+          post: { team: document.getElementById("spl-p-team").checked, daily: document.getElementById("spl-p-daily").checked, training: document.getElementById("spl-p-training").checked, test: document.getElementById("spl-p-test").checked },
           channel: document.getElementById("spl-ch").value,
           ping: document.getElementById("spl-ping").value,
           team: document.getElementById("spl-team").checked,
