@@ -449,6 +449,7 @@
     const lnk = (href, inner, on, cls = "") => `<a class="td-link td-ev ${cls}${on ? " on" : ""}" href="#${href}">${inner}</a>`;
     let h = lnk("stint/neu", `${ICONS.flag}<span>Neues Event planen</span>`, id === "stint/neu", "td-ev-top");
     h += lnk("stint", `${ICONS.calendar}<span>Alle Events</span>`, id === "stint", "td-ev-top");
+    h += lnk("spotting", `${ICONS.eye}<span>Spotting</span>`, id === "spotting" || id.startsWith("spotting/"), "td-ev-top");
     if (!EVNAV) h += '<div class="td-ev-leer">Lädt …</div>';
     else {
       const ende = (p) => Math.max(p.start, ...p.cars.map(c => c.start || p.start)) + (p.mode === "zeit" ? p.dauerMin * 60000 : 6 * 3600000);
@@ -519,7 +520,7 @@
       </div>`;
 
     ladeEvNav(false);
-    if (id !== "garage61" && id !== "woche") merke(id.startsWith("stint/") ? "stint" : id || "dashboard");
+    if (id !== "garage61" && id !== "woche") merke(id.startsWith("stint/") ? "stint" : id.startsWith("spotting/") ? "spotting" : id || "dashboard");
     if (id === "woche" && ME.panels.garage61) return renderG61("woche");
     if (id === "nutzung" && ME.isAdmin) return renderNutzung();
     if (id === "limits" && ME.isAdmin) return renderLimits();
@@ -538,6 +539,8 @@
       return window.F2FTrainer.mount(main(), { api, esc, toast, ICONS, panelHead, btn });
     if ((id === "stint" || id.startsWith("stint/")) && ME.panels.stint && window.F2FStint)
       return window.F2FStint.mount(main(), { api, esc, toast, ICONS, panelHead, btn, ME }, id.slice(6));
+    if ((id === "spotting" || id.startsWith("spotting/")) && ME.panels.stint && window.F2FSpotting)
+      return window.F2FSpotting.mount(main(), { api, esc, toast, ICONS, panelHead, btn, ME }, id.slice(9));
     if (PANELS[id] && ME.panels[id]) return renderSoon(PANELS[id].title, id, PANELS[id].desc);
     renderHome(tools);
   }
@@ -1295,7 +1298,7 @@
 
   /* ---------------- Nutzung (nur Admin) ---------------- */
   const BEREICHE = {
-    dashboard: "Dashboard", news: "Team News", fahrer: "Fahrerprofil", abwesend: "Abwesenheiten", links: "Links", trainer: "Trainer", stint: "Stintplaner",
+    dashboard: "Dashboard", news: "Team News", fahrer: "Fahrerprofil", abwesend: "Abwesenheiten", links: "Links", trainer: "Trainer", stint: "Stintplaner", spotting: "Spotting",
     "g61-woche": "Wochenübersicht", "g61-fleiss": "Trainingsfleiß", "g61-trips": "Fahrtenbuch", "g61-board": "Bestenliste", "g61-ratings": "iRating", "g61-rennen": "Nächstes Rennen", "g61-training": "Training", "g61-bestzeiten": "Bestzeiten",
     aktivitaet: "Aktivität", "news-schreiben": "News schreiben", fahrerprofile: "Fahrerprofile", "kalender-admin": "Rennkalender", admin: "Admin",
   };
