@@ -8,6 +8,12 @@ on:
   schedule:
     - cron: "17 4 * * *"
   workflow_dispatch:
+  # läuft auch gleich nach jeder Änderung am Abruf selbst (kein Klicken nötig)
+  push:
+    branches: [main]
+    paths:
+      - tools/iracing-sync.mjs
+      - .github/workflows/iracing.yml
 
 permissions:
   contents: write
