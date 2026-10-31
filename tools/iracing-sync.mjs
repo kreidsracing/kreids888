@@ -295,19 +295,23 @@ function streckeVon(sc) {
 async function ausApi(key) {
   const alle = liste(await apiHolen("/series?limit=500", key), "series", "data", "items");
   if (!alle.length) throw new Error("keine Serien in der Antwort");
-  // Stehen die Kennzeichen schon in der Liste, nur passende Serien im Detail holen
-  const hatFlags = alle.some(s => s && ("special_event" in s || "team" in s));
-  const kandidaten = hatFlags ? alle.filter(s => s.special_event || s.team) : alle;
+  // Teamrennen erkennt man erst im Detail (max_team_drivers > 1); Oval/Dirt nur als Special Event
+  const kandidaten = alle.filter(s => s && (s.special_event || s.team || !/oval|dirt/i.test(katName(s.category))));
+  const felder = { liste: Object.keys(alle[0] || {}) };
   const serien = [];
-  let saison = "", gezeigt = false;
   for (const k of kandidaten) {
-    const det = await apiHolen("/series/" + encodeURIComponent(k.id), key);
+    let det;
+    try { det = await apiHolen("/series/" + encodeURIComponent(k.id), key); }
+    catch (e) { console.warn("Serie " + k.id + ": " + e.message); continue; }
     const s = det.serie || det.series || det.data || det;
     const cs = s.current_season || {};
-    if (!gezeigt) { console.log("Felder Serie:", Object.keys(s).join(", "), "| Saison:", Object.keys(cs).join(", ")); gezeigt = true; }
+    if (!felder.serie) {
+      felder.serie = Object.keys(s); felder.saison = Object.keys(cs);
+      felder.kategorie = s.category && typeof s.category === "object" ? Object.keys(s.category) : typeof s.category;
+      const sc0 = liste(cs.schedules, "data")[0]; if (sc0) felder.woche = Object.keys(sc0);
+    }
     const sp = !!s.special_event, team = !!s.team || Number(cs.max_team_drivers) > 1;
     if (!sp && !team) continue;
-    if (!saison && (cs.season_name || cs.name)) saison = cs.season_name || cs.name;
     const w = liste(cs.schedules, "data").map((sc, i) => {
       const st = liste(sc.session_times, "data").map(x => Date.parse(x.start_at)).filter(Number.isFinite).sort((a, b) => a - b);
       const d = sc.start_date ? String(sc.start_date).slice(0, 10) : st.length ? isoTag(st[0]) : "";
@@ -318,19 +322,22 @@ async function ausApi(key) {
       if (st.length) out.s = st;
       return out;
     }).filter(Boolean);
-    if (w.length) serien.push({ n: s.name || k.name, cat: titel(s.category || k.category || ""), cls: "", team, sp, cars: "", takt: "", w });
+    if (w.length) serien.push({ n: s.name || k.name, cat: titel(katName(s.category) || katName(k.category)), cls: "", team, sp, cars: "", takt: "", w });
   }
-  return { saison, serien };
+  console.log("API-Felder:", JSON.stringify(felder));
+  return { serien, felder };
 }
+const katName = (c) => typeof c === "string" ? c : c && typeof c === "object" ? String(c.name || c.title || c.label || c.category || "") : "";
 
 /* ---------------- Ablauf ----------------
    Nur Teamrennen und Special Events, keine Daily-Rennen. */
-let quelle = "pdf", saison = "", serien = [];
+let quelle = "pdf", saison = "", serien = [], apiFelder = null;
 const KEY = process.env.IRACEPLAN_API_KEY;
 if (KEY) {
   try {
     const a = await ausApi(KEY);
-    if (a.serien.length) { serien = a.serien; saison = a.saison; quelle = "iraceplan"; }
+    apiFelder = a.felder;
+    if (a.serien.length) { serien = a.serien; quelle = "iraceplan"; }
     else console.warn("iRacePlan: keine Teamrennen/Special Events gefunden, nehme das offizielle PDF.");
   } catch (e) { console.warn("iRacePlan-API nicht nutzbar (" + e.message + "), nehme das offizielle PDF."); }
 } else console.log("Kein IRACEPLAN_API_KEY gesetzt, nehme das offizielle PDF.");
@@ -348,10 +355,14 @@ if (quelle === "pdf") {
   saison = pdf.saison;
   serien = pdf.serien.filter(s => s.team);
 } else if (pdf) {
+  saison = pdf.saison;
   const nn = (s) => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9]+/g, " ").replace(/\b(fixed|by \w+)\b/g, "").trim();
+  const genutzt = new Set();
   for (const s of serien) {
     const p = pdf.serien.find(x => nn(x.n) === nn(s.n)) || pdf.serien.find(x => nn(x.n).includes(nn(s.n)) || nn(s.n).includes(nn(x.n)));
     if (!p) continue;
+    genutzt.add(p);
+    if (p.team) s.team = true;
     s.cat = s.cat || p.cat; s.cls = s.cls || p.cls; s.cars = s.cars || p.cars; s.takt = s.takt || p.takt;
     for (const w of s.w) {
       const tag = Date.parse(w.d + "T00:00:00Z");
@@ -362,6 +373,8 @@ if (quelle === "pdf") {
       if (!w.t) w.t = pw.t;
     }
   }
+  // Teamrennen, die die API nicht als solche liefert, aus dem PDF ergänzen
+  for (const p of pdf.serien) if (p.team && !genutzt.has(p)) serien.push(p);
 }
 let specials = [];
 try { specials = parseSpecials(process.env.SPECIAL_FILE ? fs.readFileSync(process.env.SPECIAL_FILE, "utf8") : await holen(SPECIAL_URL)); }
@@ -375,6 +388,7 @@ for (const x of specials) {
   if (serien.some(s => s.sp && s.w.some(w => (w.s || []).some(t => t >= von && t <= bis)))) x.api = true;
 }
 const daten = { v: 2, saison, quelle: quelle === "iraceplan" ? "iRacePlan-API" : "iRacing Season-PDF", serien, specials };
+if (apiFelder) daten.apiFelder = apiFelder; // Feldnamen der API, falls sich das Format ändert
 const neu = JSON.stringify(daten);
 let alt = "";
 try { const a = JSON.parse(fs.readFileSync(OUT, "utf8")); delete a.stand; alt = JSON.stringify(a); } catch { }
