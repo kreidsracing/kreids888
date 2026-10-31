@@ -482,7 +482,7 @@
   }
   window.F2FEvNav = { refresh: () => ladeEvNav(true) };
 
-  const ADMIN_TEILE = [["status", "Status"], ["zugang", "Zugang"], ["panels", "Panels"], ["g61", "Garage 61 → Discord"], ["woche", "Wochen-Post"], ["abw", "Abwesenheiten"], ["stint", "Stintplaner"], ["links", "Links"], ["erinn", "Renn-Erinnerungen"], ["limits", "Limit-Warnung"]];
+  const ADMIN_TEILE = [["status", "Status"], ["zugang", "Zugang"], ["panels", "Panels"], ["g61", "Garage 61 → Discord"], ["woche", "Wochen-Post"], ["abw", "Abwesenheiten"], ["stint", "Stintplaner"], ["links", "Links"], ["erinn", "Renn-Erinnerungen"], ["limits", "Limit-Warnung"], ["ergebnisse", "Rennergebnisse"]];
   // Admin-Kasten öffnen und hinscrollen (ohne neu zu laden, damit nichts Ungespeichertes verloren geht)
   function adminOeffnen(teil) {
     const el = document.getElementById("adm-" + teil);
@@ -1873,6 +1873,20 @@
         <div class="tm-row"><div class="lbl">Testen</div><div class="tm-actions">${btn("Test-Warnung senden", "sm", 'id="li-test"')}</div></div>
       </div>
 
+      <div class="tm-box">
+        <h5>Rennergebnisse</h5>
+        <p class="hint">Nach einem Rennen schicken FF Overlay bzw. die Toolbox das offizielle Ergebnis, der Bot postet es hier. Dafür einmal im Programm „Mit F2F verbinden" klicken. Fahren mehrere aus dem Team im selben Rennen, kommt nur ein Post, der um weitere F2F-Autos ergänzt wird.</p>
+        <div class="tm-row"><div class="lbl">Posten</div>
+          <div class="tm-actions"><label class="tm-switch"><input type="checkbox" id="er-an" ${(cfg.ergebnisse || {}).an ? "checked" : ""}><span class="s"></span>An</label></div></div>
+        <div class="tm-row"><label for="er-nur">Welche Rennen</label>
+          <div><select class="tm-select" id="er-nur"><option value="team" ${(cfg.ergebnisse || {}).nur !== "alle" ? "selected" : ""}>Nur Teamrennen und Special Events</option><option value="alle" ${(cfg.ergebnisse || {}).nur === "alle" ? "selected" : ""}>Alle offiziellen Rennen von Teammitgliedern</option></select></div></div>
+        <div class="tm-row"><label for="er-ch">Discord-Kanal</label>
+          <div><select class="tm-select" id="er-ch"><option value="">– Kanal wählen –</option>${(d.channels || []).map(c => `<option value="${c.id}" ${c.id === (cfg.ergebnisse || {}).channel ? "selected" : ""}># ${esc(c.name)}</option>`).join("")}</select></div></div>
+        <div class="tm-row"><label for="er-ping">Ping<small>Rolle, die erwähnt wird</small></label>
+          <div><select class="tm-select" id="er-ping"><option value="">– niemanden pingen –</option>${d.roles.map(r => `<option value="${r.id}" ${r.id === (cfg.ergebnisse || {}).ping ? "selected" : ""}>@${esc(r.name)}</option>`).join("")}</select></div></div>
+        <div class="tm-row"><div class="lbl">Testen<small>erst speichern</small></div><div class="tm-actions">${btn("Test-Ergebnis posten", "sm", 'id="er-test"')}</div></div>
+      </div>
+
       <div class="tm-savebar" id="savebar"><span>Alles gespeichert</span>${btn("Speichern", "red", 'id="tm-save"')}</div>`;
 
     // jeden Kasten einklappbar machen (Inhalte werden nur verschoben, Eingaben bleiben erhalten)
@@ -1991,6 +2005,12 @@
           erinnTage: [...document.querySelectorAll("[data-etag]:checked")].map(x => Number(x.dataset.etag)),
           teams: (spTeamsSync(), spTeams.map(t => t.trim()).filter(Boolean)),
         },
+        ergebnisse: {
+          an: document.getElementById("er-an").checked,
+          nur: document.getElementById("er-nur").value,
+          channel: document.getElementById("er-ch").value,
+          ping: document.getElementById("er-ping").value,
+        },
         limits: {
           enabled: document.getElementById("li-on").checked,
           channel: document.getElementById("li-ch").value,
@@ -2028,6 +2048,7 @@
     action("rm-test", "/admin/reminders/test");
     action("ab-cmds", "/admin/discord/commands");
     action("li-test", "/admin/limits/test");
+    action("er-test", "/admin/ergebnis/test");
 
     // ---- Wochen-Post ----
     const wpSel = document.getElementById("wp-w");

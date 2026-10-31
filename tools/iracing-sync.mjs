@@ -324,7 +324,7 @@ async function ausApi(key) {
       if (st.length) out.s = st;
       return out;
     }).filter(Boolean);
-    if (w.length) serien.push({ n: s.name || k.name, cat: titel(katName(s.category) || katName(k.category)), cls: "", team, sp, cars: autosVon(cs), takt: "", w });
+    if (w.length) serien.push({ id: Number(s.iracing_id || k.iracing_id) || void 0, n: s.name || k.name, cat: titel(katName(s.category) || katName(k.category)), cls: "", team, sp, cars: autosVon(cs), takt: "", w });
   }
   console.log("API-Felder:", JSON.stringify(felder));
   return { serien, felder };

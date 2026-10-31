@@ -111,7 +111,8 @@
     if (w.s && w.s.length) {
       ev.von = lokalTag(st[0]); ev.bis = lokalTag(st[st.length - 1]);
       ev.zeiten = [...new Set(st.map(lokalZeit))].sort();
-      ev.hinweis = "Startzeiten aus dem offiziellen iRacing-Zeitplan, umgerechnet in deine Ortszeit.";
+      ev.slots = st.slice(0, 48); // feste Zeitfenster: Tag und Uhrzeit gehören zusammen
+      ev.hinweis = "Zeitfenster aus dem offiziellen iRacing-Zeitplan, umgerechnet in deine Ortszeit.";
     } else if (st.length) {
       ev.von = w.d; ev.bis = plusTage(w.d, 6);
       let z = [...new Set(st.map(lokalZeit))].sort();

@@ -2030,6 +2030,9 @@ body:has(.td)::after{content:"";position:fixed;inset:0;z-index:-1;pointer-events
 .sp-drv-who b{display:block;white-space:nowrap}
 .sp-drv tbody tr:hover{background:rgba(255,255,255,.025)}
 @media(max-width:700px){.sp-av-st b{display:none}.sp-av-pinsel{flex-wrap:wrap;border-radius:16px}}
+/* Zeitfenster aus iRacing (Tag + Uhrzeit fest) */
+.sp-slots{display:flex;flex-wrap:wrap;gap:8px;margin-top:6px}
+.sp-slots .sp-chipx b{color:var(--red);margin-right:4px}
 /* Aufgeklappte Auswahllisten: dunkler Hintergrund statt weiß auf weiß */
 .tm-page select{color-scheme:dark}
 .tm-page select option,.tm-page select optgroup{background:#15171d;color:#f2f3f5}

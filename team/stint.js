@@ -420,6 +420,14 @@
     if (p.von) return fmtTag(p.von);
     return "";
   }
+  // Zeitfenster aus iRacing: feste Startzeitpunkte, Tag und Uhrzeit gehören zusammen
+  const slotTxt = (t) => new Date(t).toLocaleDateString("de-DE", { weekday: "short", day: "2-digit", month: "2-digit" }) + " · " + uhr(t) + " Uhr";
+  function slotsSetzen(ev, sl) {
+    ev.slots = [...new Set((sl || []).map(Number).filter(Number.isFinite))].sort((a, b) => a - b).slice(0, 48);
+    if (!ev.slots.length) return;
+    ev.von = datumWert(ev.slots[0]); ev.bis = datumWert(ev.slots[ev.slots.length - 1]);
+    ev.zeiten = [...new Set(ev.slots.map(zeitWert))].sort();
+  }
   function tageVon(ev) {
     const out = [];
     if (!ev.von) return out;
@@ -430,6 +438,12 @@
   }
   // Tag + Uhrzeit für ein Fahrzeug: Tage aus dem Event-Zeitraum, Uhrzeiten aus den möglichen Startzeiten (oder frei)
   function startFelder(start, pre, ev) {
+    const sl = ev.slots || [];
+    if (sl.length) {
+      const drin = sl.includes(start);
+      return `<label class="sp-f sp-f-slot"><span>Zeitfenster</span><select class="tm-select" data-s="${pre}sl">${sl.map((t, i) => `<option value="${t}" ${t === start ? "selected" : ""}>#${i + 1} · ${slotTxt(t)}</option>`).join("")}<option value="andere" ${drin ? "" : "selected"}>Andere Zeit …</option></select>
+        <input class="tm-input" style="margin-top:6px" type="datetime-local" data-s="${pre}dt" value="${toLocalInput(start)}" ${drin ? "hidden" : ""}></label>`;
+    }
     const tage = tageVon(ev), datum = datumWert(start), zeit = zeitWert(start), zs = ev.zeiten || [];
     const tagTxt = (t) => new Date(t + "T12:00").toLocaleDateString("de-DE", { weekday: "short", day: "2-digit", month: "2-digit", year: "2-digit" });
     const dFeld = tage.length
@@ -442,6 +456,8 @@
   }
   // Start passend zum Event: Tag außerhalb des Zeitraums -> erster Tag; Uhrzeit nicht in den Startzeiten -> erste Startzeit
   function startAnpassen(start, ev, zeitAuch) {
+    const sl = ev.slots || [];
+    if (sl.length) return sl.includes(start) || !zeitAuch ? start : sl[0];
     const tage = tageVon(ev), zs = ev.zeiten || [];
     let d = datumWert(start), z = zeitWert(start);
     if (tage.length && !tage.includes(d)) d = tage[0];
@@ -451,8 +467,12 @@
   function bindStartFelder(box, pre) {
     const z = box.querySelector(`[data-s="${pre}z"]`), zf = box.querySelector(`[data-s="${pre}zf"]`);
     if (z) z.onchange = () => { zf.hidden = z.value !== "andere"; };
+    const sl = box.querySelector(`[data-s="${pre}sl"]`), dt = box.querySelector(`[data-s="${pre}dt"]`);
+    if (sl) sl.addEventListener("change", () => { dt.hidden = sl.value !== "andere"; });
   }
   function leseStart(box, pre) {
+    const sl = box.querySelector(`[data-s="${pre}sl"]`);
+    if (sl) return sl.value !== "andere" ? Number(sl.value) : fromLocalInput(box.querySelector(`[data-s="${pre}dt"]`).value);
     const d = box.querySelector(`[data-s="${pre}d"]`);
     const z = box.querySelector(`[data-s="${pre}z"]`), zf = box.querySelector(`[data-s="${pre}zf"]`);
     const zeit = z && z.value !== "andere" ? z.value : zf.value;
@@ -479,6 +499,10 @@
           : `<input class="tm-input sp-num" id="ev-runden" type="number" min="1" max="5000" value="${ev.runden}"><span>Runden</span>`}</div></div>`;
   }
   function wannFelder(ev) {
+    if ((ev.slots || []).length) return `
+      <div class="sp-f"><span>Zeitfenster aus iRacing<small>Tag und Uhrzeit wie im iRacing-Kalender, in deiner Ortszeit</small></span>
+        <div class="sp-slots">${ev.slots.map((t, i) => `<span class="sp-chipx"><b>#${i + 1}</b> ${slotTxt(t)}<button type="button" data-sldel="${i}" title="Entfernen">✕</button></span>`).join("")}</div>
+        <div class="tm-actions" style="margin-top:10px">${C.btn("Von Hand einstellen", "sm", 'id="ev-slaus"')}</div></div>`;
     return `
       <div class="sp-grid">
         <label class="sp-f"><span>Erster Tag</span><input class="tm-input" type="date" id="ev-von" value="${ev.von}"></label>
@@ -516,7 +540,7 @@
   function eventWizard() {
     // Standard-Notiz für neue Events (kann im Assistenten angepasst werden)
     const STANDARD_NOTIZ = "Das nächste Event ist in der Endurance Planung angelegt! Schaut mal rein und meldet euch schon mal bei einem Fahrzeug an.\n\nDie Verfügbarkeit hat noch Zeit, die könnt ihr später in Ruhe eintragen. Der Bot erinnert euch rechtzeitig.\n\nKonstanz bis ins Ziel! 🏁";
-    const w = { schritt: 1, name: "", trackId: 0, trackName: "", mode: "zeit", dauerMin: 360, runden: 100, notiz: STANDARD_NOTIZ, channel: "", von: datumWert(Date.now() + 7 * 864e5), bis: "", zeiten: ["14:00"], teams: [], carId: 0, carName: "", starts: {}, ich: "" };
+    const w = { schritt: 1, name: "", trackId: 0, trackName: "", mode: "zeit", dauerMin: 360, runden: 100, notiz: STANDARD_NOTIZ, channel: "", von: datumWert(Date.now() + 7 * 864e5), bis: "", zeiten: ["14:00"], slots: [], teams: [], carId: 0, carName: "", starts: {}, ich: "" };
     const teams = META.teams || [];
     const startVon = (n) => w.starts[n] || startAnpassen(fromLocalInput(w.von + "T" + (w.zeiten[0] || "14:00")), w, true);
     const zeichne = () => {
@@ -528,7 +552,7 @@
         return window.F2FIracing.zeige(root.querySelector("#ir-box"), {
           C, tracks: META.tracks,
           onZurueck: () => { w.irOffen = false; zeichne(); },
-          onPick: (ev) => { const { hinweis, ...felder } = ev; Object.assign(w, felder); w.irHinweis = hinweis; w.irOffen = false; w.schritt = 1; zeichne(); C.toast("Aus iRacing übernommen, bitte kurz prüfen", true); }
+          onPick: (ev) => { const { hinweis, slots, ...felder } = ev; Object.assign(w, felder); slotsSetzen(w, slots); w.irHinweis = hinweis; w.irOffen = false; w.schritt = 1; zeichne(); C.toast("Aus iRacing übernommen, bitte kurz prüfen", true); }
         });
       }
       const titel = ["Was wird gefahren?", "Wann wird gefahren?"][w.schritt - 1];
@@ -566,6 +590,8 @@
       if (v("wz-ir")) v("wz-ir").onclick = () => { lese(); w.irOffen = true; zeichne(); };
       if (v("ev-zadd")) v("ev-zadd").onclick = () => { lese(); if (zeitHinzu(w)) zeichne(); };
       $$("[data-zdel]").forEach(b => b.onclick = () => { lese(); w.zeiten.splice(Number(b.dataset.zdel), 1); zeichne(); });
+      $$("[data-sldel]").forEach(b => b.onclick = () => { const sl = [...w.slots]; sl.splice(Number(b.dataset.sldel), 1); slotsSetzen(w, sl); zeichne(); });
+      if (v("ev-slaus")) v("ev-slaus").onclick = () => { w.slots = []; zeichne(); };
       $$(".sp-wz-team").forEach(box => bindStartFelder(box, "wz" + teams.indexOf(box.dataset.wt)));
       $$("[data-team]").forEach(b => b.onclick = () => {
         lese();
@@ -589,8 +615,8 @@
         if (!w.zeiten.length) return C.toast("Bitte mindestens eine Startzeit hinzufügen");
         const b = v("wz-done"); b.disabled = true;
         try {
-          const ersterStart = w.teams.length ? Math.min(...w.teams.map(startVon)) : fromLocalInput(w.von + "T" + w.zeiten[0]);
-          const r = await C.api("/stint/event", { method: "POST", body: { event: { name: w.name, trackId: w.trackId, trackName: w.trackName, mode: w.mode, dauerMin: w.dauerMin, runden: w.runden, notiz: w.notiz, channel: w.channel, von: w.von, bis: w.bis || w.von, zeiten: w.zeiten, start: ersterStart } } });
+          const ersterStart = w.teams.length ? Math.min(...w.teams.map(startVon)) : w.slots.length ? w.slots[0] : fromLocalInput(w.von + "T" + w.zeiten[0]);
+          const r = await C.api("/stint/event", { method: "POST", body: { event: { name: w.name, trackId: w.trackId, trackName: w.trackName, mode: w.mode, dauerMin: w.dauerMin, runden: w.runden, notiz: w.notiz, channel: w.channel, von: w.von, bis: w.bis || w.von, zeiten: w.zeiten, slots: w.slots, start: ersterStart } } });
           for (const n of w.teams) {
             await C.api("/stint/car", { method: "POST", body: { id: r.id, car: { name: n, carId: w.carId, carName: w.carName, start: startVon(n), pit: { ...PIT_STD }, drivers: w.ich === n ? [{ uid: S.me || C.ME.user.id, name: C.ME.user.name, g61: g61Vorschlag(C.ME.user.id, C.ME.user.name), pace: 0, fuel: 0 }] : [], stints: [] } } }).catch(x => C.toast(n + ": " + x.message));
           }
@@ -606,7 +632,7 @@
 
   // Event bearbeiten: alles auf einer Seite, speichert automatisch
   function eventForm(p) {
-    const ev = { name: p.name, trackId: p.trackId, trackName: p.trackName, mode: p.mode, dauerMin: p.dauerMin, runden: p.runden, notiz: p.notiz || "", channel: p.channel || "", von: p.von || "", bis: p.bis || "", zeiten: [...(p.zeiten || [])] };
+    const ev = { name: p.name, trackId: p.trackId, trackName: p.trackName, mode: p.mode, dauerMin: p.dauerMin, runden: p.runden, notiz: p.notiz || "", channel: p.channel || "", von: p.von || "", bis: p.bis || "", zeiten: [...(p.zeiten || [])], slots: [...(p.slots || [])] };
     const sig = (c) => JSON.stringify({ ...c, schedule: undefined, crev: undefined });
     const orig = {};
     let cars = p.cars.map(c => { orig[c.key] = sig(c); return kopie(c); });
@@ -665,7 +691,9 @@
           <div class="tm-row"><label for="ev-chan">Discord-Kanal</label><select class="tm-select" id="ev-chan"><option value="">Standard${stdKanal() ? " (# " + esc(stdKanal()) + ")" : ""}</option>${(META.channels || []).map(c => `<option value="${c.id}" ${c.id === ev.channel ? "selected" : ""}># ${esc(c.name)}</option>`).join("")}</select></div>
           <div class="tm-row"><label for="ev-notiz">Notizen</label><textarea class="tm-input" id="ev-notiz" rows="3" maxlength="1500" placeholder="z. B. Pflichtstopps, Regeln …">${esc(ev.notiz)}</textarea></div>
         </div>
-        <div class="tm-box"><h5>Wann wird gefahren?</h5>${wannFelder(ev)}</div>
+        <div class="tm-box"><h5>Wann wird gefahren?</h5>
+          ${window.F2FIracing ? `<div class="ir-start">${C.btn("🏁 Zeitfenster aus iRacing", "red sm", 'id="ev-ir"')}<small>übernimmt Tag und Uhrzeit wie im iRacing-Kalender, Name und Strecke bleiben</small></div><div id="ev-ir-box"></div>` : ""}
+          ${wannFelder(ev)}</div>
         <div class="tm-box" ${cars.length ? "" : "hidden"}><h5>Fahrzeuge</h5>
           ${cars.map((c, i) => `<div class="sp-ecar" data-i="${i}">
             <div class="sp-ecar-h"><span class="sp-ecar-emb">${silhouette(c.name)}</span><b>${esc(c.name)}</b><button type="button" class="sp-iconbtn" data-cdel="${i}" title="Fahrzeug löschen">✕</button></div>
@@ -688,9 +716,25 @@
       $$(".sp-ecar").forEach(box => bindStartFelder(box, "c" + box.dataset.i));
       const nachziehen = (zeitAuch) => cars.forEach(c => { c.start = startAnpassen(c.start, ev, zeitAuch); });
       $$("#ev-mode [data-m]").forEach(b => b.onclick = () => { sync(); ev.mode = b.dataset.m; zeichne(); plane(); });
-      ["ev-von", "ev-bis"].forEach(id => v(id).addEventListener("change", () => { sync(); nachziehen(false); zeichne(); plane(); }));
-      v("ev-zadd").onclick = () => { sync(); const erste = !ev.zeiten.length; if (!zeitHinzu(ev)) return; if (erste) nachziehen(true); zeichne(); plane(); };
+      ["ev-von", "ev-bis"].forEach(id => v(id) && v(id).addEventListener("change", () => { sync(); nachziehen(false); zeichne(); plane(); }));
+      if (v("ev-zadd")) v("ev-zadd").onclick = () => { sync(); const erste = !ev.zeiten.length; if (!zeitHinzu(ev)) return; if (erste) nachziehen(true); zeichne(); plane(); };
       $$("[data-zdel]").forEach(b => b.onclick = () => { sync(); ev.zeiten.splice(Number(b.dataset.zdel), 1); nachziehen(true); zeichne(); plane(); });
+      // Zeitfenster aus iRacing: einzeln entfernen, ganz abschalten oder neu aus dem Kalender holen
+      $$("[data-sldel]").forEach(b => b.onclick = () => { sync(); const sl = [...ev.slots]; sl.splice(Number(b.dataset.sldel), 1); slotsSetzen(ev, sl); nachziehen(true); zeichne(); plane(); });
+      if (v("ev-slaus")) v("ev-slaus").onclick = () => { sync(); ev.slots = []; zeichne(); plane(); };
+      if (v("ev-ir")) v("ev-ir").onclick = () => {
+        sync();
+        window.F2FIracing.zeige(v("ev-ir-box"), {
+          C, tracks: META.tracks,
+          onZurueck: () => zeichne(),
+          onPick: (e) => {
+            if (e.slots && e.slots.length) slotsSetzen(ev, e.slots);
+            else { ev.slots = []; ev.von = e.von; ev.bis = e.bis; if (e.zeiten.length) ev.zeiten = e.zeiten; }
+            nachziehen(true); zeichne(); plane();
+            C.toast(e.slots && e.slots.length ? e.slots.length + " Zeitfenster übernommen" : "Zeitraum übernommen, Startzeiten bitte prüfen", true);
+          }
+        });
+      };
       $$("[data-e=team]").forEach(s => s.addEventListener("change", () => { sync(); zeichne(); }));
       $$("[data-rmd]").forEach(b => b.onclick = () => { sync(); const [ci, di] = b.dataset.rmd.split(":").map(Number); cars[ci].drivers.splice(di, 1); cars[ci].stints = (cars[ci].stints || []).map(s => ({ ...s, d: "" })); zeichne(); plane(); });
       $$("[data-addd]").forEach(s => s.onchange = () => {
