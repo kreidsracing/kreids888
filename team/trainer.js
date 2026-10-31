@@ -1123,6 +1123,108 @@
   }
 
   /* ---- Ansicht aufbauen ---- */
+  /* ---- Unter dem Vergleich: wo verlierst du, wo gewinnst du (Kurven und Geraden dazwischen) ---- */
+  function vgAbschnitte() {
+    const d = VG.d, n = d.m.length - 1, dl = d.delta, L = d.laenge || 1;
+    if (!dl || !d.kurven) return [];
+    const zeitBei = f => dl[Math.max(0, Math.min(n, Math.round(f * n)))] || 0;
+    const out = [];
+    const stueck = (lo, hi, art, k, ki, vor) => {
+      if (hi - lo < 0.002) return;
+      out.push({ lo, hi, art, k, ki, vor, dt: zeitBei(hi) - zeitBei(lo), von: Math.round(lo * L), bis: Math.round(hi * L) });
+    };
+    let ende = 0;
+    d.kurven.forEach((k, i) => {
+      if (k.lo > ende) stueck(ende, k.lo, "gerade", null, -1, d.kurven[i - 1] || null);
+      stueck(k.lo, k.hi, "kurve", k, i, null);
+      ende = Math.max(ende, k.hi);
+    });
+    if (ende < 1) stueck(ende, 1, "gerade", null, -1, d.kurven[d.kurven.length - 1] || null);
+    return out;
+  }
+  function vgAbschnittName(s) {
+    if (s.art === "kurve") return "Kurve " + s.k.nr;
+    if (!s.vor) return "Start bis Kurve " + ((VG.d.kurven[0] || {}).nr || 1);
+    return "Gerade nach Kurve " + s.vor.nr;
+  }
+  function vgAbschnittGrund(s) {
+    if (s.art === "kurve") {
+      const k = s.k, werte = [k.vmin && k.vmin[0] != null && k.vmin[1] != null ? `Vmin ${k.vmin[0]} statt ${k.vmin[1]} km/h` : "", k.vaus ? `Ausgang ${k.vaus[0]} statt ${k.vaus[1]} km/h` : ""].filter(Boolean).join(" · ");
+      return s.dt < 0 || !k.tipp || k.tipp === "passt" ? (s.dt < 0 ? "Schneller als der Vergleich" : "") + (werte ? (s.dt < 0 ? ": " : "") + werte : "") : k.tipp;
+    }
+    const v = s.vor && s.vor.vaus;
+    if (v && v[0] != null && v[1] != null && Math.abs(v[0] - v[1]) >= 2)
+      return `Ausgang aus Kurve ${s.vor.nr}: ${v[0]} statt ${v[1]} km/h, das zieht sich über die ganze Gerade`;
+    return s.dt > 0 ? "Auf der Geraden langsamer (Ausgang, Schaltpunkte oder Windschatten)" : "Auf der Geraden schneller";
+  }
+  function vgVerlustGewinn() {
+    const box = document.getElementById("gf-vg");
+    if (!box || VG.single) return;
+    const ab = vgAbschnitte();
+    if (!ab.length) { box.innerHTML = ""; return; }
+    const sek = v => (v > 0 ? "+" : v < 0 ? "−" : "") + Math.abs(v).toFixed(3).replace(".", ",") + " s";
+    const verl = ab.filter(s => s.dt > 0.005).sort((a, b) => b.dt - a.dt);
+    const gew = ab.filter(s => s.dt < -0.005).sort((a, b) => a.dt - b.dt);
+    const sumV = verl.reduce((x, s) => x + s.dt, 0), sumG = gew.reduce((x, s) => x + s.dt, 0);
+    const maxAbs = Math.max(0.001, ...ab.map(s => Math.abs(s.dt)));
+    const groesster = verl[0] || null;
+    const ges = VG.d.gesamt;
+    const block = s => {
+      const i = ab.indexOf(s), st = Math.min(1, Math.abs(s.dt) / maxAbs);
+      const kl = s.dt > 0.005 ? "verlust" : s.dt < -0.005 ? "gewinn" : "gleich";
+      return `<button type="button" class="gf-vg-b ${kl}${s === groesster ? " max" : ""}${s.art === "gerade" ? " ger" : ""}" data-vg="${i}"
+        style="left:${(s.lo * 100).toFixed(2)}%;width:${((s.hi - s.lo) * 100).toFixed(2)}%;--s:${st.toFixed(2)}"
+        title="${C.esc(vgAbschnittName(s))}: ${sek(s.dt)}"><span>${s.art === "kurve" ? "K" + s.k.nr : ""}</span></button>`;
+    };
+    const zeile = (s, max) => {
+      const i = ab.indexOf(s);
+      return `<button type="button" class="gf-vg-z${s === groesster ? " max" : ""}" data-vg="${i}">
+        <span class="gf-vg-n">${C.esc(vgAbschnittName(s))}<small>${s.von} bis ${s.bis} m</small></span>
+        <span class="gf-vg-bar"><i class="${s.dt > 0 ? "verlust" : "gewinn"}" style="width:${Math.max(4, Math.abs(s.dt) / max * 100).toFixed(0)}%"></i></span>
+        <b class="${s.dt > 0 ? "gf-rot" : "gf-gruen"}">${sek(s.dt)}</b>
+        <em>${C.esc(vgAbschnittGrund(s))}</em></button>`;
+    };
+    const L = VG.d.laenge || 1;
+    let ticks = "";
+    const schritt = L > 6000 ? 1000 : L > 3000 ? 500 : 250;
+    for (let m = schritt; m < L; m += schritt) ticks += `<span style="left:${(m / L * 100).toFixed(2)}%">${m >= 1000 ? (m / 1000).toString().replace(".", ",") + " km" : m + " m"}</span>`;
+    box.innerHTML = `
+      <div class="gf-vg-kopf">
+        <b>Wo verlierst du, wo gewinnst du</b>
+        <span>Gesamt <b class="${ges > 0 ? "gf-rot" : ges < 0 ? "gf-gruen" : ""}">${sek(ges || 0)}</b> · verloren <b class="gf-rot">${sek(sumV)}</b> in ${verl.length} Abschnitten · gewonnen <b class="gf-gruen">${sek(sumG)}</b> in ${gew.length}</span>
+      </div>
+      ${groesster ? `<div class="gf-vg-top" data-vg="${ab.indexOf(groesster)}">
+        <span class="gf-vg-tag">Größter Verlust</span>
+        <div class="gf-vg-top-in"><b>${C.esc(vgAbschnittName(groesster))}</b><em class="gf-rot">${sek(groesster.dt)}</em>
+          <span>${Math.round(groesster.dt / Math.max(sumV, 0.001) * 100)} % von allem, was du verlierst</span></div>
+        <p>${C.esc(vgAbschnittGrund(groesster))}</p>
+        ${groesster.art === "kurve" ? `<small>Bremspunkt ${groesster.k.bremse_m == null ? "?" : fmtSign(groesster.k.bremse_m, 0) + " m"} · Gaspunkt ${groesster.k.gas_m == null ? "?" : fmtSign(groesster.k.gas_m, 0) + " m"} · Vmin ${groesster.k.vmin[0] ?? "?"} statt ${groesster.k.vmin[1] ?? "?"} km/h · Ausgang ${groesster.k.vaus[0]} statt ${groesster.k.vaus[1]} km/h</small>` : ""}
+        <button type="button" class="gf-vg-hin">Auf Karte und Kanälen ansehen</button>
+      </div>` : `<div class="gf-vg-top gut"><span class="gf-vg-tag">Kein Verlust</span><p>Du bist überall mindestens so schnell wie der Vergleich.</p></div>`}
+      <div class="gf-vg-band">${ab.map(block).join("")}</div>
+      <div class="gf-vg-achse">${ticks}</div>
+      <div class="gf-vg-listen">
+        <div><h6>Verluste <small>größte zuerst</small></h6>${verl.length ? verl.slice(0, 8).map(s => zeile(s, verl[0].dt)).join("") : '<p class="gf-note">Nirgends langsamer.</p>'}</div>
+        <div><h6>Gewinne <small>größte zuerst</small></h6>${gew.length ? gew.slice(0, 8).map(s => zeile(s, -gew[0].dt)).join("") : '<p class="gf-note">Noch nirgends schneller.</p>'}</div>
+      </div>
+      <p class="gf-note">Rot = hier verlierst du Zeit, grün = hier gewinnst du, je kräftiger desto mehr. Anklicken: Abschnitt auf Karte und Kanälen ansehen.</p>`;
+    box.querySelectorAll("[data-vg]").forEach(el => el.onclick = () => vgAbschnittZeigen(ab[Number(el.dataset.vg)]));
+  }
+  // Abschnitt auf Karte und in den Kanälen zeigen (Kurve = Segment, Gerade = Ausschnitt)
+  function vgAbschnittZeigen(s) {
+    if (!s) return;
+    if (s.art === "kurve" && VG.segMode === "kurven") vgApplySeg(s.ki);
+    else {
+      const n = VG.d.m.length - 1;
+      vgPush(); VG.frei = false; VG.seg = -2;
+      VG.i0 = Math.max(0, Math.round(s.lo * n)); VG.i1 = Math.min(n, Math.round(s.hi * n));
+      VG.cur = VG.i0;
+      vgSegUpdate(); vgInfo(VG.cur); vgScrubSync(); vgUndoState(); drawAll();
+    }
+    const gf = document.querySelector("#kv-view .gf");
+    if (gf) gf.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
   function zeigeAnalyse(d, single) {
     const n = d.m.length - 1, K = d.kanaele || {};
     const A = k => K[k] ? (single ? K[k] : K[k][0]) : null, Bk = k => (!single && K[k]) ? K[k][1] : null;
@@ -1241,7 +1343,7 @@
             </div>
           </div>
         </div>
-      </div>`;
+      </div>${single ? "" : '<div class="gf-vg" id="gf-vg"></div>'}`;
 
     wireAnalyse();
     renderAnz();
@@ -1249,6 +1351,7 @@
     vgSegUpdate();
     vgInfo(-1);
     drawAll();
+    vgVerlustGewinn();
   }
 
   /* ---- Zeichnen: Grundlagen ---- */

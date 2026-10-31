@@ -2306,3 +2306,43 @@ body:has(.td)::after{content:"";position:fixed;inset:0;z-index:-1;pointer-events
 .gf-g61-sum{display:flex;flex-wrap:wrap;gap:4px 14px;flex:1;min-width:0}
 .gf-g61-sum em{font-style:normal;font-size:12.5px;color:#cfd5df;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .gf-g61-sum em.a::first-letter{color:#2bff8c}.gf-g61-sum em.b::first-letter{color:#e6e9ef}
+/* Streckenvergleich: wo verlierst du, wo gewinnst du (unter dem Vergleich) */
+.gf-vg{margin-top:14px;font-family:"Inter","Segoe UI",system-ui,sans-serif;color:#e9ecf2;background:#030405;border:1px solid rgba(255,255,255,.06);border-radius:22px;padding:16px 18px}
+.gf-vg .gf-rot{color:#ff5a5a}.gf-vg .gf-gruen{color:#2fe39b}
+.gf-vg-kopf{display:flex;flex-wrap:wrap;align-items:baseline;gap:6px 16px;margin-bottom:12px}
+.gf-vg-kopf>b{font-size:16px}.gf-vg-kopf span{font-size:13px;color:#9aa1ae}
+.gf-vg-top{position:relative;display:grid;gap:6px;padding:14px 16px 14px 18px;margin-bottom:14px;border-radius:14px;cursor:pointer;
+  background:linear-gradient(90deg,rgba(255,59,59,.2),rgba(255,59,59,.04) 70%);border:1px solid rgba(255,59,59,.45);box-shadow:0 0 24px rgba(255,59,59,.12)}
+.gf-vg-top.gut{background:linear-gradient(90deg,rgba(46,204,113,.16),rgba(46,204,113,.03) 70%);border-color:rgba(46,204,113,.4);box-shadow:none;cursor:default}
+.gf-vg-tag{justify-self:start;font-size:11px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:#fff;background:#ff3b3b;padding:3px 9px;border-radius:999px}
+.gf-vg-top.gut .gf-vg-tag{background:#22b862}
+.gf-vg-top-in{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 14px}
+.gf-vg-top-in b{font-size:20px}.gf-vg-top-in em{font-style:normal;font-size:22px;font-weight:800;font-variant-numeric:tabular-nums}
+.gf-vg-top-in span{font-size:12.5px;color:#c9ced8}
+.gf-vg-top p{margin:0;font-size:14px;color:#f1d4d4}.gf-vg-top small{font-size:12px;color:#9aa1ae}
+.gf-vg-hin{justify-self:start;margin-top:4px;background:#ff3b3b;border:0;color:#fff;font-weight:700;font-size:12.5px;padding:7px 12px;border-radius:9px;cursor:pointer}
+.gf-vg-band{position:relative;height:46px;border-radius:10px;background:#0d0f13;overflow:hidden}
+.gf-vg-b{position:absolute;top:0;bottom:0;border:0;padding:0;margin:0;cursor:pointer;border-left:1px solid #030405;display:grid;place-items:center;overflow:hidden}
+.gf-vg-b.verlust{background:rgba(255,59,59,calc(.18 + .82 * var(--s)))}
+.gf-vg-b.gewinn{background:rgba(47,227,155,calc(.15 + .7 * var(--s)))}
+.gf-vg-b.gleich{background:rgba(255,255,255,.06)}
+.gf-vg-b.ger{top:10px;bottom:10px}
+.gf-vg-b span{font-size:11px;font-weight:800;color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.7)}
+.gf-vg-b:hover{filter:brightness(1.25)}
+.gf-vg-b.max{box-shadow:inset 0 0 0 2px #fff;z-index:2;animation:gfVgPuls 1.6s ease-in-out infinite}
+@keyframes gfVgPuls{50%{box-shadow:inset 0 0 0 2px #fff,0 0 16px rgba(255,59,59,.9)}}
+.gf-vg-achse{position:relative;height:18px;margin-bottom:12px}
+.gf-vg-achse span{position:absolute;top:3px;transform:translateX(-50%);font-size:11px;color:#6f7684;white-space:nowrap}
+.gf-vg-listen{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.gf-vg-listen h6{margin:0 0 6px;font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:#9aa1ae}
+.gf-vg-listen h6 small{text-transform:none;letter-spacing:0;font-weight:400;margin-left:6px}
+.gf-vg-z{display:grid;grid-template-columns:minmax(120px,1fr) 90px 80px;grid-template-areas:"n bar dt" "g g g";gap:2px 10px;align-items:center;width:100%;text-align:left;
+  background:#0d0f13;border:1px solid rgba(255,255,255,.05);border-radius:10px;padding:8px 10px;margin-bottom:5px;color:inherit;font:inherit;cursor:pointer}
+.gf-vg-z:hover{border-color:rgba(255,255,255,.18)}
+.gf-vg-z.max{border-color:rgba(255,59,59,.6);background:rgba(255,59,59,.08)}
+.gf-vg-n{grid-area:n;font-weight:700;font-size:13.5px}.gf-vg-n small{display:block;font-weight:400;font-size:11px;color:#6f7684}
+.gf-vg-bar{grid-area:bar;height:7px;border-radius:4px;background:rgba(255,255,255,.06);overflow:hidden}
+.gf-vg-bar i{display:block;height:100%;border-radius:4px}.gf-vg-bar i.verlust{background:#ff3b3b}.gf-vg-bar i.gewinn{background:#2fe39b}
+.gf-vg-z b{grid-area:dt;text-align:right;font-variant-numeric:tabular-nums;font-size:13.5px}
+.gf-vg-z em{grid-area:g;font-style:normal;font-size:12px;color:#9aa1ae}
+@media(max-width:900px){.gf-vg-listen{grid-template-columns:1fr}}
