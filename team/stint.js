@@ -407,7 +407,7 @@
       <div class="td-label">Kommende Events</div>
       ${kommend.length ? `<div class="sp-cards">${kommend.map(karte).join("")}</div>` : '<div class="tm-box"><p class="tm-muted">Noch kein Event geplant.</p></div>'}
       ${alt.length ? `<div class="td-label">Vergangene Events</div><div class="sp-cards alt">${alt.map(karte).join("")}</div>` : ""}
-      ${META.isAdmin ? `<p class="tm-muted" style="margin-top:18px">Standard-Kanal, Pings und Teams stellst du unter <a class="r" href="#admin">Admin → Stintplaner</a> ein.</p>` : ""}`;
+      ${META.isAdmin ? `<p class="tm-muted" style="margin-top:18px">Standard-Kanal, Pings und Teams stellst du unter <a class="r" href="#team-zugang/stint">Verwaltung → Team &amp; Zugang → Stintplaner</a> ein.</p>` : ""}`;
   }
 
   /* ================================================================
@@ -539,7 +539,7 @@
   // Neues Event: Assistent in 3 Schritten (Was? Wann? Teams?)
   function eventWizard() {
     // Standard-Notiz für neue Events (kann im Assistenten angepasst werden)
-    const STANDARD_NOTIZ = "Das nächste Event ist in der Endurance Planung angelegt! Schaut mal rein und meldet euch schon mal bei einem Fahrzeug an.\n\nDie Verfügbarkeit hat noch Zeit, die könnt ihr später in Ruhe eintragen. Der Bot erinnert euch rechtzeitig.\n\nKonstanz bis ins Ziel! 🏁";
+    const STANDARD_NOTIZ = "Das nächste Event ist im Teamdashboard unter Rennen → Events angelegt! Schaut mal rein und meldet euch schon mal bei einem Fahrzeug an.\n\nDie Verfügbarkeit hat noch Zeit, die könnt ihr später in Ruhe eintragen. Der Bot erinnert euch rechtzeitig.\n\nKonstanz bis ins Ziel! 🏁";
     const w = { schritt: 1, name: "", trackId: 0, trackName: "", mode: "zeit", dauerMin: 360, runden: 100, notiz: STANDARD_NOTIZ, channel: "", von: datumWert(Date.now() + 7 * 864e5), bis: "", zeiten: ["14:00"], slots: [], teams: [], carId: 0, carName: "", starts: {}, ich: "" };
     const teams = META.teams || [];
     const startVon = (n) => w.starts[n] || startAnpassen(fromLocalInput(w.von + "T" + (w.zeiten[0] || "14:00")), w, true);
@@ -565,7 +565,7 @@
         </details>`;
       if (w.schritt === 2) inhalt = irHinweis + wannFelder(w);
       if (w.schritt === 3) inhalt = `
-        <div class="sp-f"><span>Teams antippen</span><div class="sp-teamwahl">${teams.map(n => `<button type="button" class="sp-teamchip ${w.teams.includes(n) ? "on" : ""}" data-team="${esc(n)}" style="--t1:${teamFarbe(n)[0]}"><i></i>${esc(n)}</button>`).join("") || '<span class="tm-muted">Keine Teams angelegt (Admin → Stintplaner).</span>'}</div></div>
+        <div class="sp-f"><span>Teams antippen</span><div class="sp-teamwahl">${teams.map(n => `<button type="button" class="sp-teamchip ${w.teams.includes(n) ? "on" : ""}" data-team="${esc(n)}" style="--t1:${teamFarbe(n)[0]}"><i></i>${esc(n)}</button>`).join("") || '<span class="tm-muted">Keine Teams angelegt (Verwaltung → Team &amp; Zugang → Stintplaner).</span>'}</div></div>
         ${w.teams.map(n => `<div class="sp-wz-team" data-wt="${esc(n)}"><b><i style="background:${teamFarbe(n)[0]}"></i>${esc(n)}</b><div class="sp-grid">${startFelder(startVon(n), "wz" + teams.indexOf(n), w)}</div>
           <label class="sp-check"><input type="radio" name="wz-ich" value="${esc(n)}" ${w.ich === n ? "checked" : ""}> Ich fahre hier</label></div>`).join("")}
         ${w.teams.length ? `<label class="sp-check"><input type="radio" name="wz-ich" value="" ${w.ich ? "" : "checked"}> Ich fahre selbst nicht mit</label>` : ""}`;
@@ -948,7 +948,7 @@
         <div class="sp-title"><h3>${car ? "Fahrzeug bearbeiten" : "Fahrzeug anlegen"}</h3><small>${esc(p.name)}</small></div></div>
       <div class="tm-box"><h5>Fahrzeug</h5>
         <div class="tm-row"><label for="cf-team">Team<small>vergebene Teams sind gesperrt</small></label>
-          <div>${teams.length ? `<select class="tm-select" id="cf-team">${teams.map(n => `<option value="${esc(n)}" ${n === c.name ? "selected" : ""} ${vergeben(n) ? "disabled" : ""}>${esc(n)}${vergeben(n) ? " (schon vergeben)" : ""}</option>`).join("")}</select>` : '<p class="tm-muted">Keine Teams angelegt (Admin → Stintplaner → Teams).</p>'}</div></div>
+          <div>${teams.length ? `<select class="tm-select" id="cf-team">${teams.map(n => `<option value="${esc(n)}" ${n === c.name ? "selected" : ""} ${vergeben(n) ? "disabled" : ""}>${esc(n)}${vergeben(n) ? " (schon vergeben)" : ""}</option>`).join("")}</select>` : '<p class="tm-muted">Keine Teams angelegt (Verwaltung → Team &amp; Zugang → Stintplaner → Teams).</p>'}</div></div>
         <div class="tm-row"><label for="cf-car">Fahrzeug<small>aus Garage 61</small></label><div>${autoAuswahl(c)}</div></div>
         <div class="tm-row"><div class="lbl">Start<small>deine Ortszeit</small></div>
           <div class="sp-grid" id="cf-start">${startFelder(c.start, "cf", p)}</div></div>

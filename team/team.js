@@ -53,7 +53,7 @@
   // Bereiche im Dashboard (alle Teammitglieder) – vorerst Platzhalter
   const SECTIONS = [
     { id: "news",   label: "Team News",     icon: "news" },
-    { id: "fahrer", label: "Fahrerbereich", icon: "helmet" },
+    { id: "fahrer", label: "Mein Profil", icon: "helmet" },
   ];
 
   // Tools – sichtbar je nach Rolle (Admin vergibt)
@@ -73,7 +73,9 @@
   const fmtLap = (s) => { const m = Math.floor(s / 60), r = s - m * 60; return (m ? m + ":" + (r < 10 ? "0" : "") : "") + r.toFixed(3); };
   const fmtDate = (iso) => { if (!iso) return "–"; const d = new Date(iso); return d.toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit" }) + " · " + d.toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" }); };
   const isRecent = (iso) => iso && Date.now() - Date.parse(iso) < 2 * 864e5;
-  const main = () => document.getElementById("td-main") || view;
+  // MAIN_IN: Unterbereich einer Seite mit Reitern (Inhalte, Auswertung) – die bisherigen Seiten zeichnen dann dort hinein
+  let MAIN_IN = null;
+  const main = () => (MAIN_IN && document.body.contains(MAIN_IN) && MAIN_IN) || document.getElementById("td-main") || view;
 
   async function api(path, opts = {}) {
     const r = await fetch(API + path, {
@@ -443,13 +445,15 @@
      DASHBOARD (nach Login)
      ================================================================ */
   /* ---------------- Seitenleiste: kommende Events (Stintplaner) ---------------- */
-  let EVNAV = null, EVNAV_AT = 0;
+  let EVNAV = null, EVNAV_AT = 0, EVLIVE = null, liveT = null;
+  // Gruppe „Rennen": Events, Spotting (mit Live-Zahl), Abwesenheiten, darunter die kommenden Events
   function evNavHtml(id) {
     const meinId = ME.user.id, now = Date.now();
     const lnk = (href, inner, on, cls = "") => `<a class="td-link td-ev ${cls}${on ? " on" : ""}" href="#${href}">${inner}</a>`;
-    let h = lnk("stint/neu", `${ICONS.flag}<span>Neues Event planen</span>`, id === "stint/neu", "td-ev-top");
-    h += lnk("stint", `${ICONS.calendar}<span>Alle Events</span>`, id === "stint", "td-ev-top");
-    h += lnk("spotting", `${ICONS.eye}<span>Spotting</span>`, id === "spotting" || id.startsWith("spotting/"), "td-ev-top");
+    const aktiv = (EVLIVE || []).filter(r => r.aktiv).length;
+    let h = lnk("stint", `${ICONS.calendar}<span>Events</span>`, id === "stint" || id === "stint/neu", "td-ev-top");
+    h += lnk("spotting", `${ICONS.eye}<span>Spotting</span>${aktiv ? `<span class="td-live"><i></i>${aktiv} live</span>` : ""}`, id === "spotting" || id.startsWith("spotting/"), "td-ev-top");
+    h += lnk("abwesend", `${ICONS.clock}<span>Abwesenheiten</span>`, id === "abwesend", "td-ev-top");
     if (!EVNAV) h += '<div class="td-ev-leer">Lädt …</div>';
     else {
       const ende = (p) => Math.max(p.start, ...p.cars.map(c => c.start || p.start)) + (p.mode === "zeit" ? p.dauerMin * 60000 : 6 * 3600000);
@@ -482,8 +486,42 @@
     }).catch(() => {});
   }
   window.F2FEvNav = { refresh: () => ladeEvNav(true) };
+  // wer gerade live ist (Spotting-Liste): für die Zahl in der Seitenleiste und „Live jetzt" auf der Startseite, alle 2 Min.
+  function ladeLive() {
+    if (!ME || !ME.panels || !ME.panels.stint) return Promise.resolve([]);
+    return api("/spotting/live").then(d => {
+      EVLIVE = d.rennen || [];
+      const el = document.getElementById("td-evnav");
+      if (el) el.innerHTML = evNavHtml(location.hash.replace("#", ""));
+      return EVLIVE;
+    }).catch(() => EVLIVE || []);
+  }
+  function liveTakt() {
+    clearInterval(liveT);
+    ladeLive();
+    liveT = setInterval(() => { if (document.visibilityState === "visible" && document.getElementById("td-evnav")) ladeLive().then(w => { if (document.getElementById("w-live")) zeichneLive(w); }); }, 120000);
+  }
 
-  const ADMIN_TEILE = [["status", "Status"], ["zugang", "Zugang"], ["panels", "Panels"], ["g61", "Garage 61 → Discord"], ["woche", "Wochen-Post"], ["abw", "Abwesenheiten"], ["stint", "Stintplaner"], ["links", "Links"], ["erinn", "Renn-Erinnerungen"], ["limits", "Limit-Warnung"], ["ergebnisse", "Rennergebnisse"], ["spotting", "Spotting"]];
+  // Admin-Kästen und in welchem Verwaltungs-Bereich sie stehen
+  const ADMIN_TEILE = [["status", "Status"], ["zugang", "Zugang"], ["panels", "Panels"], ["g61", "Garage 61 → Discord"], ["woche", "Wochen-Post"], ["abw", "Abwesenheiten"], ["stint", "Stintplaner"], ["links", "Links"], ["erinn", "Renn-Erinnerungen"], ["limits", "Limit-Warnung"], ["ergebnisse", "Rennergebnisse"], ["spotlive", "Spotting · Live-Meldung"], ["spotting", "Spotting"]];
+  const DISCORD_TEILE = ["g61", "woche", "erinn", "ergebnisse", "spotlive", "limits"];
+  const VERW = [["discord-posts", "discord", "Discord-Posts"], ["team-zugang", "people", "Team & Zugang"], ["inhalte", "file", "Inhalte"], ["auswertung", "gauge", "Auswertung"]];
+  const verwTabs = (aktiv) => `<div class="vw-tabs">${VERW.map(([k, , t]) => `<a href="#${k}" class="${k === aktiv ? "on" : ""}">${esc(t)}</a>`).join("")}</div>`;
+  const verwKopf = (aktiv) => panelHead(VERW.find(v => v[0] === aktiv)[1], "Verwaltung", '<span class="tm-badge">Nur Admin</span>') + verwTabs(aktiv);
+  const INHALTE = [["news", "News schreiben", () => renderNewsAdmin()], ["profile", "Fahrerprofile", () => renderProfilesAdmin()], ["kalender", "Rennkalender", () => renderKalenderAdmin()]];
+  const AUSWERTUNG = [["aktivitaet", "Discord-Aktivität", () => renderActivity()], ["nutzung", "Dashboard-Nutzung", () => renderNutzung()], ["limits", "Cloudflare-Limits", () => renderLimits()]];
+  // Verwaltungs-Bereich mit Unterreitern: die bisherigen Seiten zeichnen unverändert in den Unterbereich
+  function renderUnter(bereich, sub, liste) {
+    const e = liste.find(x => x[0] === sub) || liste[0];
+    main().innerHTML = verwKopf(bereich) + `<div class="vw-unter">${liste.map(([k, t]) => `<a href="#${bereich}/${k}" class="${k === e[0] ? "on" : ""}">${esc(t)}</a>`).join("")}</div><div id="vw-in"></div>`;
+    MAIN_IN = document.getElementById("vw-in");
+    return e[2]();
+  }
+  function renderVerw(bereich, fn) {
+    main().innerHTML = verwKopf(bereich) + `<p class="vw-zurueck"><a href="#${bereich}">← zur Übersicht</a></p><div id="vw-in"></div>`;
+    MAIN_IN = document.getElementById("vw-in");
+    return fn();
+  }
   // Admin-Kasten öffnen und hinscrollen (ohne neu zu laden, damit nichts Ungespeichertes verloren geht)
   function adminOeffnen(teil) {
     const el = document.getElementById("adm-" + teil);
@@ -498,38 +536,48 @@
     if (a && document.getElementById("adm") && adminOeffnen(a.dataset.admteil)) e.preventDefault();
   });
 
+  // alte Adressen (Lesezeichen, Links in Discord-Posts) auf die neue Ordnung umleiten
+  const ALT_ADR = { aktivitaet: "auswertung/aktivitaet", nutzung: "auswertung/nutzung", limits: "auswertung/limits", "news-schreiben": "inhalte/news",
+    fahrerprofile: "inhalte/profile", "kalender-admin": "inhalte/kalender", admin: "team-zugang", posts: "discord-posts/g61-posts", woche: "garage61/training" };
+  // für die Nutzungs-Statistik die bisherigen Namen weiterverwenden
+  const MERKE_ALS = { "inhalte/news": "news-schreiben", "inhalte/profile": "fahrerprofile", "inhalte/kalender": "kalender-admin", "auswertung/aktivitaet": "aktivitaet",
+    "auswertung/nutzung": "nutzung", "auswertung/limits": "limits", "discord-posts/g61-posts": "posts" };
+
   function renderShell() {
-    const id = location.hash.replace("#", "");
+    let id = location.hash.replace("#", "");
+    const neu = id.startsWith("admin/") ? (DISCORD_TEILE.includes(id.slice(6)) ? "discord-posts/" : "team-zugang/") + id.slice(6) : ALT_ADR[id];
+    if (neu) { id = neu; history.replaceState(null, "", "#" + id); }
+    MAIN_IN = null;
     const tools = Object.keys(PANELS).filter(p => ME.panels[p] && p !== "garage61" && p !== "links" && p !== "stint");
     const link = (hid, icon, label) => `<a class="td-link${id === hid || (hid && id.startsWith(hid + "/")) ? " on" : ""}" href="#${hid}">${ICONS[icon]}<span>${esc(label)}</span></a>`;
+    const training = (ME.panels.garage61 ? link("garage61", "garage61", "Garage 61") : "") + tools.map(p => link(p, p, PANELS[p].title)).join("");
 
     view.innerHTML = `
       <div class="td">
         <aside class="td-side">
           <nav class="td-nav" aria-label="Team-Menü">
-            ${link("", "home", "Dashboard")}
-            ${ME.panels.garage61 ? link("garage61", "garage61", "Garage 61") : ""}
-            ${SECTIONS.map(s => link(s.id, s.icon, s.label)).join("")}
-            ${ME.panels.links ? link("links", "link", "Links") : ""}
-            ${ME.panels.stint ? `<div class="td-nav-h">Endurance Planung</div><div class="td-evnav" id="td-evnav">${evNavHtml(id)}</div>` : ""}
-            <div class="td-nav-h">Tools</div>${link("abwesend", "clock", "Abwesenheiten")}${tools.map(p => link(p, p, PANELS[p].title)).join("")}
-            ${ME.isAdmin ? `<div class="td-nav-h">Verwaltung</div>${link("aktivitaet", "activity", "Aktivität")}${link("nutzung", "eye", "Nutzung")}${link("limits", "gauge", "Limits")}${link("posts", "trophy", "G61-Posts")}${link("news-schreiben", "news", "News schreiben")}${link("fahrerprofile", "helmet", "Fahrerprofile")}${link("kalender-admin", "calendar", "Rennkalender")}${link("admin", "admin", "Admin")}${id === "admin" || id.startsWith("admin/") ? `<div class="td-admsub">${ADMIN_TEILE.map(([k, l]) => `<a class="td-link td-ev td-ev-sub" href="#admin/${k}" data-admteil="${k}"><span>${esc(l)}</span></a>`).join("")}</div>` : ""}<a class="td-link" href="https://kreids888-admin.kreids.workers.dev/" target="_blank" rel="noopener">${ICONS.ext}<span>kreids888-Dashboard</span></a>` : ""}
+            ${link("", "home", "Start")}
+            <div class="td-nav-h">Rennen</div>
+            ${ME.panels.stint ? `<div class="td-evnav" id="td-evnav">${evNavHtml(id)}</div>` : link("abwesend", "clock", "Abwesenheiten")}
+            ${training ? `<div class="td-nav-h">Training</div>${training}` : ""}
+            <div class="td-nav-h">Team</div>${SECTIONS.map(s => link(s.id, s.icon, s.label)).join("")}${ME.panels.links ? link("links", "link", "Links") : ""}
+            ${ME.isAdmin ? `<div class="td-nav-h">Verwaltung</div>${VERW.map(([k, ic, t]) => link(k, ic, t)).join("")}<a class="td-link" href="https://kreids888-admin.kreids.workers.dev/" target="_blank" rel="noopener">${ICONS.ext}<span>kreids888-Dashboard</span></a>` : ""}
           </nav>
         </aside>
         <div class="td-main" id="td-main"></div>
       </div>`;
 
     ladeEvNav(false);
-    if (id !== "garage61" && id !== "woche") merke(id.startsWith("stint/") ? "stint" : id.startsWith("spotting/") ? "spotting" : id || "dashboard");
-    if (id === "woche" && ME.panels.garage61) return renderG61("woche");
-    if (id === "nutzung" && ME.isAdmin) return renderNutzung();
-    if (id === "limits" && ME.isAdmin) return renderLimits();
-    if ((id === "admin" || id.startsWith("admin/")) && ME.isAdmin) return renderAdmin(id.slice(6));
-    if (id === "posts" && ME.isAdmin) return renderPosts();
-    if (id === "aktivitaet" && ME.isAdmin) return renderActivity();
-    if (id === "news-schreiben" && ME.isAdmin) return renderNewsAdmin();
-    if (id === "fahrerprofile" && ME.isAdmin) return renderProfilesAdmin();
-    if (id === "kalender-admin" && ME.isAdmin) return renderKalenderAdmin();
+    if (!liveT) liveTakt();
+    if (!id.startsWith("garage61")) merke(MERKE_ALS[id] || (id.startsWith("stint/") ? "stint" : id.startsWith("spotting/") ? "spotting" : id.split("/")[0] || "dashboard"));
+    if (id.startsWith("garage61/") && ME.panels.garage61) return renderG61(id.slice(9));
+    if (ME.isAdmin) {
+      if (id === "discord-posts/g61-posts") return renderVerw("discord-posts", renderPosts);
+      if (id === "discord-posts" || id.startsWith("discord-posts/")) return renderAdmin(id.slice(14), "discord");
+      if (id === "team-zugang" || id.startsWith("team-zugang/")) return renderAdmin(id.slice(12), "zugang");
+      if (id === "inhalte" || id.startsWith("inhalte/")) return renderUnter("inhalte", id.slice(8) || "news", INHALTE);
+      if (id === "auswertung" || id.startsWith("auswertung/")) return renderUnter("auswertung", id.slice(11) || "aktivitaet", AUSWERTUNG);
+    }
     if (id === "news") return renderNews();
     if (id === "fahrer") return renderProfile();
     if (id === "abwesend") return renderAbwesend();
@@ -561,7 +609,7 @@
     main().innerHTML = `
       <section class="td-welcome" style="--img:url('${IMG}f2f-cars.webp')">
         <div class="td-welcome-in">
-          <div class="tp-label">${ICONS.home} Dashboard</div>
+          <div class="tp-label">${ICONS.home} Start</div>
           <h3>Willkommen zurück, <span class="r">${esc(ME.user.name)}</span></h3>
           <div class="td-welcome-b">
             <span class="tm-badge">${ME.isAdmin ? "Admin" : "Teammitglied"}</span>
@@ -570,18 +618,18 @@
         </div>
       </section>
 
-      ${ME.panels.garage61 ? `<div class="tp-widget wk-home" id="w-woche">
-        <div class="tp-widget-h">${ICONS.activity}<b>Trainingswoche</b></div>
-        <div class="tp-widget-f">Lädt …</div>
+      ${ME.panels.stint ? `<div class="hm-reihe">
+        <div class="tp-widget" id="w-next"><div class="tp-widget-h">${ICONS.flag}<b>Als Nächstes</b></div><div class="tp-widget-f">Lädt …</div></div>
+        <div class="tp-widget" id="w-live"><div class="tp-widget-h">${ICONS.eye}<b>Live jetzt</b></div><div class="tp-widget-f">Lädt …</div></div>
       </div>` : ""}
 
       <div class="td-widgets">
+        ${ME.panels.garage61 ? `<div class="tp-widget wk-home hm-woche" id="w-woche">
+          <div class="tp-widget-h">${ICONS.activity}<b>Trainingswoche</b></div>
+          <div class="tp-widget-f">Lädt …</div>
+        </div>` : ""}
         <div class="tp-widget" id="w-news">
           <div class="tp-widget-h">${ICONS.news}<b>Neueste News</b></div>
-          <div class="tp-widget-f">Lädt …</div>
-        </div>
-        <div class="tp-widget" id="w-prof">
-          <div class="tp-widget-h">${ICONS.helmet}<b>Mein Fahrerprofil</b></div>
           <div class="tp-widget-f">Lädt …</div>
         </div>
       </div>
@@ -589,13 +637,19 @@
         <div class="tp-widget-h">${ICONS.car}<b>Letzte Fahrten im Team</b></div>
         <div class="tp-widget-f">Lädt …</div>
       </div>` : ""}
+      <div class="td-widgets">
+        <div class="tp-widget" id="w-prof">
+          <div class="tp-widget-h">${ICONS.helmet}<b>Mein Fahrerprofil</b></div>
+          <div class="tp-widget-f">Lädt …</div>
+        </div>
+      </div>
       <p class="nu-hint">Hinweis: Um das Dashboard zu verbessern, wird erfasst, welche Bereiche genutzt werden und was hier eingetragen wird. Gespeichert wird das 30 Tage.</p>`;
 
     if (ME.panels.garage61) api("/g61/woche").then(d => {
       const el = document.getElementById("w-woche");
       if (!el) return;
       if (!d.ready) { el.remove(); return; }
-      el.innerHTML = `<div class="tp-widget-h">${ICONS.activity}<b>Trainingswoche · KW ${d.kwVorher}</b><a class="td-more" href="#woche">Wochenübersicht →</a></div>`
+      el.innerHTML = `<div class="tp-widget-h">${ICONS.activity}<b>Trainingswoche · KW ${d.kwVorher}</b><a class="td-more" href="#garage61/training">Wochenübersicht →</a></div>`
         + wocheKacheln(d, true) + wocheZiel(d);
     }).catch(() => { const el = document.getElementById("w-woche"); if (el) el.remove(); });
 
@@ -625,6 +679,82 @@
         <p class="tm-muted">Dein Profil erscheint nach Freigabe auf der Teamseite unter „Das Raceteam".</p>
         <a class="tm-btn sm" href="#fahrer"><span>${d.draft ? "Profil bearbeiten" : "Profil anlegen"}</span></a></div>`;
     }).catch(() => {});
+
+    if (ME.panels.stint) {
+      zeichneNaechstes();
+      if (EVLIVE) zeichneLive(EVLIVE);
+      ladeLive().then(zeichneLive);
+    }
+  }
+
+  // Startseite „Als Nächstes": nächstes Event (bevorzugt mit eigenem Auto) mit Countdown, Auto, eigenem Stint und Verfügbarkeit
+  async function zeichneNaechstes() {
+    const el = document.getElementById("w-next");
+    if (!el) return;
+    const kopf = `<div class="tp-widget-h">${ICONS.flag}<b>Als Nächstes</b><a class="td-more" href="#stint">Alle Events →</a></div>`;
+    let list = EVNAV;
+    try { if (!list) { list = (await api("/stint/list")).list || []; EVNAV = list; EVNAV_AT = Date.now(); } }
+    catch (e) { el.innerHTML = kopf + `<div class="tp-widget-f">${esc(e.message)}</div>`; return; }
+    const meinId = ME.user.id, now = Date.now();
+    const ende = (p) => Math.max(p.start, ...p.cars.map(c => c.start || p.start)) + (p.mode === "zeit" ? p.dauerMin * 60000 : 6 * 3600000);
+    const kommend = list.filter(p => ende(p) > now).sort((a, b) => a.start - b.start);
+    const meinAuto = (p) => p.cars.find(c => c.drivers.includes(meinId));
+    const p = kommend.find(meinAuto) || kommend[0];
+    if (!p) { el.innerHTML = kopf + '<div class="tp-widget-f">Kein Event geplant</div>'; return; }
+    const auto = meinAuto(p);
+    const pad = (n) => String(n).padStart(2, "0");
+    const uhrzeit = (ms) => { const x = new Date(ms); return pad(x.getHours()) + ":" + pad(x.getMinutes()); };
+    const tag = new Date(p.start).toLocaleDateString("de-DE", { weekday: "long", day: "2-digit", month: "2-digit" });
+    const laenge = p.mode === "runden" ? p.runden + " Runden" : p.dauerMin % 60 ? Math.floor(p.dauerMin / 60) + " h " + (p.dauerMin % 60) + " min" : p.dauerMin / 60 + " Stunden";
+    const fehlen = kommend.filter(x => x !== p && meinAuto(x) && x.av && x.av[meinId] === false);
+    const autoHref = auto ? "#stint/" + p.id + "/" + auto.key : "";
+    el.innerHTML = kopf + `<div class="hm-in hm-ev">
+      <div class="hm-ev-k">${ICONS.calendar}<span>${esc(tag)} · ${uhrzeit(auto && auto.start || p.start)} Uhr</span>${now >= p.start ? '<span class="tpe-live">● Läuft gerade</span>' : ""}</div>
+      <h4><a href="#stint/${esc(p.id)}">${esc(p.name)}</a></h4><div class="hm-m">${esc([laenge, p.track].filter(Boolean).join(" · "))}</div>
+      <div class="hm-cd" id="hm-cd"></div>
+      <div class="hm-fakt">
+        ${auto ? `<span>Dein Auto</span><b>${esc([auto.name, auto.carName].filter(Boolean).join(" · "))}</b>
+          <span>Dein Stint</span><b id="hm-stint">wird geladen …</b>
+          <span>Verfügbarkeit</span>${p.av && p.av[meinId] === false ? `<b class="hm-warn-t">fehlt noch · <a href="${autoHref}">eintragen</a></b>` : '<b class="hm-ok">✓ eingetragen</b>'}`
+        : '<span>Dein Auto</span><b class="tm-muted">Du bist für dieses Event noch nicht eingeteilt.</b>'}
+      </div>
+      ${auto ? `<div class="hm-knoepfe"><a class="tm-btn sm red" href="${autoHref}/plan"><span>Mein Stintplan</span></a><a class="tm-btn sm" href="${autoHref}"><span>Mein Fahrzeug</span></a></div>` : `<div class="hm-knoepfe"><a class="tm-btn sm" href="#stint/${esc(p.id)}"><span>Event ansehen</span></a></div>`}
+      ${fehlen.map(x => `<div class="hm-hinweis">⚠ <span><b>${esc(x.name)} (${new Date(x.start).toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit" })}):</b> deine Verfügbarkeit fehlt noch.</span><a class="td-more" href="#stint/${esc(x.id)}/${esc(meinAuto(x).key)}">Eintragen →</a></div>`).join("")}
+    </div>`;
+    // Countdown bis zum Start
+    const cd = document.getElementById("hm-cd");
+    const tick = () => {
+      if (!document.body.contains(cd)) return clearInterval(ti);
+      const rest = (auto && auto.start || p.start) - Date.now();
+      if (rest <= 0) { cd.innerHTML = ""; return clearInterval(ti); }
+      const t = Math.floor(rest / 864e5), h = Math.floor(rest / 36e5) % 24, m = Math.floor(rest / 6e4) % 60, s = Math.floor(rest / 1e3) % 60;
+      cd.innerHTML = [[t, "Tage"], [h, "Std"], [m, "Min"], [s, "Sek"]].map(([v, l]) => `<div><b>${pad(v)}</b><small>${l}</small></div>`).join("");
+    };
+    const ti = setInterval(tick, 1000); tick();
+    // eigener Stint aus dem Stintplan (Zeitplan pro Auto: i = Stint, u = Fahrer, v = Beginn)
+    if (auto) api("/stint/plan?id=" + encodeURIComponent(p.id)).then(r => {
+      const z = document.getElementById("hm-stint");
+      if (!z) return;
+      const car = ((r.plan || {}).cars || []).find(c => c.key === auto.key);
+      const plan = car && Array.isArray(car.schedule) ? [...car.schedule].sort((a, b) => a.v - b.v) : [];
+      const meine = plan.map((x, n) => ({ ...x, bis: (plan[n + 1] || {}).v || ende(p) })).filter(x => x.u === meinId && x.bis > Date.now());
+      z.innerHTML = meine.length ? meine.slice(0, 2).map(x => `Stint ${x.i + 1} · ${uhrzeit(x.v)} bis ${uhrzeit(x.bis)} Uhr`).join("<br>") + (meine.length > 2 ? ` <small class="tm-muted">+ ${meine.length - 2} weitere</small>` : "")
+        : '<span class="tm-muted">noch kein Stint für dich eingeplant</span>';
+    }).catch(() => { const z = document.getElementById("hm-stint"); if (z) z.innerHTML = '<span class="tm-muted">–</span>'; });
+  }
+
+  // Startseite „Live jetzt": wer gerade mit FF Overlay/Toolbox fährt (aus der Spotting-Liste)
+  const LIVE_TYP = { "Race": "Rennen", "Lone Qualify": "Quali", "Open Qualify": "Quali", "Qualify": "Quali", "Practice": "Training", "Lone Practice": "Training", "Warmup": "Warm-up", "Offline Testing": "Testfahrt" };
+  function zeichneLive(liste) {
+    const el = document.getElementById("w-live");
+    if (!el) return;
+    const kopf = `<div class="tp-widget-h">${ICONS.eye}<b>Live jetzt</b><a class="td-more" href="#spotting">Spotting →</a></div>`;
+    const r = [...(liste || [])].sort((a, b) => (b.aktiv - a.aktiv) || b.zuletzt - a.zuletzt).slice(0, 5);
+    el.innerHTML = kopf + (r.length ? `<div class="hm-in hm-live">${r.map(x => `<a class="${x.aktiv ? (x.team ? "unser" : "") : "aus"}" href="#spotting/${esc(x.sub)}"><i></i>
+      <b>${esc(x.von || "?")} · ${esc(x.strecke || "Rennen " + x.sub)}</b>
+      <small>${x.aktiv ? esc([LIVE_TYP[x.typ] || x.typ, (x.teams || []).join(", "), x.autos ? x.autos + " Autos" : ""].filter(Boolean).join(" · "))
+        : "Beendet vor " + Math.max(1, Math.round((Date.now() - x.zuletzt) / 6e4)) + " Min. · verschwindet nach 15 Min."}</small><em>Ansehen →</em></a>`).join("")}</div>`
+      : '<div class="tp-widget-f">Gerade fährt niemand. Wer mit FF Overlay oder der Toolbox fährt, erscheint hier.</div>');
   }
 
   const fmtDay = (iso) => new Date(iso).toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit" });
@@ -636,7 +766,7 @@
     const box = document.getElementById("nl");
     let d;
     try { d = await api("/news"); } catch (e) { box.innerHTML = `<div class="tm-box tm-err">${esc(e.message)}</div>`; return; }
-    if (ME.isAdmin) document.querySelector(".td-head").insertAdjacentHTML("beforeend", `<a class="tm-btn sm red" href="#news-schreiben"><span>News schreiben</span></a>`);
+    if (ME.isAdmin) document.querySelector(".td-head").insertAdjacentHTML("beforeend", `<a class="tm-btn sm red" href="#inhalte/news"><span>News schreiben</span></a>`);
     box.innerHTML = d.news.length ? d.news.map(n => newsCard(n)).join("") :
       `<div class="tm-box tm-soon"><div class="big">Noch leer</div><p>Hier erscheinen Updates und Mitteilungen der Teamleitung.</p></div>`;
   }
@@ -731,7 +861,7 @@
   const readForm = () => Object.fromEntries(["nr", "klasse", "auto", "land", "iracing", "foto", "text"].map(k => [k, document.getElementById("pf-" + k).value]));
 
   async function renderProfile() {
-    main().innerHTML = panelHead("helmet", "Fahrerbereich") + '<div id="pf"><div class="tm-loading"><span></span><span></span><span></span></div></div>';
+    main().innerHTML = panelHead("helmet", "Mein Profil") + '<div id="pf"><div class="tm-loading"><span></span><span></span><span></span></div></div>';
     const box = document.getElementById("pf");
     let d;
     try { d = await api("/profile/me"); } catch (e) { box.innerHTML = `<div class="tm-box tm-err">${esc(e.message)}</div>`; return; }
@@ -1002,7 +1132,7 @@
           <div class="tm-stat"><span class="tm-dot ${d.ready && !db.fehler ? "" : "off"}"></span><div><b>${db.kombis} Strecke/Auto-Kombis</b><div class="tm-muted">${db.offen ? db.offen + " warten noch" : "alles aktuell"}${db.lauf ? " · Stand " + fmtDate(db.lauf) : ""}</div></div></div>
           <div class="tm-stat"><span class="tm-dot ${r && r.strecke ? "" : "off"}"></span><div><b>Nächstes Rennen</b><div class="tm-muted">${rennTxt}</div></div></div>
         </div>
-        ${!d.ready ? '<p class="tm-err" style="margin-top:12px">Garage 61 ist noch nicht eingerichtet (Schlüssel und Team unter Admin).</p>' : ""}
+        ${!d.ready ? '<p class="tm-err" style="margin-top:12px">Garage 61 ist noch nicht eingerichtet (Schlüssel und Team unter Verwaltung → Discord-Posts → Garage 61).</p>' : ""}
         ${db.fehler ? `<p class="tm-err" style="margin-top:12px">Letzter Fehler (${fmtDate(db.fehlerAt)}): ${esc(db.fehler)}</p>` : ""}
         ${db.bremse ? `<p class="tm-muted" style="margin-top:8px">Letzte Bremse von Garage 61 (${fmtDate(db.bremse.at)} · ${esc(db.bremse.path)}): ${esc(db.bremse.hdr || "keine Limit-Angaben mitgeschickt")}</p>` : ""}
         ${db.umbau ? `<p class="tm-muted" style="margin-top:8px">🔄 Bestzeiten werden neu geprüft – noch ${db.offen} Kombis offen. Bis dahin keine Rekord-Posts.</p>` : ""}
@@ -1164,7 +1294,7 @@
 
   async function renderLinks() {
     main().innerHTML = panelHead("link", "Links") + '<div id="lk"><div class="tm-loading"><span></span><span></span><span></span></div></div>';
-    if (ME.isAdmin) document.querySelector(".td-head").insertAdjacentHTML("beforeend", `<a class="tm-btn sm" href="#admin"><span>Links bearbeiten</span></a>`);
+    if (ME.isAdmin) document.querySelector(".td-head").insertAdjacentHTML("beforeend", `<a class="tm-btn sm" href="#team-zugang/links"><span>Links bearbeiten</span></a>`);
     const box = document.getElementById("lk");
     let d;
     try { d = await api("/links"); } catch (e) { box.innerHTML = `<div class="tm-box tm-err">${esc(e.message)}</div>`; return; }
@@ -1298,9 +1428,10 @@
 
   /* ---------------- Nutzung (nur Admin) ---------------- */
   const BEREICHE = {
-    dashboard: "Dashboard", news: "Team News", fahrer: "Fahrerprofil", abwesend: "Abwesenheiten", links: "Links", trainer: "Trainer", stint: "Stintplaner", spotting: "Spotting",
+    dashboard: "Start", news: "Team News", fahrer: "Mein Profil", abwesend: "Abwesenheiten", links: "Links", trainer: "Trainer", stint: "Stintplaner", spotting: "Spotting",
     "g61-woche": "Wochenübersicht", "g61-fleiss": "Trainingsfleiß", "g61-trips": "Fahrtenbuch", "g61-board": "Bestenliste", "g61-ratings": "iRating", "g61-rennen": "Nächstes Rennen", "g61-training": "Training", "g61-bestzeiten": "Bestzeiten",
     aktivitaet: "Aktivität", "news-schreiben": "News schreiben", fahrerprofile: "Fahrerprofile", "kalender-admin": "Rennkalender", admin: "Admin",
+    "discord-posts": "Discord-Posts", "team-zugang": "Team & Zugang", posts: "G61-Posts",
   };
   const fmtWann = (ms) => {
     const min = Math.floor((Date.now() - ms) / 6e4);
@@ -1364,7 +1495,7 @@
           <div class="ta-upd">Stand: <b>${fmtDate(d.at)}</b></div>
           <div class="tm-muted">Gilt für dein ganzes Cloudflare-Konto (alle Worker zusammen) · setzt sich täglich um <b>${esc(d.reset)} Uhr</b> zurück · Cloudflare liefert die Zahlen mit ein paar Minuten Verzögerung</div>
         </div>
-        <div class="tm-actions">${btn("Jetzt aktualisieren", "sm", 'id="li-run"')}<a class="tm-btn sm" href="#admin"><span>Warnung einstellen</span></a></div>
+        <div class="tm-actions">${btn("Jetzt aktualisieren", "sm", 'id="li-run"')}<a class="tm-btn sm" href="#discord-posts/limits"><span>Warnung einstellen</span></a></div>
       </div>
       <div class="ta-list">${d.metrics.map(m => `
         <div class="li-row ${farbe(m.pct)}">
@@ -1713,11 +1844,55 @@
 
 
   /* ---------------- Admin ---------------- */
-  async function renderAdmin(teil) {
-    main().innerHTML = panelHead("admin", "Admin", '<span class="tm-badge">Rollen & Rechte</span>') + '<div id="adm"><div class="tm-loading"><span></span><span></span><span></span></div></div>';
+  // „Was der Bot automatisch postet": eine Zeile pro Post mit Wann, Kanal, Ping, Status (Stand der gespeicherten Einstellungen)
+  function postUebersicht(cfg, d, dp) {
+    const kanal = (id, rest) => id ? `<span class="vw-kanal">#${esc(((d.channels || []).find(c => c.id === id) || {}).name || "unbekannt")}</span>${rest || ""}` : '<span class="tm-muted">kein Kanal</span>';
+    const rolle = (id) => id ? "@" + esc(((d.roles || []).find(r => r.id === id) || {}).name || "Rolle") : "–";
+    const zahn = (ziel) => ziel.startsWith("#")
+      ? `<a class="vw-gear" href="${ziel}" title="Einstellungen öffnen">${ICONS.gear}</a>`
+      : `<a class="vw-gear" href="#discord-posts/${ziel}" data-admteil="${ziel}" title="Einstellungen öffnen">${ICONS.gear}</a>`;
+    const zeile = (name, wann, k, p, an, ziel) => `<tr><td><b>${name}</b></td><td><small>${wann}</small></td><td>${k}</td><td><small>${p}</small></td>
+      <td>${an === null ? '<span class="vw-aus">je Post</span>' : an ? '<span class="vw-an">An</span>' : '<span class="vw-aus">Aus</span>'}</td><td>${zahn(ziel)}</td></tr>`;
+    const gruppe = (t) => `<tr class="vw-gruppe"><td colspan="6">${t}</td></tr>`;
+    const std = (h) => String(h ?? 18).padStart(2, "0") + ":00 Uhr";
+    const und = (l) => l.filter(Boolean).join(" und ");
+    const g = cfg.g61 || {}, wp = cfg.wpost || {}, wpa = cfg.wpostAuto || {}, rm = cfg.reminders || {}, er = cfg.ergebnisse || {};
+    const sp = cfg.spotting || {}, li = cfg.limits || {}, ab = cfg.absences || {}, si = cfg.stint || {};
+    const g61Posts = dp && dp.posts ? Object.keys(POST_INFO).map(k => {
+      const P = dp.posts[k] || {}, w = POST_INFO[k].wann;
+      const wann = w === "sofort" ? "sofort, wenn ein Teamrekord fällt" : w === "rennen" ? (P.tage || 1) + " Tag(e) vor jedem Rennen, " + std(P.stunde)
+        : w === "tage" ? (P.tage || "?") + " Tage vor dem Rennen" : w === "woche" ? WTAGE[(P.tag || 1) - 1] + ", " + std(P.stunde) : "am 1. des Monats, " + std(P.stunde);
+      return zeile(esc(POST_INFO[k].t), wann, kanal(P.channel), "–", !!P.on, "#discord-posts/g61-posts");
+    }).join("") : zeile("Garage-61-Posts", "Rekorde, Rekordbuch, Bestenliste, Monatsrückblick …", '<span class="tm-muted">–</span>', "–", null, "#discord-posts/g61-posts");
+    return `<div class="tm-box vw-posts"><h5>Was der Bot automatisch postet</h5>
+      <p class="hint">Alles auf einen Blick. ⚙ öffnet die Einstellung des Posts (Kanal, Ping, Test-Knopf). Zeigt den gespeicherten Stand.</p>
+      <div class="vw-tab-wrap"><table class="vw-tab"><thead><tr><th>Post</th><th>Wann</th><th>Kanal</th><th>Ping</th><th>Status</th><th></th></tr></thead><tbody>
+      ${gruppe("Garage 61")}
+      ${zeile("⏱️ Neue Bestzeiten", "alle 10 Min. geprüft" + (g.onlyTeamRecord ? ", nur Team-Rekorde (P1)" : ""), kanal(g.channel), "–", !!g.enabled, "g61")}
+      ${zeile("📈 Wochen-Post Training", wpa.an ? WTAGE[(wpa.tag || 1) - 1] + ", " + std(wpa.stunde) : "nur von Hand", kanal(wp.channel || g.channel), rolle(wp.ping), !!wpa.an, "woche")}
+      ${g61Posts}
+      ${gruppe("Rennen")}
+      ${zeile("⏰ Renn-Erinnerungen", (und([rm.h24 && "24 h", rm.h1 && "1 h"]) || "–") + " vor dem Start", kanal(rm.channel), rolle(rm.ping), !!rm.enabled, "erinn")}
+      ${zeile("🗓️ Stintplaner", "Einteilungen und Stint-Erinnerungen (" + (si.vorlauf || 15) + " Min. vorher)", kanal(si.channel, '<small class="tm-muted"> · pro Event änderbar</small>'), si.stintPing ? "Fahrer" : "–", !!si.channel, "#team-zugang/stint")}
+      ${zeile("🏁 Rennergebnisse", "nach der Zielflagge: " + (und([er.team !== false && "Teamrennen", er.alle && "Rennen der Mitglieder", er.overlay && "Overlay-Nutzer"]) || "–"), kanal(er.channel), er.ping ? rolle(er.ping) + " (nur Teamrennen)" : "–", !!er.an, "ergebnisse")}
+      ${zeile("🔴 Spotting · Live-Meldung", (sp.nur === "alle" ? "bei jeder Session" : "bei Teamrennen") + (sp.test ? " und Offline-Testfahrten" : ""), kanal(sp.channel), rolle(sp.ping), !!sp.an, "spotlive")}
+      ${gruppe("Team")}
+      ${zeile("📰 Team News", "beim Veröffentlichen", '<span class="tm-muted">wird beim Schreiben gewählt</span>', "je News", null, "#inhalte/news")}
+      ${zeile("🏖️ Abwesenheiten", "wenn jemand eine Abwesenheit einträgt", kanal(ab.channel), "–", !!ab.channel, "#team-zugang/abw")}
+      ${gruppe("System")}
+      ${zeile("⚠️ Limit-Warnung", "Cloudflare-Gratis-Grenze " + (und([li.p90 && "ab 90 %", li.p100 && "bei 100 %"]) || "–"), kanal(li.channel), rolle(li.ping), !!li.enabled, "limits")}
+      </tbody></table></div></div>`;
+  }
+
+  // Verwaltung → Discord-Posts (Übersicht + Post-Einstellungen) bzw. Team & Zugang; beide Ansichten haben alle Kästen,
+  // die der anderen sind nur ausgeblendet, damit „Speichern" wie bisher alles auf einmal sichert
+  async function renderAdmin(teil, modus) {
+    modus = modus === "discord" ? "discord" : "zugang";
+    main().innerHTML = verwKopf(modus === "discord" ? "discord-posts" : "team-zugang") + '<div id="adm"><div class="tm-loading"><span></span><span></span><span></span></div></div>';
     const box = document.getElementById("adm");
-    let d;
-    try { d = await api("/admin/config"); } catch (e) { box.innerHTML = `<div class="tm-box tm-err">${esc(e.message)}</div>`; return; }
+    let d, dp = null;
+    try { [d, dp] = await Promise.all([api("/admin/config"), modus === "discord" ? api("/admin/posts").catch(() => null) : null]); }
+    catch (e) { box.innerHTML = `<div class="tm-box tm-err">${esc(e.message)}</div>`; return; }
 
     const cfg = d.config;
     const sel = {
@@ -1900,13 +2075,7 @@
 
       <div class="tm-box">
         <h5>Spotting · Live-Meldung</h5>
-        <p class="hint">Hier legst du für alle fest, welche Sessions FF Overlay bzw. die Toolbox ins Spotting schicken dürfen. Geht jemand live, postet der Bot außerdem eine Meldung mit Strecke, Session, Team, Auto, Startnummer und Klassen-SOF und einem Knopf zum Live-Spotting. Wechselt die Session (Training → Rennen), wird der Post angepasst, am Ende steht „Beendet" dran.</p>
-        <div class="tm-row"><div class="lbl">Im Spotting zeigen<small>für alle, mehrere möglich</small></div>
-          <div style="display:flex;flex-direction:column;gap:12px">
-            <label class="tm-switch"><input type="checkbox" id="spl-team" ${(cfg.spotting || {}).team !== false ? "checked" : ""}><span class="s"></span>Teamrennen und Special Events</label>
-            <label class="tm-switch"><input type="checkbox" id="spl-einzel" ${(cfg.spotting || {}).einzel !== false ? "checked" : ""}><span class="s"></span>Einzelrennen (Dailys, Training, Quali)</label>
-            <label class="tm-switch"><input type="checkbox" id="spl-offline" ${(cfg.spotting || {}).test ? "checked" : ""}><span class="s"></span>Offline-Testfahrten (lösen auch die Live-Meldung aus)</label>
-          </div></div>
+        <p class="hint">Geht jemand mit FF Overlay bzw. der Toolbox live, postet der Bot eine Meldung mit Strecke, Session, Team, Auto, Startnummer und Klassen-SOF und einem Knopf zum Live-Spotting. Wechselt die Session (Training → Rennen), wird der Post angepasst, am Ende steht „Beendet" dran. Welche Sessions überhaupt ins Spotting kommen, steht unter Team &amp; Zugang → Spotting.</p>
         <div class="tm-row"><div class="lbl">Live-Meldung</div>
           <div class="tm-actions"><label class="tm-switch"><input type="checkbox" id="spl-an" ${(cfg.spotting || {}).an ? "checked" : ""}><span class="s"></span>An</label></div></div>
         <div class="tm-row"><label for="spl-nur">Wann</label>
@@ -1916,6 +2085,17 @@
         <div class="tm-row"><label for="spl-ping">Ping<small>Rolle, die erwähnt wird</small></label>
           <div><select class="tm-select" id="spl-ping"><option value="">– niemanden pingen –</option>${d.roles.map(r => `<option value="${r.id}" ${r.id === (cfg.spotting || {}).ping ? "selected" : ""}>@${esc(r.name)}</option>`).join("")}</select></div></div>
         <div class="tm-row"><div class="lbl">Testen<small>erst speichern</small></div><div class="tm-actions">${btn("Test-Meldung posten", "sm", 'id="spl-test"')}</div></div>
+      </div>
+
+      <div class="tm-box">
+        <h5>Spotting</h5>
+        <p class="hint">Hier legst du für alle fest, welche Sessions FF Overlay bzw. die Toolbox ins Spotting schicken dürfen. Die Anordnung der Fenster stellst du direkt auf der Spotting-Seite ein, sie gilt dann für alle.</p>
+        <div class="tm-row"><div class="lbl">Im Spotting zeigen<small>für alle, mehrere möglich</small></div>
+          <div style="display:flex;flex-direction:column;gap:12px">
+            <label class="tm-switch"><input type="checkbox" id="spl-team" ${(cfg.spotting || {}).team !== false ? "checked" : ""}><span class="s"></span>Teamrennen und Special Events</label>
+            <label class="tm-switch"><input type="checkbox" id="spl-einzel" ${(cfg.spotting || {}).einzel !== false ? "checked" : ""}><span class="s"></span>Einzelrennen (Dailys, Training, Quali)</label>
+            <label class="tm-switch"><input type="checkbox" id="spl-offline" ${(cfg.spotting || {}).test ? "checked" : ""}><span class="s"></span>Offline-Testfahrten (lösen auch die Live-Meldung aus)</label>
+          </div></div>
       </div>
 
       <div class="tm-savebar" id="savebar"><span>Alles gespeichert</span>${btn("Speichern", "red", 'id="tm-save"')}</div>`;
@@ -1933,8 +2113,10 @@
       sum.appendChild(h);
       det.appendChild(sum);
       while (k.firstChild) det.appendChild(k.firstChild);
+      if (eintrag) det.hidden = DISCORD_TEILE.includes(eintrag[0]) !== (modus === "discord");
       k.replaceWith(det);
     });
+    if (modus === "discord") box.insertAdjacentHTML("afterbegin", postUebersicht(cfg, d, dp));
     if (teil) setTimeout(() => adminOeffnen(teil), 50);
 
     // Rollen-Auswahl vorbelegen + umschalten
@@ -2071,7 +2253,7 @@
     const saveBtn = document.getElementById("tm-save");
     saveBtn.onclick = async () => {
       saveBtn.disabled = true;
-      try { await save(); toast("Gespeichert", true); renderAdmin(); }
+      try { await save(); toast("Gespeichert", true); renderAdmin(teil, modus); }
       catch (e) { toast(e.message); saveBtn.disabled = false; }
     };
 
@@ -2083,7 +2265,7 @@
           if (dirty) await save();
           const r = await api(path, { method: "POST" });
           toast(r.info || "Erledigt", r.ok);
-          renderAdmin();
+          renderAdmin(teil, modus);
         } catch (e) { toast(e.message); b.disabled = false; }
       };
     };
