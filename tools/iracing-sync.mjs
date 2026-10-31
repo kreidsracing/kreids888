@@ -372,6 +372,10 @@ if (quelle === "pdf") {
       if (pw.bop && !w.bop) w.bop = pw.bop;
       if (!w.t) w.t = pw.t;
     }
+    // iRacePlan hinkt manchmal eine Season hinterher: neuere Wochen aus dem PDF anhängen
+    const letzte = s.w.length ? Math.max(...s.w.map(w => Date.parse(w.d + "T00:00:00Z"))) : 0;
+    const neuer = p.w.filter(x => Date.parse(x.d + "T00:00:00Z") > letzte + 3 * 864e5);
+    if (neuer.length) { s.w.push(...neuer); console.log(`${s.n}: ${neuer.length} neuere Wochen aus dem PDF ergänzt`); }
   }
   // Teamrennen, die die API nicht als solche liefert, aus dem PDF ergänzen
   for (const p of pdf.serien) if (p.team && !genutzt.has(p)) serien.push(p);
