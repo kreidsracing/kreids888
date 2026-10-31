@@ -172,7 +172,7 @@
           <span class="ir-info">
             <span class="ir-zeiten">🕒 ${esc(zeiten)}</span>
             ${chips.length ? `<span class="ir-chips">${chips.map(c => `<i>${esc(c)}</i>`).join("")}</span>` : ""}
-            ${e.art === "special" && e.autos ? `<span class="ir-autos">🏎 ${esc(e.autos)}</span>` : ""}
+            ${e.autos ? `<span class="ir-autos">🏎 ${esc(e.autos)}</span>` : ""}
           </span>
         </button>
         ${bop.length ? `<details class="ir-bop"><summary>BoP (${bop.length} Fahrzeuge)</summary>

@@ -310,6 +310,8 @@ async function ausApi(key) {
       felder.kategorie = s.category && typeof s.category === "object" ? Object.keys(s.category) : typeof s.category;
       const sc0 = liste(cs.schedules, "data")[0]; if (sc0) felder.woche = Object.keys(sc0);
     }
+    const kl0 = liste(cs.car_classes, "data")[0];
+    if (kl0 && !felder.klasse) { felder.klasse = Object.keys(kl0); const a0 = liste(kl0.cars, "data")[0]; if (a0) felder.auto = Object.keys(a0); }
     const sp = !!s.special_event, team = !!s.team || Number(cs.max_team_drivers) > 1;
     if (!sp && !team) continue;
     const w = liste(cs.schedules, "data").map((sc, i) => {
@@ -322,10 +324,20 @@ async function ausApi(key) {
       if (st.length) out.s = st;
       return out;
     }).filter(Boolean);
-    if (w.length) serien.push({ n: s.name || k.name, cat: titel(katName(s.category) || katName(k.category)), cls: "", team, sp, cars: "", takt: "", w });
+    if (w.length) serien.push({ n: s.name || k.name, cat: titel(katName(s.category) || katName(k.category)), cls: "", team, sp, cars: autosVon(cs), takt: "", w });
   }
   console.log("API-Felder:", JSON.stringify(felder));
   return { serien, felder };
+}
+// Fahrzeuge einer Season: Fahrzeugnamen aus car_classes[].cars, sonst die Klassennamen
+function autosVon(cs) {
+  const name = (x) => typeof x === "string" ? x : x && (x.name || x.car_name || x.full_name || x.short_name || x.car_name_abbreviated) || "";
+  const out = [];
+  for (const k of liste(cs.car_classes, "data", "classes")) {
+    const autos = liste(k && k.cars, "data").map(name).filter(Boolean);
+    if (autos.length) out.push(...autos); else if (name(k)) out.push(name(k));
+  }
+  return [...new Set(out)].join(", ");
 }
 const katName = (c) => typeof c === "string" ? c : c && typeof c === "object" ? String(c.name || c.title || c.label || c.category || "") : "";
 
@@ -389,7 +401,10 @@ if (!specials.length && fs.existsSync(OUT)) { try { specials = JSON.parse(fs.rea
 // Special Events, die die API schon mit echten Startzeiten liefert, nicht doppelt zeigen
 for (const x of specials) {
   const von = Date.parse(x.von + "T00:00:00Z") - 864e5, bis = Date.parse(x.bis + "T23:59:59Z") + 864e5;
-  if (serien.some(s => s.sp && s.w.some(w => (w.s || []).some(t => t >= von && t <= bis)))) x.api = true;
+  const s = serien.find(s => s.sp && s.w.some(w => (w.s || []).some(t => t >= von && t <= bis)));
+  if (!s) continue;
+  x.api = true;
+  if (!s.cars && x.autos) s.cars = x.autos;
 }
 const daten = { v: 2, saison, quelle: quelle === "iraceplan" ? "iRacePlan-API" : "iRacing Season-PDF", serien, specials };
 if (apiFelder) daten.apiFelder = apiFelder; // Feldnamen der API, falls sich das Format ändert
