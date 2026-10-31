@@ -520,14 +520,26 @@
     const teams = META.teams || [];
     const startVon = (n) => w.starts[n] || startAnpassen(fromLocalInput(w.von + "T" + (w.zeiten[0] || "14:00")), w, true);
     const zeichne = () => {
+      // Auswahl aus dem offiziellen iRacing-Zeitplan (iracing.js)
+      if (w.irOffen && window.F2FIracing) {
+        root.innerHTML = `
+          <a class="sp-back" href="#stint">← Alle Events</a>
+          <div class="sp-wz"><div class="tm-box"><h5>Rennen aus iRacing wählen</h5><div id="ir-box"></div></div></div>`;
+        return window.F2FIracing.zeige(root.querySelector("#ir-box"), {
+          C, tracks: META.tracks,
+          onZurueck: () => { w.irOffen = false; zeichne(); },
+          onPick: (ev) => { const { hinweis, ...felder } = ev; Object.assign(w, felder); w.irHinweis = hinweis; w.irOffen = false; w.schritt = 1; zeichne(); C.toast("Aus iRacing übernommen, bitte kurz prüfen", true); }
+        });
+      }
       const titel = ["Was wird gefahren?", "Wann wird gefahren?"][w.schritt - 1];
+      const irHinweis = w.irHinweis ? `<div class="ir-hinweis">${esc(w.irHinweis)}</div>` : "";
       let inhalt = "";
-      if (w.schritt === 1) inhalt = wasFelder(w) + `
+      if (w.schritt === 1) inhalt = (window.F2FIracing ? `<div class="ir-start">${C.btn("🏁 Aus iRacing wählen", "red sm", 'id="wz-ir"')}<small>Offizielle Rennen und Special Events, täglich aktuell</small></div>` : "") + irHinweis + wasFelder(w) + `
         <details class="sp-mehr"><summary>Mehr (Discord-Kanal, Notizen)</summary>
           <div class="tm-row"><label for="ev-chan">Discord-Kanal</label><select class="tm-select" id="ev-chan"><option value="">Standard${stdKanal() ? " (# " + esc(stdKanal()) + ")" : ""}</option>${(META.channels || []).map(c => `<option value="${c.id}" ${c.id === w.channel ? "selected" : ""}># ${esc(c.name)}</option>`).join("")}</select></div>
           <div class="tm-row"><label for="ev-notiz">Notizen</label><textarea class="tm-input" id="ev-notiz" rows="3" maxlength="1500" placeholder="z. B. Pflichtstopps, Regeln …">${esc(w.notiz)}</textarea></div>
         </details>`;
-      if (w.schritt === 2) inhalt = wannFelder(w);
+      if (w.schritt === 2) inhalt = irHinweis + wannFelder(w);
       if (w.schritt === 3) inhalt = `
         <div class="sp-f"><span>Teams antippen</span><div class="sp-teamwahl">${teams.map(n => `<button type="button" class="sp-teamchip ${w.teams.includes(n) ? "on" : ""}" data-team="${esc(n)}" style="--t1:${teamFarbe(n)[0]}"><i></i>${esc(n)}</button>`).join("") || '<span class="tm-muted">Keine Teams angelegt (Admin → Stintplaner).</span>'}</div></div>
         ${w.teams.map(n => `<div class="sp-wz-team" data-wt="${esc(n)}"><b><i style="background:${teamFarbe(n)[0]}"></i>${esc(n)}</b><div class="sp-grid">${startFelder(startVon(n), "wz" + teams.indexOf(n), w)}</div>
@@ -551,6 +563,7 @@
         }
       };
       $$("#ev-mode [data-m]").forEach(b => b.onclick = () => { lese(); w.mode = b.dataset.m; zeichne(); });
+      if (v("wz-ir")) v("wz-ir").onclick = () => { lese(); w.irOffen = true; zeichne(); };
       if (v("ev-zadd")) v("ev-zadd").onclick = () => { lese(); if (zeitHinzu(w)) zeichne(); };
       $$("[data-zdel]").forEach(b => b.onclick = () => { lese(); w.zeiten.splice(Number(b.dataset.zdel), 1); zeichne(); });
       $$(".sp-wz-team").forEach(box => bindStartFelder(box, "wz" + teams.indexOf(box.dataset.wt)));

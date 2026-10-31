@@ -1,0 +1,312 @@
+/* ===========================================================
+   iRACING-ZEITPLAN  für den F2F-Stintplaner
+   Nur Teamrennen und Special Events. Hauptquelle ist die iRacePlan-API
+   (Secret IRACEPLAN_API_KEY), Rückfall das offizielle Season-PDF von
+   iRacing (pdftotext/poppler-utils). Dazu die Special-Events-Seite von
+   iracing.com. Schreibt team/iracing.json, läuft täglich per GitHub
+   Action (.github/workflows/iracing.yml).
+   Lokal testen: PDF_FILE=… SPECIAL_FILE=… node tools/iracing-sync.mjs team/iracing.json
+   =========================================================== */
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
+import { execFileSync } from "node:child_process";
+
+const PDF_URL = "https://members-assets.iracing.com/public/schedulepdf/SeasonSchedule.pdf";
+const SPECIAL_URL = "https://www.iracing.com/special-events/";
+const UA = "kreids888-team (F2F Stintplaner, https://kreids888.com/team/)";
+const OUT = process.argv[2] || "team/iracing.json";
+
+const KURZ = { sun: 0, mon: 1, tue: 2, wed: 3, thu: 4, fri: 5, sat: 6 };
+const MONATE = { jan: 1, feb: 2, mar: 3, apr: 4, may: 5, jun: 6, jul: 7, aug: 8, sep: 9, oct: 10, nov: 11, dec: 12 };
+const pad = (n) => String(n).padStart(2, "0");
+const isoTag = (ms) => new Date(ms).toISOString().slice(0, 10);
+
+async function holen(url, binaer) {
+  const r = await fetch(url, { headers: { "User-Agent": UA } });
+  if (!r.ok) throw new Error(url + " → HTTP " + r.status);
+  return binaer ? Buffer.from(await r.arrayBuffer()) : r.text();
+}
+
+/* ---------------- Season-PDF ---------------- */
+async function pdfText() {
+  let datei = process.env.PDF_FILE;
+  if (!datei) {
+    datei = path.join(os.tmpdir(), "iracing-season.pdf");
+    fs.writeFileSync(datei, await holen(PDF_URL, true));
+  }
+  return execFileSync("pdftotext", ["-layout", "-enc", "UTF-8", datei, "-"], { maxBuffer: 64 * 1024 * 1024 }).toString("utf8");
+}
+
+// Rennrhythmus (GMT) → periodisch {step, offs, par} oder feste Tage {tage: {6: [[9,0],[19,0]], 0: [[17,0]]}}
+function rhythmus(txt) {
+  const t = String(txt || "").split("|")[0].toLowerCase();
+  if (!t || /timeslots? per week/.test(t)) return null;
+  // Tage auch abgekürzt („Thur & Sat at 10, 19 GMT"); Tage ohne eigene Zeiten teilen sich die nächsten
+  const tagRe = /\b(sun|mon|tue|wed|thu|fri|sat)[a-z]*\b/g;
+  const treffer = [...t.matchAll(tagRe)];
+  if (treffer.length) {
+    const tage = {};
+    let offen = [];
+    treffer.forEach((m, i) => {
+      const stueck = t.slice(m.index + m[0].length, i + 1 < treffer.length ? treffer[i + 1].index : t.length);
+      const zeiten = [...stueck.matchAll(/(\d{1,2})(?::(\d{2}))?/g)].map(z => [Number(z[1]), Number(z[2] || 0)]).filter(([h, mi]) => h < 24 && mi < 60);
+      offen.push(KURZ[m[1]]);
+      if (zeiten.length) { for (const tg of offen) tage[tg] = zeiten; offen = []; }
+    });
+    return Object.keys(tage).length ? { tage } : null;
+  }
+  let step = 0;
+  if (/every (30|thirty) minutes/.test(t)) step = 30;
+  else if (/every 2 hours|every (odd|even|other) 2 hours/.test(t)) step = 120;
+  else if (/every hour|hourly|every 1 hour|^races at :\d\d/.test(t)) step = 60;
+  if (!step) return null;
+  let offs = [...t.matchAll(/:(\d{2})/g)].map(m => Number(m[1]));
+  const vorne = t.match(/(\d{1,2}) past/);
+  if (!offs.length && vorne) offs = [Number(vorne[1])];
+  if (!offs.length) offs = [0];
+  if (step === 30 && offs.length > 1) step = 60;
+  const par = /\bodd\b/.test(t) ? 1 : 0;
+  return { step, offs: [...new Set(offs)].sort((a, b) => a - b), par };
+}
+
+function parseSchedule(txt) {
+  const zeilen = txt.split(/\r?\n/).map(l => l.replace(/\f/g, ""));
+  // Inhaltsverzeichnis: Kategorie (GROSS), Klasse „… (SPORTS CAR)", Serie
+  const toc = [];
+  let cat = "", cls = "", tocEnde = 0;
+  for (let i = 0; i < Math.min(zeilen.length, 600); i++) {
+    const m = zeilen[i].match(/^\s*(.+?)\s*(?:\.\s?){3,}\s*\d+\s*$/);
+    if (!m) continue;
+    tocEnde = i;
+    const name = m[1].trim();
+    const k = name.match(/^(.*Series)\s*\(([A-Z ]+)\)$/);
+    if (k) { cls = k[1].replace(/ Series$/, ""); continue; }
+    if (/^[A-Z ]+$/.test(name)) { cat = name; cls = ""; continue; }
+    toc.push({ name, cat, cls });
+  }
+  // Serien-Blöcke im Text finden
+  const pos = [];
+  const genutzt = new Set();
+  for (const s of toc) {
+    for (let i = tocEnde + 1; i < zeilen.length; i++) {
+      if (!genutzt.has(i) && zeilen[i].trim() === s.name) { pos.push({ ...s, i }); genutzt.add(i); break; }
+    }
+  }
+  pos.sort((a, b) => a.i - b.i);
+  const serien = [];
+  pos.forEach((s, k) => {
+    const block = zeilen.slice(s.i + 1, k + 1 < pos.length ? pos[k + 1].i : zeilen.length);
+    // Kopf: Fahrzeuge bis zur Lizenz-Zeile („… --> …"), danach Rennrhythmus
+    const kopf = [];
+    let j = 0;
+    for (; j < block.length && !/^Week \d+ \(/.test(block[j]) && !/^Min entries/.test(block[j]); j++) kopf.push(block[j]);
+    const li = kopf.findIndex(l => /-->/.test(l));
+    const autos = (li > 0 ? kopf.slice(0, li) : []).map(l => l.trim()).filter(Boolean).join(" ").replace(/\s+/g, " ");
+    const lizenz = li >= 0 ? kopf[li].trim() : "";
+    const takt = (li >= 0 ? kopf.slice(li + 1) : []).map(l => l.trim()).filter(l => l && !/^Min entries/.test(l)).join(" ").replace(/\s+/g, " ");
+    const wochen = parseWochen(block, /see race week for cars/i.test(kopf.join(" ")), s.name);
+    if (!wochen.length) return;
+    const r = rhythmus(takt);
+    // feste Renntage: echte Startzeitpunkte (UTC) in der Rennwoche ab dem Wochendatum
+    if (r && r.tage) for (const w of wochen) {
+      const basis = Date.parse(w.d + "T00:00:00Z");
+      const s = [];
+      for (let t = 0; t < 7; t++) {
+        const tag = basis + t * 864e5, wt = new Date(tag).getUTCDay();
+        for (const [h, mi] of r.tage[wt] || []) s.push(tag + (h * 60 + mi) * 60000);
+      }
+      if (s.length) w.s = s.sort((a, b) => a - b);
+    }
+    const name = s.name.replace(/\s*-?\s*20\d\d Season(?: \d+)?/i, "").replace(/\s+-\s*$/, "").replace(/\s{2,}/g, " ").trim();
+    serien.push({
+      n: name, cat: titel(s.cat), cls: s.cls, team: /team racing/i.test(lizenz),
+      cars: autos, takt, p: r && !r.tage ? r : undefined, w: wochen
+    });
+  });
+  const saison = (txt.match(/20\d\d Season \d/g) || []).reduce((a, x, _, arr) => arr.filter(y => y === x).length > arr.filter(y => y === a).length ? x : a, "");
+  return { saison, serien };
+}
+const titel = (s) => String(s || "").toLowerCase().replace(/\b\w/g, c => c.toUpperCase());
+
+// Wochen-Tabelle eines Serien-Blocks. pdftotext verschiebt bei Seitenumbrüchen die Zeilen
+// gegeneinander, deshalb werden Wochen, Strecken-Zellen und Renndauern getrennt als Strom
+// gelesen und danach der Reihe nach zusammengesetzt. Eine Strecken-Zelle endet immer mit der
+// Sim-Zeit „(2026-09-19 13:40 1x)".
+function parseWochen(block, autosProWoche, name) {
+  const LABEL = /^Week (\d+) \((\d{4}-\d{2}-\d{2})\)/;
+  const MARKE = /^\(\d{4}-\d{2}-\d{2} \d{2}:\d{2}/;
+  const erste = block.findIndex(l => LABEL.test(l));
+  if (erste < 0) return [];
+  // Bedingungen, die bei langen Streckennamen mit nur einem Leerzeichen anschließen
+  const BEDINGUNG = /\s(?:\d+°F|All dry events|Rain (?:possible|chance)|Grid by|Rolling|Standing|Cautions|Local |Full course|Constant weather|Qual )/;
+  const wochen = [], zellen = [], dauern = [], amLabel = [];
+  let zelle = [];
+  for (const roh of block.slice(erste)) {
+    const lm = roh.match(LABEL);
+    if (lm) wochen.push({ nr: Number(lm[1]), d: lm[2] });
+    const z = lm ? " ".repeat(lm[0].length) + roh.slice(lm[0].length) : roh;
+    if (!z.trim() || /^\s*\d+\s*$/.test(z)) continue; // leer / Seitenzahl
+    // Strecken-Spalte: erster Lauf mit einfachen Leerzeichen ab Spalte 15–30 (Sim-Zeit bis 45)
+    let txt = "";
+    if (!z.slice(0, 15).trim()) {
+      const r = z.match(/^(\s*)(\S+(?: \S+)*)/);
+      if (r && r[1].length >= 15 && r[1].length <= 45) {
+        txt = (" " + r[2]).split(BEDINGUNG)[0].trim();
+        if (MARKE.test(txt)) { zellen.push(zelle); zelle = []; }
+        else if (r[1].length <= 30 && txt) zelle.push(txt);
+        else txt = "";
+      }
+    }
+    if (lm) amLabel.push(MARKE.test(txt) ? "" : txt);
+    // Renndauer ganz rechts: Zahl, Einheit steht oft eine Zeile tiefer
+    const einheit = z.match(/\b(laps?|mins?)\s*$/);
+    const offen = dauern.length && !dauern[dauern.length - 1].e ? dauern[dauern.length - 1] : null;
+    if (einheit) {
+      if (offen) offen.e = einheit[1];
+      else { const nz = z.match(/(\d+)\s+(laps?|mins?)\s*$/); if (nz) dauern.push({ n: Number(nz[1]), e: nz[2] }); }
+    } else {
+      const nz = z.match(/\S\s+(\d+)\s*$/);
+      if (nz && z.trimEnd().length > 60 && !/\b(?:Max|Min)\s+\d+\s*$/.test(z)) dauern.push({ n: Number(nz[1]), e: "" });
+    }
+  }
+  // Ohne saubere Sim-Zeit-Zellen: Strecke aus der Wochen-Zeile selbst nehmen
+  const strom = zellen.length === wochen.length;
+  if (!strom || dauern.length !== wochen.length)
+    console.warn(`Hinweis ${name}: ${wochen.length} Wochen, ${zellen.length} Strecken, ${dauern.length} Dauern`);
+  return wochen.map((w, i) => {
+    const c = strom ? zellen[i] : amLabel[i] ? [amLabel[i]] : [];
+    const out = { ...w, t: (autosProWoche ? c.slice(0, 1) : c).join(" ").replace(/\s+/g, " ").trim() };
+    if (autosProWoche && c.length > 1) out.autos = c.slice(1).join(" ").replace(/\s+/g, " ").replace(/\s*,\s*$/, "");
+    const d = dauern[i];
+    if (d && /^lap/.test(d.e)) out.laps = d.n;
+    else if (d && /^min/.test(d.e)) out.min = d.n;
+    return out;
+  });
+}
+
+/* ---------------- Special Events (iracing.com) ---------------- */
+const ohneTags = (h) => String(h || "").replace(/<[^>]*>/g, "").replace(/&nbsp;|&#160;/g, " ").replace(/&#8211;|&ndash;/g, "–").replace(/&#8217;|&rsquo;/g, "’").replace(/&#8220;|&#8221;/g, '"').replace(/&amp;/g, "&").replace(/&#038;/g, "&").replace(/\s+/g, " ").trim();
+function datumBereich(txt, jahrStd) {
+  const t = txt.replace(/[–—]/g, "-");
+  const m = t.match(/([A-Za-z]{3,})\.?\s+(\d{1,2})(?:\s*-\s*(?:([A-Za-z]{3,})\.?\s+)?(\d{1,2}))?,?\s*(\d{4})?/);
+  if (!m) return null;
+  const m1 = MONATE[m[1].slice(0, 3).toLowerCase()];
+  if (!m1) return null;
+  const m2 = m[3] ? MONATE[m[3].slice(0, 3).toLowerCase()] : m1;
+  const jahr = Number(m[5]) || jahrStd;
+  const von = `${jahr}-${pad(m1)}-${pad(Number(m[2]))}`;
+  const bis = m[4] ? `${m2 < m1 ? jahr + 1 : jahr}-${pad(m2)}-${pad(Number(m[4]))}` : von;
+  return { von, bis };
+}
+function parseSpecials(html) {
+  const jahrStd = Number((html.match(/(20\d\d) Special Events Calendar/) || [])[1]) || new Date().getUTCFullYear();
+  const out = [];
+  for (const sec of html.split("<section").slice(1)) {
+    const h2 = sec.match(/<h2[^>]*>([\s\S]*?)<\/h2>/);
+    if (!h2) continue;
+    const name = ohneTags(h2[1]);
+    const vor = sec.slice(0, h2.index);
+    const tagM = [...vor.matchAll(/<p[^>]*>([\s\S]*?)<\/p>/g)].pop();
+    const tag = tagM ? ohneTags(tagM[1]) : "";
+    const nach = sec.slice(h2.index + h2[0].length);
+    const ps = [...nach.matchAll(/<p[^>]*>([\s\S]*?)<\/p>/g)];
+    if (!ps.length) continue;
+    const datum = datumBereich(ohneTags(ps[0][1]), jahrStd);
+    if (!datum) continue;
+    const text = ps.slice(1, 3).map(p => ohneTags(p[1])).join(" ").slice(0, 600);
+    const orte = [...new Set(ps.slice(1, 3).flatMap(p => [...p[1].matchAll(/<a[^>]*>([\s\S]*?)<\/a>/g)].map(a => ohneTags(a[1]))).filter(x => x && x.length < 80))];
+    const hm = (name + " " + text).match(/(\d{1,2})\s*-?\s*(?:hours?|hrs?|hr|h)\b/i);
+    const id = (sec.match(/^[^>]*\bid="([^"]+)"/) || [])[1] || name.toLowerCase().replace(/[^a-z0-9]+/g, "-");
+    out.push({ id, n: name, tag: tag.length < 30 ? tag : "", von: datum.von, bis: datum.bis, h: hm ? Number(hm[1]) : undefined, txt: text, orte });
+  }
+  return out.sort((a, b) => a.von.localeCompare(b.von));
+}
+
+/* ---------------- iRacePlan-API (Hauptquelle) ----------------
+   Schlüssel aus iraceplan.com/settings/api_keys, liegt als GitHub-Secret IRACEPLAN_API_KEY.
+   Nur lesen, behutsam (≈4 Anfragen/s), bei 429 Retry-After abwarten. Alle Zeiten UTC. */
+const API = process.env.IRACEPLAN_API_URL || "https://iraceplan.com/api/v1";
+const warte = (ms) => new Promise(r => setTimeout(r, ms));
+async function apiHolen(pfad, key, versuch = 0) {
+  const r = await fetch(API + pfad, { headers: { Authorization: "Bearer " + key, Accept: "application/json", "User-Agent": UA } });
+  if (r.status === 429 && versuch < 5) { await warte((Number(r.headers.get("retry-after")) || 5) * 1000); return apiHolen(pfad, key, versuch + 1); }
+  if (!r.ok) throw new Error("iRacePlan " + pfad.split("?")[0] + " → HTTP " + r.status);
+  await warte(250);
+  return r.json();
+}
+const liste = (x, ...keys) => Array.isArray(x) ? x : (keys.map(k => x && x[k]).find(Array.isArray) || []);
+function streckeVon(sc) {
+  const t = sc.track;
+  if (typeof t === "string") return t;
+  const name = (t && (t.name || t.track_name)) || sc.track_name || "";
+  const cfg = (t && (t.config_name || t.configuration || t.config)) || sc.track_config_name || sc.config_name || "";
+  return cfg && !name.includes(cfg) ? (name ? name + " - " + cfg : cfg) : name;
+}
+async function ausApi(key) {
+  const alle = liste(await apiHolen("/series?limit=500", key), "series", "data", "items");
+  if (!alle.length) throw new Error("keine Serien in der Antwort");
+  // Stehen die Kennzeichen schon in der Liste, nur passende Serien im Detail holen
+  const hatFlags = alle.some(s => s && ("special_event" in s || "team" in s));
+  const kandidaten = hatFlags ? alle.filter(s => s.special_event || s.team) : alle;
+  const serien = [];
+  let saison = "", gezeigt = false;
+  for (const k of kandidaten) {
+    const det = await apiHolen("/series/" + encodeURIComponent(k.id), key);
+    const s = det.serie || det.series || det.data || det;
+    const cs = s.current_season || {};
+    if (!gezeigt) { console.log("Felder Serie:", Object.keys(s).join(", "), "| Saison:", Object.keys(cs).join(", ")); gezeigt = true; }
+    const sp = !!s.special_event, team = !!s.team || Number(cs.max_team_drivers) > 1;
+    if (!sp && !team) continue;
+    if (!saison && (cs.season_name || cs.name)) saison = cs.season_name || cs.name;
+    const w = liste(cs.schedules, "data").map((sc, i) => {
+      const st = liste(sc.session_times, "data").map(x => Date.parse(x.start_at)).filter(Number.isFinite).sort((a, b) => a - b);
+      const d = sc.start_date ? String(sc.start_date).slice(0, 10) : st.length ? isoTag(st[0]) : "";
+      if (!d) return null;
+      const out = { nr: i + 1, d, t: streckeVon(sc) };
+      if (Number(sc.race_lap_limit) > 0) out.laps = Number(sc.race_lap_limit);
+      else if (Number(sc.race_time_limit) > 0) out.min = Number(sc.race_time_limit);
+      if (st.length) out.s = st;
+      return out;
+    }).filter(Boolean);
+    if (w.length) serien.push({ n: s.name || k.name, cat: titel(s.category || k.category || ""), cls: "", team, sp, cars: "", takt: "", w });
+  }
+  return { saison, serien };
+}
+
+/* ---------------- Ablauf ----------------
+   Nur Teamrennen und Special Events, keine Daily-Rennen. */
+let quelle = "pdf", saison = "", serien = [];
+const KEY = process.env.IRACEPLAN_API_KEY;
+if (KEY) {
+  try {
+    const a = await ausApi(KEY);
+    if (a.serien.length) { serien = a.serien; saison = a.saison; quelle = "iraceplan"; }
+    else console.warn("iRacePlan: keine Teamrennen/Special Events gefunden, nehme das offizielle PDF.");
+  } catch (e) { console.warn("iRacePlan-API nicht nutzbar (" + e.message + "), nehme das offizielle PDF."); }
+} else console.log("Kein IRACEPLAN_API_KEY gesetzt, nehme das offizielle PDF.");
+if (quelle === "pdf") {
+  const pdf = parseSchedule(await pdfText());
+  if (pdf.serien.length < 50) throw new Error("Zu wenige Serien im PDF erkannt (" + pdf.serien.length + ") – Format geändert?");
+  saison = pdf.saison;
+  serien = pdf.serien.filter(s => s.team);
+}
+let specials = [];
+try { specials = parseSpecials(process.env.SPECIAL_FILE ? fs.readFileSync(process.env.SPECIAL_FILE, "utf8") : await holen(SPECIAL_URL)); }
+catch (e) { console.warn("Special Events nicht geladen:", e.message); }
+// alte Special Events behalten, falls die Seite mal nichts liefert
+if (!specials.length && fs.existsSync(OUT)) { try { specials = JSON.parse(fs.readFileSync(OUT, "utf8")).specials || []; } catch { } }
+
+// Special Events, die die API schon mit echten Startzeiten liefert, nicht doppelt zeigen
+for (const x of specials) {
+  const von = Date.parse(x.von + "T00:00:00Z") - 864e5, bis = Date.parse(x.bis + "T23:59:59Z") + 864e5;
+  if (serien.some(s => s.sp && s.w.some(w => (w.s || []).some(t => t >= von && t <= bis)))) x.api = true;
+}
+const daten = { v: 2, saison, quelle: quelle === "iraceplan" ? "iRacePlan-API" : "iRacing Season-PDF", serien, specials };
+const neu = JSON.stringify(daten);
+let alt = "";
+try { const a = JSON.parse(fs.readFileSync(OUT, "utf8")); delete a.stand; alt = JSON.stringify(a); } catch { }
+if (alt === neu) { console.log("Keine Änderung."); process.exit(0); }
+fs.mkdirSync(path.dirname(OUT), { recursive: true });
+fs.writeFileSync(OUT, JSON.stringify({ ...daten, stand: new Date().toISOString() }));
+console.log(`Geschrieben (${daten.quelle}): ${saison}, ${serien.length} Serien (${serien.filter(s => s.sp).length} Special Events), ${specials.length} Special Events von iracing.com → ${OUT}`);

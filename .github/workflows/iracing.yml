@@ -1,0 +1,45 @@
+# Holt täglich Teamrennen und Special Events (iRacePlan-API, Rückfall: offizielles
+# iRacing Season-PDF) plus die Special-Events-Seite von iracing.com und schreibt
+# team/iracing.json für den F2F-Stintplaner. Läuft auf GitHub (gratis), Cloudflare
+# wird dafür nicht gebraucht. Secret: IRACEPLAN_API_KEY (Repo → Settings → Secrets → Actions).
+name: iRacing-Zeitplan
+
+on:
+  schedule:
+    - cron: "17 4 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: iracing-zeitplan
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: pdftotext installieren
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq poppler-utils
+      - name: Zeitplan holen
+        env:
+          IRACEPLAN_API_KEY: ${{ secrets.IRACEPLAN_API_KEY }}
+        run: node tools/iracing-sync.mjs team/iracing.json
+      - name: Änderung speichern
+        run: |
+          if git diff --quiet -- team/iracing.json && git ls-files --error-unmatch team/iracing.json >/dev/null 2>&1; then
+            echo "Keine Änderung."
+            exit 0
+          fi
+          git config user.name "iRacing-Zeitplan"
+          git config user.email "actions@users.noreply.github.com"
+          git add team/iracing.json
+          git commit -m "iRacing-Zeitplan aktualisiert"
+          git pull --rebase -q
+          git push

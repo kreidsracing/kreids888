@@ -2030,3 +2030,23 @@ body:has(.td)::after{content:"";position:fixed;inset:0;z-index:-1;pointer-events
 .sp-drv-who b{display:block;white-space:nowrap}
 .sp-drv tbody tr:hover{background:rgba(255,255,255,.025)}
 @media(max-width:700px){.sp-av-st b{display:none}.sp-av-pinsel{flex-wrap:wrap;border-radius:16px}}
+/* iRacing-Auswahl im Event-Assistenten (iracing.js) */
+.ir-start{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:0 0 16px;padding:12px 14px;border:1px dashed var(--sp-bd2,rgba(255,255,255,.12));border-radius:14px;background:rgba(225,19,36,.06)}
+.ir-start small{color:var(--steel);font-size:13px}
+.ir-hinweis{margin:0 0 14px;padding:10px 14px;border-left:3px solid var(--red);border-radius:10px;background:rgba(225,19,36,.08);font-size:13.5px;line-height:1.45}
+.ir-kopf{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:12px}
+.ir-kopf .tm-input{flex:1 1 220px;min-width:0}
+.ir-liste{display:grid;gap:6px;max-height:min(60vh,560px);overflow:auto;overscroll-behavior:contain;padding-right:2px}
+.ir-item{display:grid;grid-template-columns:minmax(0,130px) minmax(0,1.4fr) minmax(0,1.2fr) minmax(0,90px);gap:12px;align-items:center;text-align:left;width:100%;min-width:0;
+  padding:10px 14px;border:1px solid var(--sp-bd,rgba(255,255,255,.07));border-radius:12px;background:var(--sp-glass2,rgba(32,36,46,.6));color:var(--white);cursor:pointer;font:inherit;transition:.15s}
+.ir-item:hover,.ir-item:focus-visible{border-color:var(--red);background:rgba(225,19,36,.1)}
+.ir-item>span{min-width:0}
+.ir-item.sp{border-left:3px solid var(--red)}
+.ir-wann{font-family:var(--disp);font-weight:700;font-size:13px;color:var(--steel)}
+.ir-was b{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ir-was small{display:block;color:var(--steel);font-size:12px}
+.ir-ort{font-size:13px;color:var(--steel);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ir-dauer{font-family:var(--disp);font-weight:800;text-align:right;white-space:nowrap}
+.ir-fuss{font-size:12px;margin-top:10px}
+#ir-mehr{margin-top:10px}
+@media(max-width:700px){.ir-item{grid-template-columns:minmax(0,1fr) auto;gap:4px 10px}.ir-wann{grid-column:1/-1}.ir-ort{grid-column:1/2}.ir-dauer{grid-row:2/4;grid-column:2}}
