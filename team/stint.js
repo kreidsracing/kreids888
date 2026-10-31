@@ -1522,29 +1522,49 @@
     pop.onclick = (e) => e.stopPropagation();
     if (S.popZu) document.removeEventListener("click", S.popZu);
     S.popZu = zu; document.addEventListener("click", zu);
-    // Zeitstrahl: Stint anklicken = auswählen, in andere Fahrerzeile ziehen = Fahrer tauschen
+    // Zeitstrahl: Stint anklicken = auswählen, in andere Fahrerzeile ziehen = Fahrer tauschen.
+    // Beim Ziehen hängt ein Abbild am Mauszeiger (die Zeilen schneiden ab), die Zielzeile zeigt den Stint schon an seiner Stelle.
     $$(".sp-sw-b").forEach(bl => bl.onpointerdown = (e) => {
       if (e.button !== 0) return;
       const i = Number(bl.dataset.st), x = rows[i];
       const y0 = e.clientY, x0 = e.clientX;
-      let zieht = false, ziel = null;
+      let zieht = false, ziel = null, geist = null, vorschau = null;
       bl.setPointerCapture(e.pointerId);
       bl.onpointermove = (ev) => {
         if (x.real) return;
-        const dy = ev.clientY - y0;
-        if (!zieht && Math.hypot(dy, ev.clientX - x0) < 5) return;
-        zieht = true; bl.classList.add("zieht"); bl.style.transform = `translateY(${dy}px)`;
-        bl.style.pointerEvents = "none";
+        if (!zieht && Math.hypot(ev.clientY - y0, ev.clientX - x0) < 5) return;
+        if (!zieht) {
+          zieht = true;
+          const r = bl.getBoundingClientRect();
+          geist = bl.cloneNode(true);
+          geist.classList.remove("on");
+          geist.classList.add("sp-sw-geist");
+          Object.assign(geist.style, { left: r.left + "px", top: r.top + "px", width: r.width + "px", height: r.height + "px", bottom: "auto" });
+          geist.style.setProperty("--c", getComputedStyle(bl).getPropertyValue("--c"));
+          document.body.appendChild(geist);
+          bl.classList.add("quelle");
+        }
+        geist.style.transform = `translate(${ev.clientX - x0}px, ${ev.clientY - y0}px)`;
         const unter = document.elementFromPoint(ev.clientX, ev.clientY);
-        bl.style.pointerEvents = "";
-        const row = unter && unter.closest(".sp-sw-row");
-        $$(".sp-sw-row.ziel").forEach(z => z.classList.remove("ziel"));
-        ziel = row && row.dataset.row !== x.uid ? row : null;
-        if (ziel) ziel.classList.add("ziel");
+        const row = unter && unter.closest(".sp-sw-row[data-row]");
+        const neu = row && row.dataset.row !== x.uid ? row : null;
+        if (neu === ziel) return;
+        if (ziel) ziel.classList.remove("ziel");
+        if (vorschau) { vorschau.remove(); vorschau = null; }
+        ziel = neu;
+        if (!ziel) return;
+        ziel.classList.add("ziel");
+        vorschau = document.createElement("div");
+        vorschau.className = "sp-sw-b sp-sw-vorschau";
+        vorschau.style.left = bl.style.left; vorschau.style.width = bl.style.width;
+        vorschau.innerHTML = `<b>${i + 1}</b>`;
+        ziel.querySelector(".sp-sw-lane").appendChild(vorschau);
       };
-      bl.onpointerup = () => {
-        bl.onpointermove = bl.onpointerup = null;
-        bl.classList.remove("zieht"); bl.style.transform = "";
+      bl.onpointerup = bl.onpointercancel = () => {
+        bl.onpointermove = bl.onpointerup = bl.onpointercancel = null;
+        if (geist) geist.remove();
+        if (vorschau) vorschau.remove();
+        bl.classList.remove("quelle");
         $$(".sp-sw-row.ziel").forEach(z => z.classList.remove("ziel"));
         if (zieht && ziel) setzeFahrer(i, ziel.dataset.row);
         else if (!zieht) waehle(i, true);

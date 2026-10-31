@@ -141,12 +141,22 @@ function parseWochen(block, autosProWoche, name) {
   // Bedingungen, die bei langen Streckennamen mit nur einem Leerzeichen anschließen
   const BEDINGUNG = /\s(?:\d+°F|All dry events|Rain (?:possible|chance)|Grid by|Rolling|Standing|Cautions|Local |Full course|Constant weather|Qual )/;
   const wochen = [], zellen = [], dauern = [], amLabel = [];
-  let zelle = [];
+  let zelle = [], bed = "";
   for (const roh of block.slice(erste)) {
     const lm = roh.match(LABEL);
     if (lm) wochen.push({ nr: Number(lm[1]), d: lm[2] });
     const z = lm ? " ".repeat(lm[0].length) + roh.slice(lm[0].length) : roh;
     if (!z.trim() || /^\s*\d+\s*$/.test(z)) continue; // leer / Seitenzahl
+    // Bedingungs-Spalte (Wetter, Start, Gelb, Fahrer, BoP) als Strom; jede Zelle beginnt mit der Temperatur
+    const ti = z.search(/\d+°F\/-?\d+°C/);
+    let ci = ti;
+    if (ci < 0) for (const m of z.matchAll(/\s{2,}(?=\S)/g)) { const p = m.index + m[0].length; if (p >= 40) { ci = p; break; } }
+    if (ci >= 0) {
+      let c = z.slice(ci).trimEnd();
+      if (/\b(?:Max|Min)\s+\d+(?:\s+(?:laps?|mins?))?$/.test(c)) c = c.replace(/\s+(?:laps?|mins?)$/, "");
+      else c = c.replace(/\s+\d+(?:\s+(?:laps?|mins?))?$/, "").replace(/\s*\b(?:laps?|mins?)$/, "").replace(/\s+[HCF]:\d+L$/, "");
+      if (c.trim()) bed += " " + c.trim();
+    }
     // Strecken-Spalte: erster Lauf mit einfachen Leerzeichen ab Spalte 15–30 (Sim-Zeit bis 45)
     let txt = "";
     if (!z.slice(0, 15).trim()) {
@@ -172,8 +182,10 @@ function parseWochen(block, autosProWoche, name) {
   }
   // Ohne saubere Sim-Zeit-Zellen: Strecke aus der Wochen-Zeile selbst nehmen
   const strom = zellen.length === wochen.length;
-  if (!strom || dauern.length !== wochen.length)
-    console.warn(`Hinweis ${name}: ${wochen.length} Wochen, ${zellen.length} Strecken, ${dauern.length} Dauern`);
+  const bedZellen = bed.split(/(?=\d+°F\/-?\d+°C)/).map(x => x.trim()).filter(x => /^\d+°F/.test(x));
+  if (!strom || dauern.length !== wochen.length || bedZellen.length !== wochen.length)
+    console.warn(`Hinweis ${name}: ${wochen.length} Wochen, ${zellen.length} Strecken, ${dauern.length} Dauern, ${bedZellen.length} Bedingungen`);
+  let letzteBop = null; // BoP steht nur in der Woche, in der sie sich ändert, und gilt bis zur nächsten
   return wochen.map((w, i) => {
     const c = strom ? zellen[i] : amLabel[i] ? [amLabel[i]] : [];
     const out = { ...w, t: (autosProWoche ? c.slice(0, 1) : c).join(" ").replace(/\s+/g, " ").trim() };
@@ -181,8 +193,36 @@ function parseWochen(block, autosProWoche, name) {
     const d = dauern[i];
     if (d && /^lap/.test(d.e)) out.laps = d.n;
     else if (d && /^min/.test(d.e)) out.min = d.n;
+    if (bedZellen.length === wochen.length) Object.assign(out, bedingungen(bedZellen[i]));
+    if (out.bop) letzteBop = out.bop; else if (letzteBop) out.bop = letzteBop;
     return out;
   });
+}
+
+// Bedingungs-Zelle → wx {c: °C, r: 0 trocken / Regen-% / -1 möglich, st: r|s, gelb, fmin, fmax} und bop [[Kürzel, Sprit %, kg, Leistung %]]
+function bedingungen(txt) {
+  const wx = {};
+  const t = txt.match(/^\d+°F\/(-?\d+)°C/);
+  if (t) wx.c = Number(t[1]);
+  const rc = txt.match(/Rain chance (\d+)%/i);
+  if (rc) wx.r = Number(rc[1]); else if (/Rain possible/i.test(txt)) wx.r = -1; else if (/All dry/i.test(txt)) wx.r = 0;
+  if (/Standing start/i.test(txt)) wx.st = "s"; else if (/Rolling start/i.test(txt)) wx.st = "r";
+  if (/Local enforced cautions/i.test(txt)) wx.gelb = "lokal"; else if (/Full course cautions/i.test(txt)) wx.gelb = "voll"; else if (/Cautions disabled/i.test(txt)) wx.gelb = "aus";
+  const fmin = txt.match(/Min (\d+) drivers?/i), fmax = txt.match(/Max (\d+) drivers?/i);
+  if (fmin) wx.fmin = Number(fmin[1]);
+  if (fmax) wx.fmax = Number(fmax[1]);
+  // BoP steht hinter „Qual scrutiny - …." als „KÜRZEL: fuel: 97%, 5.0kg, pwr: -0.50%"
+  const rest = txt.split(/Qual scrutiny - \w+\.?/i).slice(1).join(" ");
+  const bop = [];
+  for (const m of rest.matchAll(/\b([A-Z0-9][A-Za-z0-9]{1,9}):\s+(.*?)(?=\s[A-Z0-9][A-Za-z0-9]{1,9}:\s|$)/g)) {
+    const v = m[2].replace(/-\s+(?=\d)/g, "-");
+    const fuel = v.match(/fuel:\s*(\d+(?:\.\d+)?)%/), kg = v.match(/(-?\d+(?:\.\d+)?)kg/), pwr = v.match(/pwr:\s*(-?\d+(?:\.\d+)?)%/);
+    if (fuel || kg || pwr) bop.push([m[1], fuel ? Number(fuel[1]) : null, kg ? Number(kg[1]) : null, pwr ? Number(pwr[1]) : null]);
+  }
+  const out = {};
+  if (Object.keys(wx).length) out.wx = wx;
+  if (bop.length) out.bop = bop;
+  return out;
 }
 
 /* ---------------- Special Events (iracing.com) ---------------- */
@@ -198,6 +238,14 @@ function datumBereich(txt, jahrStd) {
   const von = `${jahr}-${pad(m1)}-${pad(Number(m[2]))}`;
   const bis = m[4] ? `${m2 < m1 ? jahr + 1 : jahr}-${pad(m2)}-${pad(Number(m[4]))}` : von;
   return { von, bis };
+}
+// Kategorie eines Special Events aus Fahrzeugen/Name (wie im Season-PDF: Sports Car, Formula Car, Oval, Dirt …)
+function kategorie(txt) {
+  if (/sprint car|midget|dirt|off-road|rallycross|chili bowl|knoxville|ump\b/i.test(txt)) return "Dirt";
+  if (/nascar|late model|modified|arca|legends|street stock|truck|stock car/i.test(txt)) return "Oval";
+  if (/formula|ff1600|f1600|dallara|indycar|ir-?18|indy 500|skip barber|\bf[34]\b|super formula/i.test(txt)) return "Formula Car";
+  if (/gt[34]|gtp|hyp|lmp|lmh|porsche|cup 99|supercars|tcr|mx-?5|bmw|production car|prototype|hpd|gt[12]\b|radical|ferrari|touring|clio|gr86|scca|endurance|team event/i.test(txt)) return "Sports Car";
+  return "";
 }
 function parseSpecials(html) {
   const jahrStd = Number((html.match(/(20\d\d) Special Events Calendar/) || [])[1]) || new Date().getUTCFullYear();
@@ -218,7 +266,8 @@ function parseSpecials(html) {
     const orte = [...new Set(ps.slice(1, 3).flatMap(p => [...p[1].matchAll(/<a[^>]*>([\s\S]*?)<\/a>/g)].map(a => ohneTags(a[1]))).filter(x => x && x.length < 80))];
     const hm = (name + " " + text).match(/(\d{1,2})\s*-?\s*(?:hours?|hrs?|hr|h)\b/i);
     const id = (sec.match(/^[^>]*\bid="([^"]+)"/) || [])[1] || name.toLowerCase().replace(/[^a-z0-9]+/g, "-");
-    out.push({ id, n: name, tag: tag.length < 30 ? tag : "", von: datum.von, bis: datum.bis, h: hm ? Number(hm[1]) : undefined, txt: text, orte });
+    const autos = [...sec.matchAll(/<summary[^>]*>([\s\S]*?)<\/summary>/g)].map(m => ohneTags(m[1])).filter(Boolean).join(", ");
+    out.push({ id, n: name, tag: tag.length < 30 ? tag : "", cat: kategorie(autos + " " + name + " " + tag), von: datum.von, bis: datum.bis, h: hm ? Number(hm[1]) : undefined, autos, txt: text, orte });
   }
   return out.sort((a, b) => a.von.localeCompare(b.von));
 }
@@ -285,11 +334,34 @@ if (KEY) {
     else console.warn("iRacePlan: keine Teamrennen/Special Events gefunden, nehme das offizielle PDF.");
   } catch (e) { console.warn("iRacePlan-API nicht nutzbar (" + e.message + "), nehme das offizielle PDF."); }
 } else console.log("Kein IRACEPLAN_API_KEY gesetzt, nehme das offizielle PDF.");
+// Season-PDF immer lesen: Rückfall-Quelle und Zusatzinfos (Klasse, Wetter, Start, BoP, Fahrzeuge)
+let pdf = null;
+try {
+  pdf = parseSchedule(await pdfText());
+  if (pdf.serien.length < 50) throw new Error("nur " + pdf.serien.length + " Serien erkannt, Format geändert?");
+} catch (e) {
+  if (quelle === "pdf") throw new Error("Season-PDF: " + e.message);
+  console.warn("Season-PDF nicht nutzbar (" + e.message + "), nur API-Daten.");
+  pdf = null;
+}
 if (quelle === "pdf") {
-  const pdf = parseSchedule(await pdfText());
-  if (pdf.serien.length < 50) throw new Error("Zu wenige Serien im PDF erkannt (" + pdf.serien.length + ") – Format geändert?");
   saison = pdf.saison;
   serien = pdf.serien.filter(s => s.team);
+} else if (pdf) {
+  const nn = (s) => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9]+/g, " ").replace(/\b(fixed|by \w+)\b/g, "").trim();
+  for (const s of serien) {
+    const p = pdf.serien.find(x => nn(x.n) === nn(s.n)) || pdf.serien.find(x => nn(x.n).includes(nn(s.n)) || nn(s.n).includes(nn(x.n)));
+    if (!p) continue;
+    s.cat = s.cat || p.cat; s.cls = s.cls || p.cls; s.cars = s.cars || p.cars; s.takt = s.takt || p.takt;
+    for (const w of s.w) {
+      const tag = Date.parse(w.d + "T00:00:00Z");
+      const pw = p.w.find(x => Math.abs(Date.parse(x.d + "T00:00:00Z") - tag) <= 3 * 864e5);
+      if (!pw) continue;
+      if (pw.wx && !w.wx) w.wx = pw.wx;
+      if (pw.bop && !w.bop) w.bop = pw.bop;
+      if (!w.t) w.t = pw.t;
+    }
+  }
 }
 let specials = [];
 try { specials = parseSpecials(process.env.SPECIAL_FILE ? fs.readFileSync(process.env.SPECIAL_FILE, "utf8") : await holen(SPECIAL_URL)); }
