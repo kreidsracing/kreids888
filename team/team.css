@@ -1992,3 +1992,41 @@ body:has(.td)::after{content:"";position:fixed;inset:0;z-index:-1;pointer-events
 }
 @media(max-width:1100px){.sp-sw-achse span:nth-child(2n){display:none}}
 @media(max-width:700px){.sp-sw-achse span{display:none}.sp-sw-achse span:nth-child(3n+1){display:block}}
+/* ===== Stintplaner: Verfügbarkeit als Zeitstrahl (Ziehen zum Eintragen) ===== */
+.sp-av-tools{display:flex;flex-wrap:wrap;align-items:center;gap:10px 16px;margin-bottom:10px}
+.sp-av-pinsel{display:inline-flex;padding:4px;gap:4px;border-radius:999px;background:rgba(255,255,255,.04);border:1px solid var(--sp-bd2,rgba(255,255,255,.1))}
+.sp-av-pinsel button{display:inline-flex;align-items:center;gap:7px;border:0;background:none;color:#cfd5df;font-weight:700;font-size:13px;padding:7px 14px 7px 8px;border-radius:999px;cursor:pointer;transition:background .12s,color .12s}
+.sp-av-pinsel button i{width:22px;height:22px;border-radius:50%;display:grid;place-items:center;font-style:normal;font-size:12px;font-weight:900;color:#fff}
+.sp-av-pinsel .p2 i{background:#22b862}.sp-av-pinsel .p1 i{background:#e89a00}.sp-av-pinsel .p0 i{background:#e0303f}.sp-av-pinsel .px i{background:#4a4f5c}
+.sp-av-pinsel button:hover{background:rgba(255,255,255,.06)}
+.sp-av-pinsel button.on{background:rgba(255,255,255,.12);color:#fff;box-shadow:inset 0 0 0 1px rgba(255,255,255,.22)}
+.sp-av-tipp{flex:1;min-width:200px;font-size:12.5px;color:var(--steel)}
+.sp-avw{position:relative}
+.sp-avw .sp-sw-lane{height:34px}
+.sp-avw .sp-sw-av.v2{background:linear-gradient(180deg,rgba(46,204,113,.62),rgba(31,168,90,.5))}
+.sp-avw .sp-sw-av.v1{background:linear-gradient(180deg,rgba(255,176,32,.6),rgba(240,154,0,.48))}
+.sp-avw .sp-sw-av.v0{background:repeating-linear-gradient(135deg,rgba(255,59,59,.55) 0 6px,rgba(255,59,59,.3) 6px 12px)}
+.sp-avw .sp-sw-lane.mal{cursor:crosshair;touch-action:none;background:rgba(255,255,255,.05);box-shadow:inset 0 0 0 1px rgba(255,255,255,.14)}
+.sp-avw .sp-sw-row.ich{background:rgba(255,255,255,.025)}
+.sp-av-grenze{position:absolute;top:0;bottom:0;width:1px;background:rgba(255,255,255,.14);pointer-events:none;z-index:1}
+.sp-av-leer{position:absolute;inset:0;display:grid;place-items:center;font-size:12.5px;color:var(--steel);pointer-events:none}
+.sp-av-strow .sp-sw-lane{height:26px;background:none;overflow:visible}
+.sp-av-strow .sp-sw-name small{color:var(--steel);font-size:11px;text-transform:uppercase;letter-spacing:.1em;font-weight:700}
+.sp-av-st{position:absolute;top:2px;bottom:2px;border:0;padding:0;margin:0;border-radius:6px;background:var(--c);opacity:.85;color:#fff;font-size:11px;font-weight:800;cursor:pointer;box-shadow:inset 0 0 0 1px rgba(255,255,255,.18);display:grid;place-items:center;overflow:hidden;border-left:1px solid #0e1015}
+.sp-av-st b{text-shadow:0 1px 2px rgba(0,0,0,.6)}
+.sp-av-st:hover:not(:disabled){opacity:1;filter:brightness(1.2)}
+.sp-av-st:disabled{cursor:default}
+.sp-av-tip{position:absolute;transform:translate(-50%,-100%);background:#fff;color:#111;font-size:12px;font-weight:800;padding:3px 8px;border-radius:6px;pointer-events:none;white-space:nowrap;z-index:10;box-shadow:0 4px 12px rgba(0,0,0,.4)}
+.sp-av-st-ja{color:#5fe39a!important}.sp-av-st-evtl{color:#ffc24d!important}.sp-av-st-nein{color:#ff6b75!important}.sp-av-st-fehlt{color:var(--steel)!important}
+@media(max-width:700px){.sp-av-tipp{min-width:0;flex-basis:100%}.sp-av-pinsel button{padding:6px 10px 6px 6px;font-size:12px}}
+/* Aufgaben kompakt in einer Karte, Fahrer-Tabelle mit Avatar */
+.sp-root .sp-tasks{gap:0;border:1px solid var(--sp-bd,rgba(255,255,255,.08));border-radius:16px;overflow:hidden;background:var(--sp-glass,rgba(20,22,28,.7));margin-bottom:16px}
+.sp-root .sp-task{border:0;border-radius:0;padding:9px 12px 9px 16px;font-size:13.5px}
+.sp-root .sp-task+.sp-task{border-top:1px solid rgba(255,255,255,.06)}
+.sp-root .sp-task:not(.ich):not(.ok):not(.warn){background:none}
+.sp-root .sp-task .tm-btn.sm{padding:5px 10px;font-size:11.5px}
+.sp-drv-who{display:flex;align-items:center;gap:10px;min-width:0}
+.sp-drv-who .sp-ava{box-shadow:0 0 0 2px var(--c)}
+.sp-drv-who b{display:block;white-space:nowrap}
+.sp-drv tbody tr:hover{background:rgba(255,255,255,.025)}
+@media(max-width:700px){.sp-av-st b{display:none}.sp-av-pinsel{flex-wrap:wrap;border-radius:16px}}

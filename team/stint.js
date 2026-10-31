@@ -1113,31 +1113,63 @@
     const { stints, cols } = spalten(c);
     const uids = c.drivers.map(d => d.uid);
     if (ich) { uids.splice(uids.indexOf(S.me), 1); uids.unshift(S.me); }
-    const dauerMin = (col) => Math.max(1, Math.round((col.bis - col.von) / 60000));
-    const raster = "190px " + cols.map(col => `minmax(${stints ? 84 : 56}px, ${dauerMin(col)}fr)`).join(" ");
-    const kopf = cols.map((col, i) => { const d = new Date(col.von); const neuerTag = i === 0 || new Date(cols[i - 1].von).getDate() !== d.getDate(); return `<div class="sp-tl-col ${neuerTag ? "tag" : ""}">${neuerTag ? `<small>${d.toLocaleDateString("de-DE", { weekday: "short", day: "2-digit", month: "2-digit" })}</small>` : ""}<b>${esc(col.kopf)}</b>${col.zeit ? `<small>${col.zeit}</small>` : ""}${col.d ? `<span class="sp-tl-plan">${ava(col.d, 16)}${esc(memberName(col.d).split(" ")[0])}</span>` : ""}</div>`; }).join("");
-    const ICON = { 2: "✓", 1: "?", 0: "✕", mix: "~" };
-    const titel = (col, v) => `${col.kopf}${col.zeit ? " " + col.zeit : ""}: ${v === undefined ? "nichts eingetragen" : v === "mix" ? "teilweise eingetragen" : VTXT[v]}`;
-    const zelle = (v, plan) => "sp-pill " + (v === undefined ? "" : v === "mix" ? "mix" : VCOL[v]) + (plan ? " plan" : "");
+    if (S.avTool === undefined) S.avTool = 2;
+    const f = fenster(c);
+    const von0 = Math.floor(Math.min(f.von, cols.length ? cols[0].von : f.von) / Q) * Q;
+    const bis0 = Math.ceil(Math.max(f.bis, cols.length ? cols[cols.length - 1].bis : f.bis) / Q) * Q;
+    const span = Math.max(Q, bis0 - von0);
+    const pct = (t) => Math.max(0, Math.min(100, (t - von0) / span * 100));
+    const farbe = (uid) => FAHRER_FARBEN[Math.max(0, c.drivers.findIndex(d => d.uid === uid)) % FAHRER_FARBEN.length];
+
+    const schritt = span > 14 * 3600000 ? 2 * 3600000 : 3600000;
+    let ticks = "";
+    for (let t = Math.ceil(von0 / schritt) * schritt; t < bis0; t += schritt) ticks += `<span style="left:${pct(t)}%">${uhr(t)}</span>`;
+    const baender = (a) => {
+      const out = [];
+      let lauf = null;
+      for (let t = von0; t < bis0; t += Q) {
+        const v = a ? a[t] : undefined, k = v === undefined ? "x" : String(v);
+        if (lauf && lauf.k === k) lauf.bis = t + Q; else { if (lauf) out.push(lauf); lauf = { k, von: t, bis: t + Q }; }
+      }
+      if (lauf) out.push(lauf);
+      return out.filter(b => b.k !== "x").map(b => `<i class="sp-sw-av v${b.k}" style="left:${pct(b.von)}%;width:${pct(b.bis) - pct(b.von)}%"></i>`).join("");
+    };
+    // senkrechte Linien an den Stint-Grenzen, damit man sieht, wo welcher Stint liegt
+    const grenzen = stints ? cols.slice(1).map(col => `<i class="sp-av-grenze" style="left:${pct(col.von)}%"></i>`).join("") : "";
+    const stintZeile = stints ? `<div class="sp-sw-row sp-av-strow"><div class="sp-sw-name"><small>Stints</small></div><div class="sp-sw-lane">
+        ${cols.map((col, i) => `<button type="button" class="sp-av-st" ${ich ? `data-col="${i}"` : "disabled"} style="left:${pct(col.von)}%;width:${pct(col.bis) - pct(col.von)}%;--c:${col.d ? farbe(col.d) : "#555"}" title="${esc(col.kopf)} ${esc(col.zeit)}${col.d ? " · " + esc(memberName(col.d)) : ""}${ich ? " · anklicken = für diesen Stint eintragen" : ""}"><b>${i + 1}</b></button>`).join("")}</div></div>` : "";
     const zeile = (uid) => {
       const mein = uid === S.me;
-      const a = mein ? meine : slotsVon(uid);
-      const st = fahrerAv(uid, c);
-      return `<div class="sp-tl-row ${mein ? "ich" : ""}"><div class="sp-tl-who">${ava(uid, 34)}<div><b>${esc(memberName(uid))}${mein ? " (du)" : ""}</b><small class="${st}">${AVTXT[st]}</small>${wunschText(wunschVon(uid)) ? `<small class="sp-wtxt">${esc(wunschText(wunschVon(uid)))}</small>` : ""}</div></div>
-        ${cols.map((col, i) => { const v = spaltenWert(a, col); return `<button type="button" class="${zelle(v, col.d === uid)}" ${mein ? `data-col="${i}"` : "disabled"} title="${titel(col, v)}">${v === undefined ? (mein ? "+" : "") : ICON[v]}</button>`; }).join("")}</div>`;
+      const st = fahrerAv(uid, c), wt = wunschText(wunschVon(uid));
+      return `<div class="sp-sw-row ${mein ? "ich" : ""}" style="--c:${farbe(uid)}">
+        <div class="sp-sw-name">${ava(uid, 30)}<div><b>${esc(memberName(uid))}${mein ? " (du)" : ""}</b><small class="sp-av-st-${st}">${AVTXT[st]}${wt ? " · " + esc(wt) : ""}</small></div></div>
+        <div class="sp-sw-lane ${mein ? "mal" : ""}" ${mein ? 'id="sp-mal"' : ""}>${mein ? "" : baender(slotsVon(uid))}${grenzen}</div>
+      </div>`;
     };
+    const PINSEL = [[2, "✓", "Kann"], [1, "?", "Vielleicht"], [0, "✕", "Kann nicht"], ["x", "⌫", "Löschen"]];
     body.innerHTML = `
-      ${ich ? `<div class="sp-verf-top"><p class="sp-kurz">Tippe auf deine ${stints ? "Stints" : "Stunden"}: <b>✓</b> kann · <b>?</b> vielleicht · <b>✕</b> kann nicht. Speichert automatisch.</p>
-        <div class="sp-inline">${C.btn("Ich kann alles", "sm", 'id="sp-all2"')}${C.btn("Leeren", "sm", 'id="sp-all0"')}</div></div>
+      ${ich ? `<div class="sp-av-tools">
+          <div class="sp-av-pinsel" id="sp-pinsel">${PINSEL.map(([v, ic, l]) => `<button type="button" data-tool="${v}" class="p${v} ${String(S.avTool) === String(v) ? "on" : ""}"><i>${ic}</i>${l}</button>`).join("")}</div>
+          <span class="sp-av-tipp">Farbe wählen, dann über deine Zeile ziehen${stints ? " oder oben einen Stint antippen" : ""}. Speichert automatisch.</span>
+          <div class="sp-inline">${C.btn("Ich kann alles", "sm", 'id="sp-all2"')}${C.btn("Leeren", "sm", 'id="sp-all0"')}</div>
+        </div>
         <div class="sp-wunsch">
           <label class="sp-inl-f"><span>Wie viele Stints maximal?</span><select class="tm-select" id="sp-max"><option value="">egal</option>${[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(n => `<option value="${n}" ${wunsch.max === n ? "selected" : ""}>${n}</option>`).join("")}</select></label>
           <div class="sp-inl-f"><span>Doppelstint?</span><div class="sp-seg" id="sp-doppel"><button type="button" data-d="ja" class="${wunsch.doppel === true ? "on" : ""}">Ja</button><button type="button" data-d="egal" class="${wunsch.doppel === null ? "on" : ""}">Egal</button><button type="button" data-d="nein" class="${wunsch.doppel === false ? "on" : ""}">Nein</button></div></div>
         </div>` : ""}
-      ${uids.length ? `<div class="sp-tl-wrap"><div class="sp-tl" style="grid-template-columns:${raster}"><div class="sp-tl-head"><div class="sp-tl-corner">Fahrer</div>${kopf}</div>${uids.map(zeile).join("")}</div>
-        <div class="sp-tl-legende"><span><i style="background:linear-gradient(135deg,#34d67a,#1fa85a)"></i>kann</span><span><i style="background:linear-gradient(135deg,#ffc24d,#f09a00)"></i>vielleicht</span><span><i style="background:linear-gradient(135deg,#ff4d5a,#c40f1e)"></i>kann nicht</span><span><i style="outline:2px solid #fff"></i>dort eingeplant</span></div></div>` : '<div class="tm-box"><p class="tm-muted">Noch keine Fahrer in diesem Fahrzeug.</p></div>'}
+      ${uids.length ? `<div class="sp-sw sp-avw">
+          <div class="sp-sw-kopf"><div class="sp-sw-name"><small>Fahrer</small></div><div class="sp-sw-achse">${ticks}</div></div>
+          ${stintZeile}
+          ${uids.map(zeile).join("")}
+          <div class="sp-av-tip" id="sp-av-tip" hidden></div>
+          <div class="sp-sw-fuss"><span><i class="v2"></i>kann</span><span><i class="v1"></i>vielleicht</span><span><i class="v0"></i>kann nicht</span><span><i class="vx"></i>nichts eingetragen</span>
+            ${stints ? "<em>Die Nummern oben sind die geplanten Stints, Farbe = eingeplanter Fahrer</em>" : "<em>Sobald Rundenzeit und Sprit da sind, erscheinen hier die Stints</em>"}</div>
+        </div>` : '<div class="tm-box"><p class="tm-muted">Noch keine Fahrer in diesem Fahrzeug.</p></div>'}
       <div id="sp-abs"></div>`;
-    const setze = (col, v) => viertel(col.von, col.bis).forEach(t => { if (v === undefined) delete meine[t]; else meine[t] = v; });
-    const zeichne = (b, pop) => { const col = cols[Number(b.dataset.col)], v = spaltenWert(meine, col); b.className = zelle(v, col.d === S.me) + (pop ? " pop" : ""); b.textContent = v === undefined ? "+" : ICON[v]; b.title = titel(col, v); };
+
+    const lane = $("#sp-mal");
+    const malen = () => { if (lane) lane.innerHTML = baender(meine) + grenzen + (Object.keys(meine).some(t => t >= von0 && t < bis0) ? "" : '<span class="sp-av-leer">Hier mit der Maus ziehen, um deine Zeit einzutragen</span>'); };
+    const setze = (von, bis, v) => { for (let t = Math.floor(von / Q) * Q; t < bis; t += Q) { if (v === "x") delete meine[t]; else meine[t] = v; } };
     const speichern = () => {
       speicherStatus("Speichert …", "laeuft");
       clearTimeout(avT);
@@ -1147,23 +1179,55 @@
           S.av[S.me] = { slots: { ...meine }, v: 2, max: wunsch.max, doppel: wunsch.doppel, at: Date.now() };
           speicherStatus("✓ Gespeichert", "ok");
           zeichneKopf();
-          const st = fahrerAv(S.me, c), sm = body.querySelector(".sp-tl-row.ich small");
-          if (sm) { sm.className = st; sm.textContent = AVTXT[st]; }
+          const st = fahrerAv(S.me, c), sm = body.querySelector(".sp-sw-row.ich small"), wt = wunschText(wunsch);
+          if (sm) { sm.className = "sp-av-st-" + st; sm.textContent = AVTXT[st] + (wt ? " · " + wt : ""); }
           if (window.F2FEvNav) window.F2FEvNav.refresh();
         } catch (e) { speicherStatus("Nicht gespeichert", "err"); C.toast(e.message); }
       }, 700);
     };
-    $$("[data-col]").forEach(b => b.onclick = () => {
-      const col = cols[Number(b.dataset.col)], v = spaltenWert(meine, col);
-      setze(col, v === undefined || v === "mix" ? 2 : v === 2 ? 1 : v === 1 ? 0 : undefined);
-      zeichne(b, true); speichern();
+    if (!ich) { ladeAbsenzen(c); return; }
+
+    // Ziehen über die eigene Zeile: 15-Minuten-Raster, Vorschau beim Ziehen
+    const tip = $("#sp-av-tip");
+    const zeitBei = (x) => { const r = lane.getBoundingClientRect(); return von0 + Math.max(0, Math.min(1, (x - r.left) / r.width)) * span; };
+    const zeigeTip = (e, a, b) => {
+      const wr = body.querySelector(".sp-avw").getBoundingClientRect();
+      tip.hidden = false;
+      tip.textContent = b ? `${uhr(a)} bis ${uhr(b)}` : uhr(a);
+      tip.style.left = (e.clientX - wr.left) + "px";
+      tip.style.top = (lane.getBoundingClientRect().top - wr.top - 6) + "px";
+    };
+    let zug = null;
+    lane.addEventListener("pointermove", (e) => {
+      const t = Math.floor(zeitBei(e.clientX) / Q) * Q;
+      if (!zug) return zeigeTip(e, t);
+      const a = Math.min(zug.t0, t), b = Math.max(zug.t0, t) + Q;
+      Object.keys(meine).forEach(k => delete meine[k]); Object.assign(meine, zug.basis);
+      setze(a, b, S.avTool); malen(); zeigeTip(e, a, b);
     });
-    if (ich) {
-      $("#sp-max").onchange = (e) => { wunsch.max = Number(e.target.value) || null; speichern(); };
-      $$("#sp-doppel [data-d]").forEach(b => b.onclick = () => { wunsch.doppel = b.dataset.d === "ja" ? true : b.dataset.d === "nein" ? false : null; $$("#sp-doppel [data-d]").forEach(x => x.classList.toggle("on", x === b)); speichern(); });
-      $("#sp-all2").onclick = () => { cols.forEach(col => setze(col, 2)); $$("[data-col]").forEach(b => zeichne(b, true)); speichern(); };
-      $("#sp-all0").onclick = () => { cols.forEach(col => setze(col, undefined)); $$("[data-col]").forEach(b => zeichne(b)); speichern(); };
-    }
+    lane.addEventListener("pointerleave", () => { if (!zug) tip.hidden = true; });
+    lane.addEventListener("pointerdown", (e) => {
+      if (e.button !== 0) return;
+      e.preventDefault();
+      lane.setPointerCapture(e.pointerId);
+      const t = Math.floor(zeitBei(e.clientX) / Q) * Q;
+      zug = { t0: t, basis: { ...meine } };
+      setze(t, t + Q, S.avTool); malen(); zeigeTip(e, t, t + Q);
+    });
+    const ende = () => { if (!zug) return; zug = null; tip.hidden = true; speichern(); };
+    lane.addEventListener("pointerup", ende);
+    lane.addEventListener("pointercancel", ende);
+
+    $$("#sp-pinsel [data-tool]").forEach(b => b.onclick = () => {
+      S.avTool = b.dataset.tool === "x" ? "x" : Number(b.dataset.tool);
+      $$("#sp-pinsel [data-tool]").forEach(x => x.classList.toggle("on", x === b));
+    });
+    $$(".sp-av-st[data-col]").forEach(b => b.onclick = () => { const col = cols[Number(b.dataset.col)]; setze(col.von, col.bis, S.avTool); malen(); speichern(); });
+    $("#sp-max").onchange = (e) => { wunsch.max = Number(e.target.value) || null; speichern(); };
+    $$("#sp-doppel [data-d]").forEach(b => b.onclick = () => { wunsch.doppel = b.dataset.d === "ja" ? true : b.dataset.d === "nein" ? false : null; $$("#sp-doppel [data-d]").forEach(x => x.classList.toggle("on", x === b)); speichern(); });
+    $("#sp-all2").onclick = () => { setze(von0, bis0, 2); malen(); speichern(); };
+    $("#sp-all0").onclick = () => { setze(von0, bis0, "x"); malen(); speichern(); };
+    malen();
     ladeAbsenzen(c);
   }
   async function ladeAbsenzen(c) {
@@ -1184,7 +1248,7 @@
         <div class="sp-drv-wrap"><table class="sp-drv">
           <thead><tr><th>Fahrer</th><th>Garage-61-Fahrer</th><th>Pace<small>Ø Runde</small></th><th>Sprit<small>L pro Runde</small></th><th></th></tr></thead>
           <tbody>${c.drivers.map((d, di) => `<tr data-d="${di}">
-            <td><b>${esc(memberName(d.uid))}</b><small class="${fahrerAv(d.uid, c)}">${AVTXT[fahrerAv(d.uid, c)]}</small></td>
+            <td><div class="sp-drv-who" style="--c:${FAHRER_FARBEN[di % FAHRER_FARBEN.length]}">${ava(d.uid, 30)}<div><b>${esc(memberName(d.uid))}</b><small class="sp-av-st-${fahrerAv(d.uid, c)}">${AVTXT[fahrerAv(d.uid, c)]}</small></div></div></td>
             <td><select class="tm-select" data-g="g61"><option value="">Nicht verknüpft</option>${META.g61drivers.map(g => `<option value="${esc(g.slug)}" ${g.slug === d.g61 ? "selected" : ""}>${esc(g.name)}</option>`).join("")}</select></td>
             <td><input class="tm-input" data-g="pace" placeholder="1:58.500" value="${fmtLap(d.pace)}">${d.quelle ? `<small class="sp-quelle-d ${d.src === "hand" ? "hand" : /^Ältere/.test(d.quelle) ? "alt" : ""}">${esc(d.quelle)}</small>` : ""}</td>
             <td><input class="tm-input" data-g="fuel" type="number" step="0.01" min="0" placeholder="3.20" value="${d.fuel || ""}"></td>
