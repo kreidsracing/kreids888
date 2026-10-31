@@ -83,6 +83,7 @@
 
   function aufraeumen() {
     clearTimeout(wiederT); clearInterval(listeT); clearInterval(alterT); clearInterval(planT);
+    cancelAnimationFrame(rafId); rafId = null; ANIM.clear(); KARTE = null;
     if (ws) { ws.onclose = null; try { ws.close(); } catch (e) { } ws = null; }
     wsSub = null;
   }
@@ -201,9 +202,57 @@
   }
   const alterText = () => { const s = Math.max(0, Math.round((Date.now() - (S.stand.t || Date.now())) / 1000)); return s < 5 ? "live" : "Stand vor " + s + " s"; };
 
+  /* ---------------- Flüssige Karte ----------------
+     Die Daten kommen alle 2 s. Dazwischen fährt jedes Auto mit seiner gemessenen Geschwindigkeit weiter (60 Bilder/s);
+     kommt ein neuer Stand, gleitet es auf die echte Stelle (Abweichung baut sich in ~0,4 s ab), statt zu springen. */
+  const ANIM = new Map(); // CarIdx -> { p: Streckenanteil, t: Zeitpunkt (performance.now), v: Anteil pro s, o: Restabweichung }
+  let KARTE = null, rafId = null;
+  const wickel = (d) => d > 0.5 ? d - 1 : d < -0.5 ? d + 1 : d;
+  function animPos(a, jetzt) {
+    const dt = Math.min(4, Math.max(0, (jetzt - a.t) / 1000)); // bleiben Daten aus, steht das Auto nach 4 s
+    return (((a.p + a.v * dt + a.o * Math.exp(-dt / 0.4)) % 1) + 1) % 1;
+  }
+  function animNeu(j) {
+    const jetzt = performance.now(), da = new Set();
+    for (const x of j.autos) {
+      if (x.pct == null || x.pct < 0 || x.fl === -1) continue;
+      da.add(x.i);
+      const a = ANIM.get(x.i), est = estKlasse(j, x.k) || x.best || 0;
+      let v = a ? a.v : est > 0 ? 1 / est : 0;
+      if (a) {
+        const dt = (jetzt - a.t) / 1000, gem = wickel(x.pct - a.p) / dt;
+        if (dt > 0.3 && dt < 10 && gem >= 0 && gem < 0.05) v = a.v ? a.v * 0.5 + gem * 0.5 : gem;
+        else if (gem < 0) v = 0; // steht oder rollt zurück
+      }
+      const o = a ? wickel(animPos(a, jetzt) - x.pct) : 0;
+      ANIM.set(x.i, { p: x.pct, t: jetzt, v, o: Math.abs(o) < 0.03 ? o : 0 });
+    }
+    for (const i of [...ANIM.keys()]) if (!da.has(i)) ANIM.delete(i);
+  }
+  function animLauf() {
+    if (rafId) return;
+    const schritt = () => {
+      rafId = requestAnimationFrame(schritt);
+      if (!KARTE || !document.body.contains(KARTE.svg)) return;
+      const jetzt = performance.now();
+      for (const [i, el] of KARTE.els) {
+        const a = ANIM.get(i);
+        if (!a) continue;
+        const [px, py] = KARTE.pos(animPos(a, jetzt));
+        el.g.setAttribute("transform", `translate(${px.toFixed(2)} ${py.toFixed(2)})`);
+        if (el.txt) { // Beschriftung rechts der Mitte nach links, sonst wird sie abgeschnitten
+          const links = px > KARTE.mitteX;
+          if (links !== el.links) { el.links = links; el.txt.setAttribute("x", ((links ? -2 : 2) * KARTE.groesse).toFixed(2)); el.txt.setAttribute("text-anchor", links ? "end" : "start"); }
+        }
+      }
+    };
+    rafId = requestAnimationFrame(schritt);
+  }
+
   function neuerStand(j) {
     const erster = !S.stand;
     S.stand = j;
+    animNeu(j);
     for (const ev of j.ereignisse || []) S.ereignisse.set(ev.w + ":" + ev.art + ":" + ev.i, ev);
     if (j.ich && j.ich.sprit != null) S.sprit = { ...j.ich, t: j.t, runde: (j.autos.find(a => a.i === j.ich.idx) || {}).runde };
     const unsere = j.autos.filter(a => istF2F(a, j));
@@ -541,9 +590,10 @@
       const x0 = Math.min(...xs), x1 = Math.max(...xs), y0 = Math.min(...ys), y1 = Math.max(...ys), rand = Math.max(x1 - x0, y1 - y0) * 0.06;
       vb = `${x0 - rand} ${y0 - rand} ${x1 - x0 + 2 * rand} ${y1 - y0 + 2 * rand}`;
       pfad = "M" + pkt.map(p => p[1].toFixed(1) + " " + (-p[2]).toFixed(1)).join("L") + "Z";
-      pos = (pct) => {
-        let i = pkt.findIndex(p => p[0] > pct);
-        if (i < 0) i = 0;
+      pos = (pct) => { // erster Punkt mit Anteil > pct (binäre Suche, läuft 60x pro Sekunde je Auto)
+        let lo = 0, hi = pkt.length;
+        while (lo < hi) { const m = (lo + hi) >> 1; if (pkt[m][0] > pct) hi = m; else lo = m + 1; }
+        const i = lo % pkt.length;
         const b = pkt[i], q = pkt[(i - 1 + pkt.length) % pkt.length];
         const span = (b[0] - q[0] + 1) % 1 || 1e-6, f = ((pct - q[0] + 1) % 1) / span;
         return [q[1] + (b[1] - q[1]) * f, -(q[2] + (b[2] - q[2]) * f)];
@@ -562,10 +612,18 @@
     const legende = `<div class="spt-legende">${kNamen.map(k => `<span><i style="background:${farbe(k)}"></i>${esc((klassen.find(c => String(c.id) === k) || {}).name || "Klasse")}</span>`).join("")}
       <span><i style="background:#e11324"></i>unser Auto</span><span><i class="ring"></i>Klassenspitze</span><span>♛ führt gesamt</span>
       <span class="q">${S.strecke && S.strecke.quelle === "g61" ? "Streckenform aus Garage 61" : pkt ? "Streckenform aus dem GPS des Fahrers" : ""}</span></div>`;
+    // jedes Auto als Gruppe am Nullpunkt; die Position setzt animLauf() 60x pro Sekunde per transform
+    const jetzt = performance.now(), g = groesse.toFixed(2);
     box.innerHTML = `<svg class="spt-map" viewBox="${vb}" preserveAspectRatio="xMidYMid meet">
       <path d="${pfad}" class="spt-bahn" style="stroke-width:${groesse * 1.6}"/><path d="${pfad}" class="spt-bahn2" style="stroke-width:${groesse * 0.5}"/>
-      ${autos.map(x => { const [px, py] = pos(x.pct), u = istF2F(x, st); return `<g class="${u ? "unser" : ""}${x.box ? " box" : ""}">${x.kpos === 1 ? `<circle cx="${px.toFixed(1)}" cy="${py.toFixed(1)}" r="${(u ? 2.3 : 1.8) * groesse}" class="spt-spitze" style="stroke:${farbe(x.k)};stroke-width:${groesse * 0.35}"/>` : ""}<circle cx="${px.toFixed(1)}" cy="${py.toFixed(1)}" r="${(u ? 1.5 : 1) * groesse}" style="fill:${u ? "#e11324" : farbe(x.k)}"/>${x.pos === 1 ? `<text class="spt-krone" x="${px.toFixed(1)}" y="${(py - groesse * 2.2).toFixed(1)}" text-anchor="middle" style="font-size:${groesse * 2.6}px">♛</text>` : ""}${u ? `<text x="${(px + (px > mitteX ? -2 : 2) * groesse).toFixed(1)}" y="${(py + groesse * 0.6).toFixed(1)}" text-anchor="${px > mitteX ? "end" : "start"}" style="font-size:${groesse * 2.6}px">${esc((x.team || x.fahrer).split(" ").pop())}${x.nr ? " #" + esc(x.nr) : ""}</text>` : ""}</g>`; }).join("")}
+      ${autos.map(x => {
+        const a = ANIM.get(x.i), [px, py] = pos(a ? animPos(a, jetzt) : x.pct), u = istF2F(x, st), links = px > mitteX;
+        return `<g data-i="${x.i}" class="${u ? "unser" : ""}${x.box ? " box" : ""}" transform="translate(${px.toFixed(2)} ${py.toFixed(2)})">${x.kpos === 1 ? `<circle r="${(u ? 2.3 : 1.8) * groesse}" class="spt-spitze" style="stroke:${farbe(x.k)};stroke-width:${groesse * 0.35}"/>` : ""}<circle r="${(u ? 1.5 : 1) * groesse}" style="fill:${u ? "#e11324" : farbe(x.k)}"/>${x.pos === 1 ? `<text class="spt-krone" y="${(-groesse * 2.2).toFixed(2)}" text-anchor="middle" style="font-size:${groesse * 2.6}px">♛</text>` : ""}${u ? `<text class="spt-lbl" x="${((links ? -2 : 2) * groesse).toFixed(2)}" y="${(groesse * 0.6).toFixed(2)}" text-anchor="${links ? "end" : "start"}" style="font-size:${groesse * 2.6}px">${esc((x.team || x.fahrer).split(" ").pop())}${x.nr ? " #" + esc(x.nr) : ""}</text>` : ""}</g>`;
+      }).join("")}
     </svg>${legende}${pkt ? "" : '<p class="tm-muted spt-klein">Streckenform folgt, sobald der Fahrer eine Runde gefahren ist.</p>'}`;
+    const svg = box.querySelector("svg");
+    KARTE = { svg, pos, mitteX, groesse: Number(g), els: new Map([...svg.querySelectorAll("g[data-i]")].map(el => { const txt = el.querySelector(".spt-lbl"); return [Number(el.dataset.i), { g: el, txt, links: txt ? txt.getAttribute("text-anchor") === "end" : false }]; })) };
+    animLauf();
   }
 
   window.F2FSpotting = { mount };
