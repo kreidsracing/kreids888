@@ -22,7 +22,7 @@
   const istF2F = (a, st) => !!a && ((st.ich && a.i === st.ich.idx) || (st.session.meineTeams || []).includes(a.team) || /\bf2f\b|flag ?to ?flag/i.test(a.team || ""));
   const TYP = { "Race": "Rennen", "Lone Qualify": "Quali", "Open Qualify": "Quali", "Qualify": "Quali", "Practice": "Training", "Lone Practice": "Training", "Warmup": "Warm-up" };
 
-  const HINWEIS = `<div class="spt-hinweis"><b>So kommen Rennen hierher:</b> Wer fährt, braucht <b>FF Overlay</b> (oder die kreids888 Toolbox) offen und oben rechts mit <b>„Mit F2F verbinden"</b> angemeldet. Dann erscheint das Rennen hier automatisch, auch wenn mehrere von euch gleichzeitig in verschiedenen Rennen sind. Sprit und Strategie sieht man nur, wenn der Fahrer am Steuer das Programm laufen hat.</div>`;
+  const HINWEIS = `<div class="spt-hinweis"><b>So kommen Rennen hierher:</b> Wer fährt, braucht <b>FF Overlay</b> (oder die kreids888 Toolbox) offen und oben rechts mit <b>„Mit F2F verbinden"</b> angemeldet. Dann erscheint jede Online-Session (Training, Quali, Rennen) hier automatisch, auch wenn mehrere von euch gleichzeitig in verschiedenen Rennen sind. Sprit und Strategie sieht man nur, wenn der Fahrer am Steuer das Programm laufen hat. Offline-Testfahrten werden nicht gesendet.</div>`;
 
   /* ---------------- Fenster und Anordnung ---------------- */
   const FENSTER = [
@@ -99,7 +99,7 @@
           <div class="sp-card-h"><b>${esc(x.strecke || "Rennen " + x.sub)}</b>${x.aktiv ? '<span class="tm-badge live">Live</span>' : '<span class="tm-badge grey">Beendet</span>'}</div>
           <div class="sp-card-m">${esc([TYP[x.typ] || x.typ, x.variante].filter(Boolean).join(" · "))}</div>
           <div class="sp-card-f"><span>${C.ICONS.helmet || ""}${esc(x.von || "?")}</span>${(x.teams || []).length ? `<span>${C.ICONS.car}${esc(x.teams.join(", "))}</span>` : ""}<span>${x.autos} Autos</span></div>
-        </a>`).join("")}</div>` : '<div class="tm-box"><p class="tm-muted">Gerade fährt niemand mit verbundenem FF Overlay. Sobald jemand in einer iRacing-Session ist, taucht das Rennen hier auf.</p></div>';
+        </a>`).join("")}</div>` : '<div class="tm-box"><p class="tm-muted">Gerade fährt niemand mit verbundenem FF Overlay. Sobald jemand in einer Online-Session ist, taucht das Rennen hier auf.</p></div>';
     };
     await zeichne();
     listeT = setInterval(() => { if (mine === alive && location.hash === "#spotting") zeichne(); }, 15000);
