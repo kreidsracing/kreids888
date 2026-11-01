@@ -2405,3 +2405,8 @@ body:has(.td)::after{content:"";position:fixed;inset:0;z-index:-1;pointer-events
 .fa-name{font-weight:700;min-width:0;overflow:hidden;text-overflow:ellipsis}
 .fa-name small{display:block;font-weight:500;color:var(--steel);font-size:12.5px;margin-top:2px}
 @media (max-width:640px){.fa-zeile{grid-template-columns:1fr 1fr;gap:10px}.fa-name{grid-column:1/-1}}
+
+/* Trainer · Top 20: Knopf „Jetzt neu laden" neben Team / Top 20 */
+.gf-g61-zeile{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.gf-g61-neu{text-transform:none;letter-spacing:0;font-weight:700;padding:9px 12px}
+.gf-g61-neu:disabled{opacity:.6;cursor:wait}

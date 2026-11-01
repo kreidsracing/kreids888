@@ -882,8 +882,8 @@
           ${meine.length ? `<optgroup label="Von dir gefahren">${meine.map(opt).join("")}</optgroup>` : ""}
           ${andere.length ? `<optgroup label="Vom Team gefahren">${andere.map(opt).join("")}</optgroup>` : ""}
         </select></label>
-        <label><span>Runden von</span><div class="gf-g61-quelle" id="g61-quelle">
-          <button type="button" data-q="team" class="${top ? "" : "on"}">Team</button><button type="button" data-q="top" class="${top ? "on" : ""}">Top 20 Garage 61</button></div></label>
+        <label><span>Runden von</span><div class="gf-g61-zeile"><div class="gf-g61-quelle" id="g61-quelle">
+          <button type="button" data-q="team" class="${top ? "" : "on"}">Team</button><button type="button" data-q="top" class="${top ? "on" : ""}">Top 20 Garage 61</button></div>${top ? `<button type="button" class="gf-mini-btn gf-g61-neu" id="g61-neu" title="Top 20 sofort frisch aus Garage 61 holen"${laedt ? " disabled" : ""}>↻ Jetzt neu laden</button>` : ""}</div></label>
         ${top ? "" : `<label><span>Fahrer</span><select class="tm-select" id="g61-wer">
           <option value="">Alle im Team</option>
           ${G61V.fahrer.map(f => `<option value="${C.esc(f.slug)}">${C.esc(f.name)}${f.slug === ich ? " (du)" : ""}</option>`).join("")}
@@ -916,6 +916,8 @@
       if (G61V.quelle === "team" && !G61V.runden) vgG61Runden();
     });
     el.querySelectorAll("[data-g61]").forEach(b => b.onclick = () => vgG61Laden(b.dataset.g61, b.dataset.ziel, b));
+    const nl = document.getElementById("g61-neu");
+    if (nl) nl.onclick = () => { nl.disabled = true; nl.textContent = "lädt …"; vgG61Top(true); };
   }
   async function vgG61Runden() {
     const [t, c] = (G61V.kombi || "").split("|");
@@ -951,13 +953,13 @@
     return true;
   }
   // Top 20 aus ganz Garage 61 für die gewählte Strecke mit Auto
-  async function vgG61Top() {
+  async function vgG61Top(frisch) {
     const [t, c] = (G61V.kombi || "").split("|");
     G61V.topFehler = "";
     if (!t || !c) { G61V.top = []; return vgG61Zeichnen(); }
     const fuer = G61V.kombi;
     try {
-      const d = await C.api(`/trainer/g61/runden?quelle=top&track=${encodeURIComponent(t)}&car=${encodeURIComponent(c)}`);
+      const d = await C.api(`/trainer/g61/runden?quelle=top&track=${encodeURIComponent(t)}&car=${encodeURIComponent(c)}${frisch ? "&frisch=1" : ""}`);
       if (fuer !== G61V.kombi) return;
       G61V.top = d.runden || []; G61V.bremseText = ""; G61V.altTop = d.alt || "";
     } catch (e) {
