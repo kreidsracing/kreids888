@@ -2412,3 +2412,6 @@ body:has(.td)::after{content:"";position:fixed;inset:0;z-index:-1;pointer-events
 .gf-g61-zeile{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 .gf-g61-neu{text-transform:none;letter-spacing:0;font-weight:700;padding:9px 12px}
 .gf-g61-neu:disabled{opacity:.6;cursor:wait}
+
+/* Trainer · Live-Coach: Garage-61-Kasten unter der Referenzrunde */
+.kt-g61{margin:14px 0}

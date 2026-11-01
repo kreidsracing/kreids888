@@ -204,6 +204,7 @@
           <div class="kt-ref-track" id="kt-ref-track">Nach dieser Runde wird gepiept und korrigiert.</div>
           <div class="tm-actions" style="margin-top:12px">
             <label class="tm-btn sm red kt-file"><span>CSV laden</span><input type="file" accept=".csv" id="kt-file" hidden></label>
+            <button type="button" class="tm-btn sm" id="kt-g61-btn" title="Referenzrunde direkt aus Garage 61 laden"><span>Aus Garage 61</span></button>
             <select class="tm-select kt-runden" id="kt-runden">${rundenOptions(runden, "– Gespeicherte Runde wählen –")}</select>
           </div>
         </div>
@@ -217,6 +218,7 @@
           <div class="kt-st"><span class="kt-dot" id="kt-st-dot"></span><span id="kt-st-text">Bereit.</span></div>
         </div>
       </section>
+      <div class="gf-g61 kt-g61" id="kv-g61" hidden></div>
 
       <div class="kt-cols">
         <div>
@@ -257,6 +259,7 @@
       } catch (x) { C.toast(x.message); }
       e.target.value = "";
     };
+    document.getElementById("kt-g61-btn").onclick = () => { G61V.ort = "coach"; vgG61Oeffnen(); };
     document.getElementById("kt-runden").onchange = async (e) => {
       const [typ, id] = e.target.value.split("|");
       if (!id) return;
@@ -827,11 +830,12 @@
       // zuletzt gefahrene Strecke mit Auto automatisch wählen (eigene, sonst die des Teams)
       const k = vgG61Zuletzt()[0] || G61V.kombis[0];
       G61V.kombi = k ? k.t + "|" + k.c : "";
-      // ohne eigenen Mitschnitt: letzte eigene Runde und schnellste Teamrunde gleich laden und vergleichen
-      G61V.auto = !!nurAuf && !!G61V.ich;
     }
+    // im Streckenvergleich beim ersten Öffnen ohne eigenen Mitschnitt: letzte eigene Runde und schnellste Teamrunde gleich laden und vergleichen
+    if (G61V.ort !== "coach" && !G61V.autoGeprueft) { G61V.autoGeprueft = true; G61V.auto = !!nurAuf && !!G61V.ich; }
     vgG61Zeichnen();
     if (!G61V.runden) vgG61Runden();
+    else if (G61V.auto && G61V.runden.length) vgG61Auto();
   }
   // eigene Kombis, die zuletzt gefahrene zuerst
   const vgG61Zuletzt = () => G61V.kombis.filter(x => G61V.ich && x.zuletzt && x.zuletzt[G61V.ich]).sort((a, b) => b.zuletzt[G61V.ich].localeCompare(a.zuletzt[G61V.ich]));
@@ -845,7 +849,7 @@
     const meine = vgG61Zuletzt(), andere = G61V.kombis.filter(x => !meine.includes(x));
     const neu = vgG61Neueste(), kz = meine[0];
     const fahrerName = s => (G61V.fahrer.find(f => f.slug === s) || {}).name || s;
-    const top = G61V.quelle === "top";
+    const top = G61V.quelle === "top", coach = G61V.ort === "coach";
     // pro Person nur die schnellste Runde (die Listen kommen schon nach Zeit sortiert)
     const schnellste = l => { const da = new Set(); return l.filter(r => { const k = r.slug || r.fahrer || r.id; if (da.has(k)) return false; da.add(k); return true; }); };
     const liste = schnellste(top ? (G61V.top || []) : (G61V.runden || []).filter(r => !G61V.wer || r.slug === G61V.wer)).slice(0, 40);
@@ -867,7 +871,7 @@
     };
     el.classList.toggle("zu", G61V.zu);
     if (G61V.zu) {
-      const a = gew("kv-a"), b = gew("kv-b");
+      const a = coach ? "" : gew("kv-a"), b = coach ? "" : gew("kv-b");
       el.innerHTML = `<button type="button" class="gf-g61-kopf gf-g61-auf" id="g61-auf" title="Aufklappen"><i>▸</i><b>Runden aus Garage 61</b>
         <span class="gf-g61-sum">${a ? `<em class="a">● ${C.esc(a)}</em>` : ""}${b ? `<em class="b">● ${C.esc(b)}</em>` : ""}</span><small>aufklappen</small></button>`;
       document.getElementById("g61-auf").onclick = () => { G61V.zu = false; vgG61Zeichnen(); };
@@ -875,7 +879,7 @@
     }
     el.innerHTML = `
       <div class="gf-g61-kopf">
-        <button type="button" class="gf-g61-auf" id="g61-auf" title="Einklappen"><i>▾</i><b>Runden aus Garage 61</b></button>${kz ? `<span class="gf-g61-zuletzt">Zuletzt gefahren: ${C.esc(kz.tn)} · ${C.esc(kz.cn)} (${tag(kz.zuletzt[ich])})</span>` : ""}<small>Für den Vergleich muss der Coach nicht gelaufen sein. Es wird nichts gespeichert, beim Schließen des Helfers ist alles wieder weg.</small>
+        <button type="button" class="gf-g61-auf" id="g61-auf" title="Einklappen"><i>▾</i><b>Runden aus Garage 61</b></button>${kz ? `<span class="gf-g61-zuletzt">Zuletzt gefahren: ${C.esc(kz.tn)} · ${C.esc(kz.cn)} (${tag(kz.zuletzt[ich])})</span>` : ""}<small>${coach ? "Klick bei einer Runde auf „Als Referenz“, dann piept und korrigiert der Coach nach dieser Runde." : "Für den Vergleich muss der Coach nicht gelaufen sein."} Es wird nichts gespeichert, beim Schließen des Helfers ist alles wieder weg.</small>
       </div>
       <div class="gf-g61-wahl">
         <label><span>Strecke und Auto</span><select class="tm-select" id="g61-kombi">
@@ -902,7 +906,8 @@
             <small>${tag(r.at)}</small>
             <span class="gf-g61-bed" title="Asphalt / Luft / Tank beim Start der Runde">${bedingungen(r)}</span>
             <span class="gf-g61-tags">${!top && neu && r.id === neu.id ? '<i class="neu">zuletzt gefahren</i>' : ""}${r.sauber ? '<i class="ok">sauber</i>' : ""}${r.abflug ? "<i>Abflug</i>" : ""}${r.box ? "<i>Box</i>" : ""}${frei ? "" : "<i>keine Telemetrie</i>"}</span>
-            <span class="gf-g61-knopf"><button type="button" class="gf-mini-btn a" data-g61="${C.esc(r.id)}" data-ziel="a"${gesperrt}>Meine Runde</button><button type="button" class="gf-mini-btn b" data-g61="${C.esc(r.id)}" data-ziel="b"${gesperrt}>Vergleich</button></span>
+            <span class="gf-g61-knopf">${coach ? `<button type="button" class="gf-mini-btn a" data-g61="${C.esc(r.id)}" data-ziel="ref"${gesperrt}>Als Referenz</button>`
+              : `<button type="button" class="gf-mini-btn a" data-g61="${C.esc(r.id)}" data-ziel="a"${gesperrt}>Meine Runde</button><button type="button" class="gf-mini-btn b" data-g61="${C.esc(r.id)}" data-ziel="b"${gesperrt}>Vergleich</button>`}</span>
           </div>`; }).join("")}</div>`
         : `<p class="tm-muted">${top ? "Garage 61 hat für diese Kombination keine Runden." : G61V.wer ? "Von diesem Fahrer gibt es hier keine Runde mit Telemetrie. Stell „Fahrer“ auf „Alle im Team“." : "Keine Runden mit Telemetrie für diese Kombination."}</p>`}`;
     const ks = document.getElementById("g61-kombi"), ws = document.getElementById("g61-wer");
@@ -934,13 +939,15 @@
       else { G61V.runden = []; G61V.fehler = e.message; }
     }
     vgG61Zeichnen();
-    if (G61V.auto && G61V.runden.length) {
-      G61V.auto = false;
-      const a = vgG61Neueste(), b = G61V.runden.find(r => !a || r.id !== a.id);
-      if (!a) return;
-      if (!(await vgG61Laden(a.id, "a"))) return;
-      if (b && await vgG61Laden(b.id, "b")) { G61V.zu = true; vgG61Zeichnen(); vergleichStart(); }
-    }
+    if (G61V.auto && G61V.runden.length) vgG61Auto();
+  }
+  async function vgG61Auto() {
+    G61V.auto = false;
+    if (G61V.ort === "coach") return;
+    const a = vgG61Neueste(), b = G61V.runden.find(r => !a || r.id !== a.id);
+    if (!a) return;
+    if (!(await vgG61Laden(a.id, "a"))) return;
+    if (b && await vgG61Laden(b.id, "b")) { G61V.zu = true; vgG61Zeichnen(); vergleichStart(); }
   }
   // Garage 61 bremst (zu viele Abfragen): nicht als Fehler zeigen, sondern nach der genannten Zeit selbst neu laden
   function vgG61Bremse(msg, nochmal) {
@@ -983,8 +990,15 @@
       const teil = s => String(s || "").replace(/\s+-\s+/g, " ").replace(/[\\/:*?"<>|]/g, " ").trim();
       const name = `G61 - ${teil(r.fahrer)} - ${teil(k.cn)} - ${teil(k.tn)} - ${g61Zeit(r.zeit).replace(":", ".")}.csv`;
       let up;
-      try { up = await hcall("/lap/upload?zweck=vergleich", { raw, name }, 30000); }
+      const ref = ziel === "ref";
+      try { up = await hcall("/lap/upload?zweck=" + (ref ? "ref" : "vergleich"), { raw, name }, 30000); }
       catch (e) { throw new Error(e.status ? e.message : "Der Helfer läuft nicht. Starte den Team-Trainer, dann klappt das Laden."); }
+      if (ref) {
+        const el = document.getElementById("kv-g61"); if (el) el.hidden = true;
+        refreshRunden();
+        C.toast(`${r.fahrer} ${g61Zeit(r.zeit)} ist jetzt die Referenzrunde`, true);
+        return true;
+      }
       VG.laps = up.laps; refreshVgSelects();
       const sel = document.getElementById(ziel === "a" ? "kv-a" : "kv-b");
       if (sel) { sel.value = "ref|" + up.id; if (sel.onchange) sel.onchange(); }
@@ -1024,6 +1038,7 @@
     const updGo = () => { const s = goBtn.querySelector("span"); if (s) s.textContent = bEl.value ? "Vergleichen" : "Ansehen"; };
     bEl.onchange = updGo; updGo();
     goBtn.onclick = vergleichStart;
+    G61V.ort = "vergleich";
     document.getElementById("kv-g61-btn").onclick = () => vgG61Oeffnen();
     // ohne eigenen Mitschnitt gleich die Garage-61-Runden zeigen
     if (!VG.laps.eigene.length) { vgG61Oeffnen(true); if (VG.laps.refs.length) aEl.value = "ref|" + VG.laps.refs[0].id; }
@@ -2054,6 +2069,7 @@
     ]],
     ["Live-Coach · Referenzrunde", [
       ["CSV laden", "Die Runde, nach der gepiept und korrigiert wird. Daneben stehen Rundenzeit, Anzahl der Bremszonen und Streckenlänge, im Protokoll jede Bremszone mit Bremspunkt, Gaspunkt, Geschwindigkeit und Gang."],
+      ["Aus Garage 61", "Runden vom Team oder aus den Top 20 von Garage 61 direkt als Referenzrunde laden, ohne CSV herunterzuladen. Strecke und Auto wählen, dann bei der Runde „Als Referenz“ klicken."],
       ["Gespeicherte Runden", "Geladene Referenzrunden und deine eigenen Mitschnitte lassen sich über die Auswahl daneben wieder laden."],
       ["Automatisch laden", "Die zuletzt benutzte Referenzrunde wird beim nächsten Start des Helfers von selbst geladen."],
     ]],
