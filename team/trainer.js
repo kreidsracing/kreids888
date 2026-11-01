@@ -807,7 +807,8 @@
   const vgOptionsB = () => `<option value="">— nur ansehen (kein Vergleich) —</option>` + vgOptions(true);
 
   /* ---- Runden aus Garage 61: Vergleich auch ohne eigenen Mitschnitt ---- */
-  const G61V = { kombis: null, fahrer: [], ich: "", kombi: "", wer: null, runden: null, fehler: "", auto: false, zu: false };
+  const G61V = { kombis: null, fahrer: [], ich: "", kombi: "", wer: null, runden: null, fehler: "", auto: false, zu: false,
+    quelle: "team", top: null, topFehler: "" };   // quelle: "team" = Runden des Teams, "top" = Top 20 aus ganz Garage 61
   const g61Zeit = s => { const m = Math.floor(s / 60), r = s - m * 60; return m + ":" + (r < 10 ? "0" : "") + r.toFixed(3); };
   async function vgG61Oeffnen(nurAuf) {
     const el = document.getElementById("kv-g61");
@@ -844,7 +845,9 @@
     const meine = vgG61Zuletzt(), andere = G61V.kombis.filter(x => !meine.includes(x));
     const neu = vgG61Neueste(), kz = meine[0];
     const fahrerName = s => (G61V.fahrer.find(f => f.slug === s) || {}).name || s;
-    const liste = (G61V.runden || []).filter(r => !G61V.wer || r.slug === G61V.wer).slice(0, 40);
+    const top = G61V.quelle === "top";
+    const liste = top ? (G61V.top || []) : (G61V.runden || []).filter(r => !G61V.wer || r.slug === G61V.wer).slice(0, 40);
+    const fehler = top ? G61V.topFehler : G61V.fehler, laedt = top ? !G61V.top : !G61V.runden;
     // eingeklappt: nur die Kopfzeile mit dem, was gerade geladen ist
     const gew = id => {
       const s = document.getElementById(id), o = s && s.selectedOptions[0];
@@ -870,27 +873,37 @@
           ${meine.length ? `<optgroup label="Von dir gefahren">${meine.map(opt).join("")}</optgroup>` : ""}
           ${andere.length ? `<optgroup label="Vom Team gefahren">${andere.map(opt).join("")}</optgroup>` : ""}
         </select></label>
-        <label><span>Fahrer</span><select class="tm-select" id="g61-wer">
+        <label><span>Runden von</span><div class="gf-g61-quelle" id="g61-quelle">
+          <button type="button" data-q="team" class="${top ? "" : "on"}">Team</button><button type="button" data-q="top" class="${top ? "on" : ""}">Top 20 Garage 61</button></div></label>
+        ${top ? "" : `<label><span>Fahrer</span><select class="tm-select" id="g61-wer">
           <option value="">Alle im Team</option>
           ${G61V.fahrer.map(f => `<option value="${C.esc(f.slug)}">${C.esc(f.name)}${f.slug === ich ? " (du)" : ""}</option>`).join("")}
-        </select></label>
+        </select></label>`}
       </div>
-      ${G61V.fehler ? `<div class="tm-box tm-err">${C.esc(G61V.fehler)}</div>`
-        : !G61V.runden ? '<div class="tm-loading"><span></span><span></span><span></span></div>'
-        : liste.length ? `<div class="gf-g61-liste">${liste.map((r, i) => `
-          <div class="gf-g61-z">
+      ${top ? '<p class="gf-g61-hinweis">Die 20 schnellsten Fahrer auf Garage 61 mit dieser Strecke und diesem Auto, je Fahrer seine beste Runde. Laden geht nur, wenn der Fahrer seine Telemetrie freigibt.</p>' : ""}
+      ${fehler ? `<div class="tm-box tm-err">${C.esc(fehler)}</div>`
+        : laedt ? '<div class="tm-loading"><span></span><span></span><span></span></div>'
+        : liste.length ? `<div class="gf-g61-liste">${liste.map((r, i) => {
+          const frei = r.tel !== false, gesperrt = frei ? "" : ' disabled title="Dieser Fahrer gibt seine Telemetrie nicht frei"';
+          return `
+          <div class="gf-g61-z${frei ? "" : " gesperrt"}${top && r.slug && r.slug === ich ? " ich" : ""}">
             <span class="gf-g61-nr">${i + 1}</span><b class="gf-g61-zeit">${g61Zeit(r.zeit)}</b>
             <span class="gf-g61-wer">${C.esc(r.fahrer || fahrerName(r.slug))}</span>
             <small>${tag(r.at)}</small>
-            <span class="gf-g61-tags">${neu && r.id === neu.id ? '<i class="neu">zuletzt gefahren</i>' : ""}${r.sauber ? '<i class="ok">sauber</i>' : ""}${r.abflug ? "<i>Abflug</i>" : ""}${r.box ? "<i>Box</i>" : ""}${r.nass ? "<i>nass</i>" : ""}</span>
-            <span class="gf-g61-knopf"><button type="button" class="gf-mini-btn a" data-g61="${C.esc(r.id)}" data-ziel="a">Meine Runde</button><button type="button" class="gf-mini-btn b" data-g61="${C.esc(r.id)}" data-ziel="b">Vergleich</button></span>
-          </div>`).join("")}</div>`
-        : `<p class="tm-muted">${G61V.wer ? "Von diesem Fahrer gibt es hier keine Runde mit Telemetrie. Stell „Fahrer“ auf „Alle im Team“." : "Keine Runden mit Telemetrie für diese Kombination."}</p>`}`;
+            <span class="gf-g61-tags">${!top && neu && r.id === neu.id ? '<i class="neu">zuletzt gefahren</i>' : ""}${r.sauber ? '<i class="ok">sauber</i>' : ""}${r.abflug ? "<i>Abflug</i>" : ""}${r.box ? "<i>Box</i>" : ""}${r.nass ? "<i>nass</i>" : ""}${frei ? "" : "<i>keine Telemetrie</i>"}</span>
+            <span class="gf-g61-knopf"><button type="button" class="gf-mini-btn a" data-g61="${C.esc(r.id)}" data-ziel="a"${gesperrt}>Meine Runde</button><button type="button" class="gf-mini-btn b" data-g61="${C.esc(r.id)}" data-ziel="b"${gesperrt}>Vergleich</button></span>
+          </div>`; }).join("")}</div>`
+        : `<p class="tm-muted">${top ? "Garage 61 hat für diese Kombination keine Runden." : G61V.wer ? "Von diesem Fahrer gibt es hier keine Runde mit Telemetrie. Stell „Fahrer“ auf „Alle im Team“." : "Keine Runden mit Telemetrie für diese Kombination."}</p>`}`;
     const ks = document.getElementById("g61-kombi"), ws = document.getElementById("g61-wer");
-    ks.value = G61V.kombi; ws.value = G61V.wer || "";
+    ks.value = G61V.kombi; if (ws) ws.value = G61V.wer || "";
     document.getElementById("g61-auf").onclick = () => { G61V.zu = true; vgG61Zeichnen(); };
-    ks.onchange = () => { G61V.kombi = ks.value; G61V.runden = null; vgG61Zeichnen(); vgG61Runden(); };
-    ws.onchange = () => { G61V.wer = ws.value; vgG61Zeichnen(); };
+    ks.onchange = () => { G61V.kombi = ks.value; G61V.runden = null; G61V.top = null; vgG61Zeichnen(); if (G61V.quelle === "top") vgG61Top(); else vgG61Runden(); };
+    if (ws) ws.onchange = () => { G61V.wer = ws.value; vgG61Zeichnen(); };
+    el.querySelectorAll("#g61-quelle [data-q]").forEach(b => b.onclick = () => {
+      G61V.quelle = b.dataset.q; vgG61Zeichnen();
+      if (G61V.quelle === "top" && !G61V.top) vgG61Top();
+      if (G61V.quelle === "team" && !G61V.runden) vgG61Runden();
+    });
     el.querySelectorAll("[data-g61]").forEach(b => b.onclick = () => vgG61Laden(b.dataset.g61, b.dataset.ziel, b));
   }
   async function vgG61Runden() {
@@ -912,8 +925,21 @@
       if (b && await vgG61Laden(b.id, "b")) { G61V.zu = true; vgG61Zeichnen(); vergleichStart(); }
     }
   }
+  // Top 20 aus ganz Garage 61 für die gewählte Strecke mit Auto
+  async function vgG61Top() {
+    const [t, c] = (G61V.kombi || "").split("|");
+    G61V.topFehler = "";
+    if (!t || !c) { G61V.top = []; return vgG61Zeichnen(); }
+    const fuer = G61V.kombi;
+    try {
+      const d = await C.api(`/trainer/g61/runden?quelle=top&track=${encodeURIComponent(t)}&car=${encodeURIComponent(c)}`);
+      if (fuer !== G61V.kombi) return;
+      G61V.top = d.runden || [];
+    } catch (e) { if (fuer === G61V.kombi) { G61V.top = []; G61V.topFehler = e.message; } }
+    vgG61Zeichnen();
+  }
   async function vgG61Laden(id, ziel, btn) {
-    const r = (G61V.runden || []).find(x => x.id === id);
+    const r = (G61V.runden || []).find(x => x.id === id) || (G61V.top || []).find(x => x.id === id);
     const k = (G61V.kombis || []).find(x => x.t + "|" + x.c === G61V.kombi) || {};
     if (!r) return false;
     const alt = btn ? btn.textContent : "";
