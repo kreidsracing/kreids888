@@ -60,7 +60,8 @@
     const out = [];
     for (const x of d.specials || []) {
       if (x.bis < heute || x.api) continue; // x.api: kommt schon mit Startzeiten aus der API
-      out.push({ art: "special", sp: true, key: "sp:" + x.id + ":" + x.von, sort: utcTag(x.von), titel: x.n, sub: x.tag ? x.tag.toLowerCase().replace(/\b\w/g, c => c.toUpperCase()) : "Special Event", cat: x.cat || "", cls: "", von: x.von, bis: x.bis, h: x.h, ort: (x.orte || [])[0] || "", orte: x.orte || [], autos: x.autos || "", txt: x.txt || "" });
+      const slots = Array.isArray(x.slots) ? x.slots : [];
+      out.push({ art: "special", sp: true, key: "sp:" + x.id + ":" + x.von, sort: slots.length ? slots[0] : utcTag(x.von), titel: x.n, sub: x.tag ? x.tag.toLowerCase().replace(/\b\w/g, c => c.toUpperCase()) : "Special Event", cat: x.cat || "", cls: "", von: x.von, bis: x.bis, h: x.h, laps: x.laps, slots, std: !!x.std, ort: (x.orte || [])[0] || "", orte: x.orte || [], autos: x.autos || "", txt: x.txt || "" });
     }
     for (const s of d.serien || []) {
       if (!s.team && !s.sp) continue;
@@ -88,7 +89,7 @@
 
   // Startzeitpunkte (UTC) eines Eintrags
   function starts(e) {
-    if (e.art === "special") return [];
+    if (e.art === "special") return e.slots;
     if (e.w.s && e.w.s.length) return e.w.s;
     return e.serie.p ? periodisch(e.serie.p, e.w.d) : [];
   }
@@ -96,12 +97,19 @@
   // Eintrag → Felder für den Assistenten
   function alsEvent(e, tracks) {
     if (e.art === "special") {
-      return {
-        name: e.titel.slice(0, 80), ...strecke(tracks, e.orte),
-        mode: "zeit", dauerMin: e.h ? e.h * 60 : 360,
-        von: e.von, bis: e.bis, zeiten: [],
-        hinweis: "Special Event aus dem offiziellen iRacing-Kalender. Die Startzeiten veröffentlicht iRacing in der Ankündigung, bitte unten eintragen." + (e.h ? "" : " Die Renndauer bitte prüfen.")
-      };
+      const ev = { name: e.titel.slice(0, 80), ...strecke(tracks, e.orte), von: e.von, bis: e.bis, zeiten: [] };
+      if (e.laps) { ev.mode = "runden"; ev.runden = e.laps; } else { ev.mode = "zeit"; ev.dauerMin = e.h ? e.h * 60 : 360; }
+      const hin = ["Special Event aus dem offiziellen iRacing-Kalender."];
+      if (e.slots.length) {
+        ev.von = lokalTag(e.slots[0]); ev.bis = lokalTag(e.slots[e.slots.length - 1]);
+        ev.zeiten = [...new Set(e.slots.map(lokalZeit))].sort();
+        ev.slots = e.slots.slice(0, 48);
+        hin.push("Voraussichtliche Zeitfenster: iRacing nutzt bei Team-Specials fast immer diese Standardzeiten (in deiner Ortszeit). Bitte mit der Ankündigung abgleichen.");
+      } else hin.push("Die Startzeiten veröffentlicht iRacing in der Ankündigung, bitte unten eintragen.");
+      if (!e.h && !e.laps) hin.push("Die Renndauer bitte prüfen.");
+      if (!e.orte.length) hin.push("Die Strecke nennt iRacing noch nicht.");
+      ev.hinweis = hin.join(" ");
+      return ev;
     }
     const s = e.serie, w = e.w;
     const ort = w.t.split(" - ")[0];
@@ -156,12 +164,12 @@
     const max = 60 + V.mehr * 60;
     const zeile = (e) => {
       const st = starts(e);
-      const wann = e.art === "special"
+      const wann = e.art === "special" && !st.length
         ? fmtTag(e.von) + (e.bis !== e.von ? " – " + fmtTag(e.bis) : "")
-        : st.length && e.w.s ? fmtTag(lokalTag(st[0])) + (lokalTag(st[st.length - 1]) !== lokalTag(st[0]) ? " – " + fmtTag(lokalTag(st[st.length - 1])) : "")
+        : st.length && (e.art === "special" || e.w.s) ? fmtTag(lokalTag(st[0])) + (lokalTag(st[st.length - 1]) !== lokalTag(st[0]) ? " – " + fmtTag(lokalTag(st[st.length - 1])) : "")
         : "Woche ab " + fmtTag(e.w.d);
       const dauer = e.art === "special" ? dauerTxt(e) : dauerTxt(e.w);
-      const zeiten = e.art === "special" ? "Startzeiten folgen in der iRacing-Ankündigung" : startText(st) || "Keine festen Startzeiten im Zeitplan";
+      const zeiten = e.art === "special" ? (st.length ? startText(st) + " (voraussichtlich)" : "Startzeiten folgen in der iRacing-Ankündigung") : startText(st) || "Keine festen Startzeiten im Zeitplan";
       const chips = e.art === "special" ? [] : wetterChips(e.w.wx);
       const bop = e.art === "special" ? [] : e.w.bop || [];
       return `<div class="ir-item${e.sp ? " sp" : ""}">

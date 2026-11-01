@@ -263,11 +263,22 @@ function parseSpecials(html) {
     const datum = datumBereich(ohneTags(ps[0][1]), jahrStd);
     if (!datum) continue;
     const text = ps.slice(1, 3).map(p => ohneTags(p[1])).join(" ").slice(0, 600);
-    const orte = [...new Set(ps.slice(1, 3).flatMap(p => [...p[1].matchAll(/<a[^>]*>([\s\S]*?)<\/a>/g)].map(a => ohneTags(a[1]))).filter(x => x && x.length < 80))];
+    // Strecken aus den Links: erst die Linktexte (Anzeige), dann die Namen aus /tracks/… („Tulsa Expo Center" → chili bowl)
+    const links = ps.slice(1, 3).flatMap(p => [...p[1].matchAll(/<a([^>]*)>([\s\S]*?)<\/a>/g)].map(a => [ohneTags(a[2]), ((a[1].match(/href="[^"]*\/tracks\/([^"/]+)/) || [])[1] || "").replace(/-/g, " ")]))
+      .filter(([t]) => t && t.length < 80);
+    const orte = [...new Set([...links.map(l => l[0]), ...links.map(l => l[1]).filter(Boolean)])];
     const hm = (name + " " + text).match(/(\d{1,2})\s*-?\s*(?:hours?|hrs?|hr|h)\b/i);
+    const lm = hm ? null : text.match(/\b(\d{2,3})[\s-]*laps?\b/i); // „300 lap showdown", „55-lap A main"
     const id = (sec.match(/^[^>]*\bid="([^"]+)"/) || [])[1] || name.toLowerCase().replace(/[^a-z0-9]+/g, "-");
     const autos = [...sec.matchAll(/<summary[^>]*>([\s\S]*?)<\/summary>/g)].map(m => ohneTags(m[1])).filter(Boolean).join(", ");
-    out.push({ id, n: name, tag: tag.length < 30 ? tag : "", cat: kategorie(autos + " " + name + " " + tag), von: datum.von, bis: datum.bis, h: hm ? Number(hm[1]) : undefined, autos, txt: text, orte });
+    out.push({ id, n: name, tag: tag.length < 30 ? tag : "", cat: kategorie(autos + " " + name + " " + tag), von: datum.von, bis: datum.bis, h: hm ? Number(hm[1]) : undefined, laps: lm ? Number(lm[1]) : undefined, autos, txt: text, orte });
+  }
+  // iRacing kopiert Abschnitte samt Kennung (992 Endurance Cup hatte „spa-24"): bei doppelter Kennung bekommt
+  // der Eintrag, dessen Name nicht zur Kennung passt, eine eigene aus dem Namen
+  const slug = (t) => t.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+  for (const x of out) {
+    if (out.filter(o => o.id === x.id).length < 2) continue;
+    if (!x.id.split("-").some(w => w.length > 2 && slug(x.n).split("-").includes(w))) x.id = slug(x.n);
   }
   return out.sort((a, b) => a.von.localeCompare(b.von));
 }
@@ -401,13 +412,38 @@ catch (e) { console.warn("Special Events nicht geladen:", e.message); }
 // alte Special Events behalten, falls die Seite mal nichts liefert
 if (!specials.length && fs.existsSync(OUT)) { try { specials = JSON.parse(fs.readFileSync(OUT, "utf8")).specials || []; } catch { } }
 
-// Special Events, die die API schon mit echten Startzeiten liefert, nicht doppelt zeigen
+// Special Events, die die API schon mit echten Startzeiten liefert, nicht doppelt zeigen.
+// Zeitraum UND Name müssen passen: nur nach Datum wurde z. B. der Chili Bowl dem Production Car Challenge zugeordnet
 for (const x of specials) {
+  delete x.api; delete x.slots; delete x.std;
   const von = Date.parse(x.von + "T00:00:00Z") - 864e5, bis = Date.parse(x.bis + "T23:59:59Z") + 864e5;
-  const s = serien.find(s => s.sp && s.w.some(w => (w.s || []).some(t => t >= von && t <= bis)));
-  if (!s) continue;
-  x.api = true;
-  if (!s.cars && x.autos) s.cars = x.autos;
+  const sw = stichworte(x.n);
+  const s = serien.find(s => s.sp && s.w.some(w => (w.s || []).some(t => t >= von && t <= bis)) && [...stichworte(s.n)].some(w => sw.has(w)));
+  if (s) {
+    x.api = true;
+    if (!s.cars && x.autos) s.cars = x.autos;
+  } else if (/team/i.test(x.tag)) {
+    const st = standardSlots(x);
+    if (st.length) { x.slots = st; x.std = true; }
+  }
+}
+// Name → Stichworte; Zahlen, Füllwörter und Sponsoren zählen nicht („24 Hours of Spa Presented by Falken Tyre" → spa)
+function stichworte(n) {
+  const fuell = new Set(["the", "of", "at", "by", "and", "iracing", "com", "hours", "hour", "hr", "hrs", "race", "series", "event", "special", "fixed", "championship", "car", "cars", "cup", "class"]);
+  return new Set(String(n || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/\bpresented by\b.*$/, "")
+    .split(/[^a-z0-9]+/).filter(w => w.length > 1 && !fuell.has(w) && !/^\d+(h|hr|hrs|km)?$/.test(w)));
+}
+// Team-Specials ohne API-Zeiten: iRacing nutzt (laut allen Team-Specials der API) dieselben Zeitfenster ab dem Freitag,
+// in UTC Fr 22:00, Sa 07:00, 12:00, 16:00 und bei Rennen bis 10 h zusätzlich So 00:00. Auf der Seite als „voraussichtlich" markiert.
+function standardSlots(x) {
+  const h = 36e5, bis = Date.parse(x.bis + "T00:00:00Z");
+  for (let t = Date.parse(x.von + "T00:00:00Z"); t <= bis; t += 24 * h) {
+    if (new Date(t).getUTCDay() !== 5) continue;
+    const out = [t + 22 * h, t + 31 * h, t + 36 * h, t + 40 * h];
+    if (!(x.h > 10)) out.push(t + 48 * h);
+    return out;
+  }
+  return [];
 }
 const daten = { v: 2, saison, quelle: quelle === "iraceplan" ? "iRacePlan-API" : "iRacing Season-PDF", serien, specials };
 if (apiFelder) daten.apiFelder = apiFelder; // Feldnamen der API, falls sich das Format ändert
