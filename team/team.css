@@ -2394,3 +2394,7 @@ body:has(.td)::after{content:"";position:fixed;inset:0;z-index:-1;pointer-events
 .gf-g61-pause{margin:6px 0;padding:10px 12px;border-radius:10px;background:rgba(255,176,32,.1);border:1px solid rgba(255,176,32,.3);color:#ffd28a;font-size:13px}
 @media(max-width:1300px){.gf-g61-z{grid-template-columns:28px 80px minmax(100px,1fr) 64px 1fr auto}.gf-g61-tags{display:none}}
 @media(max-width:1100px){.gf-g61-z{grid-template-columns:28px 80px 1fr auto}.gf-g61-z small,.gf-g61-tags{display:none}.gf-g61-bed{grid-column:2/4}}
+/* Setup-Berater: Fensteraufteilung. Schmale Setup-Spalte, Symptomliste hoeher, ab 1500px zweispaltig */
+@media(min-width:1001px){.kt-setup{grid-template-columns:minmax(280px,420px) minmax(0,1fr)}}
+.kt-syms{max-height:min(52vh,560px)}
+@media(min-width:1500px){.kt-syms{columns:2;column-gap:32px;max-height:none}.kt-sym,.kt-grp{break-inside:avoid}.kt-grp{break-after:avoid}}
