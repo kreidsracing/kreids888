@@ -808,7 +808,7 @@
 
   /* ---- Runden aus Garage 61: Vergleich auch ohne eigenen Mitschnitt ---- */
   const G61V = { kombis: null, fahrer: [], ich: "", kombi: "", wer: null, runden: null, fehler: "", auto: false, zu: false,
-    quelle: "team", top: null, topFehler: "" };   // quelle: "team" = Runden des Teams, "top" = Top 20 aus ganz Garage 61
+    quelle: "team", top: null, topFehler: "", altTop: "", altTeam: "" };   // quelle: "team" = Runden des Teams, "top" = Top 20 aus ganz Garage 61
   const g61Zeit = s => { const m = Math.floor(s / 60), r = s - m * 60; return m + ":" + (r < 10 ? "0" : "") + r.toFixed(3); };
   async function vgG61Oeffnen(nurAuf) {
     const el = document.getElementById("kv-g61");
@@ -889,7 +889,8 @@
           ${G61V.fahrer.map(f => `<option value="${C.esc(f.slug)}">${C.esc(f.name)}${f.slug === ich ? " (du)" : ""}</option>`).join("")}
         </select></label>`}
       </div>
-      ${top ? '<p class="gf-g61-hinweis">Die 20 Schnellsten, je Fahrer seine beste Runde. Drin sind alle Fahrer aus den Garage-61-Teams des Team-Kontos (F2F, SPR und weitere) und alle, denen das Konto auf Garage 61 folgt. Wer dort gefolgt wird, taucht hier auf. Die komplette Bestenliste wie auf der Garage-61-Seite kommt erst, wenn Garage 61 unsere App dafür freischaltet. Laden geht nur, wenn der Fahrer seine Telemetrie freigibt.</p>' : ""}
+      ${top ? '<p class="gf-g61-hinweis">Die 20 Schnellsten, je Fahrer seine beste Runde. Drin sind die Fahrer aus F2F Motorsport und Snail Pace Racing (SPR) und alle, denen das Konto auf Garage 61 folgt. Wer dort gefolgt wird, taucht hier auf. Die komplette Bestenliste wie auf der Garage-61-Seite kommt erst, wenn Garage 61 unsere App dafür freischaltet. Laden geht nur, wenn der Fahrer seine Telemetrie freigibt.</p>' : ""}
+      ${(top ? G61V.altTop : G61V.altTeam) && !laedt && !fehler ? `<p class="gf-g61-pause">Garage 61 bremst gerade. Gezeigt wird der letzte gespeicherte Stand von ${new Date(top ? G61V.altTop : G61V.altTeam).toLocaleString("de-DE", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })} Uhr.</p>` : ""}
       ${fehler ? `<div class="tm-box tm-err">${C.esc(fehler)}</div>`
         : laedt ? (G61V.bremseText ? `<p class="gf-g61-pause">${C.esc(G61V.bremseText)}</p>` : '<div class="tm-loading"><span></span><span></span><span></span></div>')
         : liste.length ? `<div class="gf-g61-liste">${liste.map((r, i) => {
@@ -907,7 +908,7 @@
     const ks = document.getElementById("g61-kombi"), ws = document.getElementById("g61-wer");
     ks.value = G61V.kombi; if (ws) ws.value = G61V.wer || "";
     document.getElementById("g61-auf").onclick = () => { G61V.zu = true; vgG61Zeichnen(); };
-    ks.onchange = () => { G61V.kombi = ks.value; G61V.runden = null; G61V.top = null; vgG61Zeichnen(); if (G61V.quelle === "top") vgG61Top(); else vgG61Runden(); };
+    ks.onchange = () => { G61V.kombi = ks.value; G61V.runden = null; G61V.top = null; G61V.altTop = G61V.altTeam = ""; vgG61Zeichnen(); if (G61V.quelle === "top") vgG61Top(); else vgG61Runden(); };
     if (ws) ws.onchange = () => { G61V.wer = ws.value; vgG61Zeichnen(); };
     el.querySelectorAll("#g61-quelle [data-q]").forEach(b => b.onclick = () => {
       G61V.quelle = b.dataset.q; vgG61Zeichnen();
@@ -924,7 +925,7 @@
     try {
       const d = await C.api(`/trainer/g61/runden?track=${encodeURIComponent(t)}&car=${encodeURIComponent(c)}`);
       if (fuer !== G61V.kombi) return;
-      G61V.runden = d.runden || []; G61V.bremseText = "";
+      G61V.runden = d.runden || []; G61V.bremseText = ""; G61V.altTeam = d.alt || "";
     } catch (e) {
       if (fuer !== G61V.kombi) return;
       if (vgG61Bremse(e.message, () => { G61V.runden = null; vgG61Zeichnen(); vgG61Runden(); })) { G61V.runden = null; G61V.fehler = ""; }
@@ -958,7 +959,7 @@
     try {
       const d = await C.api(`/trainer/g61/runden?quelle=top&track=${encodeURIComponent(t)}&car=${encodeURIComponent(c)}`);
       if (fuer !== G61V.kombi) return;
-      G61V.top = d.runden || []; G61V.bremseText = "";
+      G61V.top = d.runden || []; G61V.bremseText = ""; G61V.altTop = d.alt || "";
     } catch (e) {
       if (fuer !== G61V.kombi) return;
       if (vgG61Bremse(e.message, () => { G61V.top = null; vgG61Zeichnen(); vgG61Top(); })) { G61V.top = null; G61V.topFehler = ""; }
