@@ -2446,19 +2446,9 @@ body:has(.td)::after{content:"";position:fixed;inset:0;z-index:-1;pointer-events
 .ksv-ta{display:flex;gap:6px;flex:none}
 
 /* Team & Zugang · Spotting: Erklärung unter jedem Schalter + Legende der Fahrer-Schalter */
-.spz-arten{display:flex;flex-direction:column;gap:10px}
-.spz-art{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px 16px;align-items:center;padding:10px 14px;border:1px solid var(--g-bd);border-radius:12px;background:var(--g-glass2)}
-.spz-kopf b{display:block;font-size:14px}
-.spz-kopf small{display:block;color:var(--steel);font-size:12.5px;margin-top:2px;line-height:1.4}
-.spz-wahl{display:inline-flex;padding:3px;gap:3px;border-radius:10px;background:#0d0f13;border:1px solid rgba(255,255,255,.1)}
-.spz-wahl label{position:relative;cursor:pointer}
-.spz-wahl input{position:absolute;opacity:0;pointer-events:none}
-.spz-wahl span{display:block;font-weight:700;font-size:12.5px;padding:7px 12px;border-radius:8px;color:#aeb4c0;white-space:nowrap}
-.spz-wahl input:checked+span{background:var(--red);color:#fff}
-.spz-wahl input[value=g61]:checked+span{background:#2fe39b;color:#04120b}
-.spz-wahl input[value=aus]:checked+span{background:#3a3d46;color:#fff}
-.spz-wahl input:focus-visible+span{outline:2px solid var(--red);outline-offset:1px}
-@media (max-width:900px){.spz-art{grid-template-columns:minmax(0,1fr)}}
+.spz-sw{align-items:flex-start}
+.spz-sw>span:last-child{display:flex;flex-direction:column;gap:3px;padding-top:2px}
+.spz-sw small{color:var(--steel);font-size:12.5px;line-height:1.45;max-width:640px}
 .fa-legende{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-bottom:12px}
 .fa-legende>div{padding:10px 12px;border:1px solid var(--g-bd);border-radius:12px;background:var(--g-glass2);font-size:12.5px;line-height:1.45;color:var(--steel)}
 .fa-legende b{display:block;color:#fff;font-size:13px;margin-bottom:3px}

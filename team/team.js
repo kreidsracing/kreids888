@@ -1921,8 +1921,6 @@
         </div>`).join("")}</div>`
       : '<p class="tm-muted" style="margin:4px 0 0">Keine Fahrer gefunden. Hat die Team-Rolle Mitglieder?</p>';
     const sz = (cfg.spotting || {}).schutz || {}, doh = d.doHeute;
-    // Spotting pro Session-Art: "spot" = unser Spotting, "g61" = nur Link zu Garage 61 (Standard wie im Worker)
-    const spWeg = Object.fromEntries(Object.entries({ team: "spot", einzel: "g61", test: "g61" }).map(([k, std]) => { const w = ((cfg.spotting || {}).link || {})[k]; return [k, w === "g61" || w === "spot" ? w : std]; }));
     const g = cfg.g61, gi = d.g61;
     const wp = cfg.wpost || {}, wpo = wp.opt || {}, wpa = cfg.wpostAuto || {};
     const teamOpts = gi.teams.length
@@ -2092,7 +2090,7 @@
 
       <div class="tm-box">
         <h5>Spotting · Live-Meldung</h5>
-        <p class="hint">Geht jemand mit FF Overlay bzw. der Toolbox live, postet der Bot eine Meldung mit Strecke, Session, Team, Auto, Startnummer und Klassen-SOF und einem Knopf zum Live-Spotting. Wechselt die Session (Training → Rennen), wird der Post angepasst, am Ende steht „Beendet" dran. Welche Sessions überhaupt ins Spotting kommen, steht unter Team &amp; Zugang → Spotting. Steht eine Session-Art dort auf „Garage-61-Link“, kommt statt dieser Meldung ein einzelner Post mit Link zu Garage 61, in denselben Kanal und nach denselben Häkchen.</p>
+        <p class="hint">Geht jemand mit FF Overlay bzw. der Toolbox live, postet der Bot eine Meldung mit Strecke, Session, Team, Auto, Startnummer und Klassen-SOF und einem Knopf zum Live-Spotting. Wechselt die Session (Training → Rennen), wird der Post angepasst, am Ende steht „Beendet" dran. Welche Sessions überhaupt ins Spotting kommen, steht unter Team &amp; Zugang → Spotting.</p>
         <div class="tm-row"><div class="lbl">Live-Meldung</div>
           <div class="tm-actions"><label class="tm-switch"><input type="checkbox" id="spl-an" ${(cfg.spotting || {}).an ? "checked" : ""}><span class="s"></span>An</label></div></div>
         <div class="tm-row"><div class="lbl">Wann<small>mehrere möglich · wechselt die Session (Training → Rennen), wird neu geprüft</small></div>
@@ -2111,31 +2109,23 @@
 
       <div class="tm-box">
         <h5>Spotting</h5>
-        <p class="hint">Hier legst du fest, wie Sessions aus FF Overlay und der Toolbox live gezeigt werden: über unser Spotting, nur als Link zu Garage 61 oder gar nicht. Die Posts dazu gehen in den Kanal der Live-Meldung (Discord-Posts → Spotting · Live-Meldung) und folgen deren Häkchen. Rennergebnisse laufen getrennt davon, hier wirkt nur der Fahrer-Schalter „Rennergebnis“. Die Anordnung der Spotting-Fenster stellst du direkt auf der Spotting-Seite ein, sie gilt dann für alle.</p>
-        <div class="tm-row"><div class="lbl">Live zeigen<small>pro Session-Art, gilt für alle Fahrer</small></div>
-          <div><div class="fa-legende">
-            <div><b>Unser Spotting</b>Live-Seite im Dashboard mit Karte, Abständen und Funk, dazu die Live-Meldung mit Knopf zum Spotting. Der Post wird bei jedem Session-Wechsel angepasst, am Ende steht „Beendet“. Verbraucht Cloudflare-Budget, siehe Budget-Schutz.</div>
-            <div><b>Garage-61-Link</b>Kein Spotting. Es kommt ein einziger Post mit Strecke, Auto und Knopf „Live bei Garage 61“, kostet fast nichts. Ansehen nur mit Garage-61-Konto, der Fahrer braucht die Garage-61-App. Findet der Server die Session nicht, führt der Knopf zu „Now racing“. Ein „Beendet“ gibt es nicht.</div>
-            <div><b>Aus</b>Diese Session-Art ist nirgends live zu sehen und es kommt kein Post.</div>
-          </div>
-          <div class="spz-arten">
-            <div class="spz-art"><div class="spz-kopf"><b>Teamrennen und Special Events</b><small>Jede Session mit Team, auch Training und Quali vor dem Rennen.</small></div>
-              <div class="spz-wahl" role="radiogroup" aria-label="Teamrennen und Special Events" data-alt="${spWeg.team}"><label><input type="radio" name="spw-team" value="spot" ${((cfg.spotting || {}).team !== false) && spWeg.team === "spot" ? "checked" : ""}><span>Unser Spotting</span></label><label><input type="radio" name="spw-team" value="g61" ${((cfg.spotting || {}).team !== false) && spWeg.team === "g61" ? "checked" : ""}><span>Garage-61-Link</span></label><label><input type="radio" name="spw-team" value="aus" ${!((cfg.spotting || {}).team !== false) ? "checked" : ""}><span>Aus</span></label></div></div>
-            <div class="spz-art"><div class="spz-kopf"><b>Einzelrennen (Dailys, Training, Quali)</b><small>Alles online ohne Team.</small></div>
-              <div class="spz-wahl" role="radiogroup" aria-label="Einzelrennen (Dailys, Training, Quali)" data-alt="${spWeg.einzel}"><label><input type="radio" name="spw-einzel" value="spot" ${((cfg.spotting || {}).einzel !== false) && spWeg.einzel === "spot" ? "checked" : ""}><span>Unser Spotting</span></label><label><input type="radio" name="spw-einzel" value="g61" ${((cfg.spotting || {}).einzel !== false) && spWeg.einzel === "g61" ? "checked" : ""}><span>Garage-61-Link</span></label><label><input type="radio" name="spw-einzel" value="aus" ${!((cfg.spotting || {}).einzel !== false) ? "checked" : ""}><span>Aus</span></label></div></div>
-            <div class="spz-art"><div class="spz-kopf"><b>Offline-Testfahrten</b><small>Offline in iRacing (Test Drive), allein auf der Strecke.</small></div>
-              <div class="spz-wahl" role="radiogroup" aria-label="Offline-Testfahrten" data-alt="${spWeg.test}"><label><input type="radio" name="spw-test" value="spot" ${(!!(cfg.spotting || {}).test) && spWeg.test === "spot" ? "checked" : ""}><span>Unser Spotting</span></label><label><input type="radio" name="spw-test" value="g61" ${(!!(cfg.spotting || {}).test) && spWeg.test === "g61" ? "checked" : ""}><span>Garage-61-Link</span></label><label><input type="radio" name="spw-test" value="aus" ${!(!!(cfg.spotting || {}).test) ? "checked" : ""}><span>Aus</span></label></div></div>
-          </div></div></div>
-        <div class="tm-row"><div class="lbl">Budget-Schutz<small>Spotting und Rennergebnisse teilen sich das tägliche Gratis-Budget bei Cloudflare. Liegt der Verbrauch über der Grenze, startet bis 1 Uhr nachts kein neues Spotting dieser Art. Gilt nur, wo „Unser Spotting“ gewählt ist. 100 = nie pausieren. Teamrennen und Rennergebnisse laufen immer.</small></div>
+        <p class="hint">Hier legst du fest, was FF Overlay und die Toolbox ins Spotting schicken dürfen. Spotting ist die Live-Seite im Dashboard, dazu kommt die Live-Meldung im Discord. Was hier nicht durchkommt, ist nirgends live zu sehen und bekommt auch keine Live-Meldung. Rennergebnisse laufen getrennt davon, hier wirkt nur der Fahrer-Schalter „Rennergebnis“. Die Anordnung der Fenster stellst du direkt auf der Spotting-Seite ein, sie gilt dann für alle.</p>
+        <div class="tm-row"><div class="lbl">Im Spotting zeigen<small>gilt für alle Fahrer, mehrere möglich</small></div>
+          <div style="display:flex;flex-direction:column;gap:14px">
+            <label class="tm-switch spz-sw"><input type="checkbox" id="spl-team" ${(cfg.spotting || {}).team !== false ? "checked" : ""}><span class="s"></span><span>Teamrennen und Special Events<small>Jede Session mit Team, auch Training und Quali vor dem Rennen. Aus: Teamrennen sind nicht live zu sehen und es kommt keine Live-Meldung.</small></span></label>
+            <label class="tm-switch spz-sw"><input type="checkbox" id="spl-einzel" ${(cfg.spotting || {}).einzel !== false ? "checked" : ""}><span class="s"></span><span>Einzelrennen (Dailys, Training, Quali)<small>Alles online ohne Team. Aus: dafür kein Spotting und keine Live-Meldung. Pausiert außerdem beim Budget-Schutz.</small></span></label>
+            <label class="tm-switch spz-sw"><input type="checkbox" id="spl-offline" ${(cfg.spotting || {}).test ? "checked" : ""}><span class="s"></span><span>Offline-Testfahrten<small>Offline in iRacing (Test Drive), allein auf der Strecke. Aus: dafür kein Spotting und keine Live-Meldung. Pausiert außerdem beim Budget-Schutz.</small></span></label>
+          </div></div>
+        <div class="tm-row"><div class="lbl">Budget-Schutz<small>Spotting und Rennergebnisse teilen sich das tägliche Gratis-Budget bei Cloudflare. Liegt der Verbrauch über der Grenze, startet bis 1 Uhr nachts kein neues Spotting dieser Art. 100 = nie pausieren. Teamrennen und Rennergebnisse laufen immer.</small></div>
           <div style="display:flex;flex-direction:column;gap:10px">
             <label class="fa-grenze">Offline-Testfahrten pausieren ab <input class="tm-input" type="number" id="sps-offline" min="5" max="100" step="5" value="${Number(sz.offline) || 50}"> %</label>
             <label class="fa-grenze">Training und Einzelrennen pausieren ab <input class="tm-input" type="number" id="sps-einzel" min="5" max="100" step="5" value="${Number(sz.einzel) || 80}"> %</label>
             <span class="tm-muted">${doh && doh.ready ? `Heute verbraucht: <b>${String(doh.max).replace(".", ",")} %</b> (Stand ${new Date(doh.at).toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" })} Uhr, setzt sich um 1 Uhr nachts zurück) · Details unter Auswertung → Cloudflare-Limits` : "Verbrauch gerade nicht abrufbar, dann wird nichts pausiert."}</span>
           </div></div>
-        <div class="tm-row"><div class="lbl">Fahrer<small>alle mit Team-Rolle, dazu wer schon mit FF Overlay oder Toolbox verbunden war. Live geht nur, was oben nicht auf „Aus“ steht und hier an ist.</small></div>
+        <div class="tm-row"><div class="lbl">Fahrer<small>alle mit Team-Rolle, dazu wer schon mit FF Overlay oder Toolbox verbunden war. Live geht nur, was oben UND hier an ist.</small></div>
           <div><div class="fa-legende">
-            <div><b>Spotting</b>Aus: Von diesem Fahrer geht nichts live, weder Spotting noch Garage-61-Link, auch keine Teamrennen und keine Offline-Testfahrten. Ein Teamrennen kann trotzdem live sein, wenn ein Teamkollege im selben Rennen verbunden ist.</div>
-            <div><b>Offline</b>Aus: Nur seine Offline-Testfahrten gehen nicht live, weder Spotting noch Link. Rennen, Training und Quali laufen normal.</div>
+            <div><b>Spotting</b>Aus: Von diesem Fahrer geht nichts live, auch keine Teamrennen und keine Offline-Testfahrten. Ein Teamrennen kann trotzdem live sein, wenn ein Teamkollege im selben Rennen verbunden ist.</div>
+            <div><b>Offline</b>Aus: Nur seine Offline-Testfahrten gehen nicht live. Rennen, Training und Quali laufen normal.</div>
             <div><b>Rennergebnis</b>Aus: Sein Programm schickt keine Ergebnisse. Fährt ein Teamkollege mit Schalter an im selben Rennen, kommt das Ergebnis trotzdem über ihn.</div>
           </div>${fahrerHtml}</div></div>
       </div>
@@ -2191,9 +2181,7 @@
     spTeamsDraw();
     document.getElementById("sp-team-add").onclick = () => { spTeamsSync(); spTeams.push(""); spTeamsDraw(); markDirty(); const l = [...document.querySelectorAll("#sp-teams input")].pop(); if (l) l.focus(); };
     box.querySelectorAll("#g61-on,#g61-rec").forEach(el => el.addEventListener("change", markDirty));
-    // gewählter Weg pro Session-Art (Unser Spotting | Garage-61-Link | Aus)
-    const spWahl = (k) => (box.querySelector(`[name=spw-${k}]:checked`) || {}).value || "aus";
-    box.querySelectorAll("[data-fa-spot],[data-fa-erg],[data-fa-offline],[id^=spl-],[id^=er-],[id^=sps-],[name^=spw-]").forEach(el => el.addEventListener("change", markDirty));
+    box.querySelectorAll("[data-fa-spot],[data-fa-erg],[data-fa-offline],[id^=spl-],[id^=er-],[id^=sps-]").forEach(el => el.addEventListener("change", markDirty));
     box.querySelectorAll("[id^=sps-]").forEach(el => el.addEventListener("input", markDirty));
 
     // ---- Links bearbeiten ----
@@ -2270,10 +2258,9 @@
           post: { team: document.getElementById("spl-p-team").checked, daily: document.getElementById("spl-p-daily").checked, training: document.getElementById("spl-p-training").checked, test: document.getElementById("spl-p-test").checked },
           channel: document.getElementById("spl-ch").value,
           ping: document.getElementById("spl-ping").value,
-          team: spWahl("team") !== "aus",
-          einzel: spWahl("einzel") !== "aus",
-          test: spWahl("test") !== "aus",
-          link: Object.fromEntries(["team", "einzel", "test"].map(k => [k, spWahl(k) === "aus" ? document.querySelector(`[name=spw-${k}]`).closest(".spz-wahl").dataset.alt : spWahl(k)])),
+          team: document.getElementById("spl-team").checked,
+          einzel: document.getElementById("spl-einzel").checked,
+          test: document.getElementById("spl-offline").checked,
           schutz: { offline: Number(document.getElementById("sps-offline").value) || 50, einzel: Number(document.getElementById("sps-einzel").value) || 80 },
         },
         ergebnisse: {
