@@ -1910,16 +1910,17 @@
       ? `<div class="tm-roles" data-pick="${key}">${d.roles.map(r => `<button type="button" class="tm-chip" data-role="${r.id}"><i style="${r.color ? "background:" + hex(r.color) : ""}"></i>${esc(r.name)}</button>`).join("")}</div>`
       : '<span class="tm-err">Keine Rollen geladen – ist der Bot auf dem Server?</span>';
 
-    // Fahrer-Schalter: alle, die FF Overlay oder die Toolbox verbunden haben; gespeichert wird, wer aus ist
-    const fahrerAus = { spot: new Set((cfg.fahrerAus || {}).spot || []), erg: new Set((cfg.fahrerAus || {}).erg || []) };
+    // Fahrer-Schalter: alle mit Team-Rolle plus wer FF Overlay oder die Toolbox verbunden hat; gespeichert wird, wer aus ist
+    const FA_ARTEN = [["spot", "Spotting"], ["offline", "Offline"], ["erg", "Rennergebnis"]];
+    const fahrerAus = Object.fromEntries(FA_ARTEN.map(([k]) => [k, new Set((cfg.fahrerAus || {})[k] || [])]));
     const appFahrer = d.appFahrer || [];
     const fahrerHtml = appFahrer.length
       ? `<div class="fa-liste">${appFahrer.map(f => `<div class="fa-zeile">
-          <span class="fa-name">${esc(f.n)}<small>${f.team ? "" : "ohne Team-Rolle · "}zuletzt ${f.z ? esc(fmtDay(f.z)) : "?"}</small></span>
-          <label class="tm-switch"><input type="checkbox" data-fa-spot="${esc(f.id)}" ${fahrerAus.spot.has(f.id) ? "" : "checked"}><span class="s"></span>Spotting</label>
-          <label class="tm-switch"><input type="checkbox" data-fa-erg="${esc(f.id)}" ${fahrerAus.erg.has(f.id) ? "" : "checked"}><span class="s"></span>Rennergebnis</label>
+          <span class="fa-name">${esc(f.n)}<small>${f.team ? "" : "ohne Team-Rolle · "}${f.app ? "zuletzt verbunden " + (f.z ? esc(fmtDay(f.z)) : "?") : "noch nicht verbunden"}</small></span>
+          ${FA_ARTEN.map(([k, l]) => `<label class="tm-switch"><input type="checkbox" data-fa-${k}="${esc(f.id)}" ${fahrerAus[k].has(f.id) ? "" : "checked"}><span class="s"></span>${l}</label>`).join("")}
         </div>`).join("")}</div>`
-      : '<p class="tm-muted" style="margin:4px 0 0">Noch niemand verbunden. Wer in FF Overlay oder der Toolbox „Mit F2F verbinden“ klickt, erscheint hier.</p>';
+      : '<p class="tm-muted" style="margin:4px 0 0">Keine Fahrer gefunden. Hat die Team-Rolle Mitglieder?</p>';
+    const sz = (cfg.spotting || {}).schutz || {}, doh = d.doHeute;
     const g = cfg.g61, gi = d.g61;
     const wp = cfg.wpost || {}, wpo = wp.opt || {}, wpa = cfg.wpostAuto || {};
     const teamOpts = gi.teams.length
@@ -2103,8 +2104,6 @@
           <div><select class="tm-select" id="spl-ch"><option value="">– Kanal wählen –</option>${(d.channels || []).map(c => `<option value="${c.id}" ${c.id === (cfg.spotting || {}).channel ? "selected" : ""}># ${esc(c.name)}</option>`).join("")}</select></div></div>
         <div class="tm-row"><label for="spl-ping">Ping<small>Rolle, die erwähnt wird</small></label>
           <div><select class="tm-select" id="spl-ping"><option value="">– niemanden pingen –</option>${d.roles.map(r => `<option value="${r.id}" ${r.id === (cfg.spotting || {}).ping ? "selected" : ""}>@${esc(r.name)}</option>`).join("")}</select></div></div>
-        <div class="tm-row"><div class="lbl">Fahrer<small>wer FF Overlay oder die Toolbox verbunden hat · aus: von diesem Fahrer kommt kein Spotting (mit Live-Meldung) bzw. kein Rennergebnis</small></div>
-          ${fahrerHtml}</div>
         <div class="tm-row"><div class="lbl">Testen<small>erst speichern</small></div><div class="tm-actions">${btn("Test-Meldung posten", "sm", 'id="spl-test"')}</div></div>
       </div>
 
@@ -2117,6 +2116,14 @@
             <label class="tm-switch"><input type="checkbox" id="spl-einzel" ${(cfg.spotting || {}).einzel !== false ? "checked" : ""}><span class="s"></span>Einzelrennen (Dailys, Training, Quali)</label>
             <label class="tm-switch"><input type="checkbox" id="spl-offline" ${(cfg.spotting || {}).test ? "checked" : ""}><span class="s"></span>Offline-Testfahrten</label>
           </div></div>
+        <div class="tm-row"><div class="lbl">Budget-Schutz<small>Spotting und Rennergebnisse teilen sich das tägliche Gratis-Budget bei Cloudflare. 100 = nie pausieren. Teamrennen und Rennergebnisse laufen immer.</small></div>
+          <div style="display:flex;flex-direction:column;gap:10px">
+            <label class="fa-grenze">Offline-Testfahrten pausieren ab <input class="tm-input" type="number" id="sps-offline" min="5" max="100" step="5" value="${Number(sz.offline) || 50}"> %</label>
+            <label class="fa-grenze">Training und Einzelrennen pausieren ab <input class="tm-input" type="number" id="sps-einzel" min="5" max="100" step="5" value="${Number(sz.einzel) || 80}"> %</label>
+            <span class="tm-muted">${doh && doh.ready ? `Heute verbraucht: <b>${String(doh.max).replace(".", ",")} %</b> (Stand ${new Date(doh.at).toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" })} Uhr, setzt sich um 1 Uhr nachts zurück) · Details unter Auswertung → Cloudflare-Limits` : "Verbrauch gerade nicht abrufbar, dann wird nichts pausiert."}</span>
+          </div></div>
+        <div class="tm-row"><div class="lbl">Fahrer<small>alle mit Team-Rolle · aus: von diesem Fahrer kommt kein Spotting (mit Live-Meldung), keine Offline-Testfahrt bzw. kein Rennergebnis</small></div>
+          ${fahrerHtml}</div>
       </div>
 
       <div class="tm-savebar" id="savebar"><span>Alles gespeichert</span>${btn("Speichern", "red", 'id="tm-save"')}</div>`;
@@ -2170,7 +2177,8 @@
     spTeamsDraw();
     document.getElementById("sp-team-add").onclick = () => { spTeamsSync(); spTeams.push(""); spTeamsDraw(); markDirty(); const l = [...document.querySelectorAll("#sp-teams input")].pop(); if (l) l.focus(); };
     box.querySelectorAll("#g61-on,#g61-rec").forEach(el => el.addEventListener("change", markDirty));
-    box.querySelectorAll("[data-fa-spot],[data-fa-erg],[id^=spl-],[id^=er-]").forEach(el => el.addEventListener("change", markDirty));
+    box.querySelectorAll("[data-fa-spot],[data-fa-erg],[data-fa-offline],[id^=spl-],[id^=er-],[id^=sps-]").forEach(el => el.addEventListener("change", markDirty));
+    box.querySelectorAll("[id^=sps-]").forEach(el => el.addEventListener("input", markDirty));
 
     // ---- Links bearbeiten ----
     let links = (d.links || []).map(l => ({ ...l }));
@@ -2249,6 +2257,7 @@
           team: document.getElementById("spl-team").checked,
           einzel: document.getElementById("spl-einzel").checked,
           test: document.getElementById("spl-offline").checked,
+          schutz: { offline: Number(document.getElementById("sps-offline").value) || 50, einzel: Number(document.getElementById("sps-einzel").value) || 80 },
         },
         ergebnisse: {
           an: document.getElementById("er-an").checked,
@@ -2261,7 +2270,7 @@
           kanalOverlay: document.getElementById("er-ch-ov").value,
         },
         // wer nicht in der Liste steht (z. B. lange nicht verbunden), behält seine Einstellung
-        fahrerAus: Object.fromEntries(["spot", "erg"].map(k => [k, [
+        fahrerAus: Object.fromEntries(FA_ARTEN.map(([k]) => [k, [
           ...[...fahrerAus[k]].filter(id => !appFahrer.some(f => f.id === id)),
           ...[...document.querySelectorAll(`[data-fa-${k}]`)].filter(x => !x.checked).map(x => x.getAttribute("data-fa-" + k))
         ]])),
