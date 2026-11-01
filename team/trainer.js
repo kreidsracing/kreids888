@@ -880,7 +880,7 @@
           ${G61V.fahrer.map(f => `<option value="${C.esc(f.slug)}">${C.esc(f.name)}${f.slug === ich ? " (du)" : ""}</option>`).join("")}
         </select></label>`}
       </div>
-      ${top ? '<p class="gf-g61-hinweis">Die 20 schnellsten Fahrer auf Garage 61 mit dieser Strecke und diesem Auto, je Fahrer seine beste Runde. Laden geht nur, wenn der Fahrer seine Telemetrie freigibt.</p>' : ""}
+      ${top ? '<p class="gf-g61-hinweis">Die 20 Schnellsten, je Fahrer seine beste Runde. Garage 61 gibt uns über die Schnittstelle nur dein Team und die Fahrer frei, denen das Team-Konto auf Garage 61 folgt. Wer dort gefolgt wird, taucht hier auf. Die komplette Bestenliste wie auf der Garage-61-Seite kommt erst, wenn Garage 61 unsere App dafür freischaltet. Laden geht nur, wenn der Fahrer seine Telemetrie freigibt.</p>' : ""}
       ${fehler ? `<div class="tm-box tm-err">${C.esc(fehler)}</div>`
         : laedt ? '<div class="tm-loading"><span></span><span></span><span></span></div>'
         : liste.length ? `<div class="gf-g61-liste">${liste.map((r, i) => {
