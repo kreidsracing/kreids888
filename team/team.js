@@ -537,11 +537,12 @@
   });
 
   // alte Adressen (Lesezeichen, Links in Discord-Posts) auf die neue Ordnung umleiten
-  const ALT_ADR = { aktivitaet: "auswertung/aktivitaet", nutzung: "auswertung/nutzung", limits: "auswertung/limits", "news-schreiben": "inhalte/news",
-    fahrerprofile: "inhalte/profile", "kalender-admin": "inhalte/kalender", admin: "team-zugang", posts: "discord-posts/g61-posts", woche: "garage61/training" };
+  // (Objekte ohne Prototyp: #constructor, #__proto__, #toString liefern sonst Object-Methoden und die Seite bleibt leer)
+  const ALT_ADR = Object.assign(Object.create(null), { aktivitaet: "auswertung/aktivitaet", nutzung: "auswertung/nutzung", limits: "auswertung/limits", "news-schreiben": "inhalte/news",
+    fahrerprofile: "inhalte/profile", "kalender-admin": "inhalte/kalender", admin: "team-zugang", posts: "discord-posts/g61-posts", woche: "garage61/training" });
   // für die Nutzungs-Statistik die bisherigen Namen weiterverwenden
-  const MERKE_ALS = { "inhalte/news": "news-schreiben", "inhalte/profile": "fahrerprofile", "inhalte/kalender": "kalender-admin", "auswertung/aktivitaet": "aktivitaet",
-    "auswertung/nutzung": "nutzung", "auswertung/limits": "limits", "discord-posts/g61-posts": "posts" };
+  const MERKE_ALS = Object.assign(Object.create(null), { "inhalte/news": "news-schreiben", "inhalte/profile": "fahrerprofile", "inhalte/kalender": "kalender-admin", "auswertung/aktivitaet": "aktivitaet",
+    "auswertung/nutzung": "nutzung", "auswertung/limits": "limits", "discord-posts/g61-posts": "posts" });
 
   function renderShell() {
     let id = location.hash.replace("#", "");
@@ -589,7 +590,7 @@
       return window.F2FStint.mount(main(), { api, esc, toast, ICONS, panelHead, btn, ME }, id.slice(6));
     if ((id === "spotting" || id.startsWith("spotting/")) && ME.panels.stint && window.F2FSpotting)
       return window.F2FSpotting.mount(main(), { api, esc, toast, ICONS, panelHead, btn, ME }, id.slice(9));
-    if (PANELS[id] && ME.panels[id]) return renderSoon(PANELS[id].title, id, PANELS[id].desc);
+    if (Object.hasOwn(PANELS, id) && ME.panels[id]) return renderSoon(PANELS[id].title, id, PANELS[id].desc);
     renderHome(tools);
   }
 

@@ -44,7 +44,9 @@
     const out = {};
     for (const f of FENSTER) {
       const s = { ...STANDARD[f.id] }, x = l && l[f.id];
-      out[f.id] = x && Number.isFinite(x.x) ? { x: klemm(x.x, 0, SPALTEN - 2), y: Math.max(0, x.y | 0), w: klemm(x.w, 2, SPALTEN), h: klemm(x.h, 3, 30), aus: !!x.aus } : s;
+      const px = x && Number.isFinite(x.x) ? klemm(x.x, 0, SPALTEN - 2) : 0;
+      // Breite so klemmen, dass das Fenster nicht über Spalte 12 hinausragt (x + w <= 12)
+      out[f.id] = x && Number.isFinite(x.x) ? { x: px, y: Math.max(0, x.y | 0), w: klemm(x.w, 2, SPALTEN - px), h: klemm(x.h, 3, 30), aus: !!x.aus } : s;
     }
     LAYOUT = out;
     kompakt();
@@ -82,8 +84,9 @@
   const handy = () => window.matchMedia("(max-width: 900px)").matches;
 
   function aufraeumen() {
+    alive++; // noch laufende live()/liste()/planLaden() erkennen daran, dass ihre Ansicht weg ist
     clearTimeout(wiederT); clearInterval(listeT); clearInterval(alterT); clearInterval(planT);
-    cancelAnimationFrame(rafId); rafId = null; ANIM.clear(); KARTE = null;
+    cancelAnimationFrame(rafId); rafId = null; clearInterval(animTakt); animTakt = null; ANIM.clear(); KARTE = null;
     if (ws) { ws.onclose = null; try { ws.close(); } catch (e) { } ws = null; }
     wsSub = null;
   }
@@ -91,8 +94,8 @@
   window.addEventListener("resize", () => { if (root && root.querySelector("#spt-gitter")) setzeFenster(); });
 
   async function mount(el, ctx, sub) {
-    C = ctx; root = el; alive++;
-    aufraeumen();
+    C = ctx; root = el;
+    aufraeumen(); // zählt alive hoch
     sub = String(sub || "").replace(/\D/g, "");
     if (!sub) return liste(alive);
     return live(sub, alive);
@@ -114,6 +117,7 @@
         </a>`).join("")}</div>` : '<div class="tm-box"><p class="tm-muted">Gerade fährt niemand mit verbundenem FF Overlay. Sobald jemand in einer Online-Session ist, taucht das Rennen hier auf.</p></div>';
     };
     await zeichne();
+    if (mine !== alive) return; // inzwischen weg: keinen Zeitgeber mehr starten
     listeT = setInterval(() => { if (mine === alive && location.hash === "#spotting") zeichne(); }, 15000);
   }
 
@@ -132,7 +136,15 @@
     bindeFenster();
     zeichne();
     verbinde(sub, mine, 0);
-    alterT = setInterval(() => { const el = root.querySelector("#spt-alter"); if (el && S.stand) el.textContent = alterText(); }, 1000);
+    alterT = setInterval(() => {
+      const el = root.querySelector("#spt-alter");
+      if (el && S.stand) el.textContent = alterText();
+      // seit über 8 s kein Stand: auf der Karte zeigen (die Autos stehen dann), nach 25 s die Verbindung neu aufbauen,
+      // aber nur, wenn laut Server noch jemand sendet (Rennen vorbei = kein aktiver Sender: nicht alle 25 s neu verbinden)
+      const alt = S.stand ? Date.now() - (S.stand.t || 0) : 0, warn = root.querySelector("#spt-map-warn");
+      if (warn) { warn.hidden = alt < 8000; if (alt >= 8000) warn.textContent = "Seit " + Math.round(alt / 1000) + " s keine Daten vom Fahrer"; }
+      if (alt > 25000 && ws && S.verbunden && S.sender.some(x => x && x.aktiv) && Date.now() - (S.neuVerbunden || 0) > 25000) { S.neuVerbunden = Date.now(); try { ws.close(); } catch (e) { } }
+    }, 1000);
     planT = setInterval(() => { if (mine === alive) planLaden(true); }, 5 * 60000);
   }
   function setzeFenster() {
@@ -184,20 +196,33 @@
   /* ---------------- Verbindung ---------------- */
   function verbinde(sub, mine, versuch) {
     const url = (location.protocol === "https:" ? "wss://" : "ws://") + location.host + "/api/team/spotting/ws?sub=" + encodeURIComponent(sub);
-    ws = new WebSocket(url); wsSub = sub;
+    const nochmal = () => { clearTimeout(wiederT); wiederT = setTimeout(() => { if (mine === alive) verbinde(sub, mine, versuch + 1); }, Math.min(30000, 2000 * (versuch + 1))); };
+    try { ws = new WebSocket(url); } catch (e) { ws = null; return nochmal(); }
+    wsSub = sub;
     ws.onopen = () => { S.verbunden = true; versuch = 0; kopf(); };
     ws.onmessage = (e) => {
       if (mine !== alive) return;
       let j; try { j = JSON.parse(e.data); } catch (x) { return; }
-      if (j.typ === "stand") { neuerStand(j); zeichne(); }
-      else if (j.typ === "strecke") { S.strecke = j; zeichneKarte(); }
-      else if (j.typ === "sender") { S.sender = j.liste || []; kopf(); }
+      if (!j || typeof j !== "object") return;
+      // nur verwenden, was die Seite sicher lesen kann (sonst bricht das Zeichnen bei jedem Stand ab)
+      if (j.typ === "stand") {
+        if (!Array.isArray(j.autos) || !j.session || typeof j.session !== "object" || Array.isArray(j.session)) return;
+        j.autos = j.autos.filter(a => a && typeof a === "object");
+        neuerStand(j); zeichne();
+      }
+      else if (j.typ === "strecke") {
+        const pk = Array.isArray(j.punkte) ? j.punkte.filter(p => Array.isArray(p) && p.length >= 3 && Number.isFinite(p[0]) && Number.isFinite(p[1]) && Number.isFinite(p[2])) : [];
+        if (!pk.length) return;
+        S.strecke = { ...j, punkte: pk };
+        zeichneKarte();
+      }
+      else if (j.typ === "sender") { S.sender = Array.isArray(j.liste) ? j.liste.filter(x => x && typeof x === "object") : []; kopf(); }
     };
     ws.onclose = () => {
       S.verbunden = false;
       if (mine !== alive || wsSub !== sub) return;
-      kopf();
-      wiederT = setTimeout(() => verbinde(sub, mine, versuch + 1), Math.min(30000, 2000 * (versuch + 1)));
+      nochmal(); // immer neu verbinden, auch wenn das Neuzeichnen des Kopfs scheitert
+      try { kopf(); } catch (e) { }
     };
   }
   const alterText = () => { const s = Math.max(0, Math.round((Date.now() - (S.stand.t || Date.now())) / 1000)); return s < 5 ? "live" : "Stand vor " + s + " s"; };
@@ -206,10 +231,10 @@
      Die Daten kommen alle 2 s. Dazwischen fährt jedes Auto mit seiner gemessenen Geschwindigkeit weiter (60 Bilder/s);
      kommt ein neuer Stand, gleitet es auf die echte Stelle (Abweichung baut sich in ~0,4 s ab), statt zu springen. */
   const ANIM = new Map(); // CarIdx -> { p: Streckenanteil, t: Zeitpunkt (performance.now), v: Anteil pro s, o: Restabweichung }
-  let KARTE = null, rafId = null;
+  let KARTE = null, rafId = null, animTakt = null, letzterFrame = 0;
   const wickel = (d) => d > 0.5 ? d - 1 : d < -0.5 ? d + 1 : d;
   function animPos(a, jetzt) {
-    const dt = Math.min(4, Math.max(0, (jetzt - a.t) / 1000)); // bleiben Daten aus, steht das Auto nach 4 s
+    const dt = Math.min(6, Math.max(0, (jetzt - a.t) / 1000)); // bleiben Daten aus, steht das Auto nach 6 s
     return (((a.p + a.v * dt + a.o * Math.exp(-dt / 0.4)) % 1) + 1) % 1;
   }
   function animNeu(j) {
@@ -230,9 +255,9 @@
     for (const i of [...ANIM.keys()]) if (!da.has(i)) ANIM.delete(i);
   }
   function animLauf() {
-    if (rafId) return;
-    const schritt = () => {
-      rafId = requestAnimationFrame(schritt);
+    if (rafId != null || animTakt != null) return; // läuft schon (beides stoppt nur aufraeumen())
+    // ein Bild rechnen: Position jedes Autos aus seiner Geschwindigkeit und der verstrichenen Zeit
+    const bild = () => {
       if (!KARTE || !document.body.contains(KARTE.svg)) return;
       const jetzt = performance.now();
       for (const [i, el] of KARTE.els) {
@@ -246,14 +271,19 @@
         }
       }
     };
+    const schritt = () => { rafId = requestAnimationFrame(schritt); letzterFrame = performance.now(); bild(); };
     rafId = requestAnimationFrame(schritt);
+    // Browser drosseln requestAnimationFrame (Spiel im Vordergrund, Energiesparen, eingebettete Ansicht): dann übernimmt ein Zeitgeber mit 20 Bildern/s
+    animTakt = setInterval(() => { if (performance.now() - letzterFrame > 90) bild(); }, 50);
   }
 
   function neuerStand(j) {
     const erster = !S.stand;
     S.stand = j;
     animNeu(j);
-    for (const ev of j.ereignisse || []) S.ereignisse.set(ev.w + ":" + ev.art + ":" + ev.i, ev);
+    for (const ev of Array.isArray(j.ereignisse) ? j.ereignisse : []) if (ev && typeof ev === "object") S.ereignisse.set(ev.w + ":" + ev.art + ":" + ev.i, ev);
+    // Rennleitung: nur die neuesten 500 Meldungen behalten (sonst wächst die Liste das ganze Rennen und wird alle 2 s ganz sortiert)
+    if (S.ereignisse.size > 500) S.ereignisse = new Map([...S.ereignisse].sort((x, y) => (x[1].w || 0) - (y[1].w || 0)).slice(-500));
     if (j.ich && j.ich.sprit != null) S.sprit = { ...j.ich, t: j.t, runde: (j.autos.find(a => a.i === j.ich.idx) || {}).runde };
     const unsere = j.autos.filter(a => istF2F(a, j));
     if (S.auto == null || !j.autos.some(a => a.i === S.auto)) S.auto = (unsere[0] || j.autos[0] || {}).i ?? null;
@@ -336,18 +366,20 @@
 
   /* ---------------- Stintplaner (Plan zum laufenden Rennen) ---------------- */
   async function planLaden(still) {
-    const st = S.stand;
+    const st = S.stand, mine = alive, gleich = () => mine === alive && root && root.isConnected; // Ansicht noch dieselbe?
     if (!st) return;
     try {
       const d = await C.api("/stint/list");
+      if (!gleich()) return;
       const jetzt = Date.now(), strecke = norm(st.session.strecke).split(" ").slice(0, 2).join(" ");
       const ende = (p) => Math.max(p.start, ...p.cars.map(c => c.start || p.start)) + (p.mode === "zeit" ? p.dauerMin * 60000 : 8 * 3600000);
       const kand = (d.list || []).filter(p => jetzt > p.start - 3 * 3600000 && jetzt < ende(p) + 3600000 && (!strecke || norm(p.track).includes(strecke)));
       if (!kand.length) { S.plan = null; return; }
       const r = await C.api("/stint/plan?id=" + encodeURIComponent(kand[0].id));
+      if (!gleich()) return; // inzwischen weggeklickt: nichts mehr zeichnen (sonst startet die Kartenanimation wieder)
       S.plan = r.plan;
       if (!still) zeichne();
-    } catch (e) { S.plan = null; }
+    } catch (e) { if (gleich()) S.plan = null; }
   }
 
   /* ---------------- Zeichnen ---------------- */
@@ -359,13 +391,15 @@
     const aus = FENSTER.filter(f => LAYOUT[f.id].aus);
     const wetter = s ? [s.luft != null ? s.luft + " °C Luft" : "", s.asphalt != null ? s.asphalt + " °C Asphalt" : "", s.nass_erklaert ? "Nass erklärt" : ""].filter(Boolean).join(" · ") : "";
     const nass = s ? NASS[s.nass] || "" : "";
+    // Name aus der Karten-Bibliothek ist vollständig („Nürburgring Combined – Gesamtstrecke 24h"); iRacing selbst lässt den Streckennamen manchmal weg
+    const titel = S.strecke && S.strecke.name ? String(S.strecke.name).split(" – ") : s ? [s.strecke || s.variante || "", s.strecke ? s.variante : ""] : ["", ""];
     const laenge = !s ? "" : Number(s.runden_gesamt) > 0 ? "Renndauer " + s.runden_gesamt + " Runden" : s.dauer > 0 && s.dauer < 1e5 ? "Renndauer " + Math.floor(s.dauer / 60) + ":" + pad(Math.round(s.dauer % 60)) + " h" : "";
     const unsere = st ? st.autos.filter(a => istF2F(a, st)) : [];
     const unsereKl = [...new Set(unsere.map(a => String(a.k)))];
     const klName = (id) => ((s && s.klassen || []).find(k => String(k.id) === id) || {}).name || "";
     const klFarbe = (id) => { const f = String(((s && s.klassen || []).find(k => String(k.id) === id) || {}).farbe || "").replace(/^0x/, "#"); return /^#[0-9a-f]{6}$/i.test(f) ? f : "#e11324"; };
     const html = `<div class="spt-kopf">
-      ${s ? `<span class="tm-badge live">${esc(TYP[s.typ] || s.typ || "Session")}</span>${nass ? `<span class="spt-wx ${nass.toLowerCase()}">${nass}</span>` : ""}<h3>${esc(s.strecke)}${s.variante ? ` <small>${esc(s.variante)}</small>` : ""}</h3>
+      ${s ? `<span class="tm-badge live">${esc(TYP[s.typ] || s.typ || "Session")}</span>${nass ? `<span class="spt-wx ${nass.toLowerCase()}">${nass}</span>` : ""}<h3>${esc(titel[0])}${titel[1] ? ` <small>${esc(titel[1])}</small>` : ""}</h3>
         <span class="spt-meta">${[laenge, st.autos.length + " Teilnehmer", "Klassen " + (s.klassen || []).map(k => esc(k.name)).join(", "), esc(wetter)].filter(Boolean).join(" · ")}</span>
         ${unsere.length ? `<div class="spt-unsere">${unsereKl.map(k => `<span class="spt-kl" style="--k:${klFarbe(k)}">${esc(klName(k))}</span>`).join("")}<small>= unsere Autos</small><b>${unsere.length} F2F-${unsere.length === 1 ? "Auto" : "Autos"} in dieser Session</b></div>` : ""}` : "<h3>Verbinde …</h3>"}
       <span class="spt-quelle"><i class="${S.verbunden ? "an" : ""}"></i>${st ? `Daten von ${esc(sender ? sender.name : st.von || "?")} · <span id="spt-alter"></span>` : S.verbunden ? "verbunden, warte auf Daten" : "getrennt"}</span>
@@ -418,9 +452,9 @@
     if (a) {
       const liste = felder[a.k] || [], n = liste.indexOf(a), vor = liste[n - 1], hinter = liste[n + 1], est = estKlasse(st, a.k) || a.best;
       const zeile = (o, vorne) => {
-        if (!o) return `<div class="spt-duell leer">${vorne ? "Niemand vor dir – Klassenspitze" : "Niemand hinter dir"}</div>`;
+        if (!o) return `<div class="spt-duell leer">${vorne ? "Niemand vor dir · Klassenspitze" : "Niemand hinter dir"}</div>`;
         const g = vorne ? abstandSek(a, o, st) : abstandSek(o, a, st), t = trend(vorne ? a.i + ":" + o.i : o.i + ":" + a.i, est);
-        const tt = t == null ? "Trend nach ca. 2 Runden" : Math.abs(t) < 0.05 ? "± 0,0 s/Rd. – gleich schnell"
+        const tt = t == null ? "Trend nach ca. 2 Runden" : Math.abs(t) < 0.05 ? "± 0,0 s/Rd. · gleich schnell"
           : vorne ? (t < 0 ? `▲ holst ${Math.abs(t).toFixed(1).replace(".", ",")} s/Rd. auf` : `▼ verlierst ${t.toFixed(1).replace(".", ",")} s/Rd.`)
             : (t < 0 ? `▼ kommt ${Math.abs(t).toFixed(1).replace(".", ",")} s/Rd. näher` : `▲ du baust ${t.toFixed(1).replace(".", ",")} s/Rd. aus`);
         const gut = t != null && (vorne ? t < 0 : t > 0);
@@ -464,19 +498,25 @@
       klListe = [...st.autos].sort((x, y) => (x.pos || 999) - (y.pos || 999) || fort(y) - fort(x));
       klListe.forEach((x, n) => { x._gapG = abstandText(x, klListe[0], st); x._intG = n ? abstandText(x, klListe[n - 1], st) : ""; });
     }
+    // Spalten in Gruppen: Position | Abstände | Rundenzeiten | Trend | Reifen & Stint (Klasse g = Trenner davor, z = Zahl rechtsbündig)
     const fz = (x) => {
-      const pm = plusMinus(x, felder[x.k] || [], st);
+      const pm = plusMinus(x, felder[x.k] || [], st), wer = [x.team, x.fahrer].filter(Boolean).join(" · ");
       return `<tr class="${istF2F(x, st) ? "unser" : ""}${x.box ? " inbox" : ""}">
-      <td><b>${(alle ? x.pos : x.kpos) || "–"}</b></td>${alle ? `<td><span class="spt-kl" style="--k:${farbe(x.k)}">${esc(kl(x.k).name)}</span> <small class="spt-klpos">P${x.kpos || "–"}</small></td>` : ""}<td>${esc(x.nr)}</td>
-      <td class="spt-name">${x.team ? `<b>${esc(x.team)}</b><small>${esc(x.fahrer)}</small>` : `<b>${esc(x.fahrer)}</b>`}</td>
-      <td>${x.runde ?? "–"}</td><td>${esc(alle ? x._gapG : x._gap)}</td><td>${esc(alle ? x._intG : x._int)}</td><td class="spt-rel">${zuUns(x)}</td>
-      <td>${zeit(x.last)}</td><td>${zeit(x.o5)}</td><td>${pmZahl(pm.vorne, false)}</td><td>${pmZahl(pm.hinten, true)}</td><td>${zeit(x.best)}</td>
-      <td>${esc(reifenName(st, x))}</td><td>${(alle ? x.start : x.kstart) ? "P" + (alle ? x.start : x.kstart) : "–"}</td>
-      <td>${x.stint_s != null ? dauer(x.stint_s) + (x.stint_r != null ? " · " + x.stint_r + " Rd." : "") : "–"}</td><td>${x.stopps || 0}</td>
-      <td>${x.box ? '<span class="tm-badge">Box</span>' : x.fl === -1 ? '<span class="tm-badge grey">weg</span>' : ""}</td></tr>`;
+      <td class="spt-pos"><b>${(alle ? x.pos : x.kpos) || "–"}</b></td>${alle ? `<td><span class="spt-kl" style="--k:${farbe(x.k)}">${esc(kl(x.k).name)}</span> <small class="spt-klpos">P${x.kpos || "–"}</small></td>` : ""}<td class="spt-nr">${esc(x.nr)}</td>
+      <td class="spt-name" title="${esc(wer)}">${x.team ? `<b>${esc(x.team)}</b><small>${esc(x.fahrer)}</small>` : `<b>${esc(x.fahrer)}</b>`}</td><td class="z">${x.runde ?? "–"}</td>
+      <td class="g z">${esc(alle ? x._gapG : x._gap)}</td><td class="z">${esc(alle ? x._intG : x._int)}</td><td class="z spt-rel">${zuUns(x)}</td>
+      <td class="g z">${zeit(x.last)}</td><td class="z">${zeit(x.o5)}</td><td class="z">${zeit(x.best)}</td>
+      <td class="g z">${pmZahl(pm.vorne, false)}</td><td class="z">${pmZahl(pm.hinten, true)}</td>
+      <td class="g">${esc(reifenName(st, x))}</td><td class="z">${(alle ? x.start : x.kstart) ? "P" + (alle ? x.start : x.kstart) : "–"}</td>
+      <td class="z">${x.stint_s != null ? dauer(x.stint_s) + (x.stint_r != null ? " · " + x.stint_r + " Rd." : "") : "–"}</td><td class="z">${x.stopps || 0}</td>
+      <td class="spt-boxz">${x.box ? '<span class="tm-badge">Box</span>' : x.fl === -1 ? '<span class="tm-badge grey">weg</span>' : ""}</td></tr>`;
     };
+    // feste Spaltenbreiten (colgroup) und gleich breite Ziffern, damit nichts springt, wenn alle 2 s neue Werte kommen
+    const spalten = `<colgroup><col class="c-pos">${alle ? '<col class="c-kl">' : ""}<col class="c-nr"><col><col class="c-rd"><col class="c-ab" span="3"><col class="c-zeit" span="3"><col class="c-pm" span="2"><col class="c-rf"><col class="c-start"><col class="c-stint"><col class="c-stopp"><col class="c-box"></colgroup>`;
     setze("feld", `<div class="sp-seg spt-klassen"><button type="button" data-kl="alle" class="${alle ? "on" : ""}">Alle</button>${Object.keys(felder).map(k => `<button type="button" data-kl="${esc(k)}" class="${k === S.klasse ? "on" : ""}">${esc(kl(k).name || "Klasse")}</button>`).join("")}</div>
-      <table class="spt-tab"><thead><tr><th>Pos</th>${alle ? "<th>Kl.</th>" : ""}<th>#</th><th>Team / Fahrer</th><th>Rd.</th><th>${alle ? "Abstand" : "Abst. Kl."}</th><th>Intervall</th><th>Relativ</th><th>Letzte</th><th title="Schnitt der letzten 5 sauberen Runden">Ø 5 Rd.</th><th title="Abstand zum Vordermann, Sekunden pro Runde (minus = holt auf)">± Vorne</th><th title="Abstand zum Hintermann, Sekunden pro Runde (plus = baut aus)">± Hinten</th><th>Beste</th><th>Reifen</th><th>Start</th><th>Stint</th><th>Stopps</th><th></th></tr></thead>
+      <table class="spt-tab spt-feld${alle ? " alle" : ""}">${spalten}<thead>
+        <tr class="spt-gr"><th colspan="${alle ? 5 : 4}">Position</th><th colspan="3" class="g">Abstände</th><th colspan="3" class="g">Rundenzeiten</th><th colspan="2" class="g" title="Sekunden pro Runde über etwa 2 Runden">Trend</th><th colspan="5" class="g">Reifen &amp; Stint</th></tr>
+        <tr class="spt-sp"><th class="spt-pos">Pos</th>${alle ? "<th>Kl.</th>" : ""}<th class="spt-nr">#</th><th>Team / Fahrer</th><th class="z">Rd.</th><th class="g z">${alle ? "Abstand" : "Abst. Kl."}</th><th class="z">Intervall</th><th class="z">Relativ</th><th class="g z">Letzte</th><th class="z" title="Schnitt der letzten 5 sauberen Runden">Ø 5 Rd.</th><th class="z">Beste</th><th class="g z" title="Abstand zum Vordermann, Sekunden pro Runde (minus = holt auf)">± Vorne</th><th class="z" title="Abstand zum Hintermann, Sekunden pro Runde (plus = baut aus)">± Hinten</th><th class="g">Reifen</th><th class="z">Start</th><th class="z">Stint</th><th class="z">Stopps</th><th></th></tr></thead>
       <tbody>${klListe.map(fz).join("")}</tbody></table>
       <p class="tm-muted spt-klein">Ø 5 Rd. = letzte 5 saubere Runden (ohne Box, Abflug, Start, Ausreißer). ± in Sekunden pro Runde über etwa 2 Runden. Schaden gibt iRacing für andere Autos nicht heraus.</p>`);
     root.querySelectorAll("[data-kl]").forEach(b => b.onclick = () => { S.klasse = b.dataset.kl; zeichne(); });
@@ -611,7 +651,7 @@
     const kNamen = [...new Set(autos.map(x => String(x.k)))];
     const legende = `<div class="spt-legende">${kNamen.map(k => `<span><i style="background:${farbe(k)}"></i>${esc((klassen.find(c => String(c.id) === k) || {}).name || "Klasse")}</span>`).join("")}
       <span><i style="background:#e11324"></i>unser Auto</span><span><i class="ring"></i>Klassenspitze</span><span>♛ führt gesamt</span>
-      <span class="q">${S.strecke && S.strecke.quelle === "g61" ? "Streckenform aus Garage 61" : pkt ? "Streckenform aus dem GPS des Fahrers" : ""}</span></div>`;
+      <span class="q">${!pkt ? "" : S.strecke.quelle === "g61" ? "Streckenform aus Garage 61" : S.strecke.quelle === "app" ? "Streckenform aus der Bibliothek (von einem F2F-Fahrer gelernt)" : "Streckenform aus dem GPS des Fahrers"}</span></div>`;
     // jedes Auto als Gruppe am Nullpunkt; die Position setzt animLauf() 60x pro Sekunde per transform
     const jetzt = performance.now(), g = groesse.toFixed(2);
     box.innerHTML = `<svg class="spt-map" viewBox="${vb}" preserveAspectRatio="xMidYMid meet">
@@ -620,7 +660,7 @@
         const a = ANIM.get(x.i), [px, py] = pos(a ? animPos(a, jetzt) : x.pct), u = istF2F(x, st), links = px > mitteX;
         return `<g data-i="${x.i}" class="${u ? "unser" : ""}${x.box ? " box" : ""}" transform="translate(${px.toFixed(2)} ${py.toFixed(2)})">${x.kpos === 1 ? `<circle r="${(u ? 2.3 : 1.8) * groesse}" class="spt-spitze" style="stroke:${farbe(x.k)};stroke-width:${groesse * 0.35}"/>` : ""}<circle r="${(u ? 1.5 : 1) * groesse}" style="fill:${u ? "#e11324" : farbe(x.k)}"/>${x.pos === 1 ? `<text class="spt-krone" y="${(-groesse * 2.2).toFixed(2)}" text-anchor="middle" style="font-size:${groesse * 2.6}px">♛</text>` : ""}${u ? `<text class="spt-lbl" x="${((links ? -2 : 2) * groesse).toFixed(2)}" y="${(groesse * 0.6).toFixed(2)}" text-anchor="${links ? "end" : "start"}" style="font-size:${groesse * 2.6}px">${esc((x.team || x.fahrer).split(" ").pop())}${x.nr ? " #" + esc(x.nr) : ""}</text>` : ""}</g>`;
       }).join("")}
-    </svg>${legende}${pkt ? "" : '<p class="tm-muted spt-klein">Streckenform folgt, sobald der Fahrer eine Runde gefahren ist.</p>'}`;
+    </svg><div class="spt-map-warn" id="spt-map-warn" hidden></div>${legende}${pkt ? "" : '<p class="tm-muted spt-klein">Streckenform wird geladen. Gibt es für diese Strecke noch keine, kommt sie, sobald der Fahrer eine Runde gefahren ist.</p>'}`;
     const svg = box.querySelector("svg");
     KARTE = { svg, pos, mitteX, groesse: Number(g), els: new Map([...svg.querySelectorAll("g[data-i]")].map(el => { const txt = el.querySelector(".spt-lbl"); return [Number(el.dataset.i), { g: el, txt, links: txt ? txt.getAttribute("text-anchor") === "end" : false }]; })) };
     animLauf();
