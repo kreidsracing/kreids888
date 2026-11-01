@@ -1910,6 +1910,16 @@
       ? `<div class="tm-roles" data-pick="${key}">${d.roles.map(r => `<button type="button" class="tm-chip" data-role="${r.id}"><i style="${r.color ? "background:" + hex(r.color) : ""}"></i>${esc(r.name)}</button>`).join("")}</div>`
       : '<span class="tm-err">Keine Rollen geladen – ist der Bot auf dem Server?</span>';
 
+    // Fahrer-Schalter: alle, die FF Overlay oder die Toolbox verbunden haben; gespeichert wird, wer aus ist
+    const fahrerAus = { spot: new Set((cfg.fahrerAus || {}).spot || []), erg: new Set((cfg.fahrerAus || {}).erg || []) };
+    const appFahrer = d.appFahrer || [];
+    const fahrerHtml = appFahrer.length
+      ? `<div class="fa-liste">${appFahrer.map(f => `<div class="fa-zeile">
+          <span class="fa-name">${esc(f.n)}<small>${f.team ? "" : "ohne Team-Rolle · "}zuletzt ${f.z ? esc(fmtDay(f.z)) : "?"}</small></span>
+          <label class="tm-switch"><input type="checkbox" data-fa-spot="${esc(f.id)}" ${fahrerAus.spot.has(f.id) ? "" : "checked"}><span class="s"></span>Spotting</label>
+          <label class="tm-switch"><input type="checkbox" data-fa-erg="${esc(f.id)}" ${fahrerAus.erg.has(f.id) ? "" : "checked"}><span class="s"></span>Rennergebnis</label>
+        </div>`).join("")}</div>`
+      : '<p class="tm-muted" style="margin:4px 0 0">Noch niemand verbunden. Wer in FF Overlay oder der Toolbox „Mit F2F verbinden“ klickt, erscheint hier.</p>';
     const g = cfg.g61, gi = d.g61;
     const wp = cfg.wpost || {}, wpo = wp.opt || {}, wpa = cfg.wpostAuto || {};
     const teamOpts = gi.teams.length
@@ -2093,6 +2103,8 @@
           <div><select class="tm-select" id="spl-ch"><option value="">– Kanal wählen –</option>${(d.channels || []).map(c => `<option value="${c.id}" ${c.id === (cfg.spotting || {}).channel ? "selected" : ""}># ${esc(c.name)}</option>`).join("")}</select></div></div>
         <div class="tm-row"><label for="spl-ping">Ping<small>Rolle, die erwähnt wird</small></label>
           <div><select class="tm-select" id="spl-ping"><option value="">– niemanden pingen –</option>${d.roles.map(r => `<option value="${r.id}" ${r.id === (cfg.spotting || {}).ping ? "selected" : ""}>@${esc(r.name)}</option>`).join("")}</select></div></div>
+        <div class="tm-row"><div class="lbl">Fahrer<small>wer FF Overlay oder die Toolbox verbunden hat · aus: von diesem Fahrer kommt kein Spotting (mit Live-Meldung) bzw. kein Rennergebnis</small></div>
+          ${fahrerHtml}</div>
         <div class="tm-row"><div class="lbl">Testen<small>erst speichern</small></div><div class="tm-actions">${btn("Test-Meldung posten", "sm", 'id="spl-test"')}</div></div>
       </div>
 
@@ -2158,6 +2170,7 @@
     spTeamsDraw();
     document.getElementById("sp-team-add").onclick = () => { spTeamsSync(); spTeams.push(""); spTeamsDraw(); markDirty(); const l = [...document.querySelectorAll("#sp-teams input")].pop(); if (l) l.focus(); };
     box.querySelectorAll("#g61-on,#g61-rec").forEach(el => el.addEventListener("change", markDirty));
+    box.querySelectorAll("[data-fa-spot],[data-fa-erg],[id^=spl-],[id^=er-]").forEach(el => el.addEventListener("change", markDirty));
 
     // ---- Links bearbeiten ----
     let links = (d.links || []).map(l => ({ ...l }));
@@ -2247,6 +2260,11 @@
           kanalAlle: document.getElementById("er-ch-alle").value,
           kanalOverlay: document.getElementById("er-ch-ov").value,
         },
+        // wer nicht in der Liste steht (z. B. lange nicht verbunden), behält seine Einstellung
+        fahrerAus: Object.fromEntries(["spot", "erg"].map(k => [k, [
+          ...[...fahrerAus[k]].filter(id => !appFahrer.some(f => f.id === id)),
+          ...[...document.querySelectorAll(`[data-fa-${k}]`)].filter(x => !x.checked).map(x => x.getAttribute("data-fa-" + k))
+        ]])),
         limits: {
           enabled: document.getElementById("li-on").checked,
           channel: document.getElementById("li-ch").value,

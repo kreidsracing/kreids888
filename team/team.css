@@ -2398,3 +2398,10 @@ body:has(.td)::after{content:"";position:fixed;inset:0;z-index:-1;pointer-events
 @media(min-width:1001px){.kt-setup{grid-template-columns:minmax(280px,420px) minmax(0,1fr)}}
 .kt-syms{max-height:min(52vh,560px)}
 @media(min-width:1500px){.kt-syms{columns:2;column-gap:32px;max-height:none}.kt-sym,.kt-grp{break-inside:avoid}.kt-grp{break-after:avoid}}
+
+/* Admin · Spotting-Live-Meldung: Fahrer-Schalter (Spotting / Rennergebnis pro Fahrer) */
+.fa-liste{display:flex;flex-direction:column;gap:8px}
+.fa-zeile{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:22px;align-items:center;padding:10px 14px;border:1px solid var(--g-bd);border-radius:12px;background:var(--g-glass2)}
+.fa-name{font-weight:700;min-width:0;overflow:hidden;text-overflow:ellipsis}
+.fa-name small{display:block;font-weight:500;color:var(--steel);font-size:12.5px;margin-top:2px}
+@media (max-width:640px){.fa-zeile{grid-template-columns:1fr 1fr;gap:10px}.fa-name{grid-column:1/-1}}
