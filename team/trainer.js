@@ -591,25 +591,51 @@
   }
 
   /* ---------------- Setup-Vergleich (rohe Garage-Werte zweier Setups) ---------------- */
-  const SVG = { a: "", b: "", sig: "", nr: 0 };
+  const SVG = { a: "", b: "", sig: "", nr: 0, team: [], ich: "", admin: false, g61: null, g61Grund: "", g61Fehler: "", cache: {} };
   const svgName = n => n.replace(/\.json$/, "").replace(/_/g, " ");
+  const svgNeu = () => { const [x, y] = String((st && st.version) || "0").split(".").map(Number); return x > 2 || (x === 2 && y >= 7); };
+  const svgDatum = t => new Date(t).toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "2-digit" });
+  const svgTeamTxt = t => `${t.von} · ${t.car} · ${t.track} · ${svgDatum(t.at)}${t.notiz ? " · " + t.notiz : ""}`;
+  const svgG61Key = g => "g61:" + [g.team, g.pack, g.item].join("|");
+  const svgG61Txt = g => `${g.name} · ${g.cn}${g.tn ? " · " + g.tn : ""}${g.packName ? " (" + g.packName + ")" : ""}`;
+
+  function svgLabel(v) {
+    if (v === "aktuell") return "Aktuelles Setup";
+    if (v.startsWith("team:")) { const t = SVG.team.find(x => "team:" + x.id === v); return t ? "Team: " + svgTeamTxt(t) : "Teamsetup"; }
+    if (v.startsWith("g61:")) { const g = (SVG.g61 || []).find(x => svgG61Key(x) === v); return g ? `Garage 61 ${g.teamName}: ${svgG61Txt(g)}` : "Garage 61"; }
+    return svgName(v);
+  }
 
   async function renderSetupVergleich() {
     const box = document.getElementById("kt-tab");
     clearInterval(setupT); setupT = null;
     box.innerHTML = '<div class="tm-loading"><span></span><span></span><span></span></div>';
-    let s, saved;
+    let s, saved, tm, g6;
     try {
-      [s, saved] = await Promise.all([hcall("/setup/state"), hcall("/setup/saved")]);
+      [s, saved, tm, g6] = await Promise.all([hcall("/setup/state"), hcall("/setup/saved"),
+        C.api("/trainer/setups").catch(e => ({ setups: [], fehler: e.message })),
+        C.api("/trainer/g61/setups").catch(e => ({ ok: false, grund: "fehler", error: e.message }))]);
     } catch (e) { box.innerHTML = `<div class="tm-box tm-err">${C.esc(e.message)}</div>`; return; }
     if (tab !== "svergleich") return;
+    SVG.team = tm.setups || []; SVG.ich = tm.ich || ""; SVG.admin = !!tm.admin;
+    SVG.g61 = g6.ok ? g6.setups || [] : null; SVG.g61Grund = g6.ok ? "" : g6.grund || ""; SVG.g61Fehler = g6.error || "";
+    const neu = svgNeu();
     const namen = saved.saved;
-    const gibt = v => v === "aktuell" ? s.has : namen.includes(v);
-    if (!gibt(SVG.a)) SVG.a = s.has ? "aktuell" : (namen[0] || "");
-    if (!gibt(SVG.b) || SVG.b === SVG.a) SVG.b = namen.find(n => n !== SVG.a) || "";
-    const opts = sel => `<option value="">Setup wählen …</option>` +
+    const werte = [...namen, ...(neu ? SVG.team.map(t => "team:" + t.id) : []), ...(neu && SVG.g61 ? SVG.g61.map(svgG61Key) : [])];
+    const gibt = v => v === "aktuell" ? s.has : werte.includes(v);
+    if (!gibt(SVG.a)) SVG.a = s.has ? "aktuell" : (werte[0] || "");
+    if (!gibt(SVG.b) || SVG.b === SVG.a) SVG.b = werte.find(n => n !== SVG.a) || "";
+    const opt = (v, txt, sel) => `<option value="${C.esc(v)}" ${sel === v ? "selected" : ""}>${C.esc(txt)}</option>`;
+    const g61Teams = [...new Set((SVG.g61 || []).map(g => g.teamName))];
+    const opts = sel => `<option value="">Setup wählen …</option><optgroup label="Meine Setups">` +
       `<option value="aktuell" ${s.has ? "" : "disabled"} ${sel === "aktuell" ? "selected" : ""}>Aktuelles Setup${s.has ? ` (${C.esc(s.car)} · ${C.esc(s.track)})` : " (keins geladen)"}</option>` +
-      namen.map(n => `<option value="${C.esc(n)}" ${sel === n ? "selected" : ""}>${C.esc(svgName(n))}${saved.notizen[n] ? " · " + C.esc(saved.notizen[n]) : ""}</option>`).join("");
+      namen.map(n => opt(n, svgName(n) + (saved.notizen[n] ? " · " + saved.notizen[n] : ""), sel)).join("") + `</optgroup>` +
+      (neu && SVG.team.length ? `<optgroup label="Teamsetups F2F">${SVG.team.map(t => opt("team:" + t.id, svgTeamTxt(t), sel)).join("")}</optgroup>` : "") +
+      (neu ? g61Teams.map(tn => `<optgroup label="Garage 61 · ${C.esc(tn)}">${SVG.g61.filter(g => g.teamName === tn).map(g => opt(svgG61Key(g), svgG61Txt(g), sel)).join("")}</optgroup>`).join("") : "");
+    const hinweis = !neu ? "Teamsetups und Garage 61 gibt es ab Helfer 2.7. Lade oben die neue Version herunter und starte den Helfer neu."
+      : SVG.g61Grund === "rechte" ? "Garage 61: Setups aus euren Datenpaketen (F2F, SPR) erscheinen hier, sobald dein Garage-61-Schlüssel die Berechtigung „team_datapacks_read“ hat."
+      : SVG.g61Grund === "fehler" ? "Garage 61 ist gerade nicht erreichbar" + (SVG.g61Fehler ? ": " + SVG.g61Fehler : ".")
+      : SVG.g61 && !SVG.g61.length ? "Garage 61: In euren Datenpaketen sind noch keine Setups." : "";
     box.innerHTML = `
       <div class="tm-box kt-bar">
         <label class="tm-switch"><input type="checkbox" id="ksv-live" ${s.live ? "checked" : ""}><span class="s"></span><b>Setup live aus iRacing lesen</b></label>
@@ -617,12 +643,16 @@
         <span class="kt-sp"></span>
         ${btn2("Aktuelles Setup merken", 'id="ksv-save"')}
       </div>
-      <div class="tm-box ksv-wahl">
-        <label><span class="ksv-tag a">A</span><select class="tm-select" id="ksv-a">${opts(SVG.a)}</select></label>
-        <button type="button" class="tm-btn sm" id="ksv-tausch" title="A und B tauschen"><span>⇄</span></button>
-        <label><span class="ksv-tag b">B</span><select class="tm-select" id="ksv-b">${opts(SVG.b)}</select></label>
+      <div class="tm-box">
+        <div class="ksv-wahl">
+          <label><span class="ksv-tag a">A</span><select class="tm-select" id="ksv-a">${opts(SVG.a)}</select></label>
+          <button type="button" class="tm-btn sm" id="ksv-tausch" title="A und B tauschen"><span>⇄</span></button>
+          <label><span class="ksv-tag b">B</span><select class="tm-select" id="ksv-b">${opts(SVG.b)}</select></label>
+        </div>
+        ${hinweis ? `<p class="hint ksv-hin">${C.esc(hinweis)}</p>` : ""}
       </div>
-      <div class="tm-box" id="ksv-out"></div>`;
+      <div class="tm-box" id="ksv-out"></div>
+      <div class="tm-box" id="ksv-team"></div>`;
     const wahl = () => { SVG.a = document.getElementById("ksv-a").value; SVG.b = document.getElementById("ksv-b").value; svgVergleichen(); };
     document.getElementById("ksv-a").onchange = wahl;
     document.getElementById("ksv-b").onchange = wahl;
@@ -633,6 +663,7 @@
     document.getElementById("ksv-save").onclick = async () => {
       try { const r = await post("/setup/save"); C.toast("Gemerkt: " + svgName(r.name), true); renderSetupVergleich(); } catch (x) { C.toast(x.message); }
     };
+    svgTeam(s, namen, saved.notizen, neu);
     SVG.sig = "";
     svgStatus(s, true);
     svgVergleichen();
@@ -640,6 +671,60 @@
     setupT = setInterval(async () => {
       try { const r = await hcall("/setup/state", {}, 3000); if (my === alive && tab === "svergleich") svgStatus(r); } catch (e) { /* Poll kümmert sich */ }
     }, 1500);
+  }
+
+  // Teamsetups: hochladen, als gemerktes Setup holen, eigene löschen
+  function svgTeam(s, namen, notizen, neu) {
+    const el = document.getElementById("ksv-team");
+    if (!el) return;
+    const eigen = [s.has ? `<option value="aktuell">Aktuelles Setup (${C.esc(s.car)} · ${C.esc(s.track)})</option>` : "",
+      ...namen.map(n => `<option value="${C.esc(n)}">${C.esc(svgName(n))}${notizen[n] ? " · " + C.esc(notizen[n]) : ""}</option>`)].join("");
+    el.innerHTML = `
+      <div class="kt-card-h"><h5>Teamsetups F2F</h5><span class="tm-muted">${SVG.team.length} geteilt</span></div>
+      ${neu ? (eigen ? `<div class="ksv-hoch">
+          <select class="tm-select" id="ksv-hq">${eigen}</select>
+          <input type="text" class="kt-ft-in" id="ksv-hn" maxlength="200" placeholder="Notiz, z. B. Quali Spa, trocken">
+          ${btn2("Ins Team laden", 'id="ksv-hb"', "sm red")}
+        </div>` : `<p class="tm-muted">Zum Teilen erst ein Setup laden oder merken.</p>`)
+        : `<p class="tm-muted">Teilen und Holen geht ab Helfer 2.7.</p>`}
+      ${SVG.team.length ? `<div class="ksv-tl">${SVG.team.map(t => `
+        <div class="ksv-ti">
+          <div><b>${C.esc(t.car)} · ${C.esc(t.track)}</b><small>${C.esc(t.von)} · ${svgDatum(t.at)}${t.notiz ? " · " + C.esc(t.notiz) : ""}</small></div>
+          <span class="ksv-ta">
+            ${neu ? `<button type="button" class="tm-btn sm" data-tmerk="${t.id}"><span>Merken</span></button>` : ""}
+            ${t.vonId === SVG.ich || SVG.admin ? `<button type="button" class="tm-btn sm" data-tdel="${t.id}"><span>Löschen</span></button>` : ""}
+          </span>
+        </div>`).join("")}</div>` : `<p class="tm-muted">Noch keine Teamsetups geteilt.</p>`}`;
+    const hb = document.getElementById("ksv-hb");
+    if (hb) hb.onclick = async () => {
+      const q = document.getElementById("ksv-hq").value, notiz = document.getElementById("ksv-hn").value.trim();
+      hb.disabled = true;
+      try {
+        const d = await hcall("/setup/get?name=" + encodeURIComponent(q));
+        await C.api("/trainer/setups", { method: "POST", body: { car: d.car, track: d.track, notiz: notiz || d.notiz || "", setup: d.setup } });
+        C.toast("Ins Team geladen", true);
+        renderSetupVergleich();
+      } catch (x) { C.toast(x.message); hb.disabled = false; }
+    };
+    el.querySelectorAll("[data-tmerk]").forEach(b => b.onclick = async () => {
+      b.disabled = true;
+      try {
+        const d = await C.api("/trainer/setups/" + b.dataset.tmerk);
+        const r = await post("/setup/import", { setup: d.setup, car: d.car, track: d.track, notiz: d.notiz, von: d.von, quelle: "Team" });
+        C.toast("Gemerkt: " + svgName(r.name), true);
+        renderSetupVergleich();
+      } catch (x) { C.toast(x.message); b.disabled = false; }
+    });
+    el.querySelectorAll("[data-tdel]").forEach(b => b.onclick = async () => {
+      if (!confirm("Dieses Teamsetup löschen?")) return;
+      try {
+        await C.api("/trainer/setups/" + b.dataset.tdel + "/loeschen", { method: "POST" });
+        const v = "team:" + b.dataset.tdel;
+        if (SVG.a === v) SVG.a = ""; if (SVG.b === v) SVG.b = "";
+        C.toast("Gelöscht", true);
+        renderSetupVergleich();
+      } catch (x) { C.toast(x.message); }
+    });
   }
 
   function svgStatus(s, erst) {
@@ -675,6 +760,22 @@
     return { d, txt: (d > 0 ? "+" : "") + d.toFixed(nk) + (za.e ? " " + za.e : "") };
   }
 
+  // Teamsetups und Garage 61 holt die Seite selbst und gibt sie dem Helfer als {setup} mit
+  async function svgQuelle(v) {
+    if (!v.startsWith("team:") && !v.startsWith("g61:")) return v;
+    if (!SVG.cache[v]) {
+      let d;
+      if (v.startsWith("team:")) d = await C.api("/trainer/setups/" + v.slice(5));
+      else {
+        const [team, pack, item] = v.slice(4).split("|");
+        d = await C.api(`/trainer/g61/setups?team=${encodeURIComponent(team)}&pack=${encodeURIComponent(pack)}&item=${encodeURIComponent(item)}`);
+      }
+      if (!d.setup) throw new Error(d.error || "Setup nicht gefunden");
+      SVG.cache[v] = { setup: d.setup };
+    }
+    return SVG.cache[v];
+  }
+
   async function svgVergleichen() {
     const out = document.getElementById("ksv-out");
     if (!out) return;
@@ -685,11 +786,12 @@
     if (SVG.a === SVG.b) { out.innerHTML = `<p class="tm-muted">A und B sind dasselbe Setup. Wähle für B ein anderes.</p>`; return; }
     const nr = ++SVG.nr;
     let d;
-    try { d = await post("/setup/diff", { a: SVG.a, b: SVG.b }); }
+    try { d = await post("/setup/diff", { a: await svgQuelle(SVG.a), b: await svgQuelle(SVG.b) }); }
     catch (e) { if (nr === SVG.nr) out.innerHTML = `<p class="tm-err">${C.esc(e.message)}</p>`; return; }
     if (nr !== SVG.nr || !document.getElementById("ksv-out")) return;
-    const name = v => v === "aktuell" ? "Aktuelles Setup" : svgName(v);
-    const kopf = `<div class="ksv-kopf"><span><span class="ksv-tag a">A</span>${C.esc(name(SVG.a))}</span><span><span class="ksv-tag b">B</span>${C.esc(name(SVG.b))}</span></div>`;
+    const kopf = `<div class="ksv-kopf"><span><span class="ksv-tag a">A</span>${C.esc(svgLabel(SVG.a))}</span><span><span class="ksv-tag b">B</span>${C.esc(svgLabel(SVG.b))}</span></div>`;
+    const g61 = [SVG.a, SVG.b].filter(v => v.startsWith("g61:")).length === 1
+      ? `<p class="hint">Garage 61 benennt manche Werte anders als iRacing. Solche Werte stehen dann auf einer Seite als „fehlt“.</p>` : "";
     if (!d.diff.length) {
       out.innerHTML = kopf + `<div class="tm-soon"><div class="big">Beide Setups sind gleich</div><p>In der Garage ist kein Wert verschieden.</p></div>`;
       return;
@@ -702,7 +804,7 @@
     });
     const wert = v => v === "–" ? `<i class="ksv-fehlt">fehlt</i>` : C.esc(v);
     out.innerHTML = kopf +
-      `<p class="hint">${d.diff.length} ${d.diff.length === 1 ? "Wert ist" : "Werte sind"} verschieden, in ${bereiche.length} ${bereiche.length === 1 ? "Bereich" : "Bereichen"}. Verglichen werden nur die Garage-Werte, keine Reifentemperaturen oder Messwerte.</p>
+      `<p class="hint">${d.diff.length} ${d.diff.length === 1 ? "Wert ist" : "Werte sind"} verschieden, in ${bereiche.length} ${bereiche.length === 1 ? "Bereich" : "Bereichen"}. Verglichen werden nur die Garage-Werte, keine Reifentemperaturen oder Messwerte.</p>${g61}
       <div class="ksv-tab">
         <div class="ksv-r ksv-h"><span>Wert</span><span>A</span><span>B</span><span>B gegen A</span></div>
         ${bereiche.map(g => `<div class="kt-grp">${C.esc(g.wo)}</div>` + g.rows.map(x => {
@@ -2236,6 +2338,9 @@
       ["Was verglichen wird", "Nur die rohen Werte aus der Garage, also genau das, was du einstellst. Reifentemperaturen, Profil und andere Messwerte zählen nicht."],
       ["Aktuelles Setup", "Mit „Setup live lesen“ kannst du dein Setup aus iRacing gegen ein gemerktes vergleichen. Änderst du in der Garage etwas, rechnet der Vergleich von selbst neu."],
       ["Tauschen", "⇄ zwischen A und B tauscht die beiden Setups."],
+      ["Teamsetups", "Unten bei „Teamsetups F2F“ ein eigenes Setup mit Notiz ins Team laden. Dann steht es bei allen im Team zur Auswahl. „Merken“ holt ein Teamsetup zu dir als gemerktes Setup, „Löschen“ geht nur bei deinen eigenen. In iRacing einstellen musst du die Werte weiter selbst."],
+      ["Garage 61", "Setups aus den Datenpaketen von F2F und SPR in Garage 61 erscheinen in der Auswahl, sobald der Garage-61-Schlüssel die Berechtigung „team_datapacks_read“ hat."],
+      ["Helfer", "Teamsetups und Garage 61 brauchen Helfer 2.7."],
     ]],
     ["Streckenvergleich", [
       ["Zwei Runden übereinander", "Aufgebaut wie die GO-Fast-Telemetrie: oben die beiden Fahrer mit Gas, Bremse, Tempo, Gang und Drehzahl an der aktuellen Stelle, links die Strecke, rechts die Kanäle. Deine Runde ist grün, die Vergleichsrunde weiß gepunktet. Fahrerkarte anklicken blendet die Runde aus und wieder ein."],

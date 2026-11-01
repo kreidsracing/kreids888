@@ -2433,3 +2433,14 @@ body:has(.td)::after{content:"";position:fixed;inset:0;z-index:-1;pointer-events
 .ksv-h>span{color:var(--steel)}
 .ksv-fehlt{color:var(--steel);font-weight:400}
 @media(max-width:640px){.ksv-r{grid-template-columns:1fr 1fr;gap:2px 10px}.ksv-r>span{grid-column:1/-1}.ksv-h{display:none}}
+.ksv-hin{margin:10px 0 0}
+.ksv-wahl optgroup{font-weight:800;color:var(--steel)}
+.ksv-hoch{display:flex;flex-wrap:wrap;gap:8px 10px;align-items:center;margin-bottom:12px}
+.ksv-hoch select{flex:1 1 260px;min-width:0}
+.ksv-hoch input{flex:2 1 220px;min-width:0}
+.ksv-tl{display:grid;gap:2px}
+.ksv-ti{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:7px 0;border-bottom:1px solid rgba(255,255,255,.04)}
+.ksv-ti>div{min-width:0}
+.ksv-ti b{display:block;font-size:13.5px}
+.ksv-ti small{display:block;color:var(--steel);font-size:12px;overflow-wrap:anywhere}
+.ksv-ta{display:flex;gap:6px;flex:none}
