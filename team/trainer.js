@@ -848,6 +848,13 @@
     const top = G61V.quelle === "top";
     const liste = top ? (G61V.top || []) : (G61V.runden || []).filter(r => !G61V.wer || r.slug === G61V.wer).slice(0, 40);
     const fehler = top ? G61V.topFehler : G61V.fehler, laedt = top ? !G61V.top : !G61V.runden;
+    const zahl = (v, n) => v == null ? "" : Number(v).toFixed(n).replace(".", ",");
+    const WOLKEN = { 1: "klar", 2: "leicht bewölkt", 3: "bewölkt", 4: "bedeckt" };
+    // trocken / nass (mit Prozent) / Regen zuerst, dann Temperaturen und Tank
+    const strecke = r => r.nassPct == null ? "" : r.nassPct > 1 ? `<i class="nass">nass <b>${r.nassPct} %</b></i>` : `<i class="trocken">trocken</i>`;
+    const bedingungen = r => strecke(r) + (r.regen > 0 ? `<i class="regen">Regen <b>${r.regen} %</b></i>` : "") + [r.asphalt != null ? `<i class="asp">Asphalt <b>${zahl(r.asphalt, 1)}°</b></i>` : "",
+      r.luft != null ? `<i>Luft <b>${zahl(r.luft, 1)}°</b></i>` : "", r.sprit != null ? `<i class="tank">Tank <b>${zahl(r.sprit, 1)} L</b></i>` : "",
+      r.wolken ? `<i class="wolke">${WOLKEN[r.wolken] || ""}</i>` : ""].join("");
     // eingeklappt: nur die Kopfzeile mit dem, was gerade geladen ist
     const gew = id => {
       const s = document.getElementById(id), o = s && s.selectedOptions[0];
@@ -880,7 +887,7 @@
           ${G61V.fahrer.map(f => `<option value="${C.esc(f.slug)}">${C.esc(f.name)}${f.slug === ich ? " (du)" : ""}</option>`).join("")}
         </select></label>`}
       </div>
-      ${top ? '<p class="gf-g61-hinweis">Die 20 Schnellsten, je Fahrer seine beste Runde. Garage 61 gibt uns über die Schnittstelle nur dein Team und die Fahrer frei, denen das Team-Konto auf Garage 61 folgt. Wer dort gefolgt wird, taucht hier auf. Die komplette Bestenliste wie auf der Garage-61-Seite kommt erst, wenn Garage 61 unsere App dafür freischaltet. Laden geht nur, wenn der Fahrer seine Telemetrie freigibt.</p>' : ""}
+      ${top ? '<p class="gf-g61-hinweis">Die 20 Schnellsten, je Fahrer seine beste Runde. Drin sind alle Fahrer aus den Garage-61-Teams des Team-Kontos (F2F, SPR und weitere) und alle, denen das Konto auf Garage 61 folgt. Wer dort gefolgt wird, taucht hier auf. Die komplette Bestenliste wie auf der Garage-61-Seite kommt erst, wenn Garage 61 unsere App dafür freischaltet. Laden geht nur, wenn der Fahrer seine Telemetrie freigibt.</p>' : ""}
       ${fehler ? `<div class="tm-box tm-err">${C.esc(fehler)}</div>`
         : laedt ? '<div class="tm-loading"><span></span><span></span><span></span></div>'
         : liste.length ? `<div class="gf-g61-liste">${liste.map((r, i) => {
@@ -890,7 +897,8 @@
             <span class="gf-g61-nr">${i + 1}</span><b class="gf-g61-zeit">${g61Zeit(r.zeit)}</b>
             <span class="gf-g61-wer">${C.esc(r.fahrer || fahrerName(r.slug))}</span>
             <small>${tag(r.at)}</small>
-            <span class="gf-g61-tags">${!top && neu && r.id === neu.id ? '<i class="neu">zuletzt gefahren</i>' : ""}${r.sauber ? '<i class="ok">sauber</i>' : ""}${r.abflug ? "<i>Abflug</i>" : ""}${r.box ? "<i>Box</i>" : ""}${r.nass ? "<i>nass</i>" : ""}${frei ? "" : "<i>keine Telemetrie</i>"}</span>
+            <span class="gf-g61-bed" title="Asphalt / Luft / Tank beim Start der Runde">${bedingungen(r)}</span>
+            <span class="gf-g61-tags">${!top && neu && r.id === neu.id ? '<i class="neu">zuletzt gefahren</i>' : ""}${r.sauber ? '<i class="ok">sauber</i>' : ""}${r.abflug ? "<i>Abflug</i>" : ""}${r.box ? "<i>Box</i>" : ""}${frei ? "" : "<i>keine Telemetrie</i>"}</span>
             <span class="gf-g61-knopf"><button type="button" class="gf-mini-btn a" data-g61="${C.esc(r.id)}" data-ziel="a"${gesperrt}>Meine Runde</button><button type="button" class="gf-mini-btn b" data-g61="${C.esc(r.id)}" data-ziel="b"${gesperrt}>Vergleich</button></span>
           </div>`; }).join("")}</div>`
         : `<p class="tm-muted">${top ? "Garage 61 hat für diese Kombination keine Runden." : G61V.wer ? "Von diesem Fahrer gibt es hier keine Runde mit Telemetrie. Stell „Fahrer“ auf „Alle im Team“." : "Keine Runden mit Telemetrie für diese Kombination."}</p>`}`;

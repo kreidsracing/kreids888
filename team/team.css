@@ -2380,3 +2380,12 @@ body:has(.td)::after{content:"";position:fixed;inset:0;z-index:-1;pointer-events
 .gf-g61-hinweis{margin:-2px 0 10px;font-size:12px;color:var(--steel)}
 .gf-g61-z.gesperrt{opacity:.55}.gf-g61-z.gesperrt .gf-mini-btn{cursor:not-allowed}
 .gf-g61-z.ich{box-shadow:inset 3px 0 0 #2fe39b}
+/* Garage-61-Liste: Temperaturen und Tankfüllung je Runde */
+.gf-g61-z{grid-template-columns:28px 90px minmax(110px,1fr) 70px minmax(250px,auto) 150px auto}
+.gf-g61-bed{display:flex;flex-wrap:wrap;gap:4px}
+.gf-g61-bed i{font-style:normal;font-size:11.5px;padding:2px 7px;border-radius:6px;background:rgba(255,255,255,.05);color:#aeb4c0;white-space:nowrap}
+.gf-g61-bed i b{color:#e9ecf2;font-weight:700}
+.gf-g61-bed i.asp b{color:#ffb86b}.gf-g61-bed i.tank b{color:#7ec8ff}
+.gf-g61-bed i.wolke{color:#8a919e}
+@media(max-width:1100px){.gf-g61-z{grid-template-columns:28px 80px 1fr auto}.gf-g61-z small,.gf-g61-tags{display:none}.gf-g61-bed{grid-column:2/4}}
+.gf-g61-bed i.trocken{color:#7ee2a8;background:rgba(46,204,113,.12)}.gf-g61-bed i.nass{color:#9cc9ff;background:rgba(77,163,255,.16)}.gf-g61-bed i.nass b{color:#cfe4ff}.gf-g61-bed i.regen{color:#9cc9ff;background:rgba(77,163,255,.24)}
