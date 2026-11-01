@@ -2415,3 +2415,21 @@ body:has(.td)::after{content:"";position:fixed;inset:0;z-index:-1;pointer-events
 
 /* Trainer · Live-Coach: Garage-61-Kasten unter der Referenzrunde */
 .kt-g61{margin:14px 0}
+/* Trainer: Setup-Vergleich */
+.ksv-wahl{display:flex;flex-wrap:wrap;align-items:center;gap:10px 14px}
+.ksv-wahl label{display:flex;align-items:center;gap:8px;flex:1 1 300px;min-width:0}
+.ksv-wahl select{flex:1;min-width:0;width:100%}
+.ksv-tag{display:inline-grid;place-items:center;width:24px;height:24px;border-radius:7px;font-family:var(--disp);font-weight:800;font-size:13px;color:#fff;flex:none}
+.ksv-tag.a{background:#2f6bff}.ksv-tag.b{background:#ff7a1a}
+.ksv-kopf{display:flex;flex-wrap:wrap;gap:8px 24px;margin-bottom:8px;font-weight:700}
+.ksv-kopf>span{display:flex;align-items:center;gap:8px;min-width:0}
+.ksv-tab{margin-top:10px}
+.ksv-r{display:grid;grid-template-columns:minmax(140px,1.4fr) minmax(90px,1fr) minmax(90px,1fr) minmax(110px,1fr);gap:10px;align-items:center;padding:5px 0;font-size:13.5px;border-bottom:1px solid rgba(255,255,255,.04)}
+.ksv-r>span{color:var(--steel)}
+.ksv-r>b{font-family:var(--disp);font-weight:700;font-variant-numeric:tabular-nums}
+.ksv-r>em{font-style:normal;font-weight:700;font-variant-numeric:tabular-nums}
+.ksv-r>em.hoch{color:#ff9a4a}.ksv-r>em.runter{color:#6aa0ff}.ksv-r>em.anders{color:var(--steel)}
+.ksv-h{font-size:11px;letter-spacing:.14em;text-transform:uppercase;border-bottom:1px solid var(--line)}
+.ksv-h>span{color:var(--steel)}
+.ksv-fehlt{color:var(--steel);font-weight:400}
+@media(max-width:640px){.ksv-r{grid-template-columns:1fr 1fr;gap:2px 10px}.ksv-r>span{grid-column:1/-1}.ksv-h{display:none}}

@@ -128,7 +128,7 @@
         ${btn2("Helfer beenden", 'id="kt-quit"')}
       </div>
       <div class="g6-tabs kt-tabs">
-        ${[["live", "Live-Coach"], ["setup", "Setup-Berater"], ["optimizer", "Setup-Optimizer"], ["vergleich", "Streckenvergleich"], ["anleitung", "Anleitung"]]
+        ${[["live", "Live-Coach"], ["setup", "Setup-Berater"], ["optimizer", "Setup-Optimizer"], ["svergleich", "Setup-Vergleich"], ["vergleich", "Streckenvergleich"], ["anleitung", "Anleitung"]]
           .map(([k, t]) => `<button type="button" data-kt="${k}" class="${tab === k ? "on" : ""}">${t}</button>`).join("")}
       </div>
       <div id="kt-tab"></div>`;
@@ -144,6 +144,7 @@
     if (tab === "live") renderLive();
     else if (tab === "setup") renderSetup();
     else if (tab === "optimizer") renderOptimizer();
+    else if (tab === "svergleich") renderSetupVergleich();
     else if (tab === "vergleich") renderVergleich();
     else renderGuide();
     startPoll();
@@ -587,6 +588,129 @@
       t += ` · ${ph ? ph[1] : "?"} · ${te ? te[1] : "?"}`;
     }
     return t + ` · Stärke ${w.staerke || "?"}/5`;
+  }
+
+  /* ---------------- Setup-Vergleich (rohe Garage-Werte zweier Setups) ---------------- */
+  const SVG = { a: "", b: "", sig: "", nr: 0 };
+  const svgName = n => n.replace(/\.json$/, "").replace(/_/g, " ");
+
+  async function renderSetupVergleich() {
+    const box = document.getElementById("kt-tab");
+    clearInterval(setupT); setupT = null;
+    box.innerHTML = '<div class="tm-loading"><span></span><span></span><span></span></div>';
+    let s, saved;
+    try {
+      [s, saved] = await Promise.all([hcall("/setup/state"), hcall("/setup/saved")]);
+    } catch (e) { box.innerHTML = `<div class="tm-box tm-err">${C.esc(e.message)}</div>`; return; }
+    if (tab !== "svergleich") return;
+    const namen = saved.saved;
+    const gibt = v => v === "aktuell" ? s.has : namen.includes(v);
+    if (!gibt(SVG.a)) SVG.a = s.has ? "aktuell" : (namen[0] || "");
+    if (!gibt(SVG.b) || SVG.b === SVG.a) SVG.b = namen.find(n => n !== SVG.a) || "";
+    const opts = sel => `<option value="">Setup wählen …</option>` +
+      `<option value="aktuell" ${s.has ? "" : "disabled"} ${sel === "aktuell" ? "selected" : ""}>Aktuelles Setup${s.has ? ` (${C.esc(s.car)} · ${C.esc(s.track)})` : " (keins geladen)"}</option>` +
+      namen.map(n => `<option value="${C.esc(n)}" ${sel === n ? "selected" : ""}>${C.esc(svgName(n))}${saved.notizen[n] ? " · " + C.esc(saved.notizen[n]) : ""}</option>`).join("");
+    box.innerHTML = `
+      <div class="tm-box kt-bar">
+        <label class="tm-switch"><input type="checkbox" id="ksv-live" ${s.live ? "checked" : ""}><span class="s"></span><b>Setup live aus iRacing lesen</b></label>
+        <span class="kt-st"><span class="kt-dot" id="ksv-dot"></span><span id="ksv-stat"></span></span>
+        <span class="kt-sp"></span>
+        ${btn2("Aktuelles Setup merken", 'id="ksv-save"')}
+      </div>
+      <div class="tm-box ksv-wahl">
+        <label><span class="ksv-tag a">A</span><select class="tm-select" id="ksv-a">${opts(SVG.a)}</select></label>
+        <button type="button" class="tm-btn sm" id="ksv-tausch" title="A und B tauschen"><span>⇄</span></button>
+        <label><span class="ksv-tag b">B</span><select class="tm-select" id="ksv-b">${opts(SVG.b)}</select></label>
+      </div>
+      <div class="tm-box" id="ksv-out"></div>`;
+    const wahl = () => { SVG.a = document.getElementById("ksv-a").value; SVG.b = document.getElementById("ksv-b").value; svgVergleichen(); };
+    document.getElementById("ksv-a").onchange = wahl;
+    document.getElementById("ksv-b").onchange = wahl;
+    document.getElementById("ksv-tausch").onclick = () => { [SVG.a, SVG.b] = [SVG.b, SVG.a]; renderSetupVergleich(); };
+    document.getElementById("ksv-live").onchange = async (e) => {
+      try { svgStatus(await post("/setup/live", { on: e.target.checked })); } catch (x) { C.toast(x.message); }
+    };
+    document.getElementById("ksv-save").onclick = async () => {
+      try { const r = await post("/setup/save"); C.toast("Gemerkt: " + svgName(r.name), true); renderSetupVergleich(); } catch (x) { C.toast(x.message); }
+    };
+    SVG.sig = "";
+    svgStatus(s, true);
+    svgVergleichen();
+    const my = alive;
+    setupT = setInterval(async () => {
+      try { const r = await hcall("/setup/state", {}, 3000); if (my === alive && tab === "svergleich") svgStatus(r); } catch (e) { /* Poll kümmert sich */ }
+    }, 1500);
+  }
+
+  function svgStatus(s, erst) {
+    const dot = document.getElementById("ksv-dot"); if (!dot) return;
+    const t = (s.status || "").toLowerCase();
+    dot.className = "kt-dot " + (t.includes("fehl") ? "bad" : (t.includes("warte") || t.includes("starte") || t.includes("setz dich")) ? "warn" : t.startsWith("live:") ? "good" : "");
+    document.getElementById("ksv-stat").textContent = s.has ? `${s.car} · ${s.track}${s.source ? " · " + s.source : ""}` : s.status;
+    const sig = JSON.stringify([s.has, s.car, s.track, s.source, s.groups]);
+    if (sig === SVG.sig) return;
+    const vorher = SVG.sig;
+    SVG.sig = sig;
+    if (erst) return;
+    // Aktuelles Setup hat sich geändert: Auswahl auffrischen, bei „aktuell“ neu vergleichen
+    const hatte = vorher && JSON.parse(vorher)[0];
+    if (!!hatte !== !!s.has) { renderSetupVergleich(); return; }
+    if (SVG.a === "aktuell" || SVG.b === "aktuell") svgVergleichen();
+  }
+
+  // "1.25 deg" → {z: 1.25, e: "deg", nk: 2}; nur bei genau einer Zahl mit Einheit dahinter
+  function svgZahl(v) {
+    const m = String(v).trim().match(/^([-+]?\d+(?:[.,]\d+)?)\s*([^\d]*)$/);
+    if (!m) return null;
+    const t = m[1].replace(",", ".");
+    return { z: parseFloat(t), e: m[2].trim(), nk: (t.split(".")[1] || "").length };
+  }
+
+  function svgDelta(a, b) {
+    const za = svgZahl(a), zb = svgZahl(b);
+    if (!za || !zb || za.e !== zb.e) return null;
+    const nk = Math.max(za.nk, zb.nk);
+    const d = Number((zb.z - za.z).toFixed(nk));
+    if (!d) return null;
+    return { d, txt: (d > 0 ? "+" : "") + d.toFixed(nk) + (za.e ? " " + za.e : "") };
+  }
+
+  async function svgVergleichen() {
+    const out = document.getElementById("ksv-out");
+    if (!out) return;
+    if (!SVG.a || !SVG.b) {
+      out.innerHTML = `<p class="tm-muted">Wähle oben zwei Setups. Hast du noch keins gemerkt: Live-Lesen einschalten, ins Auto setzen und „Aktuelles Setup merken“ drücken. Dann ein Setup ändern und gegen das gemerkte vergleichen.</p>`;
+      return;
+    }
+    if (SVG.a === SVG.b) { out.innerHTML = `<p class="tm-muted">A und B sind dasselbe Setup. Wähle für B ein anderes.</p>`; return; }
+    const nr = ++SVG.nr;
+    let d;
+    try { d = await post("/setup/diff", { a: SVG.a, b: SVG.b }); }
+    catch (e) { if (nr === SVG.nr) out.innerHTML = `<p class="tm-err">${C.esc(e.message)}</p>`; return; }
+    if (nr !== SVG.nr || !document.getElementById("ksv-out")) return;
+    const name = v => v === "aktuell" ? "Aktuelles Setup" : svgName(v);
+    const kopf = `<div class="ksv-kopf"><span><span class="ksv-tag a">A</span>${C.esc(name(SVG.a))}</span><span><span class="ksv-tag b">B</span>${C.esc(name(SVG.b))}</span></div>`;
+    if (!d.diff.length) {
+      out.innerHTML = kopf + `<div class="tm-soon"><div class="big">Beide Setups sind gleich</div><p>In der Garage ist kein Wert verschieden.</p></div>`;
+      return;
+    }
+    const bereiche = [];
+    d.diff.forEach(x => {
+      let g = bereiche.find(b => b.wo === x.wo);
+      if (!g) bereiche.push(g = { wo: x.wo, rows: [] });
+      g.rows.push(x);
+    });
+    const wert = v => v === "–" ? `<i class="ksv-fehlt">fehlt</i>` : C.esc(v);
+    out.innerHTML = kopf +
+      `<p class="hint">${d.diff.length} ${d.diff.length === 1 ? "Wert ist" : "Werte sind"} verschieden, in ${bereiche.length} ${bereiche.length === 1 ? "Bereich" : "Bereichen"}. Verglichen werden nur die Garage-Werte, keine Reifentemperaturen oder Messwerte.</p>
+      <div class="ksv-tab">
+        <div class="ksv-r ksv-h"><span>Wert</span><span>A</span><span>B</span><span>B gegen A</span></div>
+        ${bereiche.map(g => `<div class="kt-grp">${C.esc(g.wo)}</div>` + g.rows.map(x => {
+          const dl = svgDelta(x.a, x.b);
+          return `<div class="ksv-r"><span>${C.esc(x.name)}</span><b>${wert(x.a)}</b><b>${wert(x.b)}</b>` +
+            `<em class="${dl ? (dl.d > 0 ? "hoch" : "runter") : "anders"}">${dl ? (dl.d > 0 ? "▲ " : "▼ ") + C.esc(dl.txt) : "geändert"}</em></div>`;
+        }).join("")).join("")}
+      </div>`;
   }
 
   async function renderOptimizer() {
@@ -2106,6 +2230,12 @@
       ["Testen und Rückmeldung", "Änderungen in der Garage eintragen, mindestens 3 Runden fahren und dann sagen: Problem gelöst, gleiches Problem (nächster, stärkerer Schritt), anderes Problem oder falsche Richtung."],
       ["Was du geändert hast", "Mit „Setup live lesen“ sieht der Optimizer, welche Werte du in der Garage wirklich verstellt hast. Bei „falsche Richtung“ zeigt er genau diese Werte zum Zurückstellen."],
       ["Verlauf", "Rechts stehen alle Schritte für dieses Auto auf dieser Strecke mit Ergebnis. „Alles zurück auf Start“ listet, was du seit dem ersten Schritt verstellt hast. Gespeichert wird nur im Browser, keine Runden."],
+    ]],
+    ["Setup-Vergleich", [
+      ["Wofür", "Zwei Setups nebeneinander: Setup A und Setup B wählen, dann stehen alle Garage-Werte, die verschieden sind, nach Bereich sortiert da. Zu jedem Wert siehst du A, B und um wie viel B höher oder niedriger ist."],
+      ["Was verglichen wird", "Nur die rohen Werte aus der Garage, also genau das, was du einstellst. Reifentemperaturen, Profil und andere Messwerte zählen nicht."],
+      ["Aktuelles Setup", "Mit „Setup live lesen“ kannst du dein Setup aus iRacing gegen ein gemerktes vergleichen. Änderst du in der Garage etwas, rechnet der Vergleich von selbst neu."],
+      ["Tauschen", "⇄ zwischen A und B tauscht die beiden Setups."],
     ]],
     ["Streckenvergleich", [
       ["Zwei Runden übereinander", "Aufgebaut wie die GO-Fast-Telemetrie: oben die beiden Fahrer mit Gas, Bremse, Tempo, Gang und Drehzahl an der aktuellen Stelle, links die Strecke, rechts die Kanäle. Deine Runde ist grün, die Vergleichsrunde weiß gepunktet. Fahrerkarte anklicken blendet die Runde aus und wieder ein."],
