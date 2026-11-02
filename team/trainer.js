@@ -1120,8 +1120,8 @@
         </select></label>`}
       </div>
       ${top ? '<p class="gf-g61-hinweis">Die 20 Schnellsten, je Fahrer seine beste Runde. Drin sind die Fahrer aus F2F Motorsport und Snail Pace Racing (SPR) und alle, denen das Konto auf Garage 61 folgt. Wer dort gefolgt wird, taucht hier auf. Die komplette Bestenliste wie auf der Garage-61-Seite kommt erst, wenn Garage 61 unsere App dafür freischaltet. Laden geht nur, wenn der Fahrer seine Telemetrie freigibt.</p>' : ""}
-      ${(top ? G61V.altTop : G61V.altTeam) && !laedt && !fehler ? `<p class="gf-g61-pause">Garage 61 bremst gerade. Gezeigt wird der letzte gespeicherte Stand von ${new Date(top ? G61V.altTop : G61V.altTeam).toLocaleString("de-DE", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })} Uhr.</p>` : ""}
-      ${fehler ? `<div class="tm-box tm-err">${C.esc(fehler)}</div>`
+      ${(top ? G61V.altTop : G61V.altTeam) && !laedt && !fehler ? `<p class="gf-g61-pause">Garage 61 bremst gerade oder antwortet zu langsam. Gezeigt wird der letzte gespeicherte Stand von ${new Date(top ? G61V.altTop : G61V.altTeam).toLocaleString("de-DE", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })} Uhr.</p>` : ""}
+      ${fehler ? `<div class="tm-box tm-err gf-g61-fehler">${C.esc(fehler)} <button type="button" class="gf-mini-btn" id="g61-nochmal">Nochmal versuchen</button></div>`
         : laedt ? (G61V.bremseText ? `<p class="gf-g61-pause">${C.esc(G61V.bremseText)}</p>` : '<div class="tm-loading"><span></span><span></span><span></span></div>')
         : liste.length ? `<div class="gf-g61-liste">${liste.map((r, i) => {
           const frei = r.tel !== false, gesperrt = frei ? "" : ' disabled title="Dieser Fahrer gibt seine Telemetrie nicht frei"';
@@ -1149,14 +1149,26 @@
     el.querySelectorAll("[data-g61]").forEach(b => b.onclick = () => vgG61Laden(b.dataset.g61, b.dataset.ziel, b));
     const nl = document.getElementById("g61-neu");
     if (nl) nl.onclick = () => { nl.disabled = true; nl.textContent = "lädt …"; vgG61Top(true); };
+    const nm = document.getElementById("g61-nochmal");
+    if (nm) nm.onclick = () => {
+      if (top) { G61V.top = null; G61V.topFehler = ""; vgG61Zeichnen(); vgG61Top(); }
+      else { G61V.runden = null; G61V.fehler = ""; vgG61Zeichnen(); vgG61Runden(); }
+    };
   }
+  // Garage 61 antwortet manchmal gar nicht: nach 20 s Meldung mit „Nochmal versuchen" statt endloser Ladepunkte
+  // (Abfragen mit cache: "no-store", sonst lässt Chrome den nächsten Versuch hinter der hängenden Anfrage bis zu 20 s warten)
+  const vgG61Frist = (p) => {
+    p.catch(() => {});
+    let t;
+    return Promise.race([p, new Promise((_, nein) => { t = setTimeout(() => nein(new Error("Garage 61 antwortet gerade nicht. Versuch es gleich nochmal.")), 20000); })]).finally(() => clearTimeout(t));
+  };
   async function vgG61Runden() {
     const [t, c] = (G61V.kombi || "").split("|");
     G61V.fehler = "";
     if (!t || !c) { G61V.runden = []; return vgG61Zeichnen(); }
     const fuer = G61V.kombi;
     try {
-      const d = await C.api(`/trainer/g61/runden?track=${encodeURIComponent(t)}&car=${encodeURIComponent(c)}`);
+      const d = await vgG61Frist(C.api(`/trainer/g61/runden?track=${encodeURIComponent(t)}&car=${encodeURIComponent(c)}`, { cache: "no-store" }));
       if (fuer !== G61V.kombi) return;
       G61V.runden = d.runden || []; G61V.bremseText = ""; G61V.altTeam = d.alt || "";
     } catch (e) {
@@ -1192,7 +1204,7 @@
     if (!t || !c) { G61V.top = []; return vgG61Zeichnen(); }
     const fuer = G61V.kombi;
     try {
-      const d = await C.api(`/trainer/g61/runden?quelle=top&track=${encodeURIComponent(t)}&car=${encodeURIComponent(c)}${frisch ? "&frisch=1" : ""}`);
+      const d = await vgG61Frist(C.api(`/trainer/g61/runden?quelle=top&track=${encodeURIComponent(t)}&car=${encodeURIComponent(c)}${frisch ? "&frisch=1" : ""}`, { cache: "no-store" }));
       if (fuer !== G61V.kombi) return;
       G61V.top = d.runden || []; G61V.bremseText = ""; G61V.altTop = d.alt || "";
     } catch (e) {

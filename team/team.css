@@ -2453,3 +2453,6 @@ body:has(.td)::after{content:"";position:fixed;inset:0;z-index:-1;pointer-events
 .fa-legende>div{padding:10px 12px;border:1px solid var(--g-bd);border-radius:12px;background:var(--g-glass2);font-size:12.5px;line-height:1.45;color:var(--steel)}
 .fa-legende b{display:block;color:#fff;font-size:13px;margin-bottom:3px}
 @media (max-width:900px){.fa-legende{grid-template-columns:minmax(0,1fr)}}
+
+/* Trainer · Garage-61-Listen: Fehler mit Knopf „Nochmal versuchen" */
+.gf-g61-fehler{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
