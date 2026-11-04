@@ -16,6 +16,9 @@
   let meta = null;          // Setup-Ziele
   const sev = {};           // Symptom -> Stufe 0..3 (bleibt beim Reiterwechsel)
   let setupSig = "";
+  // Eingefrorener Vorschlag: bleibt stehen, während du in der Garage änderst (sonst rechnete er
+  // vom gerade eingestellten Wert aus neu und die Vorschlagswerte liefen davon)
+  let rat = null, ratNr = 0, setupNow = [], setupKey = "";
   let alive = 0;            // Zähler, um alte Aufrufe nach Unmount zu ignorieren
 
   const SEV_COL = { 1: "#ffb020", 2: "#ff6b1f", 3: "#ff2a2a" };
@@ -391,7 +394,7 @@
             <div class="kt-help" id="kt-help"></div>
           </div>
           <div class="tm-box kt-card">
-            <div class="kt-card-h"><h5>Das solltest du ändern</h5></div>
+            <div class="kt-card-h"><h5>Das solltest du ändern</h5>${btn2("Neu vorschlagen", 'id="kt-snew" title="Neuer Vorschlag ab deinem jetzigen Setup"')}</div>
             <div id="kt-res"></div>
           </div>
         </div>
@@ -409,6 +412,7 @@
       sev[k] = sev[k] === n ? 0 : n;
       paintSev(); advise();
     });
+    document.getElementById("kt-snew").onclick = () => advise(true);
     document.getElementById("kt-sreset").onclick = () => { Object.keys(sev).forEach(k => (sev[k] = 0)); paintSev(); advise(); document.getElementById("kt-ft-out").innerHTML = ""; };
     const ftIn = document.getElementById("kt-ft-in");
     const ftGo = () => deuteFreitext(ftIn.value);
@@ -452,6 +456,8 @@
     const t = (s.status || "").toLowerCase();
     dot.className = "kt-dot " + (t.includes("fehl") ? "bad" : (t.includes("warte") || t.includes("starte") || t.includes("setz dich")) ? "warn" : t.startsWith("live:") ? "good" : "");
     document.getElementById("kt-sstat").textContent = s.status;
+    setupNow = s.groups || [];
+    setupKey = JSON.stringify([s.car, s.track, s.source]);
     const sig = JSON.stringify([s.car, s.track, s.source, s.groups]);
     if (sig === setupSig && document.getElementById("kt-slist").childElementCount) return;
     setupSig = sig;
@@ -461,24 +467,86 @@
     advise();
   }
 
-  async function advise() {
+  async function advise(neu) {
     const res = document.getElementById("kt-res");
     if (!res) return;
     if (!Object.values(sev).some(Boolean)) {
+      rat = null; ratNr++;
       res.innerHTML = `<p class="tm-muted">${setupSig && document.getElementById("kt-slist").childElementCount ? "Links steht dein Setup. Jetzt oben einstellen, was das Auto macht." : "Zuerst ein Setup laden: Live-Lesen einschalten und ins Auto setzen, oder ein gemerktes Setup laden."}</p>`;
       return;
     }
+    const sevSig = JSON.stringify(sev), key = setupKey;
+    // Gleiche Symptome, gleiches Auto/Setup: Vorschlag stehen lassen, nur abhaken, was schon eingestellt ist
+    if (!neu && rat && rat.sevSig === sevSig && rat.key === key) { ratZeigen(); return; }
+    const nr = ++ratNr, snap = setupFlach(setupNow);
     let d;
-    try { d = await post("/setup/advise", { severity: sev }); } catch (e) { res.innerHTML = `<p class="tm-err">${C.esc(e.message)}</p>`; return; }
-    const notes = d.rows.length ? d.notes.concat(["Tipp: Immer nur 1–2 Änderungen gleichzeitig testen, dann ein paar Runden fahren. Steht ein Wert im Garage-Menü schon am Anschlag, nimm die nächste Zeile."])
+    try { d = await post("/setup/advise", { severity: sev }); }
+    catch (e) { if (nr === ratNr) res.innerHTML = `<p class="tm-err">${C.esc(e.message)}</p>`; return; }
+    if (nr !== ratNr) return;
+    rat = { sevSig, key, rows: d.rows || [], notes: d.notes || [], snap };
+    ratZeigen();
+  }
+
+  // Setup als {Gruppe|Name|Nr: {g, v}}, damit Werte vorher/nachher vergleichbar sind
+  function setupFlach(groups) {
+    const out = {};
+    (groups || []).forEach(g => (g.items || []).forEach(([n, v]) => {
+      const k = g.name + "\u0001" + n;
+      let i = 0;
+      while ((k + "\u0001" + i) in out) i++;
+      out[k + "\u0001" + i] = { g: g.name, v: String(v) };
+    }));
+    return out;
+  }
+
+  // In welchen Gruppen der Setup-Liste steht die Einstellung eines Vorschlags?
+  function ratGruppen(where) {
+    const m = /^(.*?)(vorne|hinten) links \+ rechts$/.exec(where || "");
+    if (m) return [m[1] + m[2] + " links", m[1] + m[2] + " rechts"];
+    if (!where) return ["Allgemein"];
+    return where.split(" + ");
+  }
+
+  function gleicherWert(a, b) {
+    const x = parseFloat(String(a).replace(",", ".")), y = parseFloat(String(b).replace(",", "."));
+    if (!isNaN(x) && !isNaN(y)) return Math.abs(x - y) < 1e-6;
+    return String(a).trim() === String(b).trim();
+  }
+
+  // Stand eines Vorschlags im aktuellen Setup: {ok:true} = eingestellt, {wert} = auf etwas anderes geändert
+  function ratStand(r) {
+    const jetzt = setupFlach(setupNow), gr = ratGruppen(r.where);
+    const kand = Object.entries(rat.snap).filter(([, a]) => gr.includes(a.g) && a.v === r.current);
+    let anders = null;
+    for (const [k] of kand) {
+      const n = jetzt[k];
+      if (!n || n.v === r.current) continue;
+      if (gleicherWert(n.v, r.new)) return { ok: true };
+      if (anders === null) anders = n.v;
+    }
+    // Nur eindeutig zuordnen: stehen mehrere Werte gleich in der Gruppe, nichts raten
+    return anders !== null && kand.length === 1 ? { ok: false, wert: anders } : null;
+  }
+
+  function ratZeigen() {
+    const res = document.getElementById("kt-res");
+    if (!res || !rat) return;
+    const d = rat;
+    const st = d.rows.map(ratStand), fertig = st.filter(x => x && x.ok).length;
+    const notes = d.rows.length ? d.notes.concat(["Tipp: Immer nur 1–2 Änderungen gleichzeitig testen, dann ein paar Runden fahren. Steht ein Wert im Garage-Menü schon am Anschlag, nimm die nächste Zeile.",
+      "Der Vorschlag bleibt stehen, während du in der Garage änderst. Eingestellte Werte bekommen ein ✓. Nach dem Testfahren holt „Neu vorschlagen“ den nächsten Schritt ab deinem jetzigen Setup."])
       : ["Für diese Ziele gibt es in diesem Setup keine passende Einstellung."].concat(d.notes);
-    res.innerHTML = d.rows.map((r, i) => `
-      <div class="kt-rec">
-        <div class="kt-rec-h"><span class="kt-nr">${i + 1}</span><b>${C.esc(r.label)}</b><small>${C.esc(r.where)}</small></div>
-        <div class="kt-rec-v"><s>${C.esc(r.current)}</s><span>➜</span><b>${C.esc(r.new)}</b></div>
+    res.innerHTML = (fertig ? `<p class="kt-rec-stand">✓ ${fertig} von ${d.rows.length} eingestellt</p>` : "") +
+      d.rows.map((r, i) => {
+        const s = st[i], ok = s && s.ok;
+        return `
+      <div class="kt-rec${ok ? " done" : ""}">
+        <div class="kt-rec-h"><span class="kt-nr">${ok ? "✓" : i + 1}</span><b>${C.esc(r.label)}</b><small>${C.esc(r.where)}</small></div>
+        <div class="kt-rec-v"><s>${C.esc(r.current)}</s><span>➜</span><b>${C.esc(r.new)}</b>${ok ? `<em class="kt-rec-ok">eingestellt</em>` : s ? `<em class="kt-rec-anders">jetzt ${C.esc(s.wert)}</em>` : ""}</div>
         <p>Warum: ${C.esc(r.why)}</p>
         ${r.downside ? `<p class="kt-down">Nachteil: ${C.esc(r.downside)}</p>` : ""}
-      </div>`).join("") + notes.map(n => `<p class="tm-muted kt-note">ⓘ ${C.esc(n)}</p>`).join("");
+      </div>`;
+      }).join("") + notes.map(n => `<p class="tm-muted kt-note">ⓘ ${C.esc(n)}</p>`).join("");
   }
 
   /* ---- Freitext: „Beschreib, was dich stört" → Symptome ---- */
