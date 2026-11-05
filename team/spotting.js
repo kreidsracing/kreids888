@@ -651,7 +651,7 @@
     const kNamen = [...new Set(autos.map(x => String(x.k)))];
     const legende = `<div class="spt-legende">${kNamen.map(k => `<span><i style="background:${farbe(k)}"></i>${esc((klassen.find(c => String(c.id) === k) || {}).name || "Klasse")}</span>`).join("")}
       <span><i style="background:#e11324"></i>unser Auto</span><span><i class="ring"></i>Klassenspitze</span><span>♛ führt gesamt</span>
-      <span class="q">${!pkt ? "" : S.strecke.quelle === "g61" ? "Streckenform aus Garage 61" : S.strecke.quelle === "app" ? "Streckenform aus der Bibliothek (von einem F2F-Fahrer gelernt)" : "Streckenform aus dem GPS des Fahrers"}</span></div>`;
+      <span class="q">${!pkt ? "" : S.strecke.quelle === "g61" ? "Streckenform aus Garage 61" : S.strecke.quelle === "app" ? "Streckenform aus der Bibliothek (von einem F2F-Fahrer geschickt)" : "Streckenform aus der Telemetriedatei des Fahrers"}</span></div>`;
     // jedes Auto als Gruppe am Nullpunkt; die Position setzt animLauf() 60x pro Sekunde per transform
     const jetzt = performance.now(), g = groesse.toFixed(2);
     box.innerHTML = `<svg class="spt-map" viewBox="${vb}" preserveAspectRatio="xMidYMid meet">
@@ -660,7 +660,7 @@
         const a = ANIM.get(x.i), [px, py] = pos(a ? animPos(a, jetzt) : x.pct), u = istF2F(x, st), links = px > mitteX;
         return `<g data-i="${x.i}" class="${u ? "unser" : ""}${x.box ? " box" : ""}" transform="translate(${px.toFixed(2)} ${py.toFixed(2)})">${x.kpos === 1 ? `<circle r="${(u ? 2.3 : 1.8) * groesse}" class="spt-spitze" style="stroke:${farbe(x.k)};stroke-width:${groesse * 0.35}"/>` : ""}<circle r="${(u ? 1.5 : 1) * groesse}" style="fill:${u ? "#e11324" : farbe(x.k)}"/>${x.pos === 1 ? `<text class="spt-krone" y="${(-groesse * 2.2).toFixed(2)}" text-anchor="middle" style="font-size:${groesse * 2.6}px">♛</text>` : ""}${u ? `<text class="spt-lbl" x="${((links ? -2 : 2) * groesse).toFixed(2)}" y="${(groesse * 0.6).toFixed(2)}" text-anchor="${links ? "end" : "start"}" style="font-size:${groesse * 2.6}px">${esc((x.team || x.fahrer).split(" ").pop())}${x.nr ? " #" + esc(x.nr) : ""}</text>` : ""}</g>`;
       }).join("")}
-    </svg><div class="spt-map-warn" id="spt-map-warn" hidden></div>${legende}${pkt ? "" : '<p class="tm-muted spt-klein">Streckenform wird geladen. Gibt es für diese Strecke noch keine, kommt sie, sobald der Fahrer eine Runde gefahren ist.</p>'}`;
+    </svg><div class="spt-map-warn" id="spt-map-warn" hidden></div>${legende}${pkt ? "" : '<p class="tm-muted spt-klein">Streckenform wird geladen. Gibt es für diese Strecke noch keine, schickt sie das FF Overlay (ab 5.1) des Fahrers aus seiner Telemetriedatei, spätestens nach dem ersten Boxenstopp.</p>'}`;
     const svg = box.querySelector("svg");
     KARTE = { svg, pos, mitteX, groesse: Number(g), els: new Map([...svg.querySelectorAll("g[data-i]")].map(el => { const txt = el.querySelector(".spt-lbl"); return [Number(el.dataset.i), { g: el, txt, links: txt ? txt.getAttribute("text-anchor") === "end" : false }]; })) };
     animLauf();
