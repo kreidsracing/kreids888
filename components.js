@@ -73,12 +73,24 @@ const footEl=document.getElementById("site-footer");
 if(navEl) navEl.innerHTML=navHTML;
 if(footEl) footEl.innerHTML=footHTML;
 
+// ---- Streamkalender im Dashboard ausgeschaltet? -> alle Links dorthin ausblenden ----
+function skLinks(on){
+  try{ localStorage.setItem("k888_sk", on ? "1" : "0"); }catch(e){}
+  document.querySelectorAll('a[href$="streamkalender.html"]').forEach(a=>{
+    a.style.display = on ? "" : "none";
+    const s = a.nextElementSibling;
+    if(s && s.classList.contains("wbtn-sep")) s.style.display = on ? "" : "none";
+  });
+}
+try{ if(localStorage.getItem("k888_sk") === "0") skLinks(false); }catch(e){}
+
 // ---- Ticker live aus dem Dashboard laden (Fallback bleibt sonst stehen) ----
 (async function refreshTicker(){
   try{
     const r = await fetch(ADMIN_API + "/api/ticker");
     if(!r.ok) return;
     const d = await r.json();
+    if(typeof d.streamkalender === "boolean") skLinks(d.streamkalender);
     if(Array.isArray(d.messages) && d.messages.length){
       const items = buildTickerItems(d.messages);
       document.querySelectorAll(".ticker-set").forEach(el => el.innerHTML = items);

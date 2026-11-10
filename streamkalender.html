@@ -141,6 +141,11 @@
   }
 
   fetch(ADMIN_API+"/api/calendar").then(function(r){return r.json();}).then(function(d){
+    if(d.enabled===false){
+      document.querySelector(".sk-toolbar").style.display="none";
+      document.getElementById("skList").innerHTML='<p class="sk-empty">Aktuell sind keine Streams geplant.</p>';
+      return;
+    }
     var entries=Array.isArray(d.entries)?d.entries:[];
     WEEKS=buildWeeks(entries);
     IDX=startIndex();

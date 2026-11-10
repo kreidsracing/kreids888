@@ -1,21 +1,22 @@
 /* ===========================================================
-   BROADCAST-STATUS — Live / Countdown / Offline (Startseite)
+   BROADCAST-STATUS — Live / Countdown (Startseite)
    ------------------------------------------------------------
-   VARIANTE B:
-   • Countdown-Termin (Datum/Uhrzeit/Titel) kommt aus dem
-     STREAMKALENDER (Dashboard, /api/calendar). Läuft immer,
-     unabhängig von YouTube — nichts kann "offline" haken.
-   • Thumbnail wird automatisch vom YouTube-Stream gezogen
-     (kreids888-live-Worker). Fällt das aus, wird das im
-     Kalender-Eintrag hinterlegte Bild genommen.
-   • "ON AIR" (echt live) meldet ebenfalls der Worker.
+   • "ON AIR" (echt live) meldet der kreids888-live-Worker —
+     wird IMMER gezeigt.
+   • "Stream angekündigt" (Countdown) kommt aus dem STREAMKALENDER
+     (Dashboard, /api/calendar) und erscheint NUR, wenn
+       - der Streamkalender im Dashboard eingeschaltet ist UND
+       - ein Thumbnail da ist: eigenes YouTube-Thumbnail des
+         geplanten Streams ODER Bild-URL beim Kalender-Termin.
+   • Sonst ist der ganze Block ausgeblendet.
 
    (Alles in einer IIFE gekapselt -> keine globalen Namen,
     keine Konflikte mit anderen Scripts.)
    =========================================================== */
 (function () {
   const CAL_API        = "https://kreids888-admin.kreids.workers.dev/api/calendar"; // Streamkalender
-  const STREAM_API_URL = "https://kreids888-live.kreids.workers.dev/";               // Live/Thumbnail
+  const THUMB_API      = "https://kreids888-admin.kreids.workers.dev/api/thumb/";   // YouTube-Thumbnail (nur eigenes)
+  const STREAM_API_URL = "https://kreids888-live.kreids.workers.dev/";               // Live/Upcoming
   const YT_CHANNEL     = "https://youtube.com/@Kreids888";
   const POLL_MS        = 90_000;
 
@@ -23,6 +24,15 @@
 
   function $(id){ return document.getElementById(id); }
   function pad(n){ return String(n).padStart(2,"0"); }
+
+  function setVisible(on){
+    const s = $("broadcast");
+    if (s) s.style.display = on ? "" : "none";
+  }
+  function hideAll(){
+    if (countdownTimer){ clearInterval(countdownTimer); countdownTimer = null; }
+    setVisible(false);
+  }
 
   function showState(state){
     const panel = document.querySelector(".bc-panel");
@@ -46,10 +56,10 @@
       return await r.json(); // {state, videoId, title, thumbnail, scheduledStart}
     }catch(e){ return null; }
   }
-  async function fetchNextEntry(){
+  async function fetchCal(){
     try{
       const r = await fetch(CAL_API, { cache:"no-store" });
-      if (!r.ok) return null;
+      if (!r.ok) return { enabled:true, next:null };
       const d = await r.json();
       const now = Date.now();
       const future = (d.entries || [])
@@ -59,8 +69,8 @@
         })
         .filter(e => e && e.when.getTime() > now)
         .sort((a,b) => a.when - b.when);
-      return future[0] || null;
-    }catch(e){ return null; }
+      return { enabled: d.enabled !== false, next: future[0] || null };
+    }catch(e){ return { enabled:true, next:null }; }
   }
   function toDate(date, time){
     if (!date) return null;
@@ -71,34 +81,36 @@
     return isNaN(dt.getTime()) ? null : dt;
   }
 
+  // Lädt ein Bild testweise: gibt die URL zurück, wenn wirklich ein Bild kommt
+  // (kein Fehler, kein graues 120x90-Platzhalterbild), sonst null.
+  function probe(url){
+    return new Promise(res=>{
+      if (!url) return res(null);
+      const im = new Image();
+      im.onload  = () => res(im.naturalWidth > 120 ? url : null);
+      im.onerror = () => res(null);
+      im.src = url;
+    });
+  }
+
   /* ---------- Render ---------- */
   function renderLive(stream){
+    if (countdownTimer){ clearInterval(countdownTimer); countdownTimer = null; }
     const wrap = $("liveWrap");
     if (wrap && stream.videoId && wrap.dataset.id !== stream.videoId){
       wrap.dataset.id = stream.videoId;
       ytKlick(wrap, stream.videoId, { label:"Livestream ansehen", title:"Kreids888 Livestream" });
     }
     showState("live");
+    setVisible(true);
   }
 
-  function renderUpcoming(entry, stream){
+  function renderUpcoming(entry, stream, thumb){
     const t = $("bcTitle"); if (t) t.textContent = entry.title || "Stream";
 
-    // Thumbnail: zuerst YouTube (vom Worker), sonst Bild aus dem Kalendereintrag
-    const thumb = (stream && stream.videoId) ? ytThumb(stream.videoId) : (entry.image || "");
     const thumbLink = $("bcThumbLink"), thumbImg = $("bcThumb");
-    if (thumbLink && thumbImg){
-      if (!thumb){ thumbLink.hidden = true; delete thumbImg.dataset.src; }
-      else if (thumbImg.dataset.src !== thumb){
-        thumbImg.dataset.src = thumb;
-        thumbLink.hidden = true;
-        // erst zeigen, wenn wirklich ein Bild kommt (YouTube liefert sonst Fehler
-        // oder ein graues 120x90-Platzhalterbild)
-        thumbImg.onload  = () => { thumbLink.hidden = thumbImg.naturalWidth <= 120; };
-        thumbImg.onerror = () => { thumbLink.hidden = true; };
-        thumbImg.src = thumb;
-      }
-    }
+    if (thumbImg && thumbImg.getAttribute("src") !== thumb) thumbImg.src = thumb;
+    if (thumbLink) thumbLink.hidden = false;
 
     const videoId = (stream && stream.videoId) ? stream.videoId : "";
     const remind = $("bcRemind");
@@ -112,12 +124,13 @@
     }
 
     showState("upcoming");
+    setVisible(true);
 
     if (countdownTimer) clearInterval(countdownTimer);
     const target = entry.when;
     function tick(){
       const diff = target - new Date();
-      if (diff <= 0){ clearInterval(countdownTimer); refresh(); return; }
+      if (diff <= 0){ clearInterval(countdownTimer); countdownTimer = null; refresh(); return; }
       const d = Math.floor(diff/86400000);
       const h = Math.floor(diff%86400000/3600000);
       const m = Math.floor(diff%3600000/60000);
@@ -133,24 +146,30 @@
 
   /* ---------- Steuerung ---------- */
   async function refresh(){
-    if (!document.getElementById("broadcast")) return;
+    if (!$("broadcast")) return;
 
-    const [stream, next] = await Promise.all([ fetchStream(), fetchNextEntry() ]);
+    const [stream, cal] = await Promise.all([ fetchStream(), fetchCal() ]);
 
-    // 1) Wirklich live? -> ON AIR
+    // 1) Wirklich live? -> ON AIR (immer)
     if (stream && stream.state === "live"){ renderLive(stream); return; }
 
-    // 2) Nächster Kalender-Termin -> Countdown (mit YT-Thumbnail)
-    let entry = next;
-    // Sicherheitsnetz: kein Kalender-Eintrag, aber Worker kennt einen Upcoming
+    // 2) Streamkalender im Dashboard aus -> Block weg
+    if (!cal.enabled){ hideAll(); return; }
+
+    // 3) Nächster Kalender-Termin (Sicherheitsnetz: Upcoming vom Worker)
+    let entry = cal.next;
     if (!entry && stream && stream.state === "upcoming" && stream.scheduledStart){
       const w = new Date(stream.scheduledStart);
-      if (!isNaN(w.getTime())) entry = { title: stream.title || "Nächster Stream", when: w, image: stream.videoId ? ytThumb(stream.videoId) : "" };
+      if (!isNaN(w.getTime())) entry = { title: stream.title || "Nächster Stream", when: w, image: "" };
     }
-    if (entry){ renderUpcoming(entry, stream); return; }
+    if (!entry){ hideAll(); return; }
 
-    // 3) Nichts geplant
-    showState("offline");
+    // 4) Nur mit Thumbnail: zuerst eigenes YouTube-Thumbnail, sonst Bild aus dem Kalender
+    const ytUrl = (stream && stream.videoId) ? THUMB_API + encodeURIComponent(stream.videoId) + "?f=max" : "";
+    const thumb = (await probe(ytUrl)) || (await probe(entry.image));
+    if (!thumb){ hideAll(); return; }
+
+    renderUpcoming(entry, stream, thumb);
   }
 
   refresh();
