@@ -3,11 +3,11 @@
    ------------------------------------------------------------
    • "ON AIR" (echt live) meldet der kreids888-live-Worker —
      wird IMMER gezeigt.
-   • "Stream angekündigt" (Countdown) kommt aus dem STREAMKALENDER
-     (Dashboard, /api/calendar) und erscheint NUR, wenn
-       - der Streamkalender im Dashboard eingeschaltet ist UND
-       - ein Thumbnail da ist: eigenes YouTube-Thumbnail des
-         geplanten Streams ODER Bild-URL beim Kalender-Termin.
+   • "Stream angekündigt" (Countdown) erscheint NUR mit Thumbnail:
+       - Streamkalender im Dashboard AN: Termin aus dem Kalender,
+         Thumbnail = eigenes YouTube-Thumbnail ODER Bild-URL beim Termin.
+       - Streamkalender im Dashboard AUS: nur ein geplanter
+         YouTube-Stream mit eigenem Thumbnail (Termin/Titel von YouTube).
    • Sonst ist der ganze Block ausgeblendet.
 
    (Alles in einer IIFE gekapselt -> keine globalen Namen,
@@ -153,18 +153,16 @@
     // 1) Wirklich live? -> ON AIR (immer)
     if (stream && stream.state === "live"){ renderLive(stream); return; }
 
-    // 2) Streamkalender im Dashboard aus -> Block weg
-    if (!cal.enabled){ hideAll(); return; }
-
-    // 3) Nächster Kalender-Termin (Sicherheitsnetz: Upcoming vom Worker)
-    let entry = cal.next;
+    // 2) Nächster Kalender-Termin (nur wenn Streamkalender im Dashboard AN),
+    //    sonst / ohne Termin: geplanter YouTube-Stream vom Worker
+    let entry = cal.enabled ? cal.next : null;
     if (!entry && stream && stream.state === "upcoming" && stream.scheduledStart){
       const w = new Date(stream.scheduledStart);
       if (!isNaN(w.getTime())) entry = { title: stream.title || "Nächster Stream", when: w, image: "" };
     }
     if (!entry){ hideAll(); return; }
 
-    // 4) Nur mit Thumbnail: zuerst eigenes YouTube-Thumbnail, sonst Bild aus dem Kalender
+    // 3) Nur mit Thumbnail: zuerst eigenes YouTube-Thumbnail, sonst Bild aus dem Kalender
     const ytUrl = (stream && stream.videoId) ? THUMB_API + encodeURIComponent(stream.videoId) + "?f=max" : "";
     const thumb = (await probe(ytUrl)) || (await probe(entry.image));
     if (!thumb){ hideAll(); return; }
