@@ -329,6 +329,78 @@
     return s + '</svg>';
   }
 
+  // ─── Wochenplan (Story 1080×1920) – Look wie der Streamkalender auf kreids888.com + Ich-Bild ───
+  // Instagram legt oben (~200 px) und unten (~300 px) eigene Leisten drüber → Kopf ab y = 220.
+  const MONATE = ['JAN', 'FEB', 'MÄR', 'APR', 'MAI', 'JUN', 'JUL', 'AUG', 'SEP', 'OKT', 'NOV', 'DEZ'];
+  const tagMonat = datum => { const [, m, d] = String(datum).split('-').map(Number); return { d, m: MONATE[m - 1] }; };
+  function wochenText(von, bis) {
+    const a = tagMonat(von), b = tagMonat(bis), j = String(bis).slice(0, 4);
+    return a.m === b.m ? `${a.d}. – ${b.d}. ${b.m} ${j}` : `${a.d}. ${a.m} – ${b.d}. ${b.m} ${j}`;
+  }
+  function wocheSvg(post, design, bg, logo, pose) {
+    const B = 1080, H = 1920, R = 80, f1 = design.farbe1 || '#e11324';
+    const akzent = hellAuf(f1), weiss = '#f4f5f7', stahl = '#8b929c', panel = '#14161d', linie = '#242832';
+    const liste = post.liste || [];
+    let s = `<svg xmlns="http://www.w3.org/2000/svg" width="${B}" height="${H}" viewBox="0 0 ${B} ${H}">
+<defs>
+<radialGradient id="gl1" cx="${B * 0.85}" cy="-100" r="760" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="${f1}" stop-opacity=".34"/><stop offset="1" stop-color="${f1}" stop-opacity="0"/></radialGradient>
+<radialGradient id="gl2" cx="${B * 0.9}" cy="${H - 300}" r="700" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="${f1}" stop-opacity=".22"/><stop offset="1" stop-color="${f1}" stop-opacity="0"/></radialGradient>
+<filter id="schatten" x="-20%" y="-30%" width="140%" height="180%"><feDropShadow dx="0" dy="4" stdDeviation="8" flood-color="#000" flood-opacity=".7"/></filter>
+<filter id="rand" x="0" y="-5%" width="100%" height="110%"><feMorphology in="SourceAlpha" operator="dilate" radius="6" result="d"/><feFlood flood-color="#ffffff"/><feComposite in2="d" operator="in" result="r"/><feDropShadow in="r" dx="0" dy="10" stdDeviation="14" flood-color="#000" flood-opacity=".6" result="rs"/><feMerge><feMergeNode in="rs"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+</defs>
+<rect width="${B}" height="${H}" fill="#0a0b0e"/>`;
+    for (let i = -6; i < 16; i++) s += `<polygon points="${i * 140},${H} ${i * 140 + H * 0.5},0 ${i * 140 + H * 0.5 + 46},0 ${i * 140 + 46},${H}" fill="${f1}" opacity="${i % 3 === 0 ? 0.07 : 0.025}"/>`;
+    s += `<rect width="${B}" height="${H}" fill="url(#gl1)"/><rect width="${B}" height="${H}" fill="url(#gl2)"/><rect width="${B}" height="14" fill="${f1}"/>`;
+    // Kopf: STREAM WEEK · KREIDS888 · Woche
+    s += `<text x="${R}" y="250" ${SCHRIFT.semi} font-size="40" letter-spacing="14" fill="${akzent}">STREAM WEEK</text>`;
+    s += `<text x="${R - 2}" y="398" ${SCHRIFT.black} font-size="150" fill="${weiss}">KREIDS<tspan fill="${f1}">888</tspan></text>`;
+    s += `<text x="${R + 2}" y="458" ${SCHRIFT.semi} font-size="40" letter-spacing="2" fill="${stahl}">${esc(wochenText(post.datum, post.bisDatum))}</text>`;
+    s += `<rect x="${R}" y="496" width="${B - 2 * R}" height="2" fill="${linie}"/>`;
+    // Termine
+    const oben = 540, unten = 1250, rowH = (unten - oben) / Math.max(1, liste.length), ch = Math.min(rowH - 16, 230);
+    liste.forEach((e, i) => {
+      const y = oben + i * rowH, z = berlin(e.liveMs), t = tagMonat(e.datum);
+      s += `<rect x="${R}" y="${y}" width="${B - 2 * R}" height="${ch}" fill="${panel}" fill-opacity=".92"/><rect x="${R}" y="${y}" width="10" height="${ch}" fill="${f1}"/>`;
+      const wtG = Math.min(74, ch * 0.42);
+      s += `<text x="195" y="${y + ch * 0.48}" text-anchor="middle" ${SCHRIFT.black} font-size="${wtG}" fill="${akzent}">${esc(gross(z.wt))}</text>`;
+      s += `<text x="195" y="${y + ch * 0.48 + Math.min(44, ch * 0.24)}" text-anchor="middle" ${SCHRIFT.semi} font-size="${Math.min(36, ch * 0.2)}" fill="${stahl}">${esc(t.d + '. ' + t.m)}</text>`;
+      s += `<rect x="309" y="${y + 26}" width="2" height="${Math.max(10, ch - 52)}" fill="${linie}"/>`;
+      const titel = gross((e.spr && e.track ? e.track + ' · ' : '') + (e.titel || e.serie || e.art || 'Rennen'));
+      const maxB = B - 90 - 345, tit = umbruch(titel, 'xbold', maxB, Math.min(52, ch * 0.3), 26);
+      const zeile2 = `${z.zeit} UHR` + (e.art && e.art !== 'Rennen' ? ' · ' + gross(e.art) : '') + (e.nr ? ' · RUNDE ' + e.nr : '') + (e.reverseGrid ? ' · 2 RENNEN' : '');
+      const z2G = Math.min(38, ch * 0.2), lh = tit.g * 1.02, block = tit.zeilen.length * lh + z2G + 10;
+      let ty = y + (ch - block) / 2 + tit.g * 0.8;
+      tit.zeilen.forEach(l => { s += `<text x="345" y="${ty}" ${SCHRIFT.xbold} font-size="${tit.g}" fill="${weiss}">${esc(l)}</text>`; ty += lh; });
+      s += `<text x="345" y="${ty - lh + tit.g * 0.2 + z2G + 6}" ${SCHRIFT.semi} font-size="${passend(zeile2, 'semi', maxB, z2G, 18)}" fill="${stahl}">${esc(zeile2)}</text>`;
+    });
+    // Fuß: Linie, Logo (+ Team-Bild), „Live auf …“, Website – rechts das Ich-Bild
+    s += `<rect x="0" y="1290" width="${B}" height="4" fill="${f1}"/>`;
+    const k = KOPF || {}, teile = [];
+    if (k.logo) teile.push(k.logo);
+    if (k.team) teile.push(k.team);
+    if (teile.length) {
+      const maxB = 520, maxH = 170 * Math.max(k.logoF || 1, 0.6), luecke = 30;
+      let gr = teile.map(t => { const f = Math.min(maxB / t.w, maxH / t.h); return { url: t.url, w: t.w * f, h: t.h * f }; });
+      const ges = gr.reduce((a, t) => a + t.w, 0) + luecke * (gr.length - 1);
+      if (ges > maxB) { const f = (maxB - luecke * (gr.length - 1)) / (ges - luecke * (gr.length - 1)); gr = gr.map(t => ({ ...t, w: t.w * f, h: t.h * f })); }
+      const hh = Math.max(...gr.map(t => t.h));
+      let x = R;
+      for (const t of gr) { s += `<image href="${t.url}" x="${x}" y="${1340 + (hh - t.h) / 2}" width="${t.w}" height="${t.h}" preserveAspectRatio="none" filter="url(#schatten)"/>`; x += t.w + luecke; }
+    }
+    const lz = liveZeile(design);
+    if (lz) {
+      s += `<text x="${R}" y="1590" ${SCHRIFT.semi} font-size="28" letter-spacing="3" fill="${stahl}">LIVE AUF</text>`;
+      s += `<text x="${R}" y="1640" ${SCHRIFT.xbold} font-size="${passend(lz, 'xbold', 520, 46, 24)}" fill="${weiss}">${esc(lz)}</text>`;
+    }
+    s += `<text x="${R}" y="1690" ${SCHRIFT.semi} font-size="26" letter-spacing="3" fill="#c9d1da">${WEBSEITE}</text>`;
+    if (pose) {
+      const h = 680, w = h * pose.w / pose.h;
+      s += `<image href="${pose.url}" x="${B - w + 10}" y="${H - h}" width="${w}" height="${h}" preserveAspectRatio="none" filter="url(#rand)"/>`;
+    }
+    s += `<rect x="0" y="${H - 14}" width="${B}" height="14" fill="${f1}"/>`;
+    return s + '</svg>';
+  }
+
   // ─── Schriften (Saira Condensed von kreids888.com) als data:-URL ins SVG ───
   let schriftCss = null;
   const alsDataUrl = blob => new Promise((ok, nein) => { const r = new FileReader(); r.onload = () => ok(r.result); r.onerror = () => nein(new Error('Datei nicht lesbar')); r.readAsDataURL(blob); });
@@ -361,7 +433,7 @@
       return await new Promise((ok, nein) => c.toBlob(b => (b ? ok(b) : nein(new Error('Bild konnte nicht erzeugt werden.'))), 'image/jpeg', q || 0.9));
     } finally { URL.revokeObjectURL(url); }
   }
-  const svgFuer = (post, design, bg, logo) => post.typ === 'story' ? storySvg(post, design, bg, logo)
+  const svgFuer = (post, design, bg, logo, pose) => post.typ === 'woche' ? wocheSvg(post, design, bg, logo, pose) : post.typ === 'story' ? storySvg(post, design, bg, logo)
     : post.typ === 'erg' ? ergebnisSvg(post, design, bg, logo) : feedSvg(post, design, bg, logo);
   // Team-Bilder (kreids888.com/team/bilder), auf Wunsch ohne schwarzen Hintergrund
   const TEAM = [['f2f-logo.webp', 'F2F Logo', true], ['f2f-motto.webp', 'F2F Motto', true], ['f2f-cars.webp', 'F2F Autos'], ['f2f-recruiting.webp', 'F2F Recruiting'], ['f2f-logo.png', 'F2F Logo (PNG)'], ['f2f-g61.png', 'F2F G61']];
@@ -393,9 +465,10 @@
   async function post(p, design) {
     const [css, bg, logo, team] = await Promise.all([schriften(), bildDaten(p.hg), bildDaten(design.logoBild), teamBild(design.team, design.teamSchwarz !== false)]);
     KOPF = { logo: await masse(logo), team, logoF: prozent(design.logoGroesse, 100), teamF: prozent(design.teamGroesse, 100) };
-    let svg = svgFuer({ ...p, klassen: p.klassen || [] }, design, bg, logo);
+    const pose = p.typ === 'woche' && p.pose ? await bildDaten(SITE + 'overlays/personen/' + p.pose).then(masse) : null;
+    let svg = svgFuer({ ...p, klassen: p.klassen || [] }, design, bg, logo, pose);
     svg = svg.replace(/^(<svg[^>]*>)/, `$1<style>${css}</style>`);
-    return rastern(svg, 1080, p.typ === 'story' ? 1920 : 1350, 0.9);
+    return rastern(svg, 1080, p.typ === 'story' || p.typ === 'woche' ? 1920 : 1350, 0.9);
   }
   window.K888Bilder = { post, bildDaten, schriften, berlin, SITE, TEAM, teamUrl };
 })();

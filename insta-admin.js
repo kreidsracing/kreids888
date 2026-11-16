@@ -65,7 +65,7 @@
     if (GLEICHT || !STAND || !window.K888Bilder) return;
     GLEICHT = true;
     try {
-      const ohneHg = [...new Map(offenePosts().filter(p => !p.hg && !p.kiFehler && p.postMs - Date.now() < 7 * 86400000).map(p => [p.rennKey, p])).values()];
+      const ohneHg = [...new Map(offenePosts().filter(p => p.typ !== 'woche' && !p.hg && !p.kiFehler && p.postMs - Date.now() < 7 * 86400000).map(p => [p.rennKey, p])).values()];
       let ki = Math.min(2, (STAND.ki && STAND.ki.frei) || 0), neu = false;
       for (const p of ohneHg) {
         if (ki-- <= 0) break;
@@ -112,8 +112,9 @@
     wartet: ['Wartet auf Freigabe', 'gelb'], geplant: ['Geplant', 'blau'],
     fehler: ['Fehler', 'rot'], uebersprungen: ['Übersprungen', 'grau']
   };
-  const TYP = { ank: '📣 Ankündigung · Feed', story: '📱 Raceday · Story', erg: '🏁 Ergebnis · Feed' };
-  const titel = p => [p.serie || p.titel, p.nr ? 'R' + p.nr : '', [p.track, p.layout].filter(Boolean).join(' – ')].filter(Boolean).map(esc).join(' · ');
+  const TYP = { ank: '📣 Ankündigung · Feed', story: '📱 Raceday · Story', erg: '🏁 Ergebnis · Feed', woche: '🗓 Wochenplan · Story' };
+  const datumKurz = d => String(d || '').split('-').reverse().slice(0, 2).join('.') + '.';
+  const titel = p => p.typ === 'woche' ? esc(`Woche ${datumKurz(p.datum)} – ${datumKurz(p.bisDatum)}`) : [p.serie || p.titel, p.nr ? 'R' + p.nr : '', [p.track, p.layout].filter(Boolean).join(' – ')].filter(Boolean).map(esc).join(' · ');
 
   // ▶ YouTube-Thumbnail 1920×1080 (pro Rennen): kleine Vorschau aus der Vorlage
   const thumbFeld = p => `<div class="ki-stream">
@@ -132,16 +133,19 @@
       : `<div class="ki-bild ${p.typ} leer">${GLEICHT ? '🖌 wird gezeichnet …' : 'Noch kein Bild'}</div>`;
     const id = esc(p.id), k = [];
     const kn = (aktion, text, extra = '', titel = '') => `<button class="btn btn-ghost ki-k" data-aktion="${aktion}" data-id="${id}" ${extra}${titel ? ` title="${esc(titel)}"` : ''}><span>${text}</span></button>`;
-    k.push(auswahl(STIMMUNG, STAND.cfg.stimmung || 'zufall', `data-stimmung="${id}" title="Stimmung für das nächste KI-Bild"`));
-    k.push(auswahl(KAMERA, STAND.cfg.kamera || 'zufall', `data-kamera="${id}" title="Blickwinkel für das nächste KI-Bild"`));
-    k.push(kn('gemini', '✨ Bild mit Gemini', '', 'Bild-Auftrag kopieren und Gemini daneben öffnen – das kopierte Bild wird automatisch übernommen'));
-    k.push(kn('chatgpt', '🤖 Bild mit ChatGPT', '', 'ChatGPT daneben öffnen, der Bild-Auftrag steht schon drin – das kopierte Bild wird automatisch übernommen'));
-    k.push(p.hg ? kn('neu', '🎲 Neues KI-Bild', '', 'Neues KI-Hintergrundbild für alle Posts dieses Rennens') : kn('bild', '🎨 KI-Hintergrund', '', 'KI-Hintergrundbild für alle Posts dieses Rennens'));
+    const woche = p.typ === 'woche';
+    if (!woche) {
+      k.push(auswahl(STIMMUNG, STAND.cfg.stimmung || 'zufall', `data-stimmung="${id}" title="Stimmung für das nächste KI-Bild"`));
+      k.push(auswahl(KAMERA, STAND.cfg.kamera || 'zufall', `data-kamera="${id}" title="Blickwinkel für das nächste KI-Bild"`));
+      k.push(kn('gemini', '✨ Bild mit Gemini', '', 'Bild-Auftrag kopieren und Gemini daneben öffnen – das kopierte Bild wird automatisch übernommen'));
+      k.push(kn('chatgpt', '🤖 Bild mit ChatGPT', '', 'ChatGPT daneben öffnen, der Bild-Auftrag steht schon drin – das kopierte Bild wird automatisch übernommen'));
+      k.push(p.hg ? kn('neu', '🎲 Neues KI-Bild', '', 'Neues KI-Hintergrundbild für alle Posts dieses Rennens') : kn('bild', '🎨 KI-Hintergrund', '', 'KI-Hintergrundbild für alle Posts dieses Rennens'));
+    }
     if (modus === 'freigabe' && p.status !== 'uebersprungen') k.push(p.freigegeben ? kn('freigeben', '↩ Freigabe zurück', 'data-an="0"')
       : `<button class="btn btn-red ki-k" data-aktion="freigeben" data-an="1" data-id="${id}"><span>✓ Freigeben</span></button>`);
     k.push(p.status === 'uebersprungen' ? kn('ueberspringen', '↺ Wieder aktivieren', 'data-an="0"') : kn('ueberspringen', '⏭ Überspringen', 'data-an="1"'));
     if (p.status !== 'uebersprungen') k.push(kn('jetzt', '🚀 Jetzt posten'));
-    k.push(`<label class="btn btn-ghost ki-k ki-datei" title="Eigenes Hintergrundbild (z. B. iRacing-Screenshot) für alle Posts dieses Rennens"><span>📤 Eigenes Bild</span><input type="file" accept="image/*" data-eigenesbild="${id}"></label>`);
+    if (!woche) k.push(`<label class="btn btn-ghost ki-k ki-datei" title="Eigenes Hintergrundbild (z. B. iRacing-Screenshot) für alle Posts dieses Rennens"><span>📤 Eigenes Bild</span><input type="file" accept="image/*" data-eigenesbild="${id}"></label>`);
     if (p.bild) k.push(`<a class="btn btn-ghost ki-k" href="${esc(p.bild)}?laden=1" download><span>📥 Bild laden</span></a>`);
     if (p.bild) k.push(kn('manuell', '✓ Selbst gepostet', 'data-an="1"', 'Wenn du das Bild selbst in der Insta-App gepostet hast'));
     if (p.eigenesErgebnis) k.push(`<button class="btn btn-ghost ki-k" data-aktion="erg-weg" data-rk="${esc(p.rennKey)}"><span>✕ Ergebnis löschen</span></button>`);
@@ -152,7 +156,8 @@
     if (p.kiFehler) h.push(`<div class="ki-hinweis">KI-Bild ging nicht (${esc(p.kiFehler)}). Bis dahin gibt es einen Ersatz-Hintergrund.</div>`);
     if (p.typ === 'story') h.push('<div class="ki-hinweis">Link-Sticker geht nur von Hand: „📥 Bild laden“ → in der Insta-App als Story posten → hier „✓ Selbst gepostet“.</div>');
     const text = p.text ? `<details class="ki-text"><summary>Text unter dem Post</summary><pre>${esc(p.text)}</pre></details>` : '';
-    const wann = p.typ === 'erg'
+    const wann = woche ? `${(p.liste || []).length} Termine in dieser Woche`
+      : p.typ === 'erg'
       ? `Rennen vom ${esc(new Date(p.startMs).toLocaleDateString('de-DE', { timeZone: 'Europe/Berlin', weekday: 'short', day: '2-digit', month: '2-digit' }))} · <b>${esc(p.platz)}</b>`
       : `Live ab ${esc(zeit(p.liveMs).split(' · ')[1] || '')} Uhr`;
     return `<div class="ki-post">
@@ -204,6 +209,11 @@
       <div class="ki-reihe"><div class="ki-fg"><label for="ki-story-zeit">Uhrzeit</label><input id="ki-story-zeit" type="time" value="${esc(s.zeit)}"></div></div>
       <label class="chk"><input type="checkbox" id="ki-erg-an" ${e.aktiv ? 'checked' : ''}> Rennergebnis im Feed (am Tag nach dem Rennen)</label>
       <div class="ki-reihe"><div class="ki-fg"><label for="ki-erg-zeit">Uhrzeit</label><input id="ki-erg-zeit" type="time" value="${esc(e.zeit)}"></div></div>
+      <label class="chk"><input type="checkbox" id="ki-woche-an" ${(cfg.woche || {}).aktiv !== false ? 'checked' : ''}> Wochenplan als Story (sonntags, für die Woche danach)</label>
+      <div class="ki-reihe">
+        <div class="ki-fg"><label for="ki-woche-zeit">Uhrzeit</label><input id="ki-woche-zeit" type="time" value="${esc((cfg.woche || {}).zeit || '17:00')}"></div>
+        <div class="ki-fg"><label for="ki-woche-pose">Bild von dir</label><select id="ki-woche-pose"><option value="">– kein Bild –</option>${((window.K888Thumb && window.K888Thumb.POSEN) || []).map(([d, n]) => `<option value="${esc(d)}" ${(cfg.woche || {}).pose === d ? 'selected' : ''}>${esc(n)}</option>`).join('')}</select></div>
+      </div>
       <div class="ki-fg"><label>Posts für</label><div class="ki-reihe">${['Rennen', 'Stream', 'Training'].map(typ).join('')}</div></div>
       <div class="ki-fg"><label for="ki-live">„Live ab“ bei SPR-Rennen</label><select id="ki-live">
         <option value="quali" ${cfg.liveAb === 'quali' ? 'selected' : ''}>Quali-Start (Start + Training)</option>
@@ -337,6 +347,7 @@
   function rennenListe() {
     const m = new Map();
     for (const p of (STAND ? STAND.posts : [])) {
+      if (p.typ === 'woche') continue;
       const alt = m.get(p.rennKey);
       if (!alt || RANG[p.typ] < RANG[alt.typ]) m.set(p.rennKey, p);
     }
@@ -456,6 +467,7 @@
       ankuendigung: { aktiv: v('ki-ank-an').checked, tage: parseInt(v('ki-ank-tage').value, 10) || 0, zeit: v('ki-ank-zeit').value },
       story: { aktiv: v('ki-story-an').checked, zeit: v('ki-story-zeit').value },
       ergebnis: { aktiv: v('ki-erg-an').checked, zeit: v('ki-erg-zeit').value },
+      woche: { aktiv: v('ki-woche-an').checked, zeit: v('ki-woche-zeit').value, pose: v('ki-woche-pose').value },
       typen: [...BOX.querySelectorAll('[data-typ]')].filter(x => x.checked).map(x => x.dataset.typ),
       liveAb: v('ki-live').value,
       kiHinweis: v('ki-ki').checked,

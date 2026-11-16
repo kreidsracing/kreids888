@@ -94,6 +94,35 @@ export function bauePlan(daten, cfg, jetzt) {
       }, { spr: false, titel: rn.titel || '', layout: rn.layout || '', kalenderBild: rn.kalenderBild || '', eigenesErgebnis: true });
     }
   }
+  // Wochenplan (Story): sonntags zur eingestellten Uhrzeit für die Woche danach (Mo–So), nur wenn Termine drin sind
+  if (cfg.woche && cfg.woche.aktiv) {
+    const heute = berlin(jetzt).datum;
+    const bisSonntag = (7 - new Date(heute + 'T12:00:00Z').getUTCDay()) % 7;
+    for (let w = 0; w < 2; w++) {
+      const sonntag = tageZurueck(heute, -(bisSonntag + 7 * w));
+      const postMs = berlinZuMs(sonntag, cfg.woche.zeit);
+      if (postMs < jetzt - 30 * 60000) continue;
+      const montag = tageZurueck(sonntag, -1), bisDatum = tageZurueck(sonntag, -7);
+      const liste = [];
+      for (const e of daten.eintraege) {
+        if (!e || e.racing === false || !e.date || !e.time) continue;
+        const datum = String(e.date).slice(0, 10);
+        if (datum < montag || datum > bisDatum) continue;
+        const spr = e.source === 'spr', startMs = berlinZuMs(datum, e.time);
+        if (!isFinite(startMs)) continue;
+        const qualiMs = startMs + (spr ? minuten(e.train) * 60000 : 0), rennMs = qualiMs + (spr ? minuten(e.quali) * 60000 : 0);
+        const liveMs = !spr ? startMs : cfg.liveAb === 'rennen' ? rennMs : cfg.liveAb === 'start' ? startMs : qualiMs;
+        liste.push({ datum, liveMs, art: e.type || 'Rennen', titel: e.title || '', serie: e.series || '', track: e.track || '', nr: spr ? Number(e.nr) || 0 : 0, spr, reverseGrid: !!e.reverseGrid });
+      }
+      if (!liste.length) continue;
+      liste.sort((a, b) => a.liveMs - b.liveMs);
+      const key = sicher('woche~' + montag), ab = berlinZuMs(montag, '00:00');
+      posts.push({
+        key, typ: 'woche', art: 'Wochenplan', spr: false, id: key + '_story', postMs, titel: 'Wochenplan', serie: '', nr: 0, track: '', layout: '',
+        datum: montag, bisDatum, startMs: ab, liveMs: ab, klassen: [], kalenderBild: '', reverseGrid: false, liste: liste.slice(0, 7), pose: cfg.woche.pose || ''
+      });
+    }
+  }
   posts.sort((x, y) => x.postMs - y.postMs);
   return posts;
 }
@@ -119,7 +148,7 @@ export function eigeneRennen(daten, jetzt) {
 const ZEICHEN_VERSION = 2;
 export function inhaltSchluessel(post, design, cfg, bgv = 0) {
   return JSON.stringify([bgv, bgv ? '' : post.kalenderBild, post.typ, post.art, post.serie, post.nr, post.track, post.layout, post.titel, post.datum, post.liveMs, post.tage,
-    post.klassen, post.reverseGrid, post.ergebnis || null, design.farbe1, design.farbe2, design.logoVersion || 0, design.liveText, design.logoGroesse, design.team, design.teamGroesse, design.teamSchwarz, cfg.liveAb, ZEICHEN_VERSION]);
+    post.klassen, post.reverseGrid, post.ergebnis || null, design.farbe1, design.farbe2, design.logoVersion || 0, design.liveText, design.logoGroesse, design.team, design.teamGroesse, design.teamSchwarz, cfg.liveAb, post.liste || null, post.pose || null, ZEICHEN_VERSION]);
 }
 // Kurzer Hash (FNV-1a) für Links mit ?h=
 export function kurzHash(t) {

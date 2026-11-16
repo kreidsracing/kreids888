@@ -522,5 +522,5 @@
 #instaApp .kt-rechts input[type=range]{padding:0;accent-color:var(--red)}`;
   document.head.appendChild(css);
 
-  window.K888Thumb = { editor, vorschau, laden, vorlageAus, STANDARD };
+  window.K888Thumb = { editor, vorschau, laden, vorlageAus, STANDARD, POSEN, posenUrl };
 })();

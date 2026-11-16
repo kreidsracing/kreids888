@@ -31,6 +31,7 @@ const CFG_STANDARD = {
   ankuendigung: { aktiv: true, tage: 2, zeit: '19:00' },
   story: { aktiv: true, zeit: '12:00' },
   ergebnis: { aktiv: true, zeit: '18:00' },
+  woche: { aktiv: true, zeit: '17:00', pose: 'pose_02_zeigt_auf_dich.png' },   // Wochenplan-Story sonntags
   typen: ['Rennen', 'Stream'],
   liveAb: 'quali',
   kiHinweis: true,
@@ -54,6 +55,8 @@ function cfgPruefen(e) {
   c.ankuendigung = { aktiv: a.aktiv !== false, tage: Math.max(0, Math.min(14, parseInt(a.tage, 10) || 0)), zeit: istUhrzeit(a.zeit) ? a.zeit : '19:00' };
   c.story = { aktiv: st.aktiv !== false, zeit: istUhrzeit(st.zeit) ? st.zeit : '12:00' };
   c.ergebnis = { aktiv: er.aktiv !== false, zeit: istUhrzeit(er.zeit) ? er.zeit : '18:00' };
+  const wo = e.woche || {};
+  c.woche = { aktiv: wo.aktiv !== false, zeit: istUhrzeit(wo.zeit) ? wo.zeit : '17:00', pose: /^[A-Za-z0-9_.-]{1,80}\.(png|webp)$/.test(String(wo.pose || '')) || wo.pose === '' ? wo.pose : CFG_STANDARD.woche.pose };
   c.typen = Array.isArray(e.typen) ? TYPEN.filter(t => e.typen.includes(t)) : CFG_STANDARD.typen.slice();
   c.liveAb = ['quali', 'rennen', 'start'].includes(e.liveAb) ? e.liveAb : 'quali';
   c.kiHinweis = e.kiHinweis !== false;
@@ -69,7 +72,8 @@ async function ladeCfg(s) {
     ...CFG_STANDARD, ...c,
     ankuendigung: { ...CFG_STANDARD.ankuendigung, ...(c.ankuendigung || {}) },
     story: { ...CFG_STANDARD.story, ...(c.story || {}) },
-    ergebnis: { ...CFG_STANDARD.ergebnis, ...(c.ergebnis || {}) }
+    ergebnis: { ...CFG_STANDARD.ergebnis, ...(c.ergebnis || {}) },
+    woche: { ...CFG_STANDARD.woche, ...(c.woche || {}) }
   });
 }
 async function ladeDesign(s) { return { ...DESIGN_STANDARD, ...((await s.lies('design')) || {}) }; }
@@ -196,7 +200,7 @@ async function veroeffentlichen(env, s, post, design, cfg) {
     const mediaId = await posten({
       token, uid: k.user_id,
       bildUrl: `${env.ORIGIN}/bild/${post.id}/${zust.version}.jpg`,
-      typ: post.typ === 'story' ? 'story' : 'ank', text: bildtext(post, cfg, design),
+      typ: post.typ === 'story' || post.typ === 'woche' ? 'story' : 'ank', text: post.typ === 'woche' ? '' : bildtext(post, cfg, design),
       tags: [], kiHinweis: cfg.kiHinweis && !!zust.ki
     });
     zust.gepostet = { zeit: Date.now(), mediaId };
@@ -231,7 +235,7 @@ async function zyklus(env) {
   for (const p of plan) {
     if (p.postMs - jetzt > 48 * 3600000 || ki <= 0) break;
     const rk = rennKey(p.id);
-    if (gesehen.has(rk) || p.kalenderBild || (st['post:' + p.id] || {}).gepostet) continue;
+    if (p.typ === 'woche' || gesehen.has(rk) || p.kalenderBild || (st['post:' + p.id] || {}).gepostet) continue;
     gesehen.add(rk);
     if (await s.lies('bgv:' + rk)) continue;
     const m = await s.lies('bgm:' + rk);
@@ -314,7 +318,7 @@ async function stand(env, s) {
     return {
       id: p.id, typ: p.typ, art: p.art, spr: p.spr, titel: p.titel, serie: p.serie, nr: p.nr, track: p.track, layout: p.layout, datum: p.datum,
       postMs: p.postMs, startMs: p.startMs, qualiMs: p.qualiMs || p.startMs, rennMs: p.rennMs || p.startMs, liveMs: p.liveMs, tage: p.tage || 0,
-      klassen: p.klassen, reverseGrid: p.reverseGrid,
+      klassen: p.klassen, reverseGrid: p.reverseGrid, liste: p.liste || null, bisDatum: p.bisDatum || '', pose: p.pose || '',
       ergebnis: p.ergebnis || null, platz: p.ergebnis ? platzText(p.ergebnis) : '', eigenesErgebnis: !!p.eigenesErgebnis,
       status: status(z, cfg), freigegeben: !!z.freigegeben, fehler: z.fehler || '', kiFehler: bgv ? '' : (m.kiFehler || ''),
       gepostet: z.gepostet || null,
@@ -325,7 +329,7 @@ async function stand(env, s) {
       rennKey: rk,
       thumb: thrs['thr:' + rk] || null,
       autos: autos(p, design.fahrzeuge || ''),
-      text: p.typ === 'story' ? '' : bildtext(p, cfg, design)
+      text: p.typ === 'story' || p.typ === 'woche' ? '' : bildtext(p, cfg, design)
     };
   });
   return {
