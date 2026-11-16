@@ -65,3 +65,9 @@ export async function ttEntwurf(zugang, bildUrl, titel, text) {
   });
   return d.publish_id || '';
 }
+
+// Video als Entwurf in die TikTok-Inbox (MP4 vom Worker, Link-Anfang muss bestätigt sein)
+export async function ttVideoEntwurf(zugang, videoUrl) {
+  const d = await tt(zugang, '/post/publish/inbox/video/init/', { source_info: { source: 'PULL_FROM_URL', video_url: videoUrl } });
+  return d.publish_id || '';
+}

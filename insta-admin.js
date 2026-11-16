@@ -60,10 +60,11 @@
   // ─── Bilder im Browser zeichnen und hochladen ───
   // Jeder offene Post bekommt sein Bild; ändern sich Daten/Design/Hintergrund (veraltet), wird neu gezeichnet.
   // Rennen der nächsten 7 Tage ohne Hintergrund bekommen vorher ein KI-Bild (höchstens 2 pro Öffnen).
-  let GLEICHT = false;
+  let GLEICHT = false, NOCHMAL_ABGLEICHEN = false;
   const offenePosts = () => (STAND ? STAND.posts : []).filter(p => p.status !== 'gepostet' && p.status !== 'uebersprungen');
   async function abgleichen() {
-    if (GLEICHT || !STAND || !window.K888Bilder) return;
+    if (GLEICHT) { NOCHMAL_ABGLEICHEN = true; return; }   // läuft schon: danach mit dem neuen Stand nochmal
+    if (!STAND || !window.K888Bilder) return;
     GLEICHT = true;
     try {
       const ohneHg = [...new Map(offenePosts().filter(p => p.typ !== 'woche' && !p.hg && !p.kiFehler && p.postMs - Date.now() < 7 * 86400000).map(p => [p.rennKey, p])).values()];
@@ -74,7 +75,7 @@
         try { const r = await igApi('POST', `/api/post/${encodeURIComponent(p.id)}/bild`, { neu: false }); if (r.ok) neu = true; } catch (e) { /* nächstes Mal */ }
       }
       if (neu) { STAND = await igApi('GET', '/api/stand'); zeichnen(); }
-      const todo = offenePosts().filter(p => !p.bild || p.veraltet);
+      const todo = offenePosts().filter(brauchtBild);
       let n = 0;
       for (const p of todo) {
         malen(`🖌 Bilder werden gezeichnet … ${++n}/${todo.length}`);
@@ -98,17 +99,32 @@
         }
       }
     } catch (e) { meldung(e.message, 1); }
-    finally { GLEICHT = false; malen(''); zeichnen(); }
+    finally {
+      GLEICHT = false; malen(''); zeichnen();
+      if (NOCHMAL_ABGLEICHEN) { NOCHMAL_ABGLEICHEN = false; setTimeout(abgleichen, 0); }
+    }
   }
   async function bildHochladen(p) {
     const v = p.vorlage && p.vorlage !== 'kreids' && window.K888Vorlagen ? (STAND.vorlagen || []).find(x => x.id === p.vorlage) : null;
-    const blob = v ? await window.K888Vorlagen.bildFuer(JSON.parse(JSON.stringify(v)), p, STAND.design, VORLAGEN_UMG) : await window.K888Bilder.post(p, STAND.design);
-    const r = await fetch(INSTA + `/api/post/${encodeURIComponent(p.id)}/fertig?h=${encodeURIComponent(p.soll)}`, {
+    const vk = v ? JSON.parse(JSON.stringify(v)) : null;
+    const alsVideo = !!vk && window.K888Vorlagen.istVideo(vk, p, VORLAGEN_UMG);
+    const blob = vk ? await window.K888Vorlagen.bildFuer(vk, p, STAND.design, VORLAGEN_UMG) : await window.K888Bilder.post(p, STAND.design);
+    const r = await fetch(INSTA + `/api/post/${encodeURIComponent(p.id)}/fertig?h=${encodeURIComponent(p.soll)}&video=${alsVideo ? 1 : 0}`, {
       method: 'POST', headers: { Authorization: 'Bearer ' + token(), 'Content-Type': 'image/jpeg' }, body: blob
     });
     const d = await r.json().catch(() => ({}));
     if (!r.ok) throw new Error(d.error || ('Fehler ' + r.status));
-    p.bild = d.bild; p.veraltet = false;
+    p.bild = d.bild; p.veraltet = false; p.istVideo = alsVideo;
+    if (alsVideo) {
+      const name = p.track || p.titel || 'Post';
+      const mp4 = await window.K888Vorlagen.videoFuer(vk, p, STAND.design, VORLAGEN_UMG, x => malen(`🎬 Video für ${name} … ${Math.round(x * 100)} %`));
+      malen(`🎬 Video für ${name} wird hochgeladen …`);
+      const ver = Date.now(), teil = 1900000, teile = Math.ceil(mp4.size / teil);
+      for (let i = 0; i < teile; i++) await bildSenden(`/api/post/${encodeURIComponent(p.id)}/videoteil/${i}?v=${ver}`, mp4.slice(i * teil, (i + 1) * teil, 'application/octet-stream'));
+      const f = await igApi('POST', `/api/post/${encodeURIComponent(p.id)}/videofertig?v=${ver}`, { teile, groesse: mp4.size, hash: p.soll });
+      p.video = f.video; p.videoHash = p.soll;
+      if (mp4.ohneTon) meldung('Hinweis: Dieser Browser kann keinen AAC-Ton bauen – das Video ist ohne Ton.', 1);
+    }
     return d;
   }
   // Fingerabdruck eines Thumbnails (ändert sich etwas → neu zeichnen und hochladen)
@@ -118,9 +134,10 @@
     return (h >>> 0).toString(36);
   }
   // Vor dem Posten/Freigeben: aktuelles Bild sicherstellen
+  const brauchtBild = p => !p.bild || p.veraltet || (p.istVideo && !p.video);
   async function bildSicher(id) {
     const p = (STAND.posts || []).find(x => x.id === id);
-    if (p && (!p.bild || p.veraltet)) await bildHochladen(p);
+    if (p && brauchtBild(p)) await bildHochladen(p);
   }
   function malen(t) { MALT = t; const el = BOX && BOX.querySelector('.ki-malt'); if (el) { el.textContent = t; el.hidden = !t; } }
   // Bild als JPEG/PNG roh an den Worker (eigenes Bild, Gemini, ChatGPT)
@@ -167,6 +184,7 @@
     if (e.gepostet && e.gepostet.mediaId) k.push(`<button class="btn btn-ghost ki-k" data-aktion="pruefen" data-id="${id}"><span>🔍 Auf Instagram prüfen</span></button>`);
     if (e.gepostet) k.push(`<button class="btn btn-ghost ki-k" data-aktion="zurueck" data-id="${id}" data-api="${e.gepostet.manuell ? '0' : '1'}"><span>↩ Rückgängig</span></button>`);
     if (e.bild) k.push(`<a class="btn btn-ghost ki-k" href="${esc(e.bild)}?laden=1" download><span>📥 Bild laden</span></a>`);
+    if (e.video) k.push(`<a class="btn btn-ghost ki-k" href="${esc(e.video)}" target="_blank" rel="noopener"><span>🎬 Video</span></a>`);
     const tk = STAND.tiktok || {};
     if (tk.verbunden && e.imPlan && e.bild && !(e.tiktok && e.tiktok.zeit)) k.push(`<button class="btn btn-ghost ki-k" data-aktion="tiktok" data-id="${id}"><span>♪ An TikTok</span></button>`);
     const ttText = !tk.verbunden || !e.tiktok ? '' : e.tiktok.zeit ? `<div class="ki-dim">♪ TikTok: Entwurf gesendet ${esc(zeit(e.tiktok.zeit))}</div>` : e.tiktok.fehler ? `<div class="ki-hinweis rot">♪ TikTok: ${esc(e.tiktok.fehler)}</div>` : '';
@@ -185,7 +203,9 @@
 
   function postKarte(p, modus, mitThumb) {
     const [stText, stFarbe] = STATUS[p.status] || ['?', 'grau'];
-    const bild = p.bild
+    const bild = p.video
+      ? `<div class="ki-bild ${p.typ} ki-vid"><video src="${esc(p.video)}" poster="${esc(p.bild)}" muted loop playsinline controls preload="none"></video><span class="ki-vidchip">🎬 Video</span></div>`
+      : p.bild
       ? `<a href="${esc(p.bild)}" target="_blank" rel="noopener" class="ki-bild ${p.typ}" title="Vorschau groß öffnen"><img src="${esc(p.bild)}" alt="Vorschau" loading="lazy"></a>`
       : `<div class="ki-bild ${p.typ} leer">${GLEICHT ? '🖌 wird gezeichnet …' : 'Noch kein Bild'}</div>`;
     const id = esc(p.id), k = [];
@@ -204,6 +224,7 @@
     if (p.status !== 'uebersprungen') k.push(kn('jetzt', '🚀 Jetzt posten'));
     if (!woche) k.push(`<label class="btn btn-ghost ki-k ki-datei" title="Eigenes Hintergrundbild (z. B. iRacing-Screenshot) für alle Posts dieses Rennens"><span>📤 Eigenes Bild</span><input type="file" accept="image/*" data-eigenesbild="${id}"></label>`);
     if (p.bild) k.push(`<a class="btn btn-ghost ki-k" href="${esc(p.bild)}?laden=1" download><span>📥 Bild laden</span></a>`);
+    if (p.video) k.push(`<a class="btn btn-ghost ki-k" href="${esc(p.video)}" download target="_blank" rel="noopener"><span>📥 Video laden</span></a>`);
     if (p.bild) k.push(kn('manuell', '✓ Hab ich selbst gepostet', 'data-an="1"', 'Nur klicken, wenn du das Bild schon selbst in der Insta-App gepostet hast – hier wird nichts gepostet'));
     if (p.eigenesErgebnis) k.push(`<button class="btn btn-ghost ki-k" data-aktion="erg-weg" data-rk="${esc(p.rennKey)}"><span>✕ Ergebnis löschen</span></button>`);
     const tk = STAND.tiktok || {}, ttTypen = ((STAND.cfg.tiktok || {}).typen) || [];
@@ -211,6 +232,12 @@
     const yt = STAND.youtube || {};
     if (mitThumb && p.yt && yt.verbunden && p.startMs > Date.now()) k.push(`<button class="btn btn-ghost ki-k" data-aktion="yt-planen" data-rk="${esc(p.rennKey)}"><span>▶ ${p.yt.id ? 'YouTube aktualisieren' : 'Jetzt auf YouTube planen'}</span></button>`);
     const h = [];
+    if (p.status !== 'gepostet' && (STAND.videos || []).length && p.typ !== 'woche') {
+      const rv = (p.thumb && p.thumb.video) || '';
+      h.push(`<div class="ki-vwahl">🎬 Video für dieses Rennen: <select data-rvideo="${esc(p.rennKey)}" data-start="${esc(p.startMs)}"><option value="">– keins –</option>${STAND.videos.map(x => `<option value="${esc(x.id)}" ${rv === x.id ? 'selected' : ''}>${esc(x.name)}</option>`).join('')}</select></div>`);
+      if (rv && p.vorlage === 'kreids') h.push('<div class="ki-hinweis">Das Video braucht eine eigene Vorlage – oben bei „🧩 Vorlage“ eine wählen (z. B. „Video Raceday“).</div>');
+    }
+    if (p.istVideo && !p.video && p.status !== 'gepostet') h.push('<div class="ki-dim">🎬 Video wird beim Öffnen gezeichnet …</div>');
     if (p.status !== 'gepostet') {
       const fmt = p.typ === 'story' || p.typ === 'woche' ? 'story' : 'feed';
       const passend = (STAND.vorlagen || []).filter(v => v.format === fmt);
@@ -560,6 +587,22 @@
       return d;
     }
   };
+  VORLAGEN_UMG.videoHoch = async (datei, ton, fortschritt) => {
+    if (datei.size > 60e6) throw new Error('Video zu groß (höchstens 60 MB) – bitte kürzer schneiden.');
+    const url = URL.createObjectURL(datei);
+    const dauer = await new Promise(ok => { const v = document.createElement('video'); v.preload = 'metadata'; v.onloadedmetadata = () => ok(v.duration || 0); v.onerror = () => ok(0); v.src = url; });
+    URL.revokeObjectURL(url);
+    if (!dauer) throw new Error('Dieses Video kann der Browser nicht abspielen – bitte als MP4 (H.264) speichern.');
+    const name = String(datei.name || 'Video').replace(/\.[a-z0-9]+$/i, '').slice(0, 60);
+    const d = await igApi('POST', '/api/video/neu', { name, typ: datei.type || 'video/mp4', groesse: datei.size, ton, dauer });
+    for (let i = 0; i < d.teile; i++) {
+      await bildSenden(`/api/video/${d.id}/teil/${i}`, datei.slice(i * d.teil, (i + 1) * d.teil, 'application/octet-stream'));
+      if (fortschritt) fortschritt((i + 1) / d.teile);
+    }
+    const f = await igApi('POST', `/api/video/${d.id}/fertig`, {});
+    (STAND.videos = STAND.videos || []).unshift({ id: d.id, name, ton, dauer, url: f.url, zeit: Date.now() });
+    return d;
+  };
   // Eigene Bilder: WebP (bleibt durchsichtig), höchstens 1600 px
   async function zuWebp(datei) {
     const url = URL.createObjectURL(datei);
@@ -832,6 +875,11 @@
 
   async function aenderung(ev) {
     const t = ev.target;
+    if (t.dataset.rvideo !== undefined) {
+      try { await igApi('POST', `/api/thumb/${encodeURIComponent(t.dataset.rvideo)}`, { video: t.value, startMs: Number(t.dataset.start) || Date.now() }); meldung(t.value ? 'Video gesetzt – die Posts dieses Rennens werden als Video gezeichnet.' : 'Video entfernt.'); await laden(); }
+      catch (e) { meldung(e.message, 1); }
+      return;
+    }
     if (t.dataset.vorlage) {
       try { await igApi('POST', `/api/post/${encodeURIComponent(t.dataset.vorlage)}/vorlage`, { id: t.value }); await laden(); }
       catch (e) { meldung(e.message, 1); }
@@ -855,6 +903,8 @@
 #instaApp .ki-oben{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:14px;margin-bottom:8px}
 #instaApp .ki-oben>div:first-child{display:flex;flex-direction:column;gap:3px}
 #instaApp .ki-konto{font-weight:600}
+#instaApp .ki-vid{position:relative}#instaApp .ki-vid video{width:100%;height:100%;object-fit:contain;display:block;background:#000}
+#instaApp .ki-vidchip{position:absolute;top:6px;left:6px;background:rgba(0,0,0,.7);color:#fff;font-size:12px;padding:2px 6px}
 #instaApp .ki-vwahl{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:6px 0;font-size:14px}
 #instaApp .ki-vwahl select{width:auto;min-width:180px;padding:6px 8px}
 #instaApp .ki-vwahl .ki-k{padding:6px 10px}

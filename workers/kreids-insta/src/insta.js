@@ -45,18 +45,21 @@ export async function konto(token, uidVorgabe) {
   return { user_id: d.id, username: d.username };
 }
 
-export async function posten({ token, uid, bildUrl, typ, text, tags, kiHinweis }) {
+// videoUrl: Video-Post (Story → STORIES, Feed → REELS); dann dauert die Verarbeitung länger
+export async function posten({ token, uid, bildUrl, videoUrl, typ, text, tags, kiHinweis }) {
   const H = host(token);
-  const p = new URLSearchParams({ image_url: bildUrl, access_token: token });
+  const p = new URLSearchParams({ access_token: token });
+  if (videoUrl) p.set('video_url', videoUrl); else p.set('image_url', bildUrl);
   if (typ === 'story') {
     p.set('media_type', 'STORIES');
     if (tags && tags.length) p.set('user_tags', JSON.stringify(tags.map(u => ({ username: u, x: 0.5, y: 0.82 }))));
   } else {
     p.set('caption', text || '');
+    if (videoUrl) { p.set('media_type', 'REELS'); p.set('share_to_feed', 'true'); }
   }
   if (kiHinweis) p.set('is_ai_generated', 'true');
   const c = await ig(`${H}/${uid}/media`, { method: 'POST', body: p });
-  for (let i = 0; i < 12; i++) {
+  for (let i = 0; i < (videoUrl ? 70 : 12); i++) {
     const s = await ig(`${H}/${c.id}?fields=status_code&${q(token)}`);
     if (s.status_code === 'FINISHED') break;
     if (s.status_code === 'ERROR' || s.status_code === 'EXPIRED') throw new Error(`Instagram konnte das Bild nicht verarbeiten (${s.status_code}).`);

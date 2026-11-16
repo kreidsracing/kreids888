@@ -15,7 +15,7 @@ import { kiBild, sprueche, STIMMUNGEN, KAMERAS, autos } from './ki.js';
 import { konto, posten, pruefen, tokenVerlaengern, verlaengerbar } from './insta.js';
 import { istUhrzeit } from './zeit.js';
 import { ytEingerichtet, ytAnmeldeLink, ytCodeTauschen, ytZugang, ytKanal, ytStreams, ytPlanen, ytThumbnail, ytTexte } from './youtube.js';
-import { ttEingerichtet, ttAnmeldeLink, ttCodeTauschen, ttZugang, ttKonto, ttEntwurf } from './tiktok.js';
+import { ttEingerichtet, ttAnmeldeLink, ttCodeTauschen, ttZugang, ttKonto, ttEntwurf, ttVideoEntwurf } from './tiktok.js';
 
 // ─── Speicher (Durable Object, SQLite) ──────────────────────
 export class Speicher extends DurableObject {
@@ -69,6 +69,34 @@ function layoutPruefen(l) {
     if (q.spruch) o[f].spruch = { x: zahl(q.spruch.x, -100, 1000), y: zahl(q.spruch.y, -100, H), g: zahl(q.spruch.g, 30, 220) };
   }
   return o;
+}
+// Videos liegen in Stücken (Durable-Object-Werte höchstens 2 MB)
+const TEIL = 1900000, VIDEO_MAX = 60e6, VIDEO_FEHLT = 'Video fehlt noch: im Dashboard den Reiter „Instagram“ einmal öffnen, dann wird es gezeichnet.';
+async function strom(req, s, prefix, teile, groesse, typ) {
+  let start = 0, ende = groesse - 1, status = 200;
+  const r = (req.headers.get('Range') || '').match(/bytes=(\d*)-(\d*)/);
+  if (r && (r[1] || r[2])) {
+    if (r[1] === '') start = Math.max(0, groesse - Number(r[2])); else { start = Number(r[1]); if (r[2]) ende = Math.min(groesse - 1, Number(r[2])); }
+    status = 206;
+  }
+  if (start > ende || start >= groesse) return new Response('', { status: 416, headers: { 'Content-Range': `bytes */${groesse}`, ...CORS } });
+  const erster = Math.floor(start / TEIL), letzter = Math.min(teile - 1, Math.floor(ende / TEIL));
+  // FixedLengthStream: Cloudflare schickt dann eine echte Content-Length (Instagram/TikTok wollen die)
+  const { readable, writable } = typeof FixedLengthStream === 'function' ? new FixedLengthStream(ende - start + 1) : new TransformStream();
+  (async () => {
+    const w = writable.getWriter();
+    try {
+      for (let i = erster; i <= letzter; i++) {
+        const u8 = await s.lies(prefix + i);
+        if (!u8) throw new Error('Stück fehlt');
+        await w.write(u8.subarray(i === erster ? start - i * TEIL : 0, i === letzter ? ende - i * TEIL + 1 : u8.length));
+      }
+      await w.close();
+    } catch (e) { try { await w.abort(e); } catch (x) { /* egal */ } }
+  })();
+  const h = { 'Content-Type': typ, 'Content-Length': String(ende - start + 1), 'Accept-Ranges': 'bytes', 'Cache-Control': 'public, max-age=86400', ...CORS };
+  if (status === 206) h['Content-Range'] = `bytes ${start}-${ende}/${groesse}`;
+  return new Response(readable, { status, headers: h });
 }
 const KI_PRO_TAG = 10;   // FLUX.2 klein ≈ 400 Neuronen pro Bild → bleibt sicher im Gratiskontingent (10.000/Tag)
 const BILD_FEHLT = 'Bild fehlt noch: im Dashboard den Reiter „Instagram“ einmal öffnen, dann wird es gezeichnet.';
@@ -233,6 +261,8 @@ async function veroeffentlichen(env, s, post, design, cfg) {
   // Sperre gegen doppeltes Posten (Zeitplan und „Jetzt posten“ gleichzeitig)
   if (zust.gepostet || (zust.laeuft && Date.now() - zust.laeuft < 5 * 60000)) return zust;
   if (!zust.version) { zust.fehler = BILD_FEHLT; await s.schreib('post:' + post.id, zust); return zust; }
+  const videoOk = zust.video && zust.video.hash === zust.hash;
+  if (zust.istVideo && !videoOk) { zust.fehler = VIDEO_FEHLT; await s.schreib('post:' + post.id, zust); return zust; }
   zust.laeuft = Date.now();
   await s.schreib('post:' + post.id, zust);
   const token = await aktuellerToken(env, s);
@@ -243,6 +273,7 @@ async function veroeffentlichen(env, s, post, design, cfg) {
     const mediaId = await posten({
       token, uid: k.user_id,
       bildUrl: `${env.ORIGIN}/bild/${post.id}/${zust.version}.jpg`,
+      videoUrl: zust.istVideo ? `${env.ORIGIN}/pvideo/${post.id}/${zust.video.v}.mp4` : '',
       typ: post.typ === 'story' || post.typ === 'woche' ? 'story' : 'ank', text: post.typ === 'woche' ? '' : bildtext(post, cfg, design),
       tags: [], kiHinweis: cfg.kiHinweis && !!zust.ki
     });
@@ -310,11 +341,13 @@ async function ytAbgleich(env, s, plan, cfg, jetzt) {
 async function ttSenden(env, s, post, cfg, design) {
   const z = (await s.lies('post:' + post.id)) || {};
   if (!z.version) throw new Error('Bild fehlt noch – den Instagram-Reiter einmal öffnen.');
+  if (z.istVideo && !(z.video && z.video.hash === z.hash)) throw new Error('Video fehlt noch – den Instagram-Reiter einmal öffnen.');
   const zugang = await ttZugang(env, s);
   const titel = post.typ === 'woche' ? 'Stream Week' : [post.track || post.titel, post.serie].filter(Boolean).join(' · ');
   const text = post.typ === 'woche' || post.typ === 'story' ? '#simracing #iracing #kreids888' : bildtext(post, cfg, design);
   try {
-    const id = await ttEntwurf(zugang, `${env.ORIGIN}/bild/${post.id}/${z.version}.jpg`, titel, text);
+    const id = z.istVideo ? await ttVideoEntwurf(zugang, `${env.ORIGIN}/pvideo/${post.id}/${z.video.v}.mp4`)
+      : await ttEntwurf(zugang, `${env.ORIGIN}/bild/${post.id}/${z.version}.jpg`, titel, text);
     z.tiktok = { zeit: Date.now(), publishId: id };
   } catch (e) {
     z.tiktok = { ...(z.tiktok || {}), fehler: String((e && e.message) || e).slice(0, 300), versuche: ((z.tiktok && z.tiktok.versuche) || 0) + 1, zuletzt: Date.now() };
@@ -390,7 +423,10 @@ async function zyklus(env) {
   // 4. Aufräumen: Einträge älter als 14 Tage, alte KI-Tageszähler, Reste der alten Version (th:, thb:, nz:, nb:)
   const weg = [];
   const alt = ms => !ms || ms < jetzt - 14 * 86400000;
-  for (const [k, z] of Object.entries(st)) if (z && z.postMs && alt(z.postMs)) weg.push(k, 'img:' + k.slice(5));
+  for (const [k, z] of Object.entries(st)) if (z && z.postMs && alt(z.postMs)) {
+    weg.push(k, 'img:' + k.slice(5));
+    if (z.video) for (let i = 0; i < (z.video.teile || 0); i++) weg.push(`pvteil:${k.slice(5)}:${z.video.v}:${i}`);
+  }
   for (const [k, m] of Object.entries(await s.liste('bgm:'))) if (alt(m && m.startMs)) { const rk = k.slice(4); weg.push(k, 'bgr:' + rk, 'bgv:' + rk); }
   for (const [k, r] of Object.entries(await s.liste('renn:'))) if (alt(r && r.startMs)) weg.push(k, 'merg:' + k.slice(5));
   for (const [k, t] of Object.entries(await s.liste('thr:'))) if (alt(t && t.startMs)) weg.push(k);
@@ -409,7 +445,8 @@ async function zyklus(env) {
 const CORS = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-  'Access-Control-Allow-Headers': 'Authorization, Content-Type',
+  'Access-Control-Allow-Headers': 'Authorization, Content-Type, Range',
+  'Access-Control-Expose-Headers': 'Content-Length, Content-Range, Accept-Ranges',
   'Access-Control-Max-Age': '86400'
 };
 const antwort = (d, status = 200) => new Response(JSON.stringify(d), { status, headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store', ...CORS } });
@@ -493,7 +530,7 @@ async function stand(env, s) {
     const rk = rennKey(p.id), alt = kbus['kbu:' + rk];
     if (p.kalenderBild && (!alt || alt.url !== p.kalenderBild)) { const neu = { url: p.kalenderBild, startMs: p.startMs }; await s.schreib('kbu:' + rk, neu); kbus['kbu:' + rk] = neu; }
   }
-  const [vorlagenRoh, ablageRoh] = await Promise.all([s.liste('vorlage:'), s.liste('ablageinfo:')]);
+  const [vorlagenRoh, ablageRoh, videosRoh] = await Promise.all([s.liste('vorlage:'), s.liste('ablageinfo:'), s.liste('video:')]);
   const vorlagen = Object.values(vorlagenRoh).filter(v => v && v.id).sort((a, b) => (a.erstellt || 0) - (b.erstellt || 0));
   const vVersion = Object.fromEntries(vorlagen.map(v => [v.id, v.v || 0]));
   await vorlagenZuteilen(s, plan, st, vorlagen, cfg);
@@ -504,13 +541,15 @@ async function stand(env, s) {
     const m = bgms['bgm:' + rk] || {};
     const spruch = (thrs['thr:' + rk] || {}).spruch || '';
     const vid = z.vorlage && (z.vorlage === 'kreids' || vVersion[z.vorlage] !== undefined) ? z.vorlage : 'kreids';
-    const soll = kurzHash(inhaltSchluessel({ ...p, spruch }, design, cfg, bgv) + '|' + vid + ':' + (vVersion[vid] || 0));
+    const rennVideo = (thrs['thr:' + rk] || {}).video || '';
+    const soll = kurzHash(inhaltSchluessel({ ...p, spruch }, design, cfg, bgv) + '|' + vid + ':' + (vVersion[vid] || 0) + '|' + rennVideo);
     return {
       id: p.id, typ: p.typ, art: p.art, spr: p.spr, titel: p.titel, serie: p.serie, nr: p.nr, track: p.track, layout: p.layout, datum: p.datum,
       postMs: p.postMs, startMs: p.startMs, qualiMs: p.qualiMs || p.startMs, rennMs: p.rennMs || p.startMs, liveMs: p.liveMs, tage: p.tage || 0,
       klassen: p.klassen, reverseGrid: p.reverseGrid, spruch, liste: p.liste || null, bisDatum: p.bisDatum || '', pose: p.pose || '',
       ergebnis: p.ergebnis || null, platz: p.ergebnis ? platzText(p.ergebnis) : '', eigenesErgebnis: !!p.eigenesErgebnis,
-      vorlage: vid, vorlageFest: !!z.vorlageFest,
+      vorlage: vid, vorlageFest: !!z.vorlageFest, istVideo: !!z.istVideo,
+      video: z.istVideo && z.video && z.video.hash === z.hash ? `${env.ORIGIN}/pvideo/${p.id}/${z.video.v}.mp4` : '', videoHash: z.video ? z.video.hash : '',
       status: status(z, cfg, p, jetzt), freigegeben: !!z.freigegeben, fehler: z.fehler || '', kiFehler: bgv ? '' : (m.kiFehler || ''),
       gepostet: z.gepostet || null,
       bild: z.version ? `${env.ORIGIN}/bild/${p.id}/${z.version}.jpg` : '',
@@ -539,11 +578,13 @@ async function stand(env, s) {
       wann, imPlan: imPlan.has(id), fehler: z.fehler || '',
       gepostet: z.gepostet ? { zeit: z.gepostet.zeit || 0, manuell: !!z.gepostet.manuell, mediaId: z.gepostet.mediaId || '' } : null,
       tiktok: z.tiktok ? { zeit: z.tiktok.zeit || 0, fehler: z.tiktok.zeit ? '' : (z.tiktok.fehler || '') } : null,
-      bild: z.version ? `${env.ORIGIN}/bild/${id}/${z.version}.jpg` : ''
+      bild: z.version ? `${env.ORIGIN}/bild/${id}/${z.version}.jpg` : '',
+      video: z.istVideo && z.video ? `${env.ORIGIN}/pvideo/${id}/${z.video.v}.mp4` : ''
     };
   }).filter(Boolean).sort((a, b) => b.wann - a.wann);
   return {
     erledigt, vorlagen,
+    videos: Object.entries(videosRoh).filter(([, v]) => v && v.fertig).map(([k, v]) => ({ id: k.slice(6), name: v.name || '', ton: !!v.ton, dauer: v.dauer || 0, url: `${env.ORIGIN}/video/${k.slice(6)}`, zeit: v.zeit || 0 })).sort((a, b) => b.zeit - a.zeit),
     ablage: Object.entries(ablageRoh).map(([k, a]) => ({ id: k.slice(11), name: a.name || '', url: `${env.ORIGIN}/ablage/${k.slice(11)}`, zeit: a.zeit || 0 })).sort((a, b) => b.zeit - a.zeit),
     cfg, design: { ...design, logoBild: design.logoUrl ? `${env.ORIGIN}/logo.png?v=${kurzHash(design.logoUrl)}` : '' },
     posts, offen: daten.offen || [], thumbVorlage: vorlage || null,
@@ -660,6 +701,60 @@ async function api(req, env, url) {
   const aw = pfad.match(/^\/api\/ablage\/([a-z0-9]{1,40})\/weg$/);
   if (aw && req.method === 'POST') { await s.loesch(['ablage:' + aw[1], 'ablageinfo:' + aw[1]]); return antwort({ ok: true }); }
 
+  // ─── Videos: Ablage (Hintergrund-Videos) ───
+  if (pfad === '/api/video/neu' && req.method === 'POST') {
+    const b = await json(), groesse = Number(b.groesse) || 0;
+    if (groesse < 1000 || groesse > VIDEO_MAX) return fehler('Video zu groß (höchstens 60 MB) – bitte kürzer schneiden.');
+    const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+    await s.schreib('video:' + id, { name: String(b.name || 'Video').replace(/[<>]/g, '').slice(0, 60), typ: /^video\/[a-z0-9.+-]{2,30}$/.test(String(b.typ || '')) ? b.typ : 'video/mp4',
+      groesse, teile: Math.ceil(groesse / TEIL), ton: b.ton !== false, dauer: Math.max(0, Math.min(3600, Number(b.dauer) || 0)), fertig: false, zeit: Date.now() });
+    return antwort({ ok: true, id, teil: TEIL, teile: Math.ceil(groesse / TEIL) });
+  }
+  const vt = pfad.match(/^\/api\/video\/([a-z0-9]{1,40})\/(teil|fertig|weg|ton)(?:\/(\d{1,3}))?$/);
+  if (vt && req.method === 'POST') {
+    const [, vid, was, nr] = vt, info = await s.lies('video:' + vid);
+    if (!info) return fehler('Video nicht gefunden.', 404);
+    if (was === 'teil') {
+      const n = Number(nr), u8 = new Uint8Array(await req.arrayBuffer());
+      if (!(n >= 0 && n < info.teile) || !u8.length || u8.length > TEIL) return fehler('Stück ungültig.');
+      await s.schreib(`vteil:${vid}:${n}`, u8);
+      return antwort({ ok: true });
+    }
+    if (was === 'fertig') {
+      const da = Object.keys(await s.liste(`vteil:${vid}:`)).length;
+      if (da !== info.teile) return fehler(`Hochladen unvollständig (${da} von ${info.teile}).`);
+      await s.schreib('video:' + vid, { ...info, fertig: true });
+      return antwort({ ok: true, url: `${env.ORIGIN}/video/${vid}` });
+    }
+    if (was === 'ton') { const b = await json(); await s.schreib('video:' + vid, { ...info, ton: b.ton !== false }); return antwort({ ok: true }); }
+    const weg = ['video:' + vid]; for (let i = 0; i < info.teile; i++) weg.push(`vteil:${vid}:${i}`);
+    await s.loesch(weg);
+    return antwort({ ok: true });
+  }
+  // ─── Fertiges Post-Video (im Dashboard gezeichnet, MP4) ───
+  const pv = pfad.match(/^\/api\/post\/([A-Za-z0-9_-]{1,200})\/(videoteil|videofertig)(?:\/(\d{1,3}))?$/);
+  if (pv && req.method === 'POST') {
+    const [, id, was, nr] = pv, v = Number(url.searchParams.get('v')) || 0;
+    if (!v) return fehler('Version fehlt.');
+    if (was === 'videoteil') {
+      const u8 = new Uint8Array(await req.arrayBuffer());
+      if (!u8.length || u8.length > TEIL || !(Number(nr) >= 0 && Number(nr) < 40)) return fehler('Stück ungültig.');
+      await s.schreib(`pvteil:${id}:${v}:${Number(nr)}`, u8);
+      return antwort({ ok: true });
+    }
+    const b = await json(), teile = Number(b.teile) || 0, groesse = Number(b.groesse) || 0;
+    const z = (await s.lies('post:' + id)) || {};
+    if (z.gepostet) return fehler('Dieser Post ist schon gepostet.');
+    const da = Object.keys(await s.liste(`pvteil:${id}:${v}:`)).length;
+    if (!teile || da !== teile) return fehler(`Video unvollständig (${da} von ${teile}).`);
+    const alt = z.video;
+    z.video = { v, teile, groesse, hash: String(b.hash || '').slice(0, 20), zeit: Date.now() };
+    if (z.fehler === VIDEO_FEHLT) z.fehler = '';
+    await s.schreib('post:' + id, z);
+    if (alt && alt.v !== v) { const weg = []; for (let i = 0; i < (alt.teile || 0); i++) weg.push(`pvteil:${id}:${alt.v}:${i}`); if (weg.length) await s.loesch(weg); }
+    return antwort({ ok: true, video: `${env.ORIGIN}/pvideo/${id}/${v}.mp4` });
+  }
+
   // Thumbnail-Datei fürs YouTube-Video (vom Dashboard gezeichnet, PNG oder JPG unter 2 MB)
   const ytt = pfad.match(/^\/api\/ytthumb\/([A-Za-z0-9_-]{1,200})$/);
   if (ytt && req.method === 'POST') {
@@ -686,6 +781,7 @@ async function api(req, env, url) {
     const neu = { ...alt, startMs: Number(body.startMs) || alt.startMs || Date.now() };
     if (typeof body.spruch === 'string') neu.spruch = body.spruch.replace(/[<>]/g, '').slice(0, 80);
     if (typeof body.pers === 'string') neu.pers = body.pers.replace(/[^A-Za-z0-9_.-]/g, '').slice(0, 80);
+    if (typeof body.video === 'string') neu.video = body.video.replace(/[^a-z0-9]/g, '').slice(0, 40);
     if (body.seed !== undefined) neu.seed = (Number(body.seed) >>> 0) || 0;
     if (body.vorlage === null) delete neu.vorlage;
     else if (body.vorlage !== undefined) {
@@ -779,6 +875,7 @@ async function api(req, env, url) {
       const [bgv, bgm] = await Promise.all([s.lies('bgv:' + rk), s.lies('bgm:' + rk)]);
       z.version = (z.version || 0) + 1;
       z.hash = String(url.searchParams.get('h') || '').slice(0, 20);
+      z.istVideo = url.searchParams.get('video') === '1';
       z.postMs = p.postMs;
       z.info = { typ: p.typ, titel: p.titel || '', serie: p.serie || '', nr: p.nr || 0, track: p.track || '', layout: p.layout || '', datum: p.datum || '', bisDatum: p.bisDatum || '' };
       z.erstellt = Date.now();
@@ -872,6 +969,19 @@ export default {
         const h = { 'Content-Type': 'image/jpeg', 'Cache-Control': 'public, max-age=86400', ...CORS };
         if (url.searchParams.has('laden')) h['Content-Disposition'] = `attachment; filename="kreids888-${b[1]}.jpg"`;
         return new Response(jpg, { headers: h });
+      }
+      // Videos: Hintergrund-Video aus der Ablage und fertiges Post-Video (mit Range, für Instagram/TikTok)
+      const qv = url.pathname.match(/^\/video\/([a-z0-9]{1,40})$/);
+      if (qv && (req.method === 'GET' || req.method === 'HEAD')) {
+        const s = speicher(env), info = await s.lies('video:' + qv[1]);
+        if (!info || !info.fertig) return new Response('Kein Video', { status: 404, headers: CORS });
+        return strom(req, s, `vteil:${qv[1]}:`, info.teile, info.groesse, info.typ || 'video/mp4');
+      }
+      const ov = url.pathname.match(/^\/pvideo\/([A-Za-z0-9_-]{1,200})\/(\d+)\.mp4$/);
+      if (ov && (req.method === 'GET' || req.method === 'HEAD')) {
+        const s = speicher(env), z = await s.lies('post:' + ov[1]);
+        if (!z || !z.video || String(z.video.v) !== ov[2]) return new Response('Kein Video', { status: 404, headers: CORS });
+        return strom(req, s, `pvteil:${ov[1]}:${ov[2]}:`, z.video.teile, z.video.groesse, 'video/mp4');
       }
       // Eigenes Bild aus der Ablage (für Vorlagen)
       const ab = url.pathname.match(/^\/ablage\/([a-z0-9]{1,40})$/);
