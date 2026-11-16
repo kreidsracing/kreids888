@@ -85,7 +85,8 @@
       // YouTube: Thumbnails der Rennen, die bald geplant werden, zeichnen und an den Worker geben
       const yt = STAND.youtube || {}, ytc = STAND.cfg.youtube || {};
       if (yt.verbunden && ytc.aktiv !== false && window.K888Thumb) {
-        const bald = rennenListe().filter(r => (r.typ === 'story' || r.typ === 'ank') && r.startMs > Date.now() && r.startMs - Date.now() < ((ytc.tage || 3) + 1) * 86400000);
+        // bald geplant (Tage vorher) oder schon auf YouTube angelegt (z. B. „nächstes Rennen“, auch wenn weiter weg)
+        const bald = rennenListe().filter(r => (r.typ === 'story' || r.typ === 'ank') && r.startMs > Date.now() && ((r.yt && r.yt.id) || r.startMs - Date.now() < ((ytc.tage || 3) + 1) * 86400000));
         let m = 0;
         for (const r of bald) {
           const h = thumbHash(r);
