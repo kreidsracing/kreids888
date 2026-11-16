@@ -682,6 +682,9 @@ async function api(req, env, url) {
     const alt = await s.lies('vorlage:' + id);
     const neu = { ...v, id, name: String(v.name || 'Vorlage').replace(/[<>]/g, '').slice(0, 40), fuer: (v.fuer || []).filter(f => ARTFORMAT[f] === v.format),
       serien: (v.serien || []).map(x => String(x).slice(0, 80)).slice(0, 30), v: Date.now(), erstellt: (alt && alt.erstellt) || Date.now() };
+    // Nur Name/Zuordnung/Serien/an-aus geändert → Aussehen gleich → Version bleibt (Bilder müssen nicht neu)
+    const inhalt = x => JSON.stringify([x.format, x.hg, x.elemente, x.dauer || 0]);
+    if (alt && alt.v && inhalt(alt) === inhalt(neu)) neu.v = alt.v;
     await s.schreib('vorlage:' + id, neu);
     return antwort({ ok: true, id, v: neu.v });
   }

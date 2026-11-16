@@ -822,19 +822,22 @@
     }
     return p;
   }
+  // Zuordnen: welche Vorlagen kommen bei welcher Art dran (erst bauen, dann hier anhaken)
   function wechselPanel() {
     const cfg = E.umg.stand().cfg.vorlagen || {};
     const zeile = ([typ, name]) => {
-      const c = cfg[typ] || {}, eigene = vorlagen().filter(v => v.format === formatVon(typ) && (v.fuer || []).includes(typ) && v.an !== false);
+      const c = cfg[typ] || {}, passend = vorlagen().filter(v => v.format === formatVon(typ)), eigene = passend.filter(v => (v.fuer || []).includes(typ) && v.an !== false);
       return `<div class="kv-wz">
-        <b>${name}</b>
-        <select data-w="modus" data-typ="${typ}">${[['reihe', 'Der Reihe nach'], ['zufall', 'Zufällig'], ['fest', 'Immer dieselbe']].map(([k, n]) => `<option value="${k}" ${(c.modus || 'reihe') === k ? 'selected' : ''}>${n}</option>`).join('')}</select>
-        ${(c.modus || 'reihe') === 'fest' ? `<select data-w="fest" data-typ="${typ}"><option value="kreids">Kreids-Design</option>${eigene.map(v => `<option value="${esc(v.id)}" ${c.fest === v.id ? 'selected' : ''}>${esc(v.name)}</option>`).join('')}</select>` : ''}
-        <label class="chk"><input type="checkbox" data-w="kreids" data-typ="${typ}" ${c.kreids !== false ? 'checked' : ''}> Kreids-Design mit dabei</label>
-        <span class="ki-dim">${eigene.length} eigene</span>
+        <div class="kv-wkopf"><b>${name}</b><span class="ki-dim">${formatVon(typ) === 'story' ? 'Story 9:16' : 'Feed 4:5'}</span>
+          <select data-w="modus" data-typ="${typ}">${[['reihe', 'Der Reihe nach'], ['zufall', 'Zufällig'], ['fest', 'Immer dieselbe']].map(([k, n]) => `<option value="${k}" ${(c.modus || 'reihe') === k ? 'selected' : ''}>${n}</option>`).join('')}</select>
+          ${(c.modus || 'reihe') === 'fest' ? `<select data-w="fest" data-typ="${typ}"><option value="kreids">Kreids-Design</option>${eigene.map(v => `<option value="${esc(v.id)}" ${c.fest === v.id ? 'selected' : ''}>${esc(v.name)}</option>`).join('')}</select>` : ''}</div>
+        <div class="kv-zuord">
+          <label class="chk"><input type="checkbox" data-w="kreids" data-typ="${typ}" ${c.kreids !== false ? 'checked' : ''}> Kreids-Design</label>
+          ${passend.map(v => `<label class="chk"><input type="checkbox" data-zuord="${esc(v.id)}" data-typ="${typ}" ${(v.fuer || []).includes(typ) ? 'checked' : ''}> ${esc(v.name)}</label>`).join('') || `<span class="ki-dim">Noch keine ${formatVon(typ) === 'story' ? 'Story' : 'Feed'}-Vorlage gebaut</span>`}
+        </div>
       </div>`;
     };
-    return `<div class="ki-panel"><h3>🔁 Wechsel pro Art</h3>${ARTEN.map(zeile).join('')}
+    return `<div class="ki-panel"><h3>🔁 Zuordnen & Wechsel</h3><div class="ki-dim">Erst Vorlagen bauen und speichern – dann hier pro Art anhaken, welche drankommen.</div>${ARTEN.map(zeile).join('')}
       <div class="ki-knoepfe"><button class="btn btn-ghost ki-k" data-v="verteilen"><span>🔀 Offene Posts neu verteilen</span></button></div>
       <div class="ki-dim">Neue Posts bekommen ihre Vorlage beim Öffnen. Auf jeder Post-Karte kannst du sie auch selbst wählen.</div></div>`;
   }
@@ -1108,6 +1111,7 @@
     const t = ev.target;
     const typ = t.dataset.typ;
     if (t.dataset.w && ev.type === 'change') return wechselAendern(t.dataset.w, typ, t.type === 'checkbox' ? t.checked : t.value);
+    if (t.dataset.zuord && ev.type === 'change') return zuordnen(t.dataset.zuord, typ, t.checked, t);
     if (!E.v) return;
     if (t.dataset.v === 'post' && ev.type === 'change') { E.postId = t.value; return neuZeichnen(); }
     if (t.dataset.v === 'abhoch' && ev.type === 'change') return hochladen(t);
@@ -1130,6 +1134,19 @@
     if (f === 'schrift') e.gewicht = gewichtVon(wert, e.gewicht || 900);
     if (t.type === 'range' && ['animStart', 'animDauer', 'tempo'].includes(f)) { const l = t.closest('.ki-fg').querySelector('label'); if (l) l.textContent = f === 'tempo' ? `Tempo ×${wert.toFixed(1)}` : f === 'animStart' ? `Start nach ${wert.toFixed(1)} Sek.` : `Dauer ${wert.toFixed(1)} Sek.`; }
     geaendert(ev.type === 'change' && ['verlauf', 'box', 'quelle', 'art', 'schrift', 'anim', 'effekt'].includes(f));
+  }
+  async function zuordnen(id, typ, an, box) {
+    const v = vorlagen().find(x => x.id === id); if (!v) return;
+    const s = new Set(v.fuer || []); an ? s.add(typ) : s.delete(typ);
+    const neu = { ...kopie(v), fuer: [...s] };
+    box.disabled = true;
+    try {
+      await E.umg.igApi('POST', '/api/vorlage', { vorlage: neu });
+      v.fuer = neu.fuer;
+      if (E.v && E.id === id) E.v.fuer = [...neu.fuer];
+      E.umg.meldung(an ? `„${v.name}“ kommt jetzt bei ${(ARTEN.find(a => a[0] === typ) || [])[1] || typ} dran.` : `„${v.name}“ ist dort raus.`);
+      aufbauen();
+    } catch (e) { box.checked = !an; box.disabled = false; E.umg.meldung(e.message, 1); }
   }
   async function wechselAendern(was, typ, wert) {
     const cfg = E.umg.stand().cfg, v = { ...(cfg.vorlagen || {}) };
@@ -1214,12 +1231,11 @@
       await E.umg.igApi('POST', '/api/vorlagen/verteilen', {}); E.umg.meldung('Neu verteilt – die Bilder werden neu gezeichnet.'); await E.umg.gespeichert();
     });
     if (v === 'speichern') return knopf(async () => {
-      if (!(E.v.fuer || []).length) E.umg.meldung('Hinweis: Bei „Gilt für“ ist nichts angehakt – die Vorlage kommt so noch nicht dran.', 1);
       const d = await E.umg.igApi('POST', '/api/vorlage', { vorlage: { ...kopie(E.v), id: E.id || undefined } });
       E.id = d.id; E.v.id = d.id; E.v.v = d.v; E.dirty = false;
       const l = vorlagen(), i = l.findIndex(x => x.id === d.id);
       if (i >= 0) l[i] = kopie(E.v); else l.push(kopie(E.v));
-      E.umg.meldung('Vorlage gespeichert.'); await E.umg.gespeichert();
+      E.umg.meldung((E.v.fuer || []).length ? 'Vorlage gespeichert.' : 'Vorlage gespeichert – oben bei „🔁 Zuordnen & Wechsel“ anhaken, wo sie drankommt.'); await E.umg.gespeichert();
     });
     if (v === 'kopie') { const n = kopie(E.v); n.name = (n.name || 'Vorlage') + ' (Kopie)'; delete n.id; n.elemente.forEach(e => { e.id = neueId(); }); E.v = n; E.id = ''; E.dirty = true; return aufbauen(); }
     if (v === 'verwerfen') { const x = vorlagen().find(y => y.id === E.id); E.v = x ? kopie(x) : null; if (!x) E.id = ''; E.dirty = false; E.sel = ''; return aufbauen(); }
@@ -1244,8 +1260,10 @@
 #instaApp .kv-karte.an{border-color:var(--red)}#instaApp .kv-karte.aus{opacity:.5}
 #instaApp .kv-karte canvas{width:108px;height:auto;background:#000}
 #instaApp .kv-karte small{color:var(--steel);font-size:11px}
-#instaApp .kv-wz{display:flex;flex-wrap:wrap;align-items:center;gap:10px;padding:8px 0;border-top:1px solid var(--line)}
-#instaApp .kv-wz b{min-width:150px}#instaApp .kv-wz select{width:auto}
+#instaApp .kv-wz{padding:10px 0;border-top:1px solid var(--line)}
+#instaApp .kv-wkopf{display:flex;flex-wrap:wrap;align-items:center;gap:10px}
+#instaApp .kv-wkopf b{min-width:150px}#instaApp .kv-wz select{width:auto}
+#instaApp .kv-zuord{display:flex;flex-wrap:wrap;gap:4px 16px;margin-top:6px}
 #instaApp .kv-plh{display:flex;flex-wrap:wrap;gap:4px;margin:6px 0 10px}
 #instaApp .kv-plh button{background:#0d0e13;border:1px solid var(--line);color:var(--steel);font-size:12px;padding:3px 6px;cursor:pointer}
 #instaApp .kv-plh button:hover{color:#fff;border-color:var(--red)}
