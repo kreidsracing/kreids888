@@ -110,20 +110,59 @@
   }
 
   // Kopf: Kreids-Logo groß und mittig. Gibt die Unterkante zurück, damit der Text darunter Platz hat.
-  // Kopf: Logo und (wenn gewählt) Team-Bild nebeneinander, mittig. Größen aus „Aussehen“ (KOPF wird in post() gesetzt).
-  let KOPF = null;
-  function kopf(B, y, logo, m) {
-    const k = KOPF || {}, teile = [];
-    if (k.logo) { const f = k.logoF || 1, s = Math.min(m.b * f / k.logo.w, m.h * f / k.logo.h); teile.push({ url: k.logo.url, w: k.logo.w * s, h: k.logo.h * s }); }
-    if (k.team) { const f = k.teamF || 1, s = Math.min(m.b * 0.6 * f / k.team.w, m.h * f / k.team.h); teile.push({ url: k.team.url, w: k.team.w * s, h: k.team.h * s }); }
-    if (!teile.length) return { svg: '', unten: y };
-    const luecke = 44, maxB = B - 120;
-    let gesamt = teile.reduce((a, t) => a + t.w, 0) + luecke * (teile.length - 1);
-    if (gesamt > maxB) { const s = (maxB - luecke * (teile.length - 1)) / (gesamt - luecke * (teile.length - 1)); teile.forEach(t => { t.w *= s; t.h *= s; }); gesamt = maxB; }
-    const hoehe = Math.max(...teile.map(t => t.h));
-    let x = (B - gesamt) / 2, svg = '';
-    for (const t of teile) { svg += `<image href="${t.url}" x="${x}" y="${y + (hoehe - t.h) / 2}" width="${t.w}" height="${t.h}" preserveAspectRatio="none" filter="url(#schatten)"/>`; x += t.w + luecke; }
-    return { svg, unten: y + Math.max(hoehe, m.h * 0.6) };
+  // Logo, Team-Bild und Spruch liegen frei verschiebbar OBEN auf dem Bild (Ebenen aus „🎨 Aussehen“).
+  // Die Vorlagen lassen oben trotzdem den gewohnten Platz frei (kopf liefert nur die Unterkante).
+  let KOPF = null, BOXEN = [];
+  function kopf(B, y, logo, m) { return { svg: '', unten: y + m.h }; }
+  // Standard-Plätze: Mittelpunkt (cx, cy) + Breite b für Logo/Team, linke obere Ecke (x, y) + Schriftgröße g für den Spruch
+  const LAYOUT_STD = {
+    feed: { logo: { cx: 540, cy: 150, b: 700 }, team: { cx: 930, cy: 150, b: 200 }, spruch: { x: 84, y: 330, g: 84 } },
+    story: { logo: { cx: 540, cy: 330, b: 760 }, team: { cx: 930, cy: 330, b: 230 }, spruch: { x: 76, y: 560, g: 96 } }
+  };
+  function layoutAus(design) {
+    const l = (design && design.layout) || {}, o = {};
+    for (const f of ['feed', 'story']) {
+      o[f] = {};
+      for (const e of ['logo', 'team', 'spruch']) o[f][e] = { ...LAYOUT_STD[f][e], ...((l[f] || {})[e] || {}) };
+    }
+    return o;
+  }
+  // Spruch (wie beim YouTube-Thumbnail): eigener Spruch des Rennens, sonst ein passender Standard
+  function ersatzSpruch(r) {
+    const e = r.ergebnis;
+    if (e && e.ziel) return e.start && e.start > e.ziel ? `VON P${e.start} AUF P${e.ziel}?!` : e.ziel === 1 ? 'SIEG!' : e.ziel <= 3 ? 'ENDLICH PODIUM!' : 'DAS WAR KNAPP!';
+    if (e) return 'DAS ENDE WAR WILD…';
+    return 'ALLES ODER NICHTS!';
+  }
+  function spruchSvg(text, e, f1, B) {
+    const max = Math.max(30, Math.min(220, e.g || 90));
+    const t = umbruch(gross(text), 'black', B - e.x - 70, max, Math.max(24, Math.round(max * 0.45)));
+    const G = t.g, lh = G * 0.92, cap = G * 0.74, pad = G * 0.2;
+    const w = Math.max(...t.zeilen.map(z => breite(z, 'black', G, 1))), h = cap + (t.zeilen.length - 1) * lh;
+    const sch = (h + 2 * pad) * 0.21, x0 = e.x - pad * 1.2, y0 = e.y - pad, x1 = e.x + w + pad * 1.2, y1 = e.y + h + pad;
+    let svg = `<g filter="url(#schatten)"><polygon points="${x0},${y1} ${x0 + sch},${y0} ${x1 + sch},${y0} ${x1},${y1}" fill="${f1}"/>`;
+    svg += `<g transform="translate(${e.x} ${y1}) skewX(-10) translate(${-e.x} ${-y1})">`;
+    t.zeilen.forEach((z, i) => { svg += `<text x="${e.x}" y="${e.y + cap + i * lh}" ${SCHRIFT.black} font-size="${G}" letter-spacing="1" fill="${textAuf(f1)}">${esc(z)}</text>`; });
+    return { svg: svg + '</g></g>', box: { x: x0, y: y0, w: x1 + sch - x0, h: y1 - y0 } };
+  }
+  function ebenen(p, design, B) {
+    const k = KOPF || {}, L = layoutAus(design)[p.typ === 'story' ? 'story' : 'feed'];
+    let svg = `<defs><filter id="schattenE" x="-20%" y="-30%" width="140%" height="180%"><feDropShadow dx="0" dy="4" stdDeviation="8" flood-color="#000" flood-opacity=".7"/></filter></defs>`;
+    BOXEN = [];
+    const bildEbene = (name, bild) => {
+      const e = L[name]; if (!bild || !e) return;
+      const w = Math.max(40, e.b), h = w * bild.h / bild.w, x = e.cx - w / 2, y = e.cy - h / 2;
+      svg += `<image href="${bild.url}" x="${x}" y="${y}" width="${w}" height="${h}" preserveAspectRatio="none" filter="url(#schattenE)"/>`;
+      BOXEN.push({ el: name, x, y, w, h });
+    };
+    if (design.logoAn !== false) bildEbene('logo', k.logo);
+    if (design.teamAn !== false) bildEbene('team', k.team);
+    if (design.spruchAn !== false) {
+      const sp = spruchSvg((p.spruch || '').trim() || ersatzSpruch(p), L.spruch, design.farbe1 || '#e11324', B);
+      svg += sp.svg.replace('url(#schatten)', 'url(#schattenE)');
+      BOXEN.push({ el: 'spruch', ...sp.box });
+    }
+    return svg;
   }
 
   // Abdunkeln oben (Logos) und unten (Text). Der untere Verlauf startet über dem Textblock,
@@ -376,10 +415,10 @@
     // Fuß: Linie, Logo (+ Team-Bild), „Live auf …“, Website – rechts das Ich-Bild
     s += `<rect x="0" y="1290" width="${B}" height="4" fill="${f1}"/>`;
     const k = KOPF || {}, teile = [];
-    if (k.logo) teile.push(k.logo);
-    if (k.team) teile.push(k.team);
+    if (k.logo && design.logoAn !== false) teile.push(k.logo);
+    if (k.team && design.teamAn !== false) teile.push(k.team);
     if (teile.length) {
-      const maxB = 520, maxH = 170 * Math.max(k.logoF || 1, 0.6), luecke = 30;
+      const maxB = 520, maxH = 170, luecke = 30;
       let gr = teile.map(t => { const f = Math.min(maxB / t.w, maxH / t.h); return { url: t.url, w: t.w * f, h: t.h * f }; });
       const ges = gr.reduce((a, t) => a + t.w, 0) + luecke * (gr.length - 1);
       if (ges > maxB) { const f = (maxB - luecke * (gr.length - 1)) / (ges - luecke * (gr.length - 1)); gr = gr.map(t => ({ ...t, w: t.w * f, h: t.h * f })); }
@@ -461,14 +500,18 @@
     }).catch(() => { TEAMBILD.delete(key); return null; }));
     return TEAMBILD.get(key);
   }
-  const prozent = (v, std) => { const n = Number(v); return (isFinite(n) && n > 0 ? n : std) / 100; };
   async function post(p, design) {
     const [css, bg, logo, team] = await Promise.all([schriften(), bildDaten(p.hg), bildDaten(design.logoBild), teamBild(design.team, design.teamSchwarz !== false)]);
-    KOPF = { logo: await masse(logo), team, logoF: prozent(design.logoGroesse, 100), teamF: prozent(design.teamGroesse, 100) };
+    KOPF = { logo: await masse(logo), team };
     const pose = p.typ === 'woche' && p.pose ? await bildDaten(SITE + 'overlays/personen/' + p.pose).then(masse) : null;
     let svg = svgFuer({ ...p, klassen: p.klassen || [] }, design, bg, logo, pose);
     svg = svg.replace(/^(<svg[^>]*>)/, `$1<style>${css}</style>`);
-    return rastern(svg, 1080, p.typ === 'story' || p.typ === 'woche' ? 1920 : 1350, 0.9);
+    if (p.typ !== 'woche') svg = svg.replace(/<\/svg>$/, ebenen(p, design, 1080) + '</svg>');
+    else BOXEN = [];
+    const boxen = BOXEN.slice();   // Lage der Ebenen (für die Vorschau zum Verschieben)
+    const blob = await rastern(svg, 1080, p.typ === 'story' || p.typ === 'woche' ? 1920 : 1350, 0.9);
+    blob.boxen = boxen;
+    return blob;
   }
-  window.K888Bilder = { post, bildDaten, schriften, berlin, SITE, TEAM, teamUrl };
+  window.K888Bilder = { post, bildDaten, schriften, berlin, SITE, TEAM, teamUrl, layoutAus, ersatzSpruch, boxen: () => BOXEN };
 })();

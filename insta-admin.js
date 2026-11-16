@@ -22,6 +22,7 @@
   const KAMERA = [['zufall', '🎲 Blick: Zufall'], ['nah', '🔭 Nah, Autos groß'], ['schwenk', '💨 Mitzieher (Bewegung)'], ['frontal', '⬆ Frontal auf der Geraden'],
     ['kurve', '↪ Duell in der Kurve'], ['seite', '➡ Von der Seite']];
   const auswahl = (liste, wert, attr) => `<select ${attr}>${liste.map(([v, t]) => `<option value="${v}" ${v === wert ? 'selected' : ''}>${t}</option>`).join('')}</select>`;
+  let SPRUCH_NEU = false;   // Spruch im Thumbnail geändert → Post-Bilder neu zeichnen
   let BOX = null, STAND = null, FEHLER = '', LAEDT = false, REITER = 'posts', THUMB_RK = '', MALT = '';
   let WARTET = null, UEBERNIMMT = false, LESEN_VERBOTEN = false, HILFE_OFFEN = false;
 
@@ -237,55 +238,107 @@
     </div>`;
   }
 
-  // 🎨 Aussehen: Logo + Team-Bild (Größe einstellbar), Farben, Texte – mit Live-Vorschau
-  let DTEAM = null;
+  // 🎨 Aussehen: Logo, Team-Bild, Spruch (an/aus, in der Vorschau verschieben + Mausrad = Größe), Farben, Texte
+  let DTEAM = null, DLAYOUT = null, DFORMAT = 'ank', DAENDERUNG = false;
+  const FORMATE = [['ank', 'Ankündigung'], ['story', 'Raceday-Story'], ['erg', 'Ergebnis']];
   function designPanel(d) {
     const team = (window.K888Bilder && window.K888Bilder.TEAM) || [];
     const tUrl = x => (window.K888Bilder ? window.K888Bilder.teamUrl(x) : '');
     if (DTEAM === null) DTEAM = d.team || '';
-    const regler = (id, name, wert) => `<div class="ki-fg"><label for="${id}">${name} <b class="ki-wert" data-zu="${id}">${esc(wert)} %</b></label><input id="${id}" type="range" min="30" max="200" step="5" value="${esc(wert)}"></div>`;
+    if (!DLAYOUT && window.K888Bilder) DLAYOUT = window.K888Bilder.layoutAus(d);
+    const formate = FORMATE.filter(([t]) => STAND.posts.some(p => p.typ === t));
+    if (formate.length && !formate.some(f => f[0] === DFORMAT)) DFORMAT = formate[0][0];
+    const chk = (id, an, text) => `<label class="chk"><input type="checkbox" id="${id}" ${an !== false ? 'checked' : ''}> ${text}</label>`;
     return `<div class="ki-panel ki-design"><h3>🎨 Aussehen</h3>
       <div class="ki-logo">${d.logoBild ? `<img src="${esc(d.logoBild)}" alt="Logo">` : '<span>kein Logo</span>'}</div>
+      ${chk('ki-logo-an', d.logoAn, 'Logo zeigen')}
       <div class="ki-fg"><label for="ki-logo">Logo-Link (PNG oder JPG)</label><input id="ki-logo" type="text" spellcheck="false" value="${esc(d.logoUrl || '')}" placeholder="https://…/logo.png"></div>
-      ${regler('ki-logo-g', 'Logo-Größe', d.logoGroesse || 100)}
-      <div class="ki-fg"><label>Team-Bild neben dem Logo</label><div class="ki-tgal">
+      ${chk('ki-team-an', d.teamAn, 'Team-Bild zeigen')}
+      <div class="ki-tgal">
         <button type="button" data-team="" class="${!DTEAM ? 'an' : ''}">Kein</button>
         ${team.map(([f, n]) => `<button type="button" data-team="${esc(f)}" class="${DTEAM === f ? 'an' : ''}" title="${esc(n)}"><img src="${esc(tUrl(f))}" alt="${esc(n)}" loading="lazy"></button>`).join('')}
-      </div></div>
-      ${regler('ki-team-g', 'Team-Bild-Größe', d.teamGroesse || 100)}
-      <label class="chk"><input type="checkbox" id="ki-team-s" ${d.teamSchwarz !== false ? 'checked' : ''}> Schwarzen Hintergrund des Team-Bilds ausblenden</label>
+      </div>
+      ${chk('ki-team-s', d.teamSchwarz, 'Schwarzen Hintergrund des Team-Bilds ausblenden')}
+      ${chk('ki-spruch-an', d.spruchAn, 'Spruch vom Thumbnail zeigen')}
+      <div class="ki-dim">Den Spruch stellst du pro Rennen unter „▶ Thumbnail“ ein – ohne eigenen Spruch steht ein passender Standard-Spruch da.</div>
       <div class="ki-reihe">
         <div class="ki-fg"><label for="ki-f1">Farbe 1</label><input id="ki-f1" type="color" value="${esc(d.farbe1)}"></div>
         <div class="ki-fg"><label for="ki-f2">Farbe 2</label><input id="ki-f2" type="color" value="${esc(d.farbe2)}"></div>
       </div>
       <div class="ki-fg"><label for="ki-livetext">„Live auf …“ (Story und Thumbnail)</label><input id="ki-livetext" type="text" value="${esc(d.liveText || '')}" placeholder="YouTube · @Kreids888"></div>
       <div class="ki-fg"><label for="ki-autos">Fahrzeuge fürs KI-Bild (optional)</label><input id="ki-autos" type="text" value="${esc(d.fahrzeuge || '')}" placeholder="leer = passend zur Serie, z. B. Porsche 911 GT3 Cup"></div>
-      <div class="ki-knoepfe"><button class="btn btn-red ki-k" data-aktion="design"><span>💾 Aussehen speichern</span></button></div>
+      <div class="ki-knoepfe"><button class="btn btn-red ki-k" data-aktion="design"><span>💾 Aussehen speichern</span></button><span class="kt-dirty ki-ddirty">${DAENDERUNG ? '● Änderungen noch nicht gespeichert' : ''}</span></div>
       <div class="ki-dim">Danach werden alle Bilder automatisch neu gezeichnet.</div>
     </div>
-    <div class="ki-panel"><h3>Vorschau</h3><img class="ki-dvor" alt="Vorschau"><div class="ki-dim">So sieht eine Ankündigung damit aus – erst „Speichern“ übernimmt es.</div></div>`;
+    <div class="ki-panel ki-design"><h3>Vorschau</h3>
+      <div class="ki-reiter side" style="margin:0">${formate.map(([t, n]) => `<a class="${DFORMAT === t ? 'active' : ''}" data-aktion="dformat" data-wert="${t}">${n}</a>`).join('')}</div>
+      <div class="ki-dvorbox"><img class="ki-dvor" alt="Vorschau"><div class="ki-ziele"></div></div>
+      <div class="ki-dim">Logo, Team-Bild und Spruch mit der Maus ziehen · Mausrad = Größe. Feed (Ankündigung + Ergebnis) und Story haben eigene Plätze.</div>
+      <div class="ki-knoepfe"><button class="btn btn-ghost ki-k" data-aktion="dreset"><span>↺ Plätze zurücksetzen</span></button></div>
+    </div>`;
   }
   function designAusFormular() {
     const v = x => document.getElementById(x);
     return {
       logoUrl: v('ki-logo').value.trim(), farbe1: v('ki-f1').value, farbe2: v('ki-f2').value, liveText: v('ki-livetext').value, fahrzeuge: v('ki-autos').value,
-      logoGroesse: +v('ki-logo-g').value, team: DTEAM || '', teamGroesse: +v('ki-team-g').value, teamSchwarz: v('ki-team-s').checked
+      logoAn: v('ki-logo-an').checked, teamAn: v('ki-team-an').checked, spruchAn: v('ki-spruch-an').checked,
+      team: DTEAM || '', teamSchwarz: v('ki-team-s').checked, layout: DLAYOUT
     };
   }
-  let DV_TIMER = 0, DV_URL = '';
-  function designVorschau() {
+  function designGeaendert() {
+    DAENDERUNG = true;
+    const d = BOX && BOX.querySelector('.ki-ddirty'); if (d) d.textContent = '● Änderungen noch nicht gespeichert';
+    designVorschau();
+  }
+  let DV_TIMER = 0, DV_URL = '', DV_NR = 0;
+  function designVorschau(sofort) {
     clearTimeout(DV_TIMER);
     DV_TIMER = setTimeout(async () => {
       const img = BOX && BOX.querySelector('.ki-dvor');
       if (!img || !window.K888Bilder || !STAND) return;
-      const p = STAND.posts.find(x => x.typ === 'ank') || STAND.posts[0];
+      const p = STAND.posts.find(x => x.typ === DFORMAT) || STAND.posts.find(x => x.typ !== 'woche');
       if (!p) { img.alt = 'Kein Post zum Anzeigen'; return; }
+      const nr = ++DV_NR;
       try {
         const blob = await window.K888Bilder.post(p, { ...STAND.design, ...designAusFormular(), logoBild: STAND.design.logoBild });
+        if (nr !== DV_NR) return;
         if (DV_URL) URL.revokeObjectURL(DV_URL);
         DV_URL = URL.createObjectURL(blob); img.src = DV_URL;
+        const H = p.typ === 'story' ? 1920 : 1350, z = BOX.querySelector('.ki-ziele');
+        if (z) z.innerHTML = (blob.boxen || []).map(b => `<div class="ki-ziel" data-el="${b.el}" style="left:${b.x / 10.8}%;top:${b.y / H * 100}%;width:${b.w / 10.8}%;height:${b.h / H * 100}%"><span>${{ logo: 'Logo', team: 'Team-Bild', spruch: 'Spruch' }[b.el]}</span></div>`).join('');
       } catch (e) { /* egal */ }
-    }, 250);
+    }, sofort ? 0 : 250);
+  }
+  // Ziehen und Mausrad auf den Ebenen der Vorschau
+  let DZIEH = null;
+  function dRunter(ev) {
+    const z = ev.target.closest('.ki-ziel'); if (!z || !BOX.contains(z)) return;
+    ev.preventDefault();
+    DZIEH = { z, el: z.dataset.el, x: ev.clientX, y: ev.clientY };
+    z.classList.add('zieht');
+  }
+  function dBewegen(ev) {
+    if (!DZIEH) return;
+    DZIEH.z.style.transform = `translate(${ev.clientX - DZIEH.x}px, ${ev.clientY - DZIEH.y}px)`;
+  }
+  function dHoch(ev) {
+    if (!DZIEH) return;
+    const { el, x, y } = DZIEH; DZIEH = null;
+    const img = BOX.querySelector('.ki-dvor'); if (!img || !img.clientWidth) return;
+    const fmt = DFORMAT === 'story' ? 'story' : 'feed', H = fmt === 'story' ? 1920 : 1350;
+    const dx = (ev.clientX - x) * 1080 / img.clientWidth, dy = (ev.clientY - y) * H / img.clientHeight;
+    if (Math.abs(dx) + Math.abs(dy) < 2) { designVorschau(true); return; }
+    const e = DLAYOUT[fmt][el];
+    if (el === 'spruch') { e.x = Math.round(e.x + dx); e.y = Math.round(e.y + dy); } else { e.cx = Math.round(e.cx + dx); e.cy = Math.round(e.cy + dy); }
+    designGeaendert();
+  }
+  function dRad(ev) {
+    const z = ev.target.closest('.ki-ziel'); if (!z || !BOX.contains(z)) return;
+    ev.preventDefault();
+    const fmt = DFORMAT === 'story' ? 'story' : 'feed', e = DLAYOUT[fmt][z.dataset.el], f = ev.deltaY < 0 ? 1.06 : 1 / 1.06;
+    if (z.dataset.el === 'spruch') e.g = Math.round(Math.max(30, Math.min(220, e.g * f)));
+    else e.b = Math.round(Math.max(40, Math.min(1400, e.b * f)));
+    designGeaendert();
   }
 
   function zeichnen() {
@@ -355,7 +408,7 @@
   }
   const THUMB_UMG = {
     stand: () => STAND, igApi, meldung, rennen: rennenListe,
-    spruchGesetzt(rk, text) { for (const p of STAND.posts) if (p.rennKey === rk) p.thumb = { ...(p.thumb || {}), spruch: text }; },
+    spruchGesetzt(rk, text) { SPRUCH_NEU = true; for (const p of STAND.posts) if (p.rennKey === rk) { p.thumb = { ...(p.thumb || {}), spruch: text }; p.spruch = text; } },
     vorlageGespeichert(v) { STAND.thumbVorlage = v; }
   };
 
@@ -491,12 +544,19 @@
     if (tb && BOX.contains(tb)) {
       DTEAM = tb.dataset.team;
       BOX.querySelectorAll('[data-team]').forEach(x => x.classList.toggle('an', x === tb));
-      return designVorschau();
+      const an = document.getElementById('ki-team-an'); if (an && DTEAM) an.checked = true;
+      return designGeaendert();
     }
     const b = ev.target.closest('[data-aktion]'); if (!b || !BOX.contains(b)) return;
     const a = b.dataset.aktion, id = b.dataset.id;
     if (a === 'laden') return laden();
-    if (a === 'reiter') { REITER = b.dataset.wert; DTEAM = null; return zeichnen(); }
+    if (a === 'reiter') {
+      REITER = b.dataset.wert; if (!DAENDERUNG) { DTEAM = null; DLAYOUT = null; }
+      if (REITER === 'posts' && SPRUCH_NEU) { SPRUCH_NEU = false; return laden(); }
+      return zeichnen();
+    }
+    if (a === 'dformat') { DFORMAT = b.dataset.wert; BOX.querySelectorAll('[data-aktion="dformat"]').forEach(x => x.classList.toggle('active', x === b)); return designVorschau(true); }
+    if (a === 'dreset') { DLAYOUT = window.K888Bilder.layoutAus({}); return designGeaendert(); }
     if (a === 'th-edit') { REITER = 'thumb'; THUMB_RK = b.dataset.rk; zeichnen(); window.scrollTo(0, 0); return; }
     if (a === 'th-laden') return ausfuehren(b, async () => {
       const r = rennenListe().find(x => x.rennKey === b.dataset.rk); if (!r || !window.K888Thumb) return;
@@ -513,7 +573,7 @@
     if (a === 'cfg') return ausfuehren(b, async () => { await igApi('POST', '/api/einstellungen', { cfg: cfgAusFormular() }); meldung('Gespeichert.'); await laden(); });
     if (a === 'design') return ausfuehren(b, async () => {
       await igApi('POST', '/api/design', designAusFormular());
-      DTEAM = null;
+      DTEAM = null; DLAYOUT = null; DAENDERUNG = false;
       meldung('Gespeichert – alle Bilder werden neu gezeichnet.');
       await laden();
     });
@@ -634,7 +694,11 @@
 #instaApp .ki-tgal button.an{border-color:var(--red);color:#fff}
 #instaApp .ki-wert{color:#fff;margin-left:6px}
 #instaApp .ki-design input[type=range]{padding:0;accent-color:var(--red)}
-#instaApp .ki-dvor{width:100%;max-width:520px;display:block;border:1px solid var(--line);background:#000;min-height:120px}
+#instaApp .ki-dvorbox{position:relative;width:100%;max-width:520px;margin:12px 0 8px;user-select:none;overflow:hidden}
+#instaApp .ki-dvor{width:100%;display:block;border:1px solid var(--line);background:#000;min-height:120px;pointer-events:none}
+#instaApp .ki-ziel{position:absolute;border:2px dashed rgba(255,212,0,.85);cursor:move;touch-action:none;box-sizing:border-box}
+#instaApp .ki-ziel span{position:absolute;left:-2px;top:-20px;background:#ffd400;color:#000;font:700 11px var(--body);padding:1px 5px;white-space:nowrap}
+#instaApp .ki-ziel:hover,#instaApp .ki-ziel.zieht{border-color:#ffd400;background:rgba(255,212,0,.1)}
 #ki-toast{position:fixed;right:18px;bottom:18px;z-index:99;max-width:420px;background:#14161d;border:1px solid var(--line);border-left:3px solid #3fbf5f;color:#f2f4f8;font:14px/1.45 'Barlow',sans-serif;padding:10px 14px;box-shadow:0 10px 30px rgba(0,0,0,.5);opacity:0;transform:translateY(8px);transition:.2s;pointer-events:none}
 #ki-toast.an{opacity:1;transform:none}#ki-toast.rot{border-left-color:#e11324}`;
   document.head.appendChild(css);
@@ -656,11 +720,11 @@
         BOX = box;
         box.addEventListener('click', klick);
         box.addEventListener('change', aenderung);
-        box.addEventListener('input', ev => {
-          if (!ev.target.closest('.ki-design')) return;
-          const w = BOX.querySelector(`.ki-wert[data-zu="${ev.target.id}"]`); if (w) w.textContent = ev.target.value + ' %';
-          designVorschau();
-        });
+        box.addEventListener('input', ev => { if (ev.target.closest('.ki-design')) designGeaendert(); });
+        box.addEventListener('pointerdown', dRunter);
+        window.addEventListener('pointermove', dBewegen);
+        window.addEventListener('pointerup', dHoch);
+        box.addEventListener('wheel', dRad, { passive: false });
         box.addEventListener('toggle', ev => { if (ev.target.classList && ev.target.classList.contains('ki-hilfe')) HILFE_OFFEN = ev.target.open; }, true);
       }
       try { await skripte(); } catch (e) { meldung(e.message, 1); }

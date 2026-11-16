@@ -43,8 +43,23 @@ const CFG_STANDARD = {
 const DESIGN_STANDARD = {
   farbe1: '#e11324', farbe2: '#ffffff', liveText: 'YouTube · @Kreids888', fahrzeuge: '',
   logoUrl: 'https://i.postimg.cc/cC8FkHnv/kreidslogo-twitch-u-yt-3.png', logoVersion: 1,
-  logoGroesse: 100, team: '', teamGroesse: 100, teamSchwarz: true   // Größen in Prozent, Team-Bild aus kreids888.com/team/bilder
+  team: '', teamSchwarz: true,                  // Team-Bild aus kreids888.com/team/bilder
+  logoAn: true, teamAn: true, spruchAn: true,   // Ebenen ein/aus
+  layout: null                                  // Plätze/Größen der Ebenen für feed + story (null = Standard, siehe insta-bilder.js)
 };
+// Ebenen-Plätze prüfen: { feed|story: { logo|team: {cx,cy,b}, spruch: {x,y,g} } }
+function layoutPruefen(l) {
+  if (!l || typeof l !== 'object') return null;
+  const zahl = (v, min, max) => Math.round(Math.max(min, Math.min(max, Number(v) || 0)));
+  const o = {};
+  for (const f of ['feed', 'story']) {
+    const q = l[f] || {}, H = f === 'story' ? 1920 : 1350;
+    o[f] = {};
+    for (const e of ['logo', 'team']) if (q[e]) o[f][e] = { cx: zahl(q[e].cx, -200, 1280), cy: zahl(q[e].cy, -200, H + 200), b: zahl(q[e].b, 40, 1400) };
+    if (q.spruch) o[f].spruch = { x: zahl(q.spruch.x, -100, 1000), y: zahl(q.spruch.y, -100, H), g: zahl(q.spruch.g, 30, 220) };
+  }
+  return o;
+}
 const KI_PRO_TAG = 10;   // FLUX.2 klein ≈ 400 Neuronen pro Bild → bleibt sicher im Gratiskontingent (10.000/Tag)
 const BILD_FEHLT = 'Bild fehlt noch: im Dashboard den Reiter „Instagram“ einmal öffnen, dann wird es gezeichnet.';
 
@@ -314,11 +329,12 @@ async function stand(env, s) {
     const rk = rennKey(p.id);
     const bgv = bgvs['bgv:' + rk] || 0;
     const m = bgms['bgm:' + rk] || {};
-    const soll = kurzHash(inhaltSchluessel(p, design, cfg, bgv));
+    const spruch = (thrs['thr:' + rk] || {}).spruch || '';
+    const soll = kurzHash(inhaltSchluessel({ ...p, spruch }, design, cfg, bgv));
     return {
       id: p.id, typ: p.typ, art: p.art, spr: p.spr, titel: p.titel, serie: p.serie, nr: p.nr, track: p.track, layout: p.layout, datum: p.datum,
       postMs: p.postMs, startMs: p.startMs, qualiMs: p.qualiMs || p.startMs, rennMs: p.rennMs || p.startMs, liveMs: p.liveMs, tage: p.tage || 0,
-      klassen: p.klassen, reverseGrid: p.reverseGrid, liste: p.liste || null, bisDatum: p.bisDatum || '', pose: p.pose || '',
+      klassen: p.klassen, reverseGrid: p.reverseGrid, spruch, liste: p.liste || null, bisDatum: p.bisDatum || '', pose: p.pose || '',
       ergebnis: p.ergebnis || null, platz: p.ergebnis ? platzText(p.ergebnis) : '', eigenesErgebnis: !!p.eigenesErgebnis,
       status: status(z, cfg), freigegeben: !!z.freigegeben, fehler: z.fehler || '', kiFehler: bgv ? '' : (m.kiFehler || ''),
       gepostet: z.gepostet || null,
@@ -374,9 +390,8 @@ async function api(req, env, url) {
     if (farbeOk(body.farbe2)) neu.farbe2 = body.farbe2;
     if (typeof body.liveText === 'string') neu.liveText = body.liveText.replace(/[<>]/g, '').slice(0, 60);
     if (typeof body.fahrzeuge === 'string') neu.fahrzeuge = body.fahrzeuge.replace(/[<>]/g, '').slice(0, 200);
-    const groesse = v => Math.max(30, Math.min(200, Math.round(Number(v) || 100)));
-    if (body.logoGroesse !== undefined) neu.logoGroesse = groesse(body.logoGroesse);
-    if (body.teamGroesse !== undefined) neu.teamGroesse = groesse(body.teamGroesse);
+    for (const k of ['logoAn', 'teamAn', 'spruchAn']) if (body[k] !== undefined) neu[k] = body[k] !== false;
+    if (body.layout !== undefined) neu.layout = layoutPruefen(body.layout);
     if (typeof body.team === 'string') neu.team = /^[A-Za-z0-9_-]{1,60}\.(webp|png|jpg)$/.test(body.team) ? body.team : '';
     if (body.teamSchwarz !== undefined) neu.teamSchwarz = body.teamSchwarz !== false;
     if (typeof body.logoUrl === 'string') {
