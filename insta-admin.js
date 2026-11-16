@@ -255,7 +255,7 @@
     // Status YouTube / TikTok
     if (mitThumb && p.yt && yt.verbunden) {
       if (p.yt.id) h.push(`<div class="ki-dim">▶ YouTube: geplant · <a class="ki-link" href="https://www.youtube.com/watch?v=${esc(p.yt.id)}" target="_blank" rel="noopener">ansehen</a>${p.yt.thumbH ? ' · Thumbnail drin' : ''}</div>`);
-      else if (p.startMs > Date.now()) h.push(`<div class="ki-dim">▶ YouTube: wird ${esc((STAND.cfg.youtube || {}).tage || 3)} Tage vorher automatisch geplant</div>`);
+      else if (p.startMs > Date.now()) h.push(`<div class="ki-dim">▶ YouTube: wird automatisch geplant – ${(STAND.cfg.youtube || {}).naechstes !== false ? 'sobald das Rennen davor vorbei ist, spätestens ' : ''}${esc((STAND.cfg.youtube || {}).tage || 3)} Tage vorher</div>`);
       if (p.yt.fehler) h.push(`<div class="ki-hinweis rot">▶ YouTube: ${esc(p.yt.fehler)}</div>`);
     }
     if (tk.verbunden && ttTypen.includes(p.typ)) {
@@ -315,6 +315,7 @@
       ${y.fehler ? `<div class="ki-hinweis rot">⚠ ${esc(y.fehler)}</div>` : ''}
       <div class="ki-knoepfe">${y.eingerichtet ? (y.verbunden ? '<button class="btn btn-ghost ki-k" data-aktion="trennen" data-wert="youtube"><span>Trennen</span></button>' : '<button class="btn btn-red ki-k" data-aktion="verbinden" data-wert="youtube"><span>Mit YouTube verbinden</span></button>') : ''}</div>
       <label class="chk"><input type="checkbox" id="ki-yt-an" ${c.aktiv !== false ? 'checked' : ''}> Rennen automatisch als Livestream planen (mit Thumbnail)</label>
+      <label class="chk"><input type="checkbox" id="ki-yt-naechstes" ${c.naechstes !== false ? 'checked' : ''}> Nächstes Rennen gleich anlegen, sobald das vorige vorbei ist</label>
       <div class="ki-reihe">
         <div class="ki-fg"><label for="ki-yt-tage">Tage vorher</label><input id="ki-yt-tage" type="number" min="1" max="14" value="${esc(c.tage || 3)}"></div>
         <div class="ki-fg"><label for="ki-yt-sicht">Sichtbarkeit</label><select id="ki-yt-sicht"><option value="public" ${c.sichtbar !== 'unlisted' ? 'selected' : ''}>Öffentlich</option><option value="unlisted" ${c.sichtbar === 'unlisted' ? 'selected' : ''}>Nicht gelistet</option></select></div>
@@ -346,7 +347,7 @@
   function ytListeHtml() {
     if (!YTLISTE) return '<div class="ki-dim">Wird geladen …</div>';
     const l = YTLISTE.streams || [];
-    if (!l.length) return `<div class="ki-dim">Noch keine – sie werden ${esc((STAND.cfg.youtube || {}).tage || 3)} Tage vor dem Rennen angelegt.</div>`;
+    if (!l.length) return '<div class="ki-dim">Noch keine – das nächste Rennen wird beim nächsten Lauf (alle 10 Min.) angelegt.</div>';
     const st = { created: ['geplant', 'blau'], ready: ['geplant', 'blau'], testStarting: ['Test', 'gelb'], testing: ['Test', 'gelb'], liveStarting: ['startet', 'gelb'], live: ['live', 'rot'], complete: ['beendet', 'grau'], revoked: ['abgebrochen', 'grau'], geloescht: ['in YouTube gelöscht', 'grau'] };
     return l.map(x => {
       const [t, f] = st[x.status] || [x.status || '?', 'grau'];
@@ -390,7 +391,7 @@
     const v = id => document.getElementById(id);
     return {
       ...STAND.cfg,
-      youtube: { aktiv: v('ki-yt-an').checked, tage: parseInt(v('ki-yt-tage').value, 10) || 3, sichtbar: v('ki-yt-sicht').value, stream: v('ki-yt-stream').value, titel: v('ki-yt-titel').value, beschreibung: v('ki-yt-text').value, beschrQuelle: v('ki-yt-bq').value },
+      youtube: { aktiv: v('ki-yt-an').checked, tage: parseInt(v('ki-yt-tage').value, 10) || 3, naechstes: v('ki-yt-naechstes').checked, sichtbar: v('ki-yt-sicht').value, stream: v('ki-yt-stream').value, titel: v('ki-yt-titel').value, beschreibung: v('ki-yt-text').value, beschrQuelle: v('ki-yt-bq').value },
       tiktok: { typen: [...BOX.querySelectorAll('[data-tt]')].filter(x => x.checked).map(x => x.dataset.tt) }
     };
   }

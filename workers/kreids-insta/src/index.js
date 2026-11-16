@@ -38,7 +38,8 @@ const CFG_STANDARD = {
   vorlagen: { ank: { modus: 'reihe', kreids: true, fest: '' }, story: { modus: 'reihe', kreids: true, fest: '' }, erg: { modus: 'reihe', kreids: true, fest: '' }, woche: { modus: 'reihe', kreids: true, fest: '' } },
   // YouTube: geplanter Livestream pro Rennen (X Tage vorher), Thumbnail kommt automatisch aus dem Editor
   // beschrQuelle: 'letzter' = Beschreibung vom letzten eigenen YouTube-Stream, 'eigen' = Text unten
-  youtube: { aktiv: true, tage: 3, sichtbar: 'public', stream: '', beschrQuelle: 'letzter',
+  // naechstes: das nächste Rennen gleich anlegen, sobald das vorige vorbei ist (sonst erst „tage“ vorher)
+  youtube: { aktiv: true, tage: 3, naechstes: true, sichtbar: 'public', stream: '', beschrQuelle: 'letzter',
     titel: '🔴 {spruch} | {strecke} – {serie} {runde}',
     beschreibung: 'Live ab {zeit} Uhr: {serie} · {runde} · {strecke}\n{klassen}\n\n🌐 kreids888.com\n#simracing #iracing #kreids888' },
   // TikTok: diese Post-Arten gehen zusätzlich als Entwurf in die TikTok-Inbox
@@ -115,7 +116,8 @@ function cfgPruefen(e) {
     stream: /^[A-Za-z0-9_-]{0,80}$/.test(String(yt.stream || '')) ? String(yt.stream || '') : '',
     titel: typeof yt.titel === 'string' && yt.titel.trim() ? yt.titel.slice(0, 200) : ytStd.titel,
     beschreibung: typeof yt.beschreibung === 'string' ? yt.beschreibung.slice(0, 4000) : ytStd.beschreibung,
-    beschrQuelle: yt.beschrQuelle === 'eigen' ? 'eigen' : 'letzter'
+    beschrQuelle: yt.beschrQuelle === 'eigen' ? 'eigen' : 'letzter',
+    naechstes: yt.naechstes !== false
   };
   const tk = e.tiktok || {};
   c.tiktok = { typen: Array.isArray(tk.typen) ? ['ank', 'story', 'erg', 'woche'].filter(t => tk.typen.includes(t)) : CFG_STANDARD.tiktok.typen.slice() };
@@ -351,14 +353,38 @@ async function ytEinRennen(env, s, zugang, r, cfg, erzwingen, beschr) {
   await s.schreib('yt:' + r.rennKey, z);
   return z;
 }
+// Läuft gerade noch ein vom Dashboard angelegter Livestream? Vorbei = auf YouTube beendet, spätestens 4 Std. nach Live-Beginn.
+const YT_VORBEI_NACH = 4 * 3600000;
+async function ytLaeuftNoch(s, zugang, jetzt) {
+  for (const [k, z] of Object.entries(await s.liste('yt:'))) {
+    if (YT_META.includes(k) || !z || !z.id || z.vorbei) continue;
+    const ab = z.liveMs || z.startMs || 0;
+    if (!ab || ab > jetzt) continue;
+    let vorbei = jetzt > ab + YT_VORBEI_NACH;
+    if (!vorbei) {
+      try { const i = (await ytInfos(zugang, [z.id]))[z.id]; vorbei = !i || i.status === 'complete' || i.status === 'revoked'; }
+      catch (e) { vorbei = false; }
+    }
+    if (!vorbei) return true;
+    await s.schreib(k, { ...z, vorbei: true });
+  }
+  return false;
+}
 async function ytAbgleich(env, s, plan, cfg, jetzt) {
   if (!cfg.youtube.aktiv || !ytEingerichtet(env) || !(await s.lies('yt:token'))) return;
   const zugang = await ytZugang(env, s);
   const thrs = await s.liste('thr:');
   const beschr = await ytBeschreibung(s, zugang, cfg);
+  const liste = ytRennenListe(plan, thrs);
+  // Das nächste Rennen gleich anlegen, sobald das vorige vorbei ist – egal wie weit weg
+  let naechstes = '';
+  if (cfg.youtube.naechstes) {
+    const k = liste.find(r => r.startMs > jetzt);
+    if (k && k.startMs - jetzt > cfg.youtube.tage * 86400000 && !(await ytLaeuftNoch(s, zugang, jetzt))) naechstes = k.rennKey;
+  }
   let n = 2;   // höchstens 2 Rennen pro Lauf (Gratis-Tarif)
-  for (const r of ytRennenListe(plan, thrs)) {
-    if (r.startMs <= jetzt || r.startMs - jetzt > cfg.youtube.tage * 86400000) continue;
+  for (const r of liste) {
+    if (r.startMs <= jetzt || (r.rennKey !== naechstes && r.startMs - jetzt > cfg.youtube.tage * 86400000)) continue;
     const z = (await s.lies('yt:' + r.rennKey)) || {};
     const th = await s.lies('ytbh:' + r.rennKey);
     if (z.id && z.hash === ytHash(r, cfg, beschr) && (!th || th.h === z.thumbH)) continue;
