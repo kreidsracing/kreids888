@@ -39,8 +39,9 @@ export async function konto(token, uidVorgabe) {
     const t = (s.data || []).map(x => x.instagram_business_account).find(Boolean);
     if (t) return { user_id: t.id, username: t.username || '' };
   } catch (e) { /* weiter mit /me */ }
-  const d = await ig(`${H}/me?fields=id,username&${q(token)}`);
-  if (!d.username) throw new Error('Kein Instagram-Konto zum Token gefunden. Bitte IG_USER_ID (Konto-ID) in Cloudflare eintragen.');
+  // Systemnutzer-Token ohne Facebook-Seite: Konto-ID muss als IG_USER_ID in Cloudflare stehen
+  const d = await ig(`${H}/me?fields=id,username&${q(token)}`).catch(() => ({}));
+  if (!d.username) throw new Error('Instagram-Konto-ID fehlt: bitte IG_USER_ID in Cloudflare eintragen (Zahl unter dem Konto in der Meta-App).');
   return { user_id: d.id, username: d.username };
 }
 
