@@ -511,14 +511,14 @@
       <td class="g z">${pmZahl(pm.vorne, false)}</td><td class="z">${pmZahl(pm.hinten, true)}</td>
       <td class="g">${esc(reifenName(st, x))}</td><td class="z">${(alle ? x.start : x.kstart) ? "P" + (alle ? x.start : x.kstart) : "–"}</td>
       <td class="z">${x.stint_s != null ? dauer(x.stint_s) + (x.stint_r != null ? " · " + x.stint_r + " Rd." : "") : "–"}</td><td class="z">${x.stopps || 0}</td>
-      <td class="spt-boxz">${x.box ? '<span class="tm-badge">Box</span>' : x.fl === -1 ? '<span class="tm-badge grey">weg</span>' : ""}</td></tr>`;
+      <td class="g z spt-inc">${incFeld(st, x)}</td><td class="spt-boxz">${x.box ? '<span class="tm-badge">Box</span>' : x.fl === -1 ? '<span class="tm-badge grey">weg</span>' : ""}</td></tr>`;
     };
     // feste Spaltenbreiten (colgroup) und gleich breite Ziffern, damit nichts springt, wenn alle 2 s neue Werte kommen
-    const spalten = `<colgroup><col class="c-pos">${alle ? '<col class="c-kl">' : ""}<col class="c-nr"><col><col class="c-rd"><col class="c-ab" span="3"><col class="c-zeit" span="3"><col class="c-pm" span="2"><col class="c-rf"><col class="c-start"><col class="c-stint"><col class="c-stopp"><col class="c-box"></colgroup>`;
+    const spalten = `<colgroup><col class="c-pos">${alle ? '<col class="c-kl">' : ""}<col class="c-nr"><col><col class="c-rd"><col class="c-ab" span="3"><col class="c-zeit" span="3"><col class="c-pm" span="2"><col class="c-rf"><col class="c-start"><col class="c-stint"><col class="c-stopp"><col class="c-inc"><col class="c-box"></colgroup>`;
     setze("feld", `<div class="sp-seg spt-klassen"><button type="button" data-kl="alle" class="${alle ? "on" : ""}">Alle</button>${Object.keys(felder).map(k => `<button type="button" data-kl="${esc(k)}" class="${k === S.klasse ? "on" : ""}">${esc(kl(k).name || "Klasse")}</button>`).join("")}</div>
       <table class="spt-tab spt-feld${alle ? " alle" : ""}">${spalten}<thead>
-        <tr class="spt-gr"><th colspan="${alle ? 5 : 4}">Position</th><th colspan="3" class="g">Abstände</th><th colspan="3" class="g">Rundenzeiten</th><th colspan="2" class="g" title="Sekunden pro Runde über etwa 2 Runden">Trend</th><th colspan="5" class="g">Reifen &amp; Stint</th></tr>
-        <tr class="spt-sp"><th class="spt-pos">Pos</th>${alle ? "<th>Kl.</th>" : ""}<th class="spt-nr">#</th><th>Team / Fahrer</th><th class="z">Rd.</th><th class="g z">${alle ? "Abstand" : "Abst. Kl."}</th><th class="z">Intervall</th><th class="z">Relativ</th><th class="g z">Letzte</th><th class="z" title="Schnitt der letzten 5 sauberen Runden">Ø 5 Rd.</th><th class="z">Beste</th><th class="g z" title="Abstand zum Vordermann, Sekunden pro Runde (minus = holt auf)">± Vorne</th><th class="z" title="Abstand zum Hintermann, Sekunden pro Runde (plus = baut aus)">± Hinten</th><th class="g">Reifen</th><th class="z">Start</th><th class="z">Stint</th><th class="z">Stopps</th><th></th></tr></thead>
+        <tr class="spt-gr"><th colspan="${alle ? 5 : 4}">Position</th><th colspan="3" class="g">Abstände</th><th colspan="3" class="g">Rundenzeiten</th><th colspan="2" class="g" title="Sekunden pro Runde über etwa 2 Runden">Trend</th><th colspan="4" class="g">Reifen &amp; Stint</th><th class="g">Incidents</th><th></th></tr>
+        <tr class="spt-sp"><th class="spt-pos">Pos</th>${alle ? "<th>Kl.</th>" : ""}<th class="spt-nr">#</th><th>Team / Fahrer</th><th class="z">Rd.</th><th class="g z">${alle ? "Abstand" : "Abst. Kl."}</th><th class="z">Intervall</th><th class="z">Relativ</th><th class="g z">Letzte</th><th class="z" title="Schnitt der letzten 5 sauberen Runden">Ø 5 Rd.</th><th class="z">Beste</th><th class="g z" title="Abstand zum Vordermann, Sekunden pro Runde (minus = holt auf)">± Vorne</th><th class="z" title="Abstand zum Hintermann, Sekunden pro Runde (plus = baut aus)">± Hinten</th><th class="g">Reifen</th><th class="z">Start</th><th class="z">Stint</th><th class="z">Stopps</th><th class="g z" title="Incident-Punkte (Teamrennen: ganzes Team)">Inc.</th><th></th></tr></thead>
       <tbody>${klListe.map(fz).join("")}</tbody></table>
       <p class="tm-muted spt-klein">Ø 5 Rd. = letzte 5 saubere Runden (ohne Box, Abflug, Start, Ausreißer). ± in Sekunden pro Runde über etwa 2 Runden. Schaden gibt iRacing für andere Autos nicht heraus.</p>`);
     root.querySelectorAll("[data-kl]").forEach(b => b.onclick = () => { S.klasse = b.dataset.kl; zeichne(); });
@@ -569,6 +569,11 @@
     el.scrollTop = oben; el.scrollLeft = links;
   }
 
+  // Incidents-Spalte im Feld: jedes Auto, auch 0x (eigenes Auto live aus der Telemetrie)
+  function incFeld(st, a) {
+    const n = st.ich && st.ich.idx === a.i && st.ich.inc != null ? st.ich.inc : a.inc;
+    return n != null && n >= 0 ? n + "x" : "–";
+  }
   // Incident-Punkte: eigenes Auto aus der Telemetrie des Senders, sonst aus den Fahrerdaten (wenn iRacing sie liefert)
   function incVon(st, a) {
     if (st.ich && st.ich.idx === a.i && st.ich.inc != null) return st.ich.inc;

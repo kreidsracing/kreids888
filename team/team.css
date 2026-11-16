@@ -2360,7 +2360,7 @@ body:has(.td)::after{content:"";position:fixed;inset:0;z-index:-1;pointer-events
 /* Zahlenspalten fest breit (breiter als ihr längster Wert), nur Team/Fahrer nimmt den Rest */
 .spt-feld col.c-pos{width:36px}.spt-feld col.c-kl{width:88px}.spt-feld col.c-nr{width:38px}.spt-feld col.c-rd{width:38px}
 .spt-feld col.c-ab{width:60px}.spt-feld col.c-zeit{width:62px}.spt-feld col.c-pm{width:58px}
-.spt-feld col.c-rf{width:52px}.spt-feld col.c-start{width:42px}.spt-feld col.c-stint{width:98px}.spt-feld col.c-stopp{width:52px}.spt-feld col.c-box{width:46px}
+.spt-feld col.c-rf{width:52px}.spt-feld col.c-start{width:42px}.spt-feld col.c-stint{width:98px}.spt-feld col.c-stopp{width:52px}.spt-feld col.c-inc{width:48px}.spt-feld col.c-box{width:46px}
 .spt-feld th,.spt-feld td{overflow:hidden;text-overflow:ellipsis}
 .spt-feld .z{text-align:right}
 .spt-feld .spt-pos,.spt-feld .spt-boxz{text-align:center}
