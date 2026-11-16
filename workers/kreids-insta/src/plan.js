@@ -114,15 +114,12 @@ export function eigeneRennen(daten, jetzt) {
   return out;
 }
 
-// Fingerabdruck der Bild-Inhalte: ändert sich etwas, wird das Bild neu gezeichnet
+// Fingerabdruck der Bild-Inhalte: ändert sich etwas, zeichnet das Dashboard das Bild neu.
+// ZEICHEN_VERSION hochzählen, wenn sich das Aussehen der Bilder (insta-bilder.js) ändert.
+const ZEICHEN_VERSION = 2;
 export function inhaltSchluessel(post, design, cfg, bgv = 0) {
-  return JSON.stringify([bgv, post.typ, post.art, post.serie, post.nr, post.track, post.layout, post.titel, post.datum, post.liveMs, post.tage,
-    post.klassen, post.reverseGrid, post.ergebnis || null, design.farbe1, design.farbe2, design.logoVersion || 0, design.liveText, cfg.liveAb, 1]);
-}
-// Fingerabdruck fürs YouTube-Thumbnail (1920×1080)
-export function thumbSchluessel(post, design, bgv = 0) {
-  return JSON.stringify([bgv, post.art, post.serie, post.nr, post.track, post.layout, post.titel, post.datum, post.liveMs, post.klassen, post.reverseGrid,
-    design.farbe1, design.farbe2, design.logoVersion || 0, design.liveText, 1]);
+  return JSON.stringify([bgv, bgv ? '' : post.kalenderBild, post.typ, post.art, post.serie, post.nr, post.track, post.layout, post.titel, post.datum, post.liveMs, post.tage,
+    post.klassen, post.reverseGrid, post.ergebnis || null, design.farbe1, design.farbe2, design.logoVersion || 0, design.liveText, cfg.liveAb, ZEICHEN_VERSION]);
 }
 // Kurzer Hash (FNV-1a) für Links mit ?h=
 export function kurzHash(t) {

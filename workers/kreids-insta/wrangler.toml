@@ -31,10 +31,6 @@ new_sqlite_classes = ["Speicher"]
 [triggers]
 crons = ["*/10 * * * *"]
 
-[[rules]]
-type = "Data"
-globs = ["**/*.ttf", "**/*.png"]
-fallthrough = true
 
 [observability]
 enabled = true

@@ -2,17 +2,18 @@
 // kreids-insta · Instagram-Poster für Kreids888 (privates Konto)
 // • Ankündigung (Feed) X Tage vorher, Raceday-Story am Renntag, Rennergebnis (Feed)
 // • Daten aus dem Kreids-Dashboard (kreids888-admin): Streamkalender + SPR-Ergebnisse
-// • Bild: KI-Hintergrund (Flux, gratis), Kalender-Bild, Gemini/ChatGPT-Bild oder eigenes Bild + Kreids-Grafik
-// • YouTube-Thumbnail 1920×1080 pro Rennen zum Herunterladen (PNG unter 2 MB, sonst JPG)
-// • Modus „Mit Freigabe“ (jeder Post wartet auf Klick) oder „Automatisch“
+// • Die Bilder zeichnet das Dashboard im Browser (insta-bilder.js) und schickt sie hierher:
+//   Im Gratis-Tarif hat ein Worker nur 10 ms Rechenzeit – zu wenig zum Zeichnen.
+// • Der Worker plant, holt KI-Hintergründe (Cloudflare-KI, gratis), speichert und postet.
+// • YouTube-Thumbnail: Vorlage + Spruch pro Rennen werden hier gespeichert, gezeichnet wird im Browser.
 // • Nur mit Dashboard-Login nutzbar (Token wird bei kreids888-admin /api/check geprüft)
-// Routen: GET /bild/:id/:v.jpg · GET /thumb/:rennen.(jpg|png) · GET /logo.png · /api/* (Bearer-Token)
+// Routen: GET /bild/:id/:v.jpg · GET /hintergrund/:rennen · GET /logo.png · /api/* (Bearer-Token)
 // ═══════════════════════════════════════════════════════════
 import { DurableObject } from 'cloudflare:workers';
-import { ADMIN, ERG_TAGE, ladeDaten, bauePlan, eigeneRennen, rennKey, inhaltSchluessel, thumbSchluessel, kurzHash, bildtext, platzText } from './plan.js';
-import { kiBild, rendern, rendernThumb, bildVerkleinern, bildAlsJpeg, STIMMUNGEN, KAMERAS, autos } from './bild.js';
+import { ADMIN, ERG_TAGE, ladeDaten, bauePlan, eigeneRennen, rennKey, inhaltSchluessel, kurzHash, bildtext, platzText } from './plan.js';
+import { kiBild, sprueche, STIMMUNGEN, KAMERAS, autos } from './ki.js';
 import { konto, posten, tokenVerlaengern, verlaengerbar } from './insta.js';
-import { istUhrzeit, berlin } from './zeit.js';
+import { istUhrzeit } from './zeit.js';
 
 // ─── Speicher (Durable Object, SQLite) ──────────────────────
 export class Speicher extends DurableObject {
@@ -43,6 +44,7 @@ const DESIGN_STANDARD = {
   logoUrl: 'https://i.postimg.cc/cC8FkHnv/kreidslogo-twitch-u-yt-3.png', logoVersion: 1
 };
 const KI_PRO_TAG = 10;   // FLUX.2 klein ≈ 400 Neuronen pro Bild → bleibt sicher im Gratiskontingent (10.000/Tag)
+const BILD_FEHLT = 'Bild fehlt noch: im Dashboard den Reiter „Instagram“ einmal öffnen, dann wird es gezeichnet.';
 
 function cfgPruefen(e) {
   const c = {};
@@ -91,110 +93,54 @@ async function datenLaden(s, jetzt = Date.now()) {
   return daten;
 }
 
-// ─── Bilder aus dem Netz (Logo, Kalender-Bild) ─────────────
-// Zwischenspeicher: geklappt 1 Tag, nicht geklappt 15 Minuten (dann neuer Versuch)
-async function bildLaden(s, url, art) {
+// ─── Bilder ─────────────────────────────────────────────────
+function bildTyp(u8) {
+  if (u8[0] === 0x89 && u8[1] === 0x50) return 'image/png';
+  if (u8[0] === 0xff && u8[1] === 0xd8) return 'image/jpeg';
+  if (u8[0] === 0x52 && u8[1] === 0x49) return 'image/webp';
+  if (u8[0] === 0x47 && u8[1] === 0x49) return 'image/gif';
+  return '';
+}
+// Bild aus dem Netz (Logo, Kalender-Bild) unverändert durchreichen – mit CORS, damit der Browser damit zeichnen darf
+async function durchreichen(url) {
   url = String(url || '').trim();
-  if (!/^https:\/\//i.test(url) || url.length > 500) return { bild: null, grund: url ? 'Kein gültiger https-Link' : '' };
-  const key = art + ':' + url;
-  const m = await s.lies('nz:' + key);
-  if (m && m.zeit > Date.now() - (m.ok ? 86400000 : 15 * 60000)) return { bild: m.ok ? ((await s.lies('nb:' + key)) || null) : null, grund: m.grund || '' };
-  let bild = null, grund = '';
+  if (!/^https:\/\//i.test(url) || url.length > 500) return null;
   try {
-    const r = await fetch(url, { signal: AbortSignal.timeout(8000), headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Safari/537.36', Accept: 'image/png,image/jpeg,image/gif,image/*;q=0.8' } });
-    if (!r.ok) grund = 'Server meldet Fehler ' + r.status;
-    else {
-      const u8 = new Uint8Array(await r.arrayBuffer());
-      const typOk = (u8[0] === 0x89 && u8[1] === 0x50) || (u8[0] === 0xff && u8[1] === 0xd8) || (u8[0] === 0x47 && u8[1] === 0x49);
-      if (!typOk) grund = /text\/html/i.test(r.headers.get('content-type') || '') ? 'Link zeigt auf eine Webseite, nicht direkt auf das Bild' : 'Format geht nicht (bitte PNG oder JPG)';
-      else if (u8.length > 15e6) grund = 'Bild zu groß (über 15 MB)';
-      else bild = art === 'logo' ? await bildVerkleinern(u8, 900) : await bildAlsJpeg(u8, 1600);
-    }
-  } catch (e) { grund = /timeout|abort/i.test(String(e && (e.name + ' ' + e.message))) ? 'Server antwortet nicht' : String((e && e.message) || e).slice(0, 80); }
-  if (bild) await s.schreib('nb:' + key, bild); else await s.loesch(['nb:' + key]);
-  await s.schreib('nz:' + key, { zeit: Date.now(), ok: !!bild, grund });
-  return { bild, grund };
+    const r = await fetch(url, {
+      cf: { cacheTtl: 86400, cacheEverything: true }, signal: AbortSignal.timeout(8000),
+      headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Safari/537.36', Accept: 'image/png,image/jpeg,image/webp,image/*;q=0.8' }
+    });
+    const typ = r.headers.get('content-type') || '';
+    if (!r.ok || !/^image\//i.test(typ)) return null;
+    return new Response(r.body, { headers: { 'Content-Type': typ, 'Cache-Control': 'public, max-age=86400', ...CORS } });
+  } catch (e) { return null; }
 }
-const logoLaden = async (s, design) => (design.logoUrl ? (await bildLaden(s, design.logoUrl, 'logo')).bild : null);
 
-// ─── Bild erstellen ─────────────────────────────────────────
-// Ankündigung, Story und Ergebnis desselben Rennens teilen sich EIN Hintergrundbild
-// (Wiedererkennung, spart KI-Kontingent). Gespeichert pro Rennen unter bgr:/bgv:/bgm:.
-// Reihenfolge: eigenes/Gemini/ChatGPT-Bild > Bild aus dem Streamkalender > KI-Bild.
-async function bildErstellen(env, s, post, design, cfg, neuKI, wunsch) {
-  const zust = (await s.lies('post:' + post.id)) || {};
+// KI-Hintergrund für ein Rennen (Ankündigung, Story und Ergebnis teilen sich EIN Bild)
+async function hintergrundKI(env, s, post, design, cfg, wunsch, neu) {
   const rk = rennKey(post.id);
-  let bgv = (await s.lies('bgv:' + rk)) || 0;
-  let meta = (await s.lies('bgm:' + rk)) || {};
-  let bg = neuKI ? null : await s.lies('bgr:' + rk);
-  if (!bg && !neuKI && post.kalenderBild) {
-    const k = await bildLaden(s, post.kalenderBild, 'kalender');
-    if (k.bild) {
-      bg = k.bild; bgv += 1;
-      meta = { quelle: 'kalender', prompt: '', modell: '', kiFehler: '' };
-      await s.schreib('bgr:' + rk, bg); await s.schreib('bgv:' + rk, bgv); await s.schreib('bgm:' + rk, meta);
-    }
+  if (!neu && await s.lies('bgv:' + rk)) return { ok: true };
+  const tag = new Date().toISOString().slice(0, 10);
+  const heute = (await s.lies('ki:' + tag)) || 0;
+  try {
+    if (!env.AI) throw new Error('Cloudflare-KI ist nicht eingerichtet.');
+    const k = await kiBild(env, post, {
+      stimmung: (wunsch && wunsch.stimmung) || cfg.stimmung,
+      kamera: (wunsch && wunsch.kamera) || cfg.kamera,
+      fahrzeuge: design.fahrzeuge || ''
+    }, { flux: heute < KI_PRO_TAG });
+    await s.schreib('ki:' + tag, heute + 1);
+    const bgv = ((await s.lies('bgv:' + rk)) || 0) + 1;
+    await s.schreib('bgr:' + rk, k.bild);
+    await s.schreib('bgv:' + rk, bgv);
+    await s.schreib('bgm:' + rk, { quelle: 'ki', modell: k.modell, kiFehler: '', zeit: Date.now(), startMs: post.startMs });
+    return { ok: true, bgv };
+  } catch (e) {
+    const m = (await s.lies('bgm:' + rk)) || {};
+    const kiFehler = String((e && e.message) || e).slice(0, 300);
+    await s.schreib('bgm:' + rk, { ...m, kiFehler, zeit: Date.now(), startMs: post.startMs });
+    return { ok: false, kiFehler };
   }
-  if (!bg && (neuKI || !zust.version || !meta.kiFehler)) {
-    const tag = new Date().toISOString().slice(0, 10);
-    const heute = (await s.lies('ki:' + tag)) || 0;
-    try {
-      const k = await kiBild(env, post, {
-        stimmung: (wunsch && wunsch.stimmung) || cfg.stimmung,
-        kamera: (wunsch && wunsch.kamera) || cfg.kamera,
-        fahrzeuge: design.fahrzeuge || ''
-      }, { flux: heute < KI_PRO_TAG });
-      await s.schreib('ki:' + tag, heute + 1);
-      bg = k.bild;
-      meta = { prompt: k.prompt, modell: k.modell, kiFehler: '', quelle: 'ki' };
-      bgv += 1;
-      await s.schreib('bgr:' + rk, bg);
-      await s.schreib('bgv:' + rk, bgv);
-    } catch (e) {
-      meta = { ...meta, kiFehler: String((e && e.message) || e).slice(0, 300) };
-    }
-    await s.schreib('bgm:' + rk, meta);
-  }
-  zust.ki = !!bg && meta.quelle === 'ki';
-  zust.kiFehler = bg ? '' : (meta.kiFehler || '');
-  const jpg = await rendern(post, design, bg, await logoLaden(s, design));
-  zust.version = (zust.version || 0) + 1;
-  zust.hash = inhaltSchluessel(post, design, cfg, bgv);
-  zust.postMs = post.postMs;
-  zust.erstellt = Date.now();
-  await s.schreib('img:' + post.id, jpg);
-  await s.schreib('post:' + post.id, zust);
-  return zust;
-}
-
-// ─── YouTube-Thumbnail (1920×1080) ──────────────────────────
-async function thumbBauen(env, s, rk, download) {
-  const [cfg, design] = await Promise.all([ladeCfg(s), ladeDesign(s)]);
-  const plan = bauePlan(await datenLaden(s), cfg, Date.now());
-  const rennen = plan.filter(p => rennKey(p.id) === rk && p.typ !== 'erg');
-  const post = rennen.find(p => p.typ === 'story') || rennen[0];
-  if (!post) return null;
-  const bgv = (await s.lies('bgv:' + rk)) || 0;
-  const h = kurzHash(thumbSchluessel(post, design, bgv));
-  const name = `Kreids888-${post.track || post.titel || 'Rennen'}-${post.datum}`.replace(/[^A-Za-z0-9_-]+/g, '-').replace(/-+/g, '-');
-  if (!download) {
-    const z = await s.lies('th:' + rk);
-    const alt = z && z.h === h ? await s.lies('thb:' + rk) : null;
-    if (alt) return { post, h, name, bild: alt, typ: 'jpg', gespeichert: true };
-  }
-  const bg = await s.lies('bgr:' + rk);
-  const t = await rendernThumb(post, design, bg, await logoLaden(s, design), download);
-  return { post, h, name, ...t, gespeichert: false };
-}
-async function thumbAntwort(env, rk, download) {
-  const s = speicher(env);
-  const erg = await thumbBauen(env, s, rk, download);
-  if (!erg) return new Response('Dieses Rennen ist nicht (mehr) in der Planung.', { status: 404, headers: CORS });
-  if (download) {
-    return new Response(erg.bild, { headers: { 'Content-Type': erg.typ === 'png' ? 'image/png' : 'image/jpeg', 'Content-Disposition': `attachment; filename="${erg.name}.${erg.typ}"`, 'Cache-Control': 'no-store', ...CORS } });
-  }
-  if (!erg.gespeichert) { await s.schreib('thb:' + rk, erg.bild); await s.schreib('th:' + rk, { h: erg.h, startMs: erg.post.startMs }); }
-  return new Response(erg.bild, { headers: { 'Content-Type': 'image/jpeg', 'Cache-Control': 'public, max-age=86400', ...CORS } });
 }
 
 // ─── Instagram ──────────────────────────────────────────────
@@ -207,11 +153,12 @@ async function aktuellerToken(env, s) {
 async function kontoLesen(env, s, erzwingen) {
   const token = await aktuellerToken(env, s);
   if (!token) return { verbunden: false, fehler: 'Noch kein Instagram-Token eingetragen.' };
+  const uid = String(env.IG_USER_ID || '').trim();
   const k = await s.lies('konto');
-  if (!erzwingen && k && k.verbunden && k.basis === basis(env) && Date.now() - k.zeit < 6 * 3600000) return k;
+  if (!erzwingen && k && k.verbunden && k.basis === basis(env) && k.uid === uid && Date.now() - k.zeit < 6 * 3600000) return k;
   try {
-    const d = await konto(token, String(env.IG_USER_ID || '').trim());
-    const neu = { verbunden: true, user_id: d.user_id, username: d.username || '', zeit: Date.now(), basis: basis(env) };
+    const d = await konto(token, uid);
+    const neu = { verbunden: true, user_id: d.user_id, username: d.username || '', zeit: Date.now(), basis: basis(env), uid };
     await s.schreib('konto', neu);
     return neu;
   } catch (e) {
@@ -234,11 +181,10 @@ async function tokenPflege(env, s) {
 }
 
 async function veroeffentlichen(env, s, post, design, cfg) {
-  let zust = (await s.lies('post:' + post.id)) || {};
+  const zust = (await s.lies('post:' + post.id)) || {};
   // Sperre gegen doppeltes Posten (Zeitplan und „Jetzt posten“ gleichzeitig)
   if (zust.gepostet || (zust.laeuft && Date.now() - zust.laeuft < 5 * 60000)) return zust;
-  const bgv = (await s.lies('bgv:' + rennKey(post.id))) || 0;
-  if (!zust.version || zust.hash !== inhaltSchluessel(post, design, cfg, bgv)) zust = await bildErstellen(env, s, post, design, cfg, false);
+  if (!zust.version) { zust.fehler = BILD_FEHLT; await s.schreib('post:' + post.id, zust); return zust; }
   zust.laeuft = Date.now();
   await s.schreib('post:' + post.id, zust);
   const token = await aktuellerToken(env, s);
@@ -272,34 +218,37 @@ async function zyklus(env) {
   try { daten = await datenLaden(s, jetzt); } catch (e) { await s.schreib('lauf', { zeit: jetzt, fehler: String(e.message || e) }); return; }
   const plan = bauePlan(daten, cfg, jetzt);
   const st = await s.liste('post:');
-  // 1. Fällige Posts senden
+  // 1. Fällige Posts senden (nur mit fertigem Bild aus dem Dashboard)
   for (const p of plan) {
     const z = st['post:' + p.id] || {};
     if (z.gepostet || z.uebersprungen || (z.versuche || 0) >= 3) continue;
     if (p.postMs <= jetzt && (cfg.modus === 'auto' || z.freigegeben)) await veroeffentlichen(env, s, p, design, cfg);
   }
-  // 2. Bilder für die nächsten 48 Stunden vorbereiten bzw. auffrischen
-  let ki = 2, neu = 3;
+  // 2. KI-Hintergründe für die Rennen der nächsten 48 Stunden (höchstens 2 pro Lauf)
+  let ki = 2;
+  const gesehen = new Set();
   for (const p of plan) {
-    if (p.postMs - jetzt > 48 * 3600000) break;
-    const z = (await s.lies('post:' + p.id)) || {};
-    if (z.gepostet || z.uebersprungen) continue;
-    try {
-      const bgv = (await s.lies('bgv:' + rennKey(p.id))) || 0;
-      if (!z.version && (bgv || p.kalenderBild || ki > 0)) { if (!bgv && !p.kalenderBild) ki--; await bildErstellen(env, s, p, design, cfg, false); }
-      else if (z.version && z.hash !== inhaltSchluessel(p, design, cfg, bgv) && neu > 0) { neu--; await bildErstellen(env, s, p, design, cfg, false); }
-    } catch (e) { /* nächster Lauf */ }
+    if (p.postMs - jetzt > 48 * 3600000 || ki <= 0) break;
+    const rk = rennKey(p.id);
+    if (gesehen.has(rk) || p.kalenderBild || (st['post:' + p.id] || {}).gepostet) continue;
+    gesehen.add(rk);
+    if (await s.lies('bgv:' + rk)) continue;
+    const m = await s.lies('bgm:' + rk);
+    if (m && m.kiFehler && jetzt - (m.zeit || 0) < 6 * 3600000) continue;
+    ki--;
+    await hintergrundKI(env, s, p, design, cfg, null, false);
   }
   // 3. Token verlängern
   await tokenPflege(env, s);
-  // 4. Aufräumen: Einträge älter als 14 Tage, alte Thumbnails, alte Netz-Bilder, alte KI-Tageszähler
+  // 4. Aufräumen: Einträge älter als 14 Tage, alte KI-Tageszähler, Reste der alten Version (th:, thb:, nz:, nb:)
   const weg = [];
-  for (const [k, z] of Object.entries(st)) {
-    if (z && z.postMs && z.postMs < jetzt - 14 * 86400000) { const id = k.slice(5), rk = rennKey(id); weg.push(k, 'img:' + id, 'bgr:' + rk, 'bgv:' + rk, 'bgm:' + rk); }
-  }
-  for (const [k, r] of Object.entries(await s.liste('renn:'))) if (!r || !r.startMs || r.startMs < jetzt - 14 * 86400000) weg.push(k, 'merg:' + k.slice(5));
-  for (const [k, z] of Object.entries(await s.liste('th:'))) if (!z || !z.startMs || z.startMs < jetzt - 2 * 86400000) weg.push(k, 'thb:' + k.slice(3));
-  for (const [k, z] of Object.entries(await s.liste('nz:'))) if (!z || !z.zeit || z.zeit < jetzt - 7 * 86400000) weg.push(k, 'nb:' + k.slice(3));
+  const alt = ms => !ms || ms < jetzt - 14 * 86400000;
+  for (const [k, z] of Object.entries(st)) if (z && z.postMs && alt(z.postMs)) weg.push(k, 'img:' + k.slice(5));
+  for (const [k, m] of Object.entries(await s.liste('bgm:'))) if (alt(m && m.startMs)) { const rk = k.slice(4); weg.push(k, 'bgr:' + rk, 'bgv:' + rk); }
+  for (const [k, r] of Object.entries(await s.liste('renn:'))) if (alt(r && r.startMs)) weg.push(k, 'merg:' + k.slice(5));
+  for (const [k, t] of Object.entries(await s.liste('thr:'))) if (alt(t && t.startMs)) weg.push(k);
+  for (const [k, t] of Object.entries(await s.liste('kbu:'))) if (alt(t && t.startMs)) weg.push(k);
+  for (const pre of ['th:', 'thb:', 'nz:', 'nb:']) weg.push(...Object.keys(await s.liste(pre)));
   const tagHeute = new Date().toISOString().slice(0, 10);
   for (const k of Object.keys(await s.liste('ki:'))) if (k !== 'ki:' + tagHeute) weg.push(k);
   if (weg.length) await s.loesch(weg.slice(0, 120));
@@ -336,44 +285,52 @@ async function istAdmin(req) {
 function status(z, cfg) {
   if (z.gepostet) return 'gepostet';
   if (z.uebersprungen) return 'uebersprungen';
-  if (z.fehler) return 'fehler';
+  if (z.fehler && z.fehler !== BILD_FEHLT) return 'fehler';
   if (cfg.modus === 'freigabe' && !z.freigegeben) return 'wartet';
   return 'geplant';
 }
-const QUELLE = { eigen: 'Eigenes Bild', gemini: 'Gemini-App', chatgpt: 'ChatGPT-App', kalender: 'Bild aus dem Streamkalender' };
+const QUELLE = { eigen: 'Eigenes Bild', gemini: 'Gemini-App', chatgpt: 'ChatGPT-App', ki: 'Cloudflare-KI' };
 
 async function stand(env, s) {
   const jetzt = Date.now();
   const tag = new Date().toISOString().slice(0, 10);
-  const [cfg, design, st, lauf, kiHeute, bgvs, bgms] = await Promise.all([ladeCfg(s), ladeDesign(s), s.liste('post:'), s.lies('lauf'),
-    s.lies('ki:' + tag), s.liste('bgv:'), s.liste('bgm:')]);
+  const [cfg, design, st, lauf, kiHeute, bgvs, bgms, kbus, thrs, vorlage] = await Promise.all([ladeCfg(s), ladeDesign(s), s.liste('post:'), s.lies('lauf'),
+    s.lies('ki:' + tag), s.liste('bgv:'), s.liste('bgm:'), s.liste('kbu:'), s.liste('thr:'), s.lies('thumbvorlage')]);
   const daten = await datenLaden(s, jetzt);
   const plan = bauePlan(daten, cfg, jetzt);
   const k = await kontoLesen(env, s, false);
-  const logoInfo = design.logoUrl ? await s.lies('nz:logo:' + design.logoUrl) : null;
+  // Link des Kalender-Bilds pro Rennen merken (für /hintergrund/:rennen)
+  for (const p of plan) {
+    const rk = rennKey(p.id), alt = kbus['kbu:' + rk];
+    if (p.kalenderBild && (!alt || alt.url !== p.kalenderBild)) { const neu = { url: p.kalenderBild, startMs: p.startMs }; await s.schreib('kbu:' + rk, neu); kbus['kbu:' + rk] = neu; }
+  }
   const posts = plan.map(p => {
     const z = st['post:' + p.id] || {};
     const rk = rennKey(p.id);
+    const bgv = bgvs['bgv:' + rk] || 0;
     const m = bgms['bgm:' + rk] || {};
+    const soll = kurzHash(inhaltSchluessel(p, design, cfg, bgv));
     return {
-      id: p.id, typ: p.typ, art: p.art, spr: p.spr, titel: p.titel, serie: p.serie, nr: p.nr, track: p.track, layout: p.layout,
-      postMs: p.postMs, startMs: p.startMs, liveMs: p.liveMs, klassen: p.klassen, reverseGrid: p.reverseGrid,
+      id: p.id, typ: p.typ, art: p.art, spr: p.spr, titel: p.titel, serie: p.serie, nr: p.nr, track: p.track, layout: p.layout, datum: p.datum,
+      postMs: p.postMs, startMs: p.startMs, qualiMs: p.qualiMs || p.startMs, rennMs: p.rennMs || p.startMs, liveMs: p.liveMs, tage: p.tage || 0,
+      klassen: p.klassen, reverseGrid: p.reverseGrid,
       ergebnis: p.ergebnis || null, platz: p.ergebnis ? platzText(p.ergebnis) : '', eigenesErgebnis: !!p.eigenesErgebnis,
-      status: status(z, cfg), freigegeben: !!z.freigegeben, fehler: z.fehler || '', kiFehler: z.kiFehler || '',
+      status: status(z, cfg), freigegeben: !!z.freigegeben, fehler: z.fehler || '', kiFehler: bgv ? '' : (m.kiFehler || ''),
       gepostet: z.gepostet || null,
       bild: z.version ? `${env.ORIGIN}/bild/${p.id}/${z.version}.jpg` : '',
-      veraltet: !!z.version && z.hash !== inhaltSchluessel(p, design, cfg, bgvs['bgv:' + rk] || 0),
-      bildQuelle: QUELLE[m.quelle] || (m.modell ? 'Cloudflare-KI (' + m.modell + ')' : ''),
+      soll, veraltet: !!z.version && z.hash !== soll,
+      hg: bgv ? `${env.ORIGIN}/hintergrund/${rk}?v=${bgv}` : p.kalenderBild ? `${env.ORIGIN}/hintergrund/${rk}?k=${kurzHash(p.kalenderBild)}` : '',
+      bildQuelle: bgv ? (QUELLE[m.quelle] || '') + (m.modell ? ' (' + m.modell + ')' : '') : p.kalenderBild ? 'Bild aus dem Streamkalender' : '',
       rennKey: rk,
-      thumb: p.typ === 'erg' ? '' : `${env.ORIGIN}/thumb/${rk}.jpg?h=${kurzHash(thumbSchluessel(p, design, bgvs['bgv:' + rk] || 0))}`,
-      thumbLaden: p.typ === 'erg' ? '' : `${env.ORIGIN}/thumb/${rk}.png`,
+      thumb: thrs['thr:' + rk] || null,
       autos: autos(p, design.fahrzeuge || ''),
       text: p.typ === 'story' ? '' : bildtext(p, cfg, design)
     };
   });
   return {
-    cfg, design: { ...design, logoBild: design.logoUrl ? `${env.ORIGIN}/logo.png?v=${kurzHash(design.logoUrl)}` : '', logoFehler: logoInfo && !logoInfo.ok ? (logoInfo.grund || 'nicht ladbar') : '' },
-    posts, offen: daten.offen || [], konto: { verbunden: !!k.verbunden, username: k.username || '', fehler: k.fehler || '' },
+    cfg, design: { ...design, logoBild: design.logoUrl ? `${env.ORIGIN}/logo.png?v=${kurzHash(design.logoUrl)}` : '' },
+    posts, offen: daten.offen || [], thumbVorlage: vorlage || null,
+    konto: { verbunden: !!k.verbunden, username: k.username || '', fehler: k.fehler || '' },
     lauf: lauf || null, jetzt,
     ki: { genutzt: kiHeute || 0, max: KI_PRO_TAG, frei: Math.max(0, KI_PRO_TAG - (kiHeute || 0)) }
   };
@@ -384,21 +341,28 @@ async function postAusPlan(s, id) {
   const plan = bauePlan(await datenLaden(s), cfg, Date.now());
   return { p: plan.find(x => x.id === id), plan, cfg, design };
 }
+// Bild-Bytes aus dem Request (Dashboard schickt JPEG direkt, ohne JSON)
+async function bildAusBody(req, max) {
+  const u8 = new Uint8Array(await req.arrayBuffer());
+  return u8.length >= 1000 && u8.length <= max && (bildTyp(u8) === 'image/jpeg' || bildTyp(u8) === 'image/png') ? u8 : null;
+}
 
 async function api(req, env, url) {
   if (!(await istAdmin(req))) return fehler('Bitte im Kreids-Dashboard neu einloggen.', 403);
   const s = speicher(env);
   const pfad = url.pathname;
-  const body = req.method === 'POST' ? await req.json().catch(() => ({})) : {};
+  const json = () => req.json().catch(() => ({}));
 
   if (pfad === '/api/stand' && req.method === 'GET') return antwort(await stand(env, s));
 
   if (pfad === '/api/einstellungen' && req.method === 'POST') {
+    const body = await json();
     await s.schreib('cfg', cfgPruefen(body.cfg || body));
     return antwort({ ok: true, cfg: await ladeCfg(s) });
   }
 
   if (pfad === '/api/design' && req.method === 'POST') {
+    const body = await json();
     const alt = await ladeDesign(s);
     const neu = { ...alt };
     if (farbeOk(body.farbe1)) neu.farbe1 = body.farbe1;
@@ -408,7 +372,7 @@ async function api(req, env, url) {
     if (typeof body.logoUrl === 'string') {
       const u = body.logoUrl.trim();
       if (u && !/^https:\/\//i.test(u)) return fehler('Logo-Link muss mit https:// anfangen.');
-      if (u !== alt.logoUrl) { neu.logoUrl = u; neu.logoVersion = (alt.logoVersion || 0) + 1; if (u) await s.loesch(['nz:logo:' + u, 'nb:logo:' + u]); }
+      if (u !== alt.logoUrl) { neu.logoUrl = u; neu.logoVersion = (alt.logoVersion || 0) + 1; }
     }
     await s.schreib('design', neu);
     return antwort({ ok: true });
@@ -419,8 +383,38 @@ async function api(req, env, url) {
     return antwort({ verbunden: !!k.verbunden, username: k.username || '', fehler: k.fehler || '' });
   }
 
+  // YouTube-Thumbnail: Vorlage für alle Rennen
+  if (pfad === '/api/thumbvorlage' && req.method === 'POST') {
+    const body = await json();
+    const t = JSON.stringify(body.vorlage || null);
+    if (!body.vorlage || typeof body.vorlage !== 'object' || t.length > 60000) return fehler('Vorlage ungültig.');
+    await s.schreib('thumbvorlage', body.vorlage);
+    return antwort({ ok: true });
+  }
+  // YouTube-Thumbnail: Spruch und Ich-Bild für ein Rennen
+  const th = pfad.match(/^\/api\/thumb\/([A-Za-z0-9_-]{1,200})$/);
+  if (th && req.method === 'POST') {
+    const body = await json();
+    const alt = (await s.lies('thr:' + th[1])) || {};
+    const neu = { ...alt, startMs: Number(body.startMs) || alt.startMs || Date.now() };
+    if (typeof body.spruch === 'string') neu.spruch = body.spruch.replace(/[<>]/g, '').slice(0, 80);
+    if (typeof body.pers === 'string') neu.pers = body.pers.replace(/[^A-Za-z0-9_.-]/g, '').slice(0, 80);
+    await s.schreib('thr:' + th[1], neu);
+    return antwort({ ok: true });
+  }
+  // Clickbait-Sprüche (Cloudflare-KI, sonst feste Vorschläge)
+  if (pfad === '/api/sprueche' && req.method === 'POST') {
+    const body = await json();
+    const { plan } = await postAusPlan(s, '');
+    const rennen = plan.filter(x => rennKey(x.id) === body.rennKey);
+    const p = rennen.find(x => x.typ === 'erg') || rennen[0];
+    if (!p) return fehler('Dieses Rennen ist nicht (mehr) in der Planung.', 404);
+    return antwort(await sprueche(env, p));
+  }
+
   // Ergebnis eines eigenen Rennens von Hand eintragen (oder mit loeschen: true wieder entfernen)
   if (pfad === '/api/ergebnis' && req.method === 'POST') {
+    const body = await json();
     const rk = String(body.rennKey || '');
     if (!/^[A-Za-z0-9_-]{1,200}$/.test(rk) || !(await s.lies('renn:' + rk))) return fehler('Dieses Rennen kenne ich nicht (mehr).', 404);
     if (body.loeschen) {
@@ -430,53 +424,68 @@ async function api(req, env, url) {
       return antwort({ ok: true });
     }
     const platz = x => { const n = parseInt(x, 10); return n >= 1 && n <= 99 ? n : null; };
-    const status = ['DNF', 'DSQ'].includes(body.status) ? body.status : '';
-    const ziel = status ? null : platz(body.ziel);
-    if (!status && !ziel) return fehler('Bitte den Zielplatz eintragen (oder DNF/DSQ wählen).');
-    await s.schreib('merg:' + rk, { start: platz(body.start), ziel, status: status || 'FIN', punkte: Math.max(0, Math.min(999, parseInt(body.punkte, 10) || 0)), zeit: Date.now() });
+    const st = ['DNF', 'DSQ'].includes(body.status) ? body.status : '';
+    const ziel = st ? null : platz(body.ziel);
+    if (!st && !ziel) return fehler('Bitte den Zielplatz eintragen (oder DNF/DSQ wählen).');
+    await s.schreib('merg:' + rk, { start: platz(body.start), ziel, status: st || 'FIN', punkte: Math.max(0, Math.min(999, parseInt(body.punkte, 10) || 0)), zeit: Date.now() });
     return antwort({ ok: true });
   }
 
-  const m = pfad.match(/^\/api\/post\/([A-Za-z0-9_-]{1,200})\/(bild|freigeben|ueberspringen|jetzt|manuell|eigenesbild)$/);
+  const m = pfad.match(/^\/api\/post\/([A-Za-z0-9_-]{1,200})\/(fertig|bild|freigeben|ueberspringen|jetzt|manuell|eigenesbild)$/);
   if (m && req.method === 'POST') {
     const [, id, aktion] = m;
     const z = (await s.lies('post:' + id)) || {};
-    if (aktion === 'manuell') {
-      if (body.an === false) { delete z.gepostet; } else { z.gepostet = { zeit: Date.now(), manuell: true }; z.fehler = ''; }
+    if (aktion === 'manuell' || aktion === 'freigeben' || aktion === 'ueberspringen') {
+      const body = await json();
+      if (aktion === 'manuell') {
+        if (body.an === false) delete z.gepostet; else { z.gepostet = { zeit: Date.now(), manuell: true }; z.fehler = ''; }
+      } else {
+        if (aktion === 'freigeben') z.freigegeben = body.an !== false; else z.uebersprungen = body.an !== false;
+        if (body.an !== false) { z.fehler = z.version ? '' : z.fehler; z.versuche = 0; }
+      }
       await s.schreib('post:' + id, z);
       return antwort({ ok: true });
     }
-    if (aktion === 'freigeben' || aktion === 'ueberspringen') {
-      if (aktion === 'freigeben') z.freigegeben = body.an !== false;
-      else z.uebersprungen = body.an !== false;
-      if (body.an !== false) { z.fehler = ''; z.versuche = 0; }
+    const rk = rennKey(id);
+    // Fertiges Bild vom Dashboard (im Browser gezeichnet, JPEG)
+    if (aktion === 'fertig') {
+      if (z.gepostet) return fehler('Dieser Post ist schon auf Instagram.');
+      const u8 = await bildAusBody(req, 8e6);
+      if (!u8 || bildTyp(u8) !== 'image/jpeg') return fehler('Bild ungültig (JPEG bis 8 MB).');
+      const { p } = await postAusPlan(s, id);
+      if (!p) return fehler('Diesen Post gibt es im Streamkalender nicht (mehr).', 404);
+      const [bgv, bgm] = await Promise.all([s.lies('bgv:' + rk), s.lies('bgm:' + rk)]);
+      z.version = (z.version || 0) + 1;
+      z.hash = String(url.searchParams.get('h') || '').slice(0, 20);
+      z.postMs = p.postMs;
+      z.erstellt = Date.now();
+      z.ki = !!bgv && !!bgm && bgm.quelle === 'ki';
+      if (z.fehler === BILD_FEHLT) z.fehler = '';
+      await s.schreib('img:' + id, u8);
       await s.schreib('post:' + id, z);
-      return antwort({ ok: true });
+      return antwort({ ok: true, bild: `${env.ORIGIN}/bild/${id}/${z.version}.jpg` });
     }
-    const { p, plan, cfg, design } = await postAusPlan(s, id);
-    if (!p) return fehler('Diesen Post gibt es im Streamkalender nicht (mehr).', 404);
+    // Eigenes Hintergrundbild (Gemini-App, ChatGPT-App, Screenshot …) für alle Posts dieses Rennens
     if (aktion === 'eigenesbild') {
-      // Eigenes Bild (Gemini-App, ChatGPT-App, Screenshot …) für alle Posts dieses Rennens
-      const roh = String(body.bild || '').replace(/^data:image\/\w+;base64,/, '');
-      const u8 = new Uint8Array(Buffer.from(roh, 'base64'));
-      const jpg = u8[0] === 0xff && u8[1] === 0xd8, png = u8[0] === 0x89 && u8[1] === 0x50;
-      if (!(jpg || png) || u8.length < 1000 || u8.length > 1900000) return fehler('Bitte ein JPG oder PNG bis 1,9 MB.');
-      const rk = rennKey(id);
+      const u8 = await bildAusBody(req, 1.9e6);
+      if (!u8) return fehler('Bitte ein JPG oder PNG bis 1,9 MB.');
+      const { p } = await postAusPlan(s, id);
+      if (!p) return fehler('Diesen Post gibt es im Streamkalender nicht (mehr).', 404);
+      const herkunft = url.searchParams.get('herkunft');
       const bgv = ((await s.lies('bgv:' + rk)) || 0) + 1;
       await s.schreib('bgr:' + rk, u8);
       await s.schreib('bgv:' + rk, bgv);
-      await s.schreib('bgm:' + rk, { quelle: ['gemini', 'chatgpt'].includes(body.herkunft) ? body.herkunft : 'eigen', prompt: '', modell: '', kiFehler: '' });
-      const neu = await bildErstellen(env, s, p, design, cfg, false);
-      // Die anderen Posts dieses Rennens (Ankündigung ↔ Story ↔ Ergebnis) gleich mitzeichnen
-      for (const q of plan.filter(x => rennKey(x.id) === rk && x.id !== id)) {
-        if (!((await s.lies('post:' + q.id)) || {}).gepostet) await bildErstellen(env, s, q, design, cfg, false);
-      }
-      return antwort({ ok: true, bild: `${env.ORIGIN}/bild/${id}/${neu.version}.jpg` });
+      await s.schreib('bgm:' + rk, { quelle: ['gemini', 'chatgpt'].includes(herkunft) ? herkunft : 'eigen', modell: '', kiFehler: '', zeit: Date.now(), startMs: p.startMs });
+      return antwort({ ok: true, bgv });
     }
+    const body = await json();
+    const { p, cfg, design } = await postAusPlan(s, id);
+    if (!p) return fehler('Diesen Post gibt es im Streamkalender nicht (mehr).', 404);
+    // KI-Hintergrund (neu: true = neues Bild, auch wenn schon eins da ist)
     if (aktion === 'bild') {
       const wunsch = { stimmung: body.stimmung in STIMMUNGEN ? body.stimmung : '', kamera: body.kamera in KAMERAS ? body.kamera : '' };
-      const neu = await bildErstellen(env, s, p, design, cfg, !!body.neu, wunsch);
-      return antwort({ ok: true, bild: `${env.ORIGIN}/bild/${id}/${neu.version}.jpg`, kiFehler: neu.kiFehler || '' });
+      const r = await hintergrundKI(env, s, p, design, cfg, wunsch, !!body.neu);
+      return antwort({ ok: r.ok, kiFehler: r.kiFehler || '' });
     }
     if (aktion === 'jetzt') {
       if (z.gepostet) return fehler('Dieser Post ist schon auf Instagram.');
@@ -494,6 +503,7 @@ export default {
     const url = new URL(req.url);
     if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: CORS });
     try {
+      // Fertiges Post-Bild (für Instagram und die Vorschau)
       const b = url.pathname.match(/^\/bild\/([A-Za-z0-9_-]{1,200})\/\d+\.jpg$/);
       if (b && req.method === 'GET') {
         const jpg = await speicher(env).lies('img:' + b[1]);
@@ -502,25 +512,20 @@ export default {
         if (url.searchParams.has('laden')) h['Content-Disposition'] = `attachment; filename="kreids888-${b[1]}.jpg"`;
         return new Response(jpg, { headers: h });
       }
-      const th = url.pathname.match(/^\/thumb\/([A-Za-z0-9_-]{1,200})\.(jpg|png)$/);
-      if (th && req.method === 'GET') return await thumbAntwort(env, th[1], th[2] === 'png');
-      if (url.pathname === '/logo.png' && req.method === 'GET') {
+      // Hintergrund eines Rennens: KI-/eigenes Bild, sonst das Bild aus dem Streamkalender
+      const hg = url.pathname.match(/^\/hintergrund\/([A-Za-z0-9_-]{1,200})$/);
+      if (hg && req.method === 'GET') {
         const s = speicher(env);
-        const logo = await logoLaden(s, await ladeDesign(s));
-        if (!logo) return new Response('Kein Logo', { status: 404, headers: CORS });
-        return new Response(logo, { headers: { 'Content-Type': 'image/png', 'Cache-Control': 'public, max-age=3600', ...CORS } });
+        const bg = await s.lies('bgr:' + hg[1]);
+        if (bg) return new Response(bg, { headers: { 'Content-Type': bildTyp(bg) || 'image/jpeg', 'Cache-Control': 'public, max-age=86400', ...CORS } });
+        const k = await s.lies('kbu:' + hg[1]);
+        return (k && await durchreichen(k.url)) || new Response('Kein Hintergrund', { status: 404, headers: CORS });
+      }
+      if (url.pathname === '/logo.png' && req.method === 'GET') {
+        const d = await ladeDesign(speicher(env));
+        return (await durchreichen(d.logoUrl)) || new Response('Kein Logo', { status: 404, headers: CORS });
       }
       if (url.pathname.startsWith('/api/')) return await api(req, env, url);
-      // Nur zum Testen auf dem eigenen Rechner (TEST=1): Bild aus Beispieldaten zeichnen
-      if (env.TEST === '1' && url.pathname === '/test/render' && req.method === 'POST') {
-        const d = await req.json();
-        const u8 = x => (x ? new Uint8Array(Buffer.from(x, 'base64')) : null);
-        const design = { ...DESIGN_STANDARD, ...(d.design || {}) };
-        const logo = d.logo ? await bildVerkleinern(u8(d.logo), 900) : null;
-        const bg = d.bg ? await bildAlsJpeg(u8(d.bg), 1600) : null;
-        if (d.thumb) { const t = await rendernThumb(d.post, design, bg, logo, !!d.download); return new Response(t.bild, { headers: { 'Content-Type': t.typ === 'png' ? 'image/png' : 'image/jpeg' } }); }
-        return new Response(await rendern(d.post, design, bg, logo), { headers: { 'Content-Type': 'image/jpeg' } });
-      }
       if (url.pathname === '/') return new Response('kreids-insta läuft.', { headers: { 'Content-Type': 'text/plain; charset=utf-8' } });
       return new Response('Nicht gefunden', { status: 404 });
     } catch (e) {

@@ -3,7 +3,8 @@
 // • Ankündigung (Feed) X Tage vorher, Raceday-Story am Renntag, Rennergebnis (Feed)
 // • Daten: Streamkalender (SPR live + eigene Einträge) und SPR-Ergebnisse
 // • Eigene Rennen: nach dem Rennen „Ergebnis eintragen“
-// • YouTube-Thumbnail 1920×1080 pro Rennen (PNG unter 2 MB, sonst JPG)
+// • Bilder zeichnet der Browser (insta-bilder.js) und schickt sie an den Worker (Gratis-Tarif: 10 ms Rechenzeit)
+// • YouTube-Thumbnail 1920×1080: Editor mit Vorlage für alle Rennen (insta-thumb.js), PNG unter 2 MB, sonst JPG
 // • Modus „Mit Freigabe“ oder „Automatisch“
 // Worker: workers/kreids-insta (kreids-insta.kreids.workers.dev), Login = Dashboard-Login
 // Wird vom Dashboard geladen: K888Insta.start(box)
@@ -11,6 +12,8 @@
 (function () {
   'use strict';
   const INSTA = 'https://kreids-insta.kreids.workers.dev';
+  // Gleicher Ort wie diese Datei (kreids888.com): Zeichnen + Thumbnail-Editor
+  const BASIS = ((document.currentScript && document.currentScript.src) || 'https://kreids888.com/insta-admin.js').replace(/[^/]*$/, '');
   const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const token = () => { try { return localStorage.getItem('k888_token') || ''; } catch (e) { return ''; } };
   const zeit = ms => new Date(ms).toLocaleString('de-DE', { timeZone: 'Europe/Berlin', weekday: 'short', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }).replace(',', '').replace(', ', ' · ');
@@ -19,7 +22,7 @@
   const KAMERA = [['zufall', '🎲 Blick: Zufall'], ['nah', '🔭 Nah, Autos groß'], ['schwenk', '💨 Mitzieher (Bewegung)'], ['frontal', '⬆ Frontal auf der Geraden'],
     ['kurve', '↪ Duell in der Kurve'], ['seite', '➡ Von der Seite']];
   const auswahl = (liste, wert, attr) => `<select ${attr}>${liste.map(([v, t]) => `<option value="${v}" ${v === wert ? 'selected' : ''}>${t}</option>`).join('')}</select>`;
-  let BOX = null, STAND = null, FEHLER = '', LAEDT = false, REITER = 'posts';
+  let BOX = null, STAND = null, FEHLER = '', LAEDT = false, REITER = 'posts', THUMB_RK = '', MALT = '';
   let WARTET = null, UEBERNIMMT = false, LESEN_VERBOTEN = false, HILFE_OFFEN = false;
 
   // ─── Kurze Meldung unten rechts ───
@@ -42,14 +45,66 @@
     return d;
   }
 
-  async function laden() {
+  async function laden(still) {
     if (LAEDT) return;
     LAEDT = true; FEHLER = '';
-    zeichnen();
+    if (!still) zeichnen();
     try { STAND = await igApi('GET', '/api/stand'); }
     catch (e) { FEHLER = e.message; }
     LAEDT = false;
     zeichnen();
+    if (STAND && !still) abgleichen();
+  }
+
+  // ─── Bilder im Browser zeichnen und hochladen ───
+  // Jeder offene Post bekommt sein Bild; ändern sich Daten/Design/Hintergrund (veraltet), wird neu gezeichnet.
+  // Rennen der nächsten 7 Tage ohne Hintergrund bekommen vorher ein KI-Bild (höchstens 2 pro Öffnen).
+  let GLEICHT = false;
+  const offenePosts = () => (STAND ? STAND.posts : []).filter(p => p.status !== 'gepostet' && p.status !== 'uebersprungen');
+  async function abgleichen() {
+    if (GLEICHT || !STAND || !window.K888Bilder) return;
+    GLEICHT = true;
+    try {
+      const ohneHg = [...new Map(offenePosts().filter(p => !p.hg && !p.kiFehler && p.postMs - Date.now() < 7 * 86400000).map(p => [p.rennKey, p])).values()];
+      let ki = Math.min(2, (STAND.ki && STAND.ki.frei) || 0), neu = false;
+      for (const p of ohneHg) {
+        if (ki-- <= 0) break;
+        malen(`🎨 KI-Hintergrund für ${p.track || p.titel || 'Rennen'} …`);
+        try { const r = await igApi('POST', `/api/post/${encodeURIComponent(p.id)}/bild`, { neu: false }); if (r.ok) neu = true; } catch (e) { /* nächstes Mal */ }
+      }
+      if (neu) { STAND = await igApi('GET', '/api/stand'); zeichnen(); }
+      const todo = offenePosts().filter(p => !p.bild || p.veraltet);
+      let n = 0;
+      for (const p of todo) {
+        malen(`🖌 Bilder werden gezeichnet … ${++n}/${todo.length}`);
+        try { await bildHochladen(p); } catch (e) { meldung('Bild „' + (TYP[p.typ] || p.typ) + '“ ging nicht: ' + e.message, 1); }
+      }
+      if (todo.length) { STAND = await igApi('GET', '/api/stand'); }
+    } catch (e) { meldung(e.message, 1); }
+    finally { GLEICHT = false; malen(''); zeichnen(); }
+  }
+  async function bildHochladen(p) {
+    const blob = await window.K888Bilder.post(p, STAND.design);
+    const r = await fetch(INSTA + `/api/post/${encodeURIComponent(p.id)}/fertig?h=${encodeURIComponent(p.soll)}`, {
+      method: 'POST', headers: { Authorization: 'Bearer ' + token(), 'Content-Type': 'image/jpeg' }, body: blob
+    });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(d.error || ('Fehler ' + r.status));
+    p.bild = d.bild; p.veraltet = false;
+    return d;
+  }
+  // Vor dem Posten/Freigeben: aktuelles Bild sicherstellen
+  async function bildSicher(id) {
+    const p = (STAND.posts || []).find(x => x.id === id);
+    if (p && (!p.bild || p.veraltet)) await bildHochladen(p);
+  }
+  function malen(t) { MALT = t; const el = BOX && BOX.querySelector('.ki-malt'); if (el) { el.textContent = t; el.hidden = !t; } }
+  // Bild als JPEG/PNG roh an den Worker (eigenes Bild, Gemini, ChatGPT)
+  async function bildSenden(pfad, blob) {
+    const r = await fetch(INSTA + pfad, { method: 'POST', headers: { Authorization: 'Bearer ' + token(), 'Content-Type': blob.type || 'image/jpeg' }, body: blob });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(d.error || ('Fehler ' + r.status));
+    return d;
   }
 
   // ─── Zeichnen ───
@@ -60,26 +115,28 @@
   const TYP = { ank: '📣 Ankündigung · Feed', story: '📱 Raceday · Story', erg: '🏁 Ergebnis · Feed' };
   const titel = p => [p.serie || p.titel, p.nr ? 'R' + p.nr : '', [p.track, p.layout].filter(Boolean).join(' – ')].filter(Boolean).map(esc).join(' · ');
 
-  // ▶ YouTube-Thumbnail 1920×1080 (pro Rennen)
+  // ▶ YouTube-Thumbnail 1920×1080 (pro Rennen): kleine Vorschau aus der Vorlage
   const thumbFeld = p => `<div class="ki-stream">
-      <a href="${esc(p.thumb)}" target="_blank" rel="noopener" class="ki-bild yt" title="Thumbnail groß öffnen"><img src="${esc(p.thumb)}" alt="YouTube-Thumbnail 1920×1080" loading="lazy"></a>
+      <canvas class="ki-bild yt" width="480" height="270" data-thumb="${esc(p.rennKey)}" data-aktion="th-edit" data-rk="${esc(p.rennKey)}" title="Thumbnail bearbeiten"></canvas>
       <div class="ki-dim">▶ YouTube-Thumbnail · 1920×1080</div>
-      <a class="btn btn-ghost ki-k" href="${esc(p.thumbLaden)}" download title="PNG, oder JPG falls das PNG über 2 MB wäre"><span>📥 Thumbnail laden</span></a>
+      <div class="ki-knoepfe" style="margin:0">
+        <button class="btn btn-ghost ki-k" data-aktion="th-laden" data-rk="${esc(p.rennKey)}" title="PNG, oder JPG falls das PNG über 2 MB wäre"><span>📥 Laden</span></button>
+        <button class="btn btn-ghost ki-k" data-aktion="th-edit" data-rk="${esc(p.rennKey)}"><span>✎ Bearbeiten</span></button>
+      </div>
     </div>`;
 
   function postKarte(p, modus, mitThumb) {
     const [stText, stFarbe] = STATUS[p.status] || ['?', 'grau'];
     const bild = p.bild
       ? `<a href="${esc(p.bild)}" target="_blank" rel="noopener" class="ki-bild ${p.typ}" title="Vorschau groß öffnen"><img src="${esc(p.bild)}" alt="Vorschau" loading="lazy"></a>`
-      : `<div class="ki-bild ${p.typ} leer">Noch kein Bild</div>`;
+      : `<div class="ki-bild ${p.typ} leer">${GLEICHT ? '🖌 wird gezeichnet …' : 'Noch kein Bild'}</div>`;
     const id = esc(p.id), k = [];
     const kn = (aktion, text, extra = '', titel = '') => `<button class="btn btn-ghost ki-k" data-aktion="${aktion}" data-id="${id}" ${extra}${titel ? ` title="${esc(titel)}"` : ''}><span>${text}</span></button>`;
     k.push(auswahl(STIMMUNG, STAND.cfg.stimmung || 'zufall', `data-stimmung="${id}" title="Stimmung für das nächste KI-Bild"`));
     k.push(auswahl(KAMERA, STAND.cfg.kamera || 'zufall', `data-kamera="${id}" title="Blickwinkel für das nächste KI-Bild"`));
     k.push(kn('gemini', '✨ Bild mit Gemini', '', 'Bild-Auftrag kopieren und Gemini daneben öffnen – das kopierte Bild wird automatisch übernommen'));
     k.push(kn('chatgpt', '🤖 Bild mit ChatGPT', '', 'ChatGPT daneben öffnen, der Bild-Auftrag steht schon drin – das kopierte Bild wird automatisch übernommen'));
-    k.push(p.bild ? kn('neu', '🎲 Neues KI-Bild', '', 'Neues Hintergrundbild für alle Posts dieses Rennens') : kn('bild', '🖼 Bild erstellen'));
-    if (p.veraltet) k.push(kn('bild', '🔄 Aktualisieren'));
+    k.push(p.hg ? kn('neu', '🎲 Neues KI-Bild', '', 'Neues KI-Hintergrundbild für alle Posts dieses Rennens') : kn('bild', '🎨 KI-Hintergrund', '', 'KI-Hintergrundbild für alle Posts dieses Rennens'));
     if (modus === 'freigabe' && p.status !== 'uebersprungen') k.push(p.freigegeben ? kn('freigeben', '↩ Freigabe zurück', 'data-an="0"')
       : `<button class="btn btn-red ki-k" data-aktion="freigeben" data-an="1" data-id="${id}"><span>✓ Freigeben</span></button>`);
     k.push(p.status === 'uebersprungen' ? kn('ueberspringen', '↺ Wieder aktivieren', 'data-an="0"') : kn('ueberspringen', '⏭ Überspringen', 'data-an="1"'));
@@ -92,15 +149,14 @@
     if (p.fehler) h.push(`<div class="ki-hinweis rot">⚠ ${esc(p.fehler)}</div>`);
     if (p.bildQuelle) h.push(`<div class="ki-dim">Hintergrund: ${esc(p.bildQuelle)}</div>`);
     if (WARTET && WARTET.id === p.id) { const n = (KI[WARTET.quelle] || KI.gemini).name; h.push(`<div class="ki-hinweis gelb">${WARTET.quelle === 'chatgpt' ? '🤖' : '✨'} Wartet auf das Bild aus ${n}: im ${n}-Fenster Rechtsklick aufs Bild → „Bild kopieren“ → hier ins Fenster klicken (oder Strg+V). <button type="button" class="ki-link" data-aktion="ki-ab">Abbrechen</button></div>`); }
-    if (p.kiFehler) h.push(`<div class="ki-hinweis">KI-Bild ging nicht (${esc(p.kiFehler)}). Es wird ein Ersatz-Hintergrund genutzt.</div>`);
-    if (p.veraltet) h.push('<div class="ki-hinweis">Daten oder Einstellungen haben sich geändert. „Aktualisieren“ zeichnet die Vorschau neu (gleicher Hintergrund).</div>');
+    if (p.kiFehler) h.push(`<div class="ki-hinweis">KI-Bild ging nicht (${esc(p.kiFehler)}). Bis dahin gibt es einen Ersatz-Hintergrund.</div>`);
     if (p.typ === 'story') h.push('<div class="ki-hinweis">Link-Sticker geht nur von Hand: „📥 Bild laden“ → in der Insta-App als Story posten → hier „✓ Selbst gepostet“.</div>');
     const text = p.text ? `<details class="ki-text"><summary>Text unter dem Post</summary><pre>${esc(p.text)}</pre></details>` : '';
     const wann = p.typ === 'erg'
       ? `Rennen vom ${esc(new Date(p.startMs).toLocaleDateString('de-DE', { timeZone: 'Europe/Berlin', weekday: 'short', day: '2-digit', month: '2-digit' }))} · <b>${esc(p.platz)}</b>`
       : `Live ab ${esc(zeit(p.liveMs).split(' · ')[1] || '')} Uhr`;
     return `<div class="ki-post">
-      ${bild}${mitThumb && p.thumb ? thumbFeld(p) : ''}
+      ${bild}${mitThumb ? thumbFeld(p) : ''}
       <div class="ki-info">
         <div class="ki-kopf"><b>${TYP[p.typ] || p.typ}</b><span class="ki-chip ${stFarbe}">${stText}</span>${p.art && p.art !== 'Rennen' ? `<span class="ki-chip grau">${esc(p.art)}</span>` : ''}</div>
         <div class="ki-titel">${titel(p)}</div>
@@ -174,7 +230,6 @@
   function designPanel(d) {
     return `<div class="ki-panel"><h3>🎨 Aussehen</h3>
       <div class="ki-logo">${d.logoBild ? `<img src="${esc(d.logoBild)}" alt="Logo">` : '<span>kein Logo</span>'}</div>
-      ${d.logoFehler ? `<div class="ki-hinweis rot">⚠ Logo lässt sich nicht laden: ${esc(d.logoFehler)}</div>` : ''}
       <div class="ki-fg"><label for="ki-logo">Logo-Link (PNG oder JPG)</label><input id="ki-logo" type="text" spellcheck="false" value="${esc(d.logoUrl || '')}" placeholder="https://…/logo.png"></div>
       <div class="ki-reihe">
         <div class="ki-fg"><label for="ki-f1">Farbe 1</label><input id="ki-f1" type="color" value="${esc(d.farbe1)}"></div>
@@ -183,7 +238,7 @@
       <div class="ki-fg"><label for="ki-livetext">„Live auf …“ (Story und Thumbnail)</label><input id="ki-livetext" type="text" value="${esc(d.liveText || '')}" placeholder="YouTube · @Kreids888"></div>
       <div class="ki-fg"><label for="ki-autos">Fahrzeuge fürs KI-Bild (optional)</label><input id="ki-autos" type="text" value="${esc(d.fahrzeuge || '')}" placeholder="leer = passend zur Serie, z. B. Porsche 911 GT3 Cup"></div>
       <div class="ki-knoepfe"><button class="btn btn-red ki-k" data-aktion="design"><span>💾 Aussehen speichern</span></button></div>
-      <div class="ki-dim">Danach an den Posts „🔄 Aktualisieren“ – die Bilder werden neu gezeichnet.</div>
+      <div class="ki-dim">Danach werden alle Bilder automatisch neu gezeichnet.</div>
     </div>`;
   }
 
@@ -199,7 +254,7 @@
     const offen = STAND.offen || [];
     const ki = STAND.ki || { frei: 0, max: 0 };
     const liste = posts.filter(p => p.status !== 'gepostet');
-    // Thumbnail steht beim Raceday (gibt es keine Story: bei der Ankündigung)
+    // Thumbnail steht beim Raceday (gibt es keine Story: bei der Ankündigung) und beim Ergebnis
     const mitStory = new Set(posts.filter(p => p.typ === 'story').map(p => p.rennKey));
     const neuAb = new Date(new Date().setUTCHours(24, 0, 0, 0)).toLocaleTimeString('de-DE', { timeZone: 'Europe/Berlin', hour: '2-digit', minute: '2-digit' });
     BOX.innerHTML = `
@@ -217,21 +272,44 @@
           <button type="button" class="${cfg.modus === 'auto' ? 'an' : ''}" data-aktion="modus" data-wert="auto">Automatisch</button>
         </div>
       </div>
-      <p class="hint">${cfg.modus === 'auto' ? 'Posts gehen zur eingestellten Zeit von selbst raus.' : 'Jeder Post wartet, bis du ihn freigibst. Bilder werden 2 Tage vorher automatisch erstellt.'}</p>
+      <p class="hint">${cfg.modus === 'auto' ? 'Posts gehen zur eingestellten Zeit von selbst raus – die Bilder werden gezeichnet, sobald du diesen Reiter öffnest.' : 'Jeder Post wartet, bis du ihn freigibst. Die Bilder werden gezeichnet, sobald du diesen Reiter öffnest.'}</p>
+      <div class="ki-malt"${MALT ? '' : ' hidden'}>${esc(MALT)}</div>
       <div class="side ki-reiter">
-        ${[['posts', `🗓 Posts (${liste.length})`], ['zeiten', '⏰ Zeiten & Text'], ['design', '🎨 Aussehen']].map(([k, t]) =>
+        ${[['posts', `🗓 Posts (${liste.length})`], ['thumb', '▶ Thumbnail'], ['zeiten', '⏰ Zeiten & Text'], ['design', '🎨 Aussehen']].map(([k, t]) =>
           `<a class="${REITER === k ? 'active' : ''}" data-aktion="reiter" data-wert="${k}">${t}</a>`).join('')}
       </div>
       ${REITER === 'posts' ? `
         ${offen.length ? `<div class="ki-panel"><h3>🏁 Ergebnis eintragen</h3><div class="ki-dim" style="margin-bottom:10px">Deine eigenen Rennen der letzten 5 Tage. SPR-Ergebnisse kommen von selbst.</div>${offen.map(ergebnisForm).join('')}</div>` : ''}
         <div class="ki-leiste"><button class="btn btn-ghost ki-k" data-aktion="laden"><span>🔄 Neu laden</span></button></div>
         ${hilfe()}
-        ${liste.length ? liste.map(p => postKarte(p, cfg.modus, p.typ === 'story' || (p.typ === 'ank' && !mitStory.has(p.rennKey)))).join('') : '<p class="hint">Keine Rennen oder Streams in den nächsten 3 Wochen im Streamkalender.</p>'}` : ''}
+        ${liste.length ? liste.map(p => postKarte(p, cfg.modus, p.typ === 'story' || p.typ === 'erg' || (p.typ === 'ank' && !mitStory.has(p.rennKey)))).join('') : '<p class="hint">Keine Rennen oder Streams in den nächsten 3 Wochen im Streamkalender.</p>'}` : ''}
+      ${REITER === 'thumb' ? '<div class="ki-thumbbox"></div>' : ''}
       ${REITER === 'zeiten' ? `
         <div class="ki-grid">${zeitenPanel(cfg)}${textPanel(cfg)}</div>
         <div class="actions"><button class="btn btn-red" data-aktion="cfg"><span>💾 Zeiten und Texte speichern</span></button></div>` : ''}
       ${REITER === 'design' ? `<div class="ki-grid">${designPanel(STAND.design)}</div>` : ''}`;
+    if (REITER === 'thumb' && window.K888Thumb) window.K888Thumb.editor(BOX.querySelector('.ki-thumbbox'), THUMB_UMG, THUMB_RK);
+    if (REITER === 'posts' && window.K888Thumb) BOX.querySelectorAll('canvas[data-thumb]').forEach(c => {
+      const r = rennenListe().find(x => x.rennKey === c.dataset.thumb);
+      if (r) window.K888Thumb.vorschau(c, STAND.thumbVorlage, r, STAND.design);
+    });
   }
+
+  // ─── Thumbnail: Rennen (ein Eintrag pro Rennen, Daten von Story > Ankündigung > Ergebnis) ───
+  const RANG = { story: 0, ank: 1, erg: 2 };
+  function rennenListe() {
+    const m = new Map();
+    for (const p of (STAND ? STAND.posts : [])) {
+      const alt = m.get(p.rennKey);
+      if (!alt || RANG[p.typ] < RANG[alt.typ]) m.set(p.rennKey, p);
+    }
+    return [...m.values()].map(p => ({ ...p, spruch: (p.thumb && p.thumb.spruch) || '' })).sort((a, b) => a.startMs - b.startMs);
+  }
+  const THUMB_UMG = {
+    stand: () => STAND, igApi, meldung, rennen: rennenListe,
+    spruchGesetzt(rk, text) { for (const p of STAND.posts) if (p.rennKey === rk) p.thumb = { ...(p.thumb || {}), spruch: text }; },
+    vorlageGespeichert(v) { STAND.thumbVorlage = v; }
+  };
 
   // ─── Bild → JPEG (max. 1600 px) ───
   function ladeBild(src) {
@@ -245,7 +323,7 @@
       const c = document.createElement('canvas');
       c.width = Math.max(1, Math.round(i.naturalWidth * f)); c.height = Math.max(1, Math.round(i.naturalHeight * f));
       c.getContext('2d').drawImage(i, 0, 0, c.width, c.height);
-      return c.toDataURL('image/jpeg', 0.88);
+      return await new Promise((ok, nein) => c.toBlob(b => (b ? ok(b) : nein(new Error('Bild konnte nicht umgewandelt werden.'))), 'image/jpeg', 0.88));
     } finally { URL.revokeObjectURL(url); }
   }
 
@@ -311,7 +389,7 @@
     UEBERNIMMT = true;
     meldung(`Bild aus ${name} wird übernommen …`);
     try {
-      await igApi('POST', `/api/post/${encodeURIComponent(id)}/eigenesbild`, { bild: await zuJpeg(blob), herkunft: quelle });
+      await bildSenden(`/api/post/${encodeURIComponent(id)}/eigenesbild?herkunft=${quelle}`, await zuJpeg(blob));
       WARTET = null;
       meldung(`Bild aus ${name} übernommen ✓`);
       await laden();
@@ -364,6 +442,12 @@
     const a = b.dataset.aktion, id = b.dataset.id;
     if (a === 'laden') return laden();
     if (a === 'reiter') { REITER = b.dataset.wert; return zeichnen(); }
+    if (a === 'th-edit') { REITER = 'thumb'; THUMB_RK = b.dataset.rk; zeichnen(); window.scrollTo(0, 0); return; }
+    if (a === 'th-laden') return ausfuehren(b, async () => {
+      const r = rennenListe().find(x => x.rennKey === b.dataset.rk); if (!r || !window.K888Thumb) return;
+      const d = await window.K888Thumb.laden(window.K888Thumb.vorlageAus(STAND.thumbVorlage), r, STAND.design);
+      meldung(`Thumbnail geladen (${d.typ.toUpperCase()}, ${(d.groesse / 1e6).toFixed(1).replace('.', ',')} MB).`);
+    });
     if (a === 'modus') return ausfuehren(b, async () => {
       if (b.dataset.wert === STAND.cfg.modus) return;
       if (b.dataset.wert === 'auto' && !confirm('Auf „Automatisch“ stellen? Dann gehen alle Posts ohne Freigabe zur eingestellten Zeit raus.')) return;
@@ -381,7 +465,7 @@
     if (a === 'bild' || a === 'neu') return ausfuehren(b, async () => {
       const wert = attr => { const el = BOX.querySelector(`[${attr}="${CSS.escape(id)}"]`); return el ? el.value : ''; };
       const r = await igApi('POST', `/api/post/${encodeURIComponent(id)}/bild`, { neu: a === 'neu', stimmung: wert('data-stimmung'), kamera: wert('data-kamera') });
-      if (r.kiFehler) meldung('KI-Bild ging nicht, Ersatz-Hintergrund genutzt.', 1); else meldung(a === 'neu' ? 'Neues Bild erstellt. Die anderen Posts dieses Rennens mit „🔄 Aktualisieren“ übernehmen.' : 'Bild erstellt.');
+      if (r.kiFehler) meldung('KI-Bild ging nicht: ' + r.kiFehler, 1); else meldung('Neuer KI-Hintergrund – die Posts dieses Rennens werden neu gezeichnet.');
       await laden();
     });
     if (a === 'gemini' || a === 'chatgpt') {
@@ -395,11 +479,13 @@
       await laden();
     });
     if (a === 'freigeben' || a === 'ueberspringen') return ausfuehren(b, async () => {
+      if (a === 'freigeben' && b.dataset.an === '1') await bildSicher(id);
       await igApi('POST', `/api/post/${encodeURIComponent(id)}/${a}`, { an: b.dataset.an === '1' });
       await laden();
     });
     if (a === 'jetzt') return ausfuehren(b, async () => {
       if (!confirm('Diesen Post jetzt sofort auf Instagram veröffentlichen?')) return;
+      await bildSicher(id);
       await igApi('POST', `/api/post/${encodeURIComponent(id)}/jetzt`, {});
       meldung('Auf Instagram gepostet! 🎉');
       await laden();
@@ -422,7 +508,7 @@
     if (!(t.dataset.eigenesbild && t.files && t.files[0])) return;
     try {
       meldung('Bild wird hochgeladen …');
-      await igApi('POST', `/api/post/${encodeURIComponent(t.dataset.eigenesbild)}/eigenesbild`, { bild: await zuJpeg(t.files[0]) });
+      await bildSenden(`/api/post/${encodeURIComponent(t.dataset.eigenesbild)}/eigenesbild`, await zuJpeg(t.files[0]));
       meldung('Eigenes Bild übernommen (alle Posts dieses Rennens).');
       await laden();
     } catch (e) { meldung(e.message, 1); }
@@ -449,6 +535,8 @@
 #instaApp .ki-bild{flex:none;width:120px;overflow:hidden;background:#0b0c10;border:1px solid var(--line);display:flex;align-items:center;justify-content:center;color:var(--steel);font-size:12px;text-align:center}
 #instaApp .ki-bild.ank,#instaApp .ki-bild.erg{aspect-ratio:4/5}#instaApp .ki-bild.story{aspect-ratio:9/16;width:96px}#instaApp .ki-bild.yt{aspect-ratio:16/9;width:228px}
 #instaApp .ki-bild img{width:100%;height:100%;object-fit:cover;display:block}
+#instaApp canvas.ki-bild.yt{height:auto;cursor:pointer}
+#instaApp .ki-malt{margin:-6px 0 12px;padding:8px 12px;border:1px solid rgba(245,197,24,.45);color:#f5c518;font-size:14px;background:#0d0e13}
 #instaApp .ki-bild.leer{border-style:dashed}
 #instaApp .ki-stream{flex:none;display:flex;flex-direction:column;gap:6px;max-width:228px;align-items:flex-start}
 #instaApp .ki-info{flex:999 1 280px;min-width:0;display:flex;flex-direction:column;gap:5px}
@@ -489,14 +577,26 @@
 #ki-toast.an{opacity:1;transform:none}#ki-toast.rot{border-left-color:#e11324}`;
   document.head.appendChild(css);
 
+  // Zeichnen (insta-bilder.js) und Thumbnail-Editor (insta-thumb.js) nachladen
+  let SKRIPTE = null;
+  function skripte() {
+    if (!SKRIPTE) SKRIPTE = Promise.all(['insta-bilder.js', 'insta-thumb.js'].map(n => new Promise((ok, nein) => {
+      const s = document.createElement('script'); s.src = BASIS + n + '?v=' + Date.now();
+      s.onload = ok; s.onerror = () => nein(new Error('Konnte ' + n + ' nicht laden'));
+      document.head.appendChild(s);
+    }))).catch(e => { SKRIPTE = null; throw e; });
+    return SKRIPTE;
+  }
+
   window.K888Insta = {
-    start(box) {
+    async start(box) {
       if (BOX !== box) {
         BOX = box;
         box.addEventListener('click', klick);
         box.addEventListener('change', aenderung);
         box.addEventListener('toggle', ev => { if (ev.target.classList && ev.target.classList.contains('ki-hilfe')) HILFE_OFFEN = ev.target.open; }, true);
       }
+      try { await skripte(); } catch (e) { meldung(e.message, 1); }
       return laden();
     }
   };
