@@ -1,0 +1,40 @@
+# ═══════════════════════════════════════════════════════════
+# kreids-insta · Instagram-Poster für Kreids888 (privates Konto)
+# Postet Ankündigungen (Feed), Raceday-Storys und Rennergebnisse aus dem Streamkalender
+# des Kreids-Dashboards (kreids888-admin). Dazu YouTube-Thumbnails 1920×1080 zum Herunterladen.
+# Wird über Cloudflare „Workers Builds“ direkt aus GitHub gebaut
+# (Repo kreidsracing/kreids888, Stammverzeichnis workers/kreids-insta).
+# Geheimnis (im Cloudflare-Dashboard eintragen, nicht hier!): IG_TOKEN
+# Optional (Text-Variable im Dashboard): IG_USER_ID = Instagram-Konto-ID, falls das Konto nicht automatisch gefunden wird
+# ═══════════════════════════════════════════════════════════
+name = "kreids-insta"
+main = "src/index.js"
+compatibility_date = "2025-09-01"
+compatibility_flags = ["nodejs_compat"]
+workers_dev = true
+keep_vars = true
+
+[vars]
+ORIGIN = "https://kreids-insta.kreids.workers.dev"
+
+[ai]
+binding = "AI"
+
+[[durable_objects.bindings]]
+name = "SPEICHER"
+class_name = "Speicher"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["Speicher"]
+
+[triggers]
+crons = ["*/10 * * * *"]
+
+[[rules]]
+type = "Data"
+globs = ["**/*.ttf", "**/*.png"]
+fallthrough = true
+
+[observability]
+enabled = true

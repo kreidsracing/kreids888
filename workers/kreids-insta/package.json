@@ -1,0 +1,18 @@
+{
+  "name": "kreids-insta",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Kreids888 Instagram-Poster: Ankündigungen, Raceday-Storys und Rennergebnisse aus dem Streamkalender",
+  "scripts": {
+    "deploy": "wrangler deploy",
+    "dev": "wrangler dev"
+  },
+  "dependencies": {
+    "@resvg/resvg-wasm": "2.6.2",
+    "jpeg-js": "0.4.4"
+  },
+  "devDependencies": {
+    "wrangler": "^4.40.0"
+  },
+  "type": "module"
+}

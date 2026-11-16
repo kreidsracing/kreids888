@@ -125,7 +125,9 @@
       var dl=dayLabel(e._dt);
       if(dl!==curDay){ if(curDay) html+="</div>"; html+='<div class="sk-day"><div class="sk-day-h">'+dl+'</div>'; curDay=dl; }
       var time=e.time?esc(e.time):"–";
-      var meta=[e.series,e.track].filter(Boolean).map(esc).join(" · ");
+      // SPR-Rennen (live aus dem Dashboard): Titel = Serie, darunter Runde + Strecke
+      var runde=e.source==="spr"&&e.nr?"Runde "+e.nr+(e.reverseGrid?" + "+(e.nr+1)+" (Reverse Grid)":""):e.series;
+      var meta=[runde,[e.track,e.layout].filter(Boolean).join(" – ")].filter(Boolean).map(esc).join(" · ");
       var img=e.image?'<img class="sk-thumb" src="'+esc(e.image)+'" alt="" loading="lazy" style="width:150px;height:84px;object-fit:cover" onerror="this.style.display=\'none\'">':'';
       html+='<div class="sk-item" data-type="'+esc(e.type||"Rennen")+'">'+
         '<div class="sk-time">'+time+'<small>UHR</small></div>'+
@@ -224,7 +226,7 @@
         var hasImg = !skipImages && s._img && s._img.naturalWidth;
         var imgBoxW = hasImg ? 360 : 0, rightPad = 30;
         var tx=345, maxW=(W-90)-tx-(hasImg?imgBoxW+rightPad:0);
-        var fit=fitTitle(ctx,s.title||"Rennen",maxW,52,30);
+        var fit=fitTitle(ctx,(s.source==="spr"&&s.track?s.track+" · ":"")+(s.title||"Rennen"),maxW,52,30);
         var lh=fit.size*1.02;
         var blockH=fit.lines.length*lh + 44;
         var ty=y+(ch-blockH)/2+fit.size;
