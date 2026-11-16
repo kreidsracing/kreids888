@@ -57,12 +57,14 @@ export function bauePlan(daten, cfg, jetzt) {
       const tage = Math.max(0, cfg.ankuendigung.tage | 0);
       let postMs = berlinZuMs(tageZurueck(datum, tage), cfg.ankuendigung.zeit);
       if (postMs > startMs - 3600000) postMs = startMs - 3 * 3600000;
-      if (postMs <= bis && jetzt < startMs) posts.push({ ...basis, typ: 'ank', tage, postMs, id: key + '_ank' });
+      // nur bis Ende des Post-Tages („in 2 Tagen“ stimmt danach nicht mehr), höchstens bis zum Start
+      const ankBis = Math.min(startMs, berlinZuMs(tageZurueck(berlin(postMs).datum, -1), '00:00'));
+      if (postMs <= bis && jetzt < ankBis) posts.push({ ...basis, typ: 'ank', tage, postMs, id: key + '_ank' });
     }
     if (cfg.story.aktiv) {
       let postMs = berlinZuMs(datum, cfg.story.zeit);
       if (postMs > startMs - 1800000) postMs = startMs - 2 * 3600000;
-      if (postMs <= bis && jetzt < rennMs + 3600000) posts.push({ ...basis, typ: 'story', postMs, id: key + '_story' });
+      if (postMs <= bis && jetzt < liveMs) posts.push({ ...basis, typ: 'story', postMs, id: key + '_story' });
     }
   }
   // Ergebnisse: nur Rennen der letzten 5 Tage (sonst würde beim Start die ganze Historie gepostet)
@@ -72,6 +74,7 @@ export function bauePlan(daten, cfg, jetzt) {
       if (!isFinite(tagMs) || tagMs < jetzt - ERG_TAGE * 86400000 || tagMs > jetzt + 86400000) return;
       // Post-Zeit: am Tag nach dem Rennen zur eingestellten Uhrzeit (wird das Ergebnis erst später eingetragen: sofort)
       const postMs = berlinZuMs(tageZurueck(datum, -1), cfg.ergebnis.zeit);
+      if (jetzt > postMs + 2 * 86400000) return;   // alte Ergebnisse postet keiner mehr
       posts.push({
         key, typ: 'erg', art: 'Rennen', spr: true, id: key + '_erg', postMs,
         titel: '', serie: r.serie || '', nr: Number(r.nr) || 0, track: r.track || '', layout: '', datum,

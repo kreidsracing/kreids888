@@ -258,6 +258,24 @@ async function zyklus(env) {
     ki--;
     await hintergrundKI(env, s, p, design, cfg, null, false);
   }
+  // 2b. Thumbnail-Sprüche: jedes Rennen der nächsten 7 Tage bekommt von selbst einen eigenen (höchstens 2 pro Lauf)
+  try {
+    const thrs = await s.liste('thr:');
+    let n = 2;
+    const fertig = new Set();
+    for (const p of plan) {
+      if (n <= 0) break;
+      const rk = rennKey(p.id);
+      if (p.typ === 'woche' || p.typ === 'erg' || fertig.has(rk) || p.startMs < jetzt || p.startMs - jetzt > 7 * 86400000) continue;
+      fertig.add(rk);
+      const alt = thrs['thr:' + rk] || {};
+      if (alt.spruch) continue;
+      n--;
+      const { liste } = await sprueche(env, p);
+      if (!liste || !liste.length) continue;
+      await s.schreib('thr:' + rk, { ...alt, spruch: liste[Math.floor(Math.random() * liste.length)], auto: true, startMs: alt.startMs || p.startMs });
+    }
+  } catch (e) { /* nächster Lauf */ }
   // 3. Token verlängern
   await tokenPflege(env, s);
   // 4. Aufräumen: Einträge älter als 14 Tage, alte KI-Tageszähler, Reste der alten Version (th:, thb:, nz:, nb:)
@@ -352,13 +370,13 @@ async function stand(env, s) {
       text: p.typ === 'story' || p.typ === 'woche' ? '' : bildtext(p, cfg, design)
     };
   });
-  // Erledigt (gepostet) und nicht mehr geplante, nicht gepostete Posts der letzten 36 Stunden
+  // Gepostet in den letzten 36 Stunden
   const imPlan = new Set(plan.map(p => p.id));
   const erledigt = Object.entries(st).map(([k, z]) => {
     if (!z) return null;
     const id = k.slice(5), wann = (z.gepostet && z.gepostet.zeit) || z.postMs || 0;
     if (jetzt - wann > 36 * 3600000) return null;
-    if (!z.gepostet && (imPlan.has(id) || !z.version || z.uebersprungen)) return null;
+    if (!z.gepostet) return null;
     const i = z.info || {};
     return {
       id, typ: i.typ || TYP_AUS_ID(id), titel: i.titel || '', serie: i.serie || '', nr: i.nr || 0, track: i.track || '', layout: i.layout || '', datum: i.datum || DATUM_AUS_ID(id), bisDatum: i.bisDatum || '',
@@ -444,6 +462,13 @@ async function api(req, env, url) {
     const neu = { ...alt, startMs: Number(body.startMs) || alt.startMs || Date.now() };
     if (typeof body.spruch === 'string') neu.spruch = body.spruch.replace(/[<>]/g, '').slice(0, 80);
     if (typeof body.pers === 'string') neu.pers = body.pers.replace(/[^A-Za-z0-9_.-]/g, '').slice(0, 80);
+    if (body.seed !== undefined) neu.seed = (Number(body.seed) >>> 0) || 0;
+    if (body.vorlage === null) delete neu.vorlage;
+    else if (body.vorlage !== undefined) {
+      if (typeof body.vorlage !== 'object' || !Array.isArray(body.vorlage.elemente) || JSON.stringify(body.vorlage).length > 60000) return fehler('Vorlage ungültig.');
+      neu.vorlage = body.vorlage;
+    }
+    if (typeof body.spruch === 'string') delete neu.auto;
     await s.schreib('thr:' + th[1], neu);
     return antwort({ ok: true });
   }

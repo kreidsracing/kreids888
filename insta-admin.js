@@ -413,7 +413,7 @@
         <div class="ki-leiste"><button class="btn btn-ghost ki-k" data-aktion="laden"><span>🔄 Neu laden</span></button></div>
         ${hilfe()}
         ${liste.length ? liste.map(p => postKarte(p, cfg.modus, p.typ === 'story' || p.typ === 'erg' || (p.typ === 'ank' && !mitStory.has(p.rennKey)))).join('') : '<p class="hint">Keine Rennen oder Streams in den nächsten 3 Wochen im Streamkalender.</p>'}
-        ${(STAND.erledigt || []).length ? `<details class="ki-panel ki-erledigt"${ERL_OFFEN ? ' open' : ''}><summary><h3>✅ Erledigt & nicht gepostet · letzte 36 Std. (${STAND.erledigt.length})</h3></summary>${STAND.erledigt.map(erledigtZeile).join('')}</details>` : ''}` : ''}
+        ${(STAND.erledigt || []).length ? `<details class="ki-panel ki-erledigt"${ERL_OFFEN ? ' open' : ''}><summary><h3>✅ Gepostet · letzte 36 Std. (${STAND.erledigt.length})</h3></summary>${STAND.erledigt.map(erledigtZeile).join('')}</details>` : ''}` : ''}
       ${REITER === 'thumb' ? '<div class="ki-thumbbox"></div>' : ''}
       ${REITER === 'zeiten' ? `
         <div class="ki-grid">${zeitenPanel(cfg)}${textPanel(cfg)}</div>
@@ -441,7 +441,8 @@
   const THUMB_UMG = {
     stand: () => STAND, igApi, meldung, rennen: rennenListe,
     spruchGesetzt(rk, text) { SPRUCH_NEU = true; for (const p of STAND.posts) if (p.rennKey === rk) { p.thumb = { ...(p.thumb || {}), spruch: text }; p.spruch = text; } },
-    vorlageGespeichert(v) { STAND.thumbVorlage = v; }
+    vorlageGespeichert(v) { STAND.thumbVorlage = v; },
+    thumbGesetzt(rk, felder) { for (const p of STAND.posts) if (p.rennKey === rk) { p.thumb = { ...(p.thumb || {}), ...felder }; if (felder.vorlage === null) delete p.thumb.vorlage; } }
   };
 
   // ─── Bild → JPEG (max. 1600 px) ───
@@ -592,7 +593,7 @@
     if (a === 'th-edit') { REITER = 'thumb'; THUMB_RK = b.dataset.rk; zeichnen(); window.scrollTo(0, 0); return; }
     if (a === 'th-laden') return ausfuehren(b, async () => {
       const r = rennenListe().find(x => x.rennKey === b.dataset.rk); if (!r || !window.K888Thumb) return;
-      const d = await window.K888Thumb.laden(window.K888Thumb.vorlageAus(STAND.thumbVorlage), r, STAND.design);
+      const d = await window.K888Thumb.laden(window.K888Thumb.fuerRennen(STAND.thumbVorlage, r), r, STAND.design);
       meldung(`Thumbnail geladen (${d.typ.toUpperCase()}, ${(d.groesse / 1e6).toFixed(1).replace('.', ',')} MB).`);
     });
     if (a === 'modus') return ausfuehren(b, async () => {

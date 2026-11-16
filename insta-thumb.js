@@ -1,6 +1,8 @@
 // ═══════════════════════════════════════════════════════════
 // Kreids888 · YouTube-Thumbnail-Editor (1920×1080) im Instagram-Reiter des Dashboards
 // • EINE Vorlage für alle Rennen (gespeichert im Worker kreids-insta), jedes Rennen bringt seine Daten mit
+// • Varianten: jedes Rennen sieht von selbst anders aus (Seite, Farben, Pose, Team-Bild, Spruch-Stil, Bildausschnitt),
+//   „🎲 Neue Variante“ würfelt neu, „Für dieses Rennen speichern“ hält ein Rennen fest
 // • Ebenen: Texte mit Platzhaltern, Logo, Ich-Bild (Posen wie beim Social-Bild), Team-Bild
 // • Klicken = auswählen, Ziehen = verschieben, Mausrad = Größe, freie Fläche ziehen = Hintergrund verschieben
 // • Spruch pro Rennen, Clickbait-Vorschläge per Cloudflare-KI (Worker /api/sprueche)
@@ -23,7 +25,7 @@
 
   // ─── Standard-Vorlage ───
   const STANDARD = {
-    version: 1,
+    version: 1, varianten: true,
     hg: { zoom: 1, x: 0.5, y: 0.35, dunkel: 0.15, links: 0.85, leiste: true },
     elemente: [
       { id: 'team', typ: 'team', an: false, bild: 'f2f-logo.webp', schwarzWeg: true, x: 1560, y: 40, b: 300 },
@@ -40,6 +42,63 @@
   function vorlageAus(v) {
     if (!v || !Array.isArray(v.elemente)) return kopie(STANDARD);
     return { ...kopie(STANDARD), ...kopie(v), hg: { ...STANDARD.hg, ...(v.hg || {}) } };
+  }
+
+  // ─── Varianten: jedes Rennen anders ───
+  const PALETTEN = [['#e11324', '#ffd400'], ['#e11324', '#ffffff'], ['#1d4ed8', '#ffd400'], ['#2563eb', '#ffffff'], ['#7c3aed', '#22d3ee'], ['#ea580c', '#ffffff'],
+    ['#15803d', '#a3e635'], ['#db2777', '#ffd400'], ['#0f766e', '#facc15'], ['#111111', '#ffd400'], ['#c026d3', '#ffffff'], ['#0891b2', '#ffd400']];
+  function zufall(seed) {   // feste Zufallsfolge aus einer Zahl (gleiches Rennen → gleiche Variante)
+    let a = seed >>> 0;
+    return () => { a = (a + 0x6D2B79F5) >>> 0; let t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+  }
+  function zahlAus(text) { let h = 0x811c9dc5; for (let i = 0; i < text.length; i++) { h ^= text.charCodeAt(i); h = Math.imul(h, 0x01000193); } return h >>> 0; }
+  function seitenTausch(v) {
+    for (const e of v.elemente) { e.x = B - e.x; e.rechts = !e.rechts; if (e.typ === 'pers') e.spiegeln = !e.spiegeln; }
+    v.hg.seite = v.hg.seite === 'rechts' ? 'links' : 'rechts';
+  }
+  function variante(basis, seed) {
+    const v = kopie(basis), rnd = zufall(seed);
+    const wahl = l => l[Math.floor(rnd() * l.length)], um = (w, p) => w * (1 + (rnd() * 2 - 1) * p);
+    // Farben nach Rolle: Hauptfarbe = Kästen, Akzent = gelbe Texte
+    const kasten = v.elemente.find(e => e.typ === 'text' && e.box && e.box !== 'kein');
+    const akz = v.elemente.find(e => e.typ === 'text' && /\{serie\}/.test(e.inhalt || ''));
+    const HAUPT = new Set(['#e11324', String(kasten ? kasten.boxFarbe : '').toLowerCase()]);
+    const AKZENT = new Set(['#ffd400', String(akz ? akz.farbe : '').toLowerCase()]);
+    const [haupt, akzent] = wahl(PALETTEN);
+    const farbe = c => { const k = String(c || '').toLowerCase(); return HAUPT.has(k) ? haupt : AKZENT.has(k) ? akzent : c; };
+    if (rnd() < 0.5) seitenTausch(v);
+    for (const e of v.elemente) {
+      if (e.typ === 'text') {
+        e.boxFarbe = farbe(e.boxFarbe); e.farbe = farbe(e.farbe); e.farbe2 = farbe(e.farbe2);
+        if (/\{spruch\}/.test(e.inhalt || '')) {
+          if (e.box && e.box !== 'kein') e.box = wahl(['schraeg', 'schraeg', 'box']);
+          e.schraeg = rnd() < 0.8;
+          e.verlauf = e.box === 'kein' && rnd() < 0.4; e.farbe2 = akzent;
+          e.groesse = Math.round(um(e.groesse || 120, 0.08));
+          e.y = Math.round(e.y + (rnd() * 2 - 1) * 35);
+        }
+      } else if (e.typ === 'pers') {
+        e.bild = wahl(POSEN)[0];
+        const unten = Math.max(H + 10, (e.y || 0) + (e.h || 900));   // unten bündig, sonst sieht man die Schnittkante
+        e.h = Math.round(um(e.h || 900, 0.06));
+        e.y = unten - e.h;
+      } else if (e.typ === 'team' && e.an !== false) {
+        e.bild = wahl(TEAM)[0]; e.schwarzWeg = !!(TEAM.find(x => x[0] === e.bild) || [])[2];
+      }
+    }
+    v.hg.leisteFarbe = haupt;
+    v.hg.zoom = +(1 + rnd() * 0.25).toFixed(2);
+    v.hg.x = +(0.25 + rnd() * 0.5).toFixed(2);
+    v.hg.y = +(0.2 + rnd() * 0.35).toFixed(2);
+    return v;
+  }
+  // Vorlage, mit der ein Rennen gezeichnet wird: eigene des Rennens › Variante der Grundvorlage › Grundvorlage
+  function fuerRennen(basisRoh, r) {
+    const t = (r && r.thumb) || {};
+    if (t.vorlage && Array.isArray(t.vorlage.elemente)) return vorlageAus(t.vorlage);
+    const basis = vorlageAus(basisRoh);
+    if (basis.varianten === false || !r) return basis;
+    return variante(basis, (zahlAus(String(r.rennKey || '')) ^ (t.seed || 0)) >>> 0);
   }
 
   // ─── Laden: Schriften, Bilder ───
@@ -112,7 +171,7 @@
     }
     if (hg.dunkel) { g.fillStyle = `rgba(5,7,10,${hg.dunkel})`; g.fillRect(0, 0, B, H); }
     if (hg.links) {
-      const gr = g.createLinearGradient(0, 0, B, 0);
+      const gr = hg.seite === 'rechts' ? g.createLinearGradient(B, 0, 0, 0) : g.createLinearGradient(0, 0, B, 0);
       gr.addColorStop(0, `rgba(5,7,10,${hg.links})`); gr.addColorStop(0.45, `rgba(5,7,10,${hg.links * 0.7})`); gr.addColorStop(0.75, 'rgba(5,7,10,0)');
       g.fillStyle = gr; g.fillRect(0, 0, B, H);
     }
@@ -147,8 +206,9 @@
     const w = Math.max(...zeilen.map(t => g.measureText(t).width)), h = lh * (zeilen.length - 1) + cap;
     const pad = el.box && el.box !== 'kein' ? size * 0.2 : 0;
     const sk = el.schraeg ? 0.18 : 0;
+    const x = el.rechts ? el.x - (w + pad * 1.2 + h * sk) : el.x;   // rechts: x ist der rechte Rand
     g.save();
-    g.translate(el.x, el.y + h + pad);
+    g.translate(x, el.y + h + pad);
     if (sk) g.transform(1, 0, -sk, 1, 0, 0);
     g.translate(0, -(h + pad));
     if (el.box === 'box' || el.box === 'schraeg') {
@@ -170,7 +230,7 @@
     else g.fillStyle = el.farbe || '#fff';
     zeilen.forEach((z, i) => g.fillText(z, 0, cap + i * lh));
     g.restore();
-    el._box = { x: el.x - pad * 1.2 - (sk ? 0 : 0), y: el.y - pad, w: w + pad * 2.4 + h * sk, h: h + pad * 2 };
+    el._box = { x: x - pad * 1.2, y: el.y - pad, w: w + pad * 2.4 + h * sk, h: h + pad * 2 };
   }
   function bildZeichnen(g, el, img, b, h, opt) {
     if (!img) { el._box = null; return; }
@@ -179,10 +239,11 @@
     if (opt.rand) { const r = Math.max(3, Math.round(h * 0.006)); f.push(`drop-shadow(${r}px 0 0 #fff)`, `drop-shadow(-${r}px 0 0 #fff)`, `drop-shadow(0 ${r}px 0 #fff)`, `drop-shadow(0 -${r}px 0 #fff)`); }
     if (opt.schatten) f.push(`drop-shadow(0 ${Math.round(h * 0.02)}px ${Math.round(h * 0.03)}px rgba(0,0,0,.7))`);
     if (f.length && 'filter' in g) g.filter = f.join(' ');
-    if (opt.spiegeln) { g.translate(el.x + b, el.y); g.scale(-1, 1); g.drawImage(img, 0, 0, b, h); }
-    else g.drawImage(img, el.x, el.y, b, h);
+    const x = el.rechts ? el.x - b : el.x;   // rechts: x ist der rechte Rand
+    if (opt.spiegeln) { g.translate(x + b, el.y); g.scale(-1, 1); g.drawImage(img, 0, 0, b, h); }
+    else g.drawImage(img, x, el.y, b, h);
     g.restore();
-    el._box = { x: el.x, y: el.y, w: b, h };
+    el._box = { x, y: el.y, w: b, h };
   }
 
   // canvas: Ziel · v: Vorlage · r: Rennen ({…post, hg, spruch}) · design: { farbe1, logoBild } · opt: { auswahl }
@@ -206,7 +267,7 @@
         else el._box = null;
       }
     });
-    if (v.hg.leiste !== false) { g.fillStyle = design.farbe1 || '#e11324'; g.fillRect(0, H - 14, B, 14); }
+    if (v.hg.leiste !== false) { g.fillStyle = v.hg.leisteFarbe || design.farbe1 || '#e11324'; g.fillRect(0, H - 14, B, 14); }
     const sel = opt.auswahl && v.elemente.find(e => e.id === opt.auswahl);
     if (sel && sel._box && sel.an !== false) {
       g.save(); g.setLineDash([18, 10]); g.lineWidth = 4; g.strokeStyle = '#ffd400';
@@ -247,10 +308,11 @@
       box.addEventListener('change', eingabe);
     }
     E.umg = umg;
-    if (!E.v || !E.dirty) E.v = vorlageAus(umg.stand().thumbVorlage);
     const liste = umg.rennen();
-    if (rk && liste.some(r => r.rennKey === rk)) { if (E.rk !== rk) E.sprueche = []; E.rk = rk; }
-    if (!liste.some(r => r.rennKey === E.rk)) E.rk = liste.length ? liste[0].rennKey : '';
+    const vorher = E.rk;
+    if (rk && liste.some(r => r.rennKey === rk) && !E.dirty) { if (E.rk !== rk) E.sprueche = []; E.rk = rk; }
+    if (!liste.some(r => r.rennKey === E.rk)) { E.rk = liste.length ? liste[0].rennKey : ''; E.dirty = false; }
+    if (!E.v || !E.dirty || E.rk !== vorher) { E.v = fuerRennen(umg.stand().thumbVorlage, rennenAkt()); E.dirty = false; }
     aufbauen();
   }
   const rennenAkt = () => E.umg.rennen().find(r => r.rennKey === E.rk) || null;
@@ -275,11 +337,15 @@
           <canvas class="kt-cv" width="${B}" height="${H}"></canvas>
           <div class="ki-dim">Klicken = auswählen · Ziehen = verschieben · Mausrad = Größe · freie Fläche ziehen = Hintergrund verschieben</div>
           <div class="ki-knoepfe">
-            <button class="btn btn-red ki-k" data-t="speichern"><span>💾 Vorlage speichern (für alle Rennen)</span></button>
+            <button class="btn btn-red ki-k" data-t="variante"><span>🎲 Neue Variante</span></button>
+            <button class="btn btn-ghost ki-k" data-t="rennenSpeichern"><span>💾 Für dieses Rennen speichern</span></button>
+            <button class="btn btn-ghost ki-k" data-t="speichern"><span>💾 Als Vorlage für alle</span></button>
             <button class="btn btn-ghost ki-k" data-t="laden"><span>📥 Thumbnail laden</span></button>
             <button class="btn btn-ghost ki-k" data-t="standard"><span>↺ Standard-Vorlage</span></button>
             <span class="kt-dirty">${E.dirty ? '● Änderungen noch nicht gespeichert' : ''}</span>
           </div>
+          <label class="chk"><input type="checkbox" data-t="varianten" ${vorlageAus(E.umg.stand().thumbVorlage).varianten !== false ? 'checked' : ''}> Jedes Rennen sieht von selbst anders aus (Seite, Farben, Pose, Team-Bild, Spruch-Stil, Ausschnitt)</label>
+          <div class="ki-dim">${r && r.thumb && r.thumb.vorlage ? '📌 Dieses Rennen hat sein eigenes Aussehen (festgehalten).' : '🎲 Dieses Rennen zeigt seine eigene Variante.'}</div>
         </div>
         <div class="kt-rechts">
           <div class="ki-panel"><h3>Ebenen</h3>
@@ -420,7 +486,11 @@
   let spruchTimer = 0;
   function eingabe(ev) {
     const t = ev.target;
-    if (t.dataset.t === 'rennen' && ev.type === 'change') { E.rk = t.value; E.sprueche = []; return aufbauen(); }
+    if (t.dataset.t === 'rennen' && ev.type === 'change') {
+      if (E.dirty && !confirm('Änderungen an diesem Thumbnail verwerfen?')) { t.value = E.rk; return; }
+      E.rk = t.value; E.sprueche = []; E.dirty = false; E.v = fuerRennen(E.umg.stand().thumbVorlage, rennenAkt()); return aufbauen();
+    }
+    if (t.dataset.t === 'varianten' && ev.type === 'change') return variantenSchalten(t.checked);
     if (t.dataset.t === 'spruch') {
       const r = rennenAkt(); if (!r) return;
       r.spruch = t.value; E.umg.spruchGesetzt(r.rennKey, t.value);
@@ -438,6 +508,23 @@
     e[f] = wert;
     // Felder, die andere Felder ein-/ausblenden → neu aufbauen (nur bei „change“, sonst springt der Cursor)
     geaendert(ev.type === 'change' && ['verlauf', 'box'].includes(f));
+  }
+  async function variantenSchalten(an) {
+    const basis = vorlageAus(E.umg.stand().thumbVorlage); basis.varianten = an;
+    try {
+      await E.umg.igApi('POST', '/api/thumbvorlage', { vorlage: kopie(basis) });
+      E.umg.vorlageGespeichert(kopie(basis));
+      if (!E.dirty) E.v = fuerRennen(basis, rennenAkt());
+      E.umg.meldung(an ? 'Jedes Rennen sieht jetzt anders aus.' : 'Alle Rennen nutzen wieder dieselbe Vorlage.');
+      aufbauen();
+    } catch (e) { E.umg.meldung(e.message, 1); }
+  }
+  // Thumbnail-Angaben eines Rennens speichern (seed, vorlage) und in der Liste merken
+  async function rennenThumb(r, felder) {
+    await E.umg.igApi('POST', `/api/thumb/${encodeURIComponent(r.rennKey)}`, { ...felder, startMs: r.startMs });
+    E.umg.thumbGesetzt(r.rennKey, felder);
+    r.thumb = { ...(r.thumb || {}), ...felder };
+    if (felder.vorlage === null) delete r.thumb.vorlage;
   }
   async function spruchSpeichern(r, text) {
     try { await E.umg.igApi('POST', `/api/thumb/${encodeURIComponent(r.rennKey)}`, { spruch: text, startMs: r.startMs }); }
@@ -474,18 +561,32 @@
       } catch (e) { E.umg.meldung(e.message, 1); }
       E.ladenSpr = false; aufbauen(); return;
     }
-    if (t === 'speichern') {
+    const knopf = async fn => {
       const sp = b.querySelector('span'), alt = sp.textContent; b.disabled = true; sp.textContent = '⏳ …';
-      try {
-        await E.umg.igApi('POST', '/api/thumbvorlage', { vorlage: kopie(E.v) });
-        E.dirty = false; E.umg.vorlageGespeichert(kopie(E.v));
-        E.umg.meldung('Vorlage gespeichert – gilt jetzt für alle Rennen.');
-        aufbauen();
-      } catch (e) { E.umg.meldung(e.message, 1); b.disabled = false; sp.textContent = alt; }
-      return;
-    }
+      try { await fn(); aufbauen(); } catch (e) { E.umg.meldung(e.message, 1); b.disabled = false; sp.textContent = alt; }
+    };
+    if (t === 'variante') return knopf(async () => {
+      const r = rennenAkt(); if (!r) return;
+      if (E.dirty && !confirm('Änderungen verwerfen und neu würfeln?')) return;
+      await rennenThumb(r, { seed: 1 + Math.floor(Math.random() * 2147483646), vorlage: null });
+      E.v = fuerRennen(E.umg.stand().thumbVorlage, r); E.dirty = false;
+    });
+    if (t === 'rennenSpeichern') return knopf(async () => {
+      const r = rennenAkt(); if (!r) return;
+      await rennenThumb(r, { vorlage: kopie(E.v) });
+      E.dirty = false; E.umg.meldung('Für dieses Rennen gespeichert.');
+    });
+    if (t === 'speichern') return knopf(async () => {
+      const r = rennenAkt();
+      const neu = kopie(E.v); neu.varianten = vorlageAus(E.umg.stand().thumbVorlage).varianten !== false;
+      await E.umg.igApi('POST', '/api/thumbvorlage', { vorlage: neu });
+      E.umg.vorlageGespeichert(neu);
+      if (r) await rennenThumb(r, { vorlage: kopie(E.v) });   // dieses Rennen behält genau dieses Aussehen
+      E.dirty = false;
+      E.umg.meldung(neu.varianten ? 'Als Vorlage gespeichert – die anderen Rennen bekommen davon ihre eigenen Varianten.' : 'Als Vorlage für alle Rennen gespeichert.');
+    });
     if (t === 'standard') {
-      if (!confirm('Alles auf die Standard-Vorlage zurücksetzen? (Erst mit „Vorlage speichern“ gilt es für alle Rennen.)')) return;
+      if (!confirm('Auf die Standard-Vorlage zurücksetzen? (Gilt erst nach dem Speichern.)')) return;
       E.v = kopie(STANDARD); E.sel = 'spruch'; return geaendert(true);
     }
     if (t === 'laden') {
@@ -497,7 +598,7 @@
 
   // Kleine Vorschau in der Post-Karte
   async function vorschau(canvas, v, r, design) {
-    try { await zeichnen(canvas, vorlageAus(v), r, design); } catch (e) { /* egal */ }
+    try { await zeichnen(canvas, fuerRennen(v, r), r, design); } catch (e) { /* egal */ }
   }
 
   const css = document.createElement('style');
@@ -522,5 +623,5 @@
 #instaApp .kt-rechts input[type=range]{padding:0;accent-color:var(--red)}`;
   document.head.appendChild(css);
 
-  window.K888Thumb = { editor, vorschau, laden, vorlageAus, STANDARD, POSEN, posenUrl };
+  window.K888Thumb = { editor, vorschau, laden, datei, vorlageAus, fuerRennen, variante, STANDARD, POSEN, posenUrl };
 })();
