@@ -227,10 +227,23 @@
     </div>`;
   }
 
+  // 🎨 Aussehen: Logo + Team-Bild (Größe einstellbar), Farben, Texte – mit Live-Vorschau
+  let DTEAM = null;
   function designPanel(d) {
-    return `<div class="ki-panel"><h3>🎨 Aussehen</h3>
+    const team = (window.K888Bilder && window.K888Bilder.TEAM) || [];
+    const tUrl = x => (window.K888Bilder ? window.K888Bilder.teamUrl(x) : '');
+    if (DTEAM === null) DTEAM = d.team || '';
+    const regler = (id, name, wert) => `<div class="ki-fg"><label for="${id}">${name} <b class="ki-wert" data-zu="${id}">${esc(wert)} %</b></label><input id="${id}" type="range" min="30" max="200" step="5" value="${esc(wert)}"></div>`;
+    return `<div class="ki-panel ki-design"><h3>🎨 Aussehen</h3>
       <div class="ki-logo">${d.logoBild ? `<img src="${esc(d.logoBild)}" alt="Logo">` : '<span>kein Logo</span>'}</div>
       <div class="ki-fg"><label for="ki-logo">Logo-Link (PNG oder JPG)</label><input id="ki-logo" type="text" spellcheck="false" value="${esc(d.logoUrl || '')}" placeholder="https://…/logo.png"></div>
+      ${regler('ki-logo-g', 'Logo-Größe', d.logoGroesse || 100)}
+      <div class="ki-fg"><label>Team-Bild neben dem Logo</label><div class="ki-tgal">
+        <button type="button" data-team="" class="${!DTEAM ? 'an' : ''}">Kein</button>
+        ${team.map(([f, n]) => `<button type="button" data-team="${esc(f)}" class="${DTEAM === f ? 'an' : ''}" title="${esc(n)}"><img src="${esc(tUrl(f))}" alt="${esc(n)}" loading="lazy"></button>`).join('')}
+      </div></div>
+      ${regler('ki-team-g', 'Team-Bild-Größe', d.teamGroesse || 100)}
+      <label class="chk"><input type="checkbox" id="ki-team-s" ${d.teamSchwarz !== false ? 'checked' : ''}> Schwarzen Hintergrund des Team-Bilds ausblenden</label>
       <div class="ki-reihe">
         <div class="ki-fg"><label for="ki-f1">Farbe 1</label><input id="ki-f1" type="color" value="${esc(d.farbe1)}"></div>
         <div class="ki-fg"><label for="ki-f2">Farbe 2</label><input id="ki-f2" type="color" value="${esc(d.farbe2)}"></div>
@@ -239,7 +252,30 @@
       <div class="ki-fg"><label for="ki-autos">Fahrzeuge fürs KI-Bild (optional)</label><input id="ki-autos" type="text" value="${esc(d.fahrzeuge || '')}" placeholder="leer = passend zur Serie, z. B. Porsche 911 GT3 Cup"></div>
       <div class="ki-knoepfe"><button class="btn btn-red ki-k" data-aktion="design"><span>💾 Aussehen speichern</span></button></div>
       <div class="ki-dim">Danach werden alle Bilder automatisch neu gezeichnet.</div>
-    </div>`;
+    </div>
+    <div class="ki-panel"><h3>Vorschau</h3><img class="ki-dvor" alt="Vorschau"><div class="ki-dim">So sieht eine Ankündigung damit aus – erst „Speichern“ übernimmt es.</div></div>`;
+  }
+  function designAusFormular() {
+    const v = x => document.getElementById(x);
+    return {
+      logoUrl: v('ki-logo').value.trim(), farbe1: v('ki-f1').value, farbe2: v('ki-f2').value, liveText: v('ki-livetext').value, fahrzeuge: v('ki-autos').value,
+      logoGroesse: +v('ki-logo-g').value, team: DTEAM || '', teamGroesse: +v('ki-team-g').value, teamSchwarz: v('ki-team-s').checked
+    };
+  }
+  let DV_TIMER = 0, DV_URL = '';
+  function designVorschau() {
+    clearTimeout(DV_TIMER);
+    DV_TIMER = setTimeout(async () => {
+      const img = BOX && BOX.querySelector('.ki-dvor');
+      if (!img || !window.K888Bilder || !STAND) return;
+      const p = STAND.posts.find(x => x.typ === 'ank') || STAND.posts[0];
+      if (!p) { img.alt = 'Kein Post zum Anzeigen'; return; }
+      try {
+        const blob = await window.K888Bilder.post(p, { ...STAND.design, ...designAusFormular(), logoBild: STAND.design.logoBild });
+        if (DV_URL) URL.revokeObjectURL(DV_URL);
+        DV_URL = URL.createObjectURL(blob); img.src = DV_URL;
+      } catch (e) { /* egal */ }
+    }, 250);
   }
 
   function zeichnen() {
@@ -288,6 +324,7 @@
         <div class="ki-grid">${zeitenPanel(cfg)}${textPanel(cfg)}</div>
         <div class="actions"><button class="btn btn-red" data-aktion="cfg"><span>💾 Zeiten und Texte speichern</span></button></div>` : ''}
       ${REITER === 'design' ? `<div class="ki-grid">${designPanel(STAND.design)}</div>` : ''}`;
+    if (REITER === 'design') designVorschau();
     if (REITER === 'thumb' && window.K888Thumb) window.K888Thumb.editor(BOX.querySelector('.ki-thumbbox'), THUMB_UMG, THUMB_RK);
     if (REITER === 'posts' && window.K888Thumb) BOX.querySelectorAll('canvas[data-thumb]').forEach(c => {
       const r = rennenListe().find(x => x.rennKey === c.dataset.thumb);
@@ -438,10 +475,16 @@
   }
 
   function klick(ev) {
+    const tb = ev.target.closest('[data-team]');
+    if (tb && BOX.contains(tb)) {
+      DTEAM = tb.dataset.team;
+      BOX.querySelectorAll('[data-team]').forEach(x => x.classList.toggle('an', x === tb));
+      return designVorschau();
+    }
     const b = ev.target.closest('[data-aktion]'); if (!b || !BOX.contains(b)) return;
     const a = b.dataset.aktion, id = b.dataset.id;
     if (a === 'laden') return laden();
-    if (a === 'reiter') { REITER = b.dataset.wert; return zeichnen(); }
+    if (a === 'reiter') { REITER = b.dataset.wert; DTEAM = null; return zeichnen(); }
     if (a === 'th-edit') { REITER = 'thumb'; THUMB_RK = b.dataset.rk; zeichnen(); window.scrollTo(0, 0); return; }
     if (a === 'th-laden') return ausfuehren(b, async () => {
       const r = rennenListe().find(x => x.rennKey === b.dataset.rk); if (!r || !window.K888Thumb) return;
@@ -457,9 +500,9 @@
     });
     if (a === 'cfg') return ausfuehren(b, async () => { await igApi('POST', '/api/einstellungen', { cfg: cfgAusFormular() }); meldung('Gespeichert.'); await laden(); });
     if (a === 'design') return ausfuehren(b, async () => {
-      const v = x => document.getElementById(x).value;
-      await igApi('POST', '/api/design', { logoUrl: v('ki-logo').trim(), farbe1: v('ki-f1'), farbe2: v('ki-f2'), liveText: v('ki-livetext'), fahrzeuge: v('ki-autos') });
-      meldung('Gespeichert. Vorschauen mit „🔄 Aktualisieren“ neu zeichnen.');
+      await igApi('POST', '/api/design', designAusFormular());
+      DTEAM = null;
+      meldung('Gespeichert – alle Bilder werden neu gezeichnet.');
       await laden();
     });
     if (a === 'bild' || a === 'neu') return ausfuehren(b, async () => {
@@ -573,6 +616,13 @@
 #instaApp .ki-panel>.ki-dim+.ki-erg{border-top:0;padding-top:0}
 #instaApp .ki-logo{height:84px;border:1px dashed var(--line);display:flex;align-items:center;justify-content:center;padding:6px;background:repeating-conic-gradient(#1c1f28 0 25%,#14161d 0 50%) 0 0/16px 16px;color:var(--steel);font-size:13px}
 #instaApp .ki-logo img{max-height:100%;max-width:100%;object-fit:contain}
+#instaApp .ki-tgal{display:grid;grid-template-columns:repeat(7,1fr);gap:6px}
+#instaApp .ki-tgal button{padding:0;border:2px solid var(--line);background:#14161d;cursor:pointer;aspect-ratio:1/1;overflow:hidden;color:var(--steel);font-family:var(--disp);font-weight:700;font-size:12px;text-transform:uppercase}
+#instaApp .ki-tgal button img{width:100%;height:100%;object-fit:contain;display:block}
+#instaApp .ki-tgal button.an{border-color:var(--red);color:#fff}
+#instaApp .ki-wert{color:#fff;margin-left:6px}
+#instaApp .ki-design input[type=range]{padding:0;accent-color:var(--red)}
+#instaApp .ki-dvor{width:100%;max-width:520px;display:block;border:1px solid var(--line);background:#000;min-height:120px}
 #ki-toast{position:fixed;right:18px;bottom:18px;z-index:99;max-width:420px;background:#14161d;border:1px solid var(--line);border-left:3px solid #3fbf5f;color:#f2f4f8;font:14px/1.45 'Barlow',sans-serif;padding:10px 14px;box-shadow:0 10px 30px rgba(0,0,0,.5);opacity:0;transform:translateY(8px);transition:.2s;pointer-events:none}
 #ki-toast.an{opacity:1;transform:none}#ki-toast.rot{border-left-color:#e11324}`;
   document.head.appendChild(css);
@@ -594,6 +644,11 @@
         BOX = box;
         box.addEventListener('click', klick);
         box.addEventListener('change', aenderung);
+        box.addEventListener('input', ev => {
+          if (!ev.target.closest('.ki-design')) return;
+          const w = BOX.querySelector(`.ki-wert[data-zu="${ev.target.id}"]`); if (w) w.textContent = ev.target.value + ' %';
+          designVorschau();
+        });
         box.addEventListener('toggle', ev => { if (ev.target.classList && ev.target.classList.contains('ki-hilfe')) HILFE_OFFEN = ev.target.open; }, true);
       }
       try { await skripte(); } catch (e) { meldung(e.message, 1); }

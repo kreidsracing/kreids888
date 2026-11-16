@@ -110,9 +110,20 @@
   }
 
   // Kopf: Kreids-Logo groß und mittig. Gibt die Unterkante zurück, damit der Text darunter Platz hat.
+  // Kopf: Logo und (wenn gewählt) Team-Bild nebeneinander, mittig. Größen aus „Aussehen“ (KOPF wird in post() gesetzt).
+  let KOPF = null;
   function kopf(B, y, logo, m) {
-    if (!logo) return { svg: '', unten: y };
-    return { svg: `<image href="${daten(logo)}" x="${(B - m.b) / 2}" y="${y}" width="${m.b}" height="${m.h}" preserveAspectRatio="xMidYMid meet" filter="url(#schatten)"/>`, unten: y + m.h };
+    const k = KOPF || {}, teile = [];
+    if (k.logo) { const f = k.logoF || 1, s = Math.min(m.b * f / k.logo.w, m.h * f / k.logo.h); teile.push({ url: k.logo.url, w: k.logo.w * s, h: k.logo.h * s }); }
+    if (k.team) { const f = k.teamF || 1, s = Math.min(m.b * 0.6 * f / k.team.w, m.h * f / k.team.h); teile.push({ url: k.team.url, w: k.team.w * s, h: k.team.h * s }); }
+    if (!teile.length) return { svg: '', unten: y };
+    const luecke = 44, maxB = B - 120;
+    let gesamt = teile.reduce((a, t) => a + t.w, 0) + luecke * (teile.length - 1);
+    if (gesamt > maxB) { const s = (maxB - luecke * (teile.length - 1)) / (gesamt - luecke * (teile.length - 1)); teile.forEach(t => { t.w *= s; t.h *= s; }); gesamt = maxB; }
+    const hoehe = Math.max(...teile.map(t => t.h));
+    let x = (B - gesamt) / 2, svg = '';
+    for (const t of teile) { svg += `<image href="${t.url}" x="${x}" y="${y + (hoehe - t.h) / 2}" width="${t.w}" height="${t.h}" preserveAspectRatio="none" filter="url(#schatten)"/>`; x += t.w + luecke; }
+    return { svg, unten: y + Math.max(hoehe, m.h * 0.6) };
   }
 
   // Abdunkeln oben (Logos) und unten (Text). Der untere Verlauf startet über dem Textblock,
@@ -352,11 +363,39 @@
   }
   const svgFuer = (post, design, bg, logo) => post.typ === 'story' ? storySvg(post, design, bg, logo)
     : post.typ === 'erg' ? ergebnisSvg(post, design, bg, logo) : feedSvg(post, design, bg, logo);
+  // Team-Bilder (kreids888.com/team/bilder), auf Wunsch ohne schwarzen Hintergrund
+  const TEAM = [['f2f-logo.webp', 'F2F Logo', true], ['f2f-motto.webp', 'F2F Motto', true], ['f2f-cars.webp', 'F2F Autos'], ['f2f-recruiting.webp', 'F2F Recruiting'], ['f2f-logo.png', 'F2F Logo (PNG)'], ['f2f-g61.png', 'F2F G61']];
+  const teamUrl = d => SITE + 'team/bilder/' + d;
+  const MASSE = new Map();
+  function masse(url) {
+    if (!url) return Promise.resolve(null);
+    if (!MASSE.has(url)) MASSE.set(url, new Promise(ok => { const i = new Image(); i.onload = () => ok({ url, w: i.naturalWidth, h: i.naturalHeight, img: i }); i.onerror = () => ok(null); i.src = url; }));
+    return MASSE.get(url);
+  }
+  const TEAMBILD = new Map();
+  function teamBild(datei, schwarzWeg) {
+    if (!datei || !TEAM.some(t => t[0] === datei)) return Promise.resolve(null);
+    const key = datei + (schwarzWeg ? '|s' : '');
+    if (!TEAMBILD.has(key)) TEAMBILD.set(key, bildDaten(teamUrl(datei)).then(masse).then(m => {
+      if (!m) return null;
+      const c = document.createElement('canvas'); c.width = m.w; c.height = m.h;
+      const g = c.getContext('2d'); g.drawImage(m.img, 0, 0);
+      if (schwarzWeg) {
+        const d = g.getImageData(0, 0, m.w, m.h), a = d.data;
+        for (let i = 0; i < a.length; i += 4) { const x = Math.max(a[i], a[i + 1], a[i + 2]); if (x < 70) a[i + 3] = Math.min(a[i + 3], Math.max(0, (x - 18) * 5)); }
+        g.putImageData(d, 0, 0);
+      }
+      return { url: c.toDataURL('image/png'), w: m.w, h: m.h };
+    }).catch(() => { TEAMBILD.delete(key); return null; }));
+    return TEAMBILD.get(key);
+  }
+  const prozent = (v, std) => { const n = Number(v); return (isFinite(n) && n > 0 ? n : std) / 100; };
   async function post(p, design) {
-    const [css, bg, logo] = await Promise.all([schriften(), bildDaten(p.hg), bildDaten(design.logoBild)]);
+    const [css, bg, logo, team] = await Promise.all([schriften(), bildDaten(p.hg), bildDaten(design.logoBild), teamBild(design.team, design.teamSchwarz !== false)]);
+    KOPF = { logo: await masse(logo), team, logoF: prozent(design.logoGroesse, 100), teamF: prozent(design.teamGroesse, 100) };
     let svg = svgFuer({ ...p, klassen: p.klassen || [] }, design, bg, logo);
     svg = svg.replace(/^(<svg[^>]*>)/, `$1<style>${css}</style>`);
     return rastern(svg, 1080, p.typ === 'story' ? 1920 : 1350, 0.9);
   }
-  window.K888Bilder = { post, bildDaten, schriften, berlin, SITE };
+  window.K888Bilder = { post, bildDaten, schriften, berlin, SITE, TEAM, teamUrl };
 })();

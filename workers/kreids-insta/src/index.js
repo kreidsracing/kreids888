@@ -41,7 +41,8 @@ const CFG_STANDARD = {
 };
 const DESIGN_STANDARD = {
   farbe1: '#e11324', farbe2: '#ffffff', liveText: 'YouTube · @Kreids888', fahrzeuge: '',
-  logoUrl: 'https://i.postimg.cc/cC8FkHnv/kreidslogo-twitch-u-yt-3.png', logoVersion: 1
+  logoUrl: 'https://i.postimg.cc/cC8FkHnv/kreidslogo-twitch-u-yt-3.png', logoVersion: 1,
+  logoGroesse: 100, team: '', teamGroesse: 100, teamSchwarz: true   // Größen in Prozent, Team-Bild aus kreids888.com/team/bilder
 };
 const KI_PRO_TAG = 10;   // FLUX.2 klein ≈ 400 Neuronen pro Bild → bleibt sicher im Gratiskontingent (10.000/Tag)
 const BILD_FEHLT = 'Bild fehlt noch: im Dashboard den Reiter „Instagram“ einmal öffnen, dann wird es gezeichnet.';
@@ -369,6 +370,11 @@ async function api(req, env, url) {
     if (farbeOk(body.farbe2)) neu.farbe2 = body.farbe2;
     if (typeof body.liveText === 'string') neu.liveText = body.liveText.replace(/[<>]/g, '').slice(0, 60);
     if (typeof body.fahrzeuge === 'string') neu.fahrzeuge = body.fahrzeuge.replace(/[<>]/g, '').slice(0, 200);
+    const groesse = v => Math.max(30, Math.min(200, Math.round(Number(v) || 100)));
+    if (body.logoGroesse !== undefined) neu.logoGroesse = groesse(body.logoGroesse);
+    if (body.teamGroesse !== undefined) neu.teamGroesse = groesse(body.teamGroesse);
+    if (typeof body.team === 'string') neu.team = /^[A-Za-z0-9_-]{1,60}\.(webp|png|jpg)$/.test(body.team) ? body.team : '';
+    if (body.teamSchwarz !== undefined) neu.teamSchwarz = body.teamSchwarz !== false;
     if (typeof body.logoUrl === 'string') {
       const u = body.logoUrl.trim();
       if (u && !/^https:\/\//i.test(u)) return fehler('Logo-Link muss mit https:// anfangen.');

@@ -119,7 +119,7 @@ export function eigeneRennen(daten, jetzt) {
 const ZEICHEN_VERSION = 2;
 export function inhaltSchluessel(post, design, cfg, bgv = 0) {
   return JSON.stringify([bgv, bgv ? '' : post.kalenderBild, post.typ, post.art, post.serie, post.nr, post.track, post.layout, post.titel, post.datum, post.liveMs, post.tage,
-    post.klassen, post.reverseGrid, post.ergebnis || null, design.farbe1, design.farbe2, design.logoVersion || 0, design.liveText, cfg.liveAb, ZEICHEN_VERSION]);
+    post.klassen, post.reverseGrid, post.ergebnis || null, design.farbe1, design.farbe2, design.logoVersion || 0, design.liveText, design.logoGroesse, design.team, design.teamGroesse, design.teamSchwarz, cfg.liveAb, ZEICHEN_VERSION]);
 }
 // Kurzer Hash (FNV-1a) für Links mit ?h=
 export function kurzHash(t) {
