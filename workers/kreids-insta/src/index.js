@@ -34,6 +34,8 @@ const CFG_STANDARD = {
   story: { aktiv: true, zeit: '12:00' },
   ergebnis: { aktiv: true, zeit: '18:00' },
   woche: { aktiv: true, zeit: '17:00', pose: 'pose_02_zeigt_auf_dich.png' },   // Wochenplan-Story sonntags
+  // Vorlagen-Wechsel pro Art: reihe | zufall | fest (+ fest = Vorlagen-ID), kreids = fertiges Kreids-Design mit im Wechsel
+  vorlagen: { ank: { modus: 'reihe', kreids: true, fest: '' }, story: { modus: 'reihe', kreids: true, fest: '' }, erg: { modus: 'reihe', kreids: true, fest: '' }, woche: { modus: 'reihe', kreids: true, fest: '' } },
   // YouTube: geplanter Livestream pro Rennen (X Tage vorher), Thumbnail kommt automatisch aus dem Editor
   youtube: { aktiv: true, tage: 3, sichtbar: 'public', stream: '',
     titel: '🔴 {spruch} | {strecke} – {serie} {runde}',
@@ -89,6 +91,12 @@ function cfgPruefen(e) {
   c.tiktok = { typen: Array.isArray(tk.typen) ? ['ank', 'story', 'erg', 'woche'].filter(t => tk.typen.includes(t)) : CFG_STANDARD.tiktok.typen.slice() };
   const wo = e.woche || {};
   c.woche = { aktiv: wo.aktiv !== false, zeit: istUhrzeit(wo.zeit) ? wo.zeit : '17:00', pose: /^[A-Za-z0-9_.-]{1,80}\.(png|webp)$/.test(String(wo.pose || '')) || wo.pose === '' ? wo.pose : CFG_STANDARD.woche.pose };
+  const vl = e.vorlagen || {};
+  c.vorlagen = {};
+  for (const t of ['ank', 'story', 'erg', 'woche']) {
+    const x = vl[t] || {};
+    c.vorlagen[t] = { modus: ['reihe', 'zufall', 'fest'].includes(x.modus) ? x.modus : 'reihe', kreids: x.kreids !== false, fest: /^[a-z0-9]{1,40}$/.test(String(x.fest || '')) ? x.fest : '' };
+  }
   c.typen = Array.isArray(e.typen) ? TYPEN.filter(t => e.typen.includes(t)) : CFG_STANDARD.typen.slice();
   c.liveAb = ['quali', 'rennen', 'start'].includes(e.liveAb) ? e.liveAb : 'quali';
   c.kiHinweis = e.kiHinweis !== false;
@@ -107,7 +115,8 @@ async function ladeCfg(s) {
     ergebnis: { ...CFG_STANDARD.ergebnis, ...(c.ergebnis || {}) },
     woche: { ...CFG_STANDARD.woche, ...(c.woche || {}) },
     youtube: { ...CFG_STANDARD.youtube, ...(c.youtube || {}) },
-    tiktok: { ...CFG_STANDARD.tiktok, ...(c.tiktok || {}) }
+    tiktok: { ...CFG_STANDARD.tiktok, ...(c.tiktok || {}) },
+    vorlagen: { ...CFG_STANDARD.vorlagen, ...(c.vorlagen || {}) }
   });
 }
 async function ladeDesign(s) { return { ...DESIGN_STANDARD, ...((await s.lies('design')) || {}) }; }
@@ -436,6 +445,41 @@ const TYP_AUS_ID = id => /^woche_/.test(id) ? 'woche' : (String(id).match(/_(ank
 const DATUM_AUS_ID = id => (String(id).match(/(\d{4}-\d{2}-\d{2})_(ank|story|erg)$/) || [])[1] || '';
 const QUELLE = { eigen: 'Eigenes Bild', gemini: 'Gemini-App', chatgpt: 'ChatGPT-App', ki: 'Cloudflare-KI' };
 
+// ─── Vorlagen: welche Vorlage bekommt ein Post? ───
+const ARTFORMAT = { ank: 'feed', erg: 'feed', story: 'story', woche: 'story' };
+function vorlagenPool(typ, serie, vorlagen, cfg) {
+  const c = cfg.vorlagen[typ] || {};
+  const eigene = vorlagen.filter(v => v.an !== false && v.format === ARTFORMAT[typ] && (v.fuer || []).includes(typ));
+  const fuerSerie = eigene.filter(v => (v.serien || []).length && (v.serien || []).includes(serie));
+  const allgemein = eigene.filter(v => !(v.serien || []).length);
+  // Gibt es Vorlagen nur für diese Serie, kommen nur die dran – sonst die allgemeinen
+  const pool = (fuerSerie.length ? fuerSerie : allgemein).map(v => v.id);
+  if (c.kreids !== false && !fuerSerie.length) pool.unshift('kreids');
+  return pool.length ? pool : ['kreids'];
+}
+async function vorlagenZuteilen(s, plan, st, vorlagen, cfg) {
+  const ids = new Set(vorlagen.map(v => v.id));
+  const zaehler = {};
+  for (const p of plan) {
+    if (!ARTFORMAT[p.typ]) continue;
+    const key = 'post:' + p.id, z = st[key] || {};
+    if (z.gepostet) continue;
+    const pool = vorlagenPool(p.typ, p.serie, vorlagen, cfg);
+    if (z.vorlage && (z.vorlageFest ? (z.vorlage === 'kreids' || ids.has(z.vorlage)) : pool.includes(z.vorlage))) continue;
+    const c = cfg.vorlagen[p.typ] || {};
+    let id;
+    if (c.modus === 'fest') id = pool.includes(c.fest) ? c.fest : pool[0];
+    else if (c.modus === 'zufall') id = pool[Math.floor(Math.random() * pool.length)];
+    else {
+      if (zaehler[p.typ] === undefined) zaehler[p.typ] = (await s.lies('vzaehler:' + p.typ)) || 0;
+      id = pool[zaehler[p.typ] % pool.length]; zaehler[p.typ]++;
+    }
+    const neu = { ...z, vorlage: id, vorlageFest: false };
+    await s.schreib(key, neu); st[key] = neu;
+  }
+  for (const [t, n] of Object.entries(zaehler)) await s.schreib('vzaehler:' + t, n);
+}
+
 async function stand(env, s) {
   const jetzt = Date.now();
   const tag = new Date().toISOString().slice(0, 10);
@@ -449,18 +493,24 @@ async function stand(env, s) {
     const rk = rennKey(p.id), alt = kbus['kbu:' + rk];
     if (p.kalenderBild && (!alt || alt.url !== p.kalenderBild)) { const neu = { url: p.kalenderBild, startMs: p.startMs }; await s.schreib('kbu:' + rk, neu); kbus['kbu:' + rk] = neu; }
   }
+  const [vorlagenRoh, ablageRoh] = await Promise.all([s.liste('vorlage:'), s.liste('ablageinfo:')]);
+  const vorlagen = Object.values(vorlagenRoh).filter(v => v && v.id).sort((a, b) => (a.erstellt || 0) - (b.erstellt || 0));
+  const vVersion = Object.fromEntries(vorlagen.map(v => [v.id, v.v || 0]));
+  await vorlagenZuteilen(s, plan, st, vorlagen, cfg);
   const posts = plan.map(p => {
     const z = st['post:' + p.id] || {};
     const rk = rennKey(p.id);
     const bgv = bgvs['bgv:' + rk] || 0;
     const m = bgms['bgm:' + rk] || {};
     const spruch = (thrs['thr:' + rk] || {}).spruch || '';
-    const soll = kurzHash(inhaltSchluessel({ ...p, spruch }, design, cfg, bgv));
+    const vid = z.vorlage && (z.vorlage === 'kreids' || vVersion[z.vorlage] !== undefined) ? z.vorlage : 'kreids';
+    const soll = kurzHash(inhaltSchluessel({ ...p, spruch }, design, cfg, bgv) + '|' + vid + ':' + (vVersion[vid] || 0));
     return {
       id: p.id, typ: p.typ, art: p.art, spr: p.spr, titel: p.titel, serie: p.serie, nr: p.nr, track: p.track, layout: p.layout, datum: p.datum,
       postMs: p.postMs, startMs: p.startMs, qualiMs: p.qualiMs || p.startMs, rennMs: p.rennMs || p.startMs, liveMs: p.liveMs, tage: p.tage || 0,
       klassen: p.klassen, reverseGrid: p.reverseGrid, spruch, liste: p.liste || null, bisDatum: p.bisDatum || '', pose: p.pose || '',
       ergebnis: p.ergebnis || null, platz: p.ergebnis ? platzText(p.ergebnis) : '', eigenesErgebnis: !!p.eigenesErgebnis,
+      vorlage: vid, vorlageFest: !!z.vorlageFest,
       status: status(z, cfg, p, jetzt), freigegeben: !!z.freigegeben, fehler: z.fehler || '', kiFehler: bgv ? '' : (m.kiFehler || ''),
       gepostet: z.gepostet || null,
       bild: z.version ? `${env.ORIGIN}/bild/${p.id}/${z.version}.jpg` : '',
@@ -493,7 +543,8 @@ async function stand(env, s) {
     };
   }).filter(Boolean).sort((a, b) => b.wann - a.wann);
   return {
-    erledigt,
+    erledigt, vorlagen,
+    ablage: Object.entries(ablageRoh).map(([k, a]) => ({ id: k.slice(11), name: a.name || '', url: `${env.ORIGIN}/ablage/${k.slice(11)}`, zeit: a.zeit || 0 })).sort((a, b) => b.zeit - a.zeit),
     cfg, design: { ...design, logoBild: design.logoUrl ? `${env.ORIGIN}/logo.png?v=${kurzHash(design.logoUrl)}` : '' },
     posts, offen: daten.offen || [], thumbVorlage: vorlage || null,
     konto: { verbunden: !!k.verbunden, username: k.username || '', fehler: k.fehler || '' },
@@ -577,6 +628,38 @@ async function api(req, env, url) {
     const z = await ytEinRennen(env, s, await ytZugang(env, s), r, cfg, true);
     return z.fehler ? fehler(z.fehler, 502) : antwort({ ok: true, id: z.id });
   }
+  // ─── Vorlagen ───
+  if (pfad === '/api/vorlage' && req.method === 'POST') {
+    const body = await json(), v = body.vorlage;
+    const t = JSON.stringify(v || null);
+    if (!v || typeof v !== 'object' || !Array.isArray(v.elemente) || !['feed', 'story'].includes(v.format) || t.length > 60000) return fehler('Vorlage ungültig.');
+    const id = /^[a-z0-9]{6,40}$/.test(String(v.id || '')) ? v.id : Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+    const alt = await s.lies('vorlage:' + id);
+    const neu = { ...v, id, name: String(v.name || 'Vorlage').replace(/[<>]/g, '').slice(0, 40), fuer: (v.fuer || []).filter(f => ARTFORMAT[f] === v.format),
+      serien: (v.serien || []).map(x => String(x).slice(0, 80)).slice(0, 30), v: Date.now(), erstellt: (alt && alt.erstellt) || Date.now() };
+    await s.schreib('vorlage:' + id, neu);
+    return antwort({ ok: true, id, v: neu.v });
+  }
+  const vw = pfad.match(/^\/api\/vorlage\/([a-z0-9]{1,40})\/weg$/);
+  if (vw && req.method === 'POST') { await s.loesch(['vorlage:' + vw[1]]); return antwort({ ok: true }); }
+  if (pfad === '/api/vorlagen/verteilen' && req.method === 'POST') {
+    const st = await s.liste('post:');
+    for (const [k, z] of Object.entries(st)) if (z && !z.gepostet && z.vorlage) { const n = { ...z }; delete n.vorlage; delete n.vorlageFest; await s.schreib(k, n); }
+    return antwort({ ok: true });
+  }
+  // Ablage: eigene Bilder (PNG/JPG/WebP bis 1,9 MB)
+  if (pfad === '/api/ablage' && req.method === 'POST') {
+    const u8 = new Uint8Array(await req.arrayBuffer());
+    const typ = bildTyp(u8);
+    if (u8.length < 200 || u8.length > 1.9e6 || !['image/png', 'image/jpeg', 'image/webp'].includes(typ)) return fehler('Bitte PNG, JPG oder WebP bis 1,9 MB.');
+    const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+    await s.schreib('ablage:' + id, u8);
+    await s.schreib('ablageinfo:' + id, { name: String(url.searchParams.get('name') || 'Bild').replace(/[<>]/g, '').slice(0, 60), typ, zeit: Date.now() });
+    return antwort({ ok: true, id, url: `${env.ORIGIN}/ablage/${id}` });
+  }
+  const aw = pfad.match(/^\/api\/ablage\/([a-z0-9]{1,40})\/weg$/);
+  if (aw && req.method === 'POST') { await s.loesch(['ablage:' + aw[1], 'ablageinfo:' + aw[1]]); return antwort({ ok: true }); }
+
   // Thumbnail-Datei fürs YouTube-Video (vom Dashboard gezeichnet, PNG oder JPG unter 2 MB)
   const ytt = pfad.match(/^\/api\/ytthumb\/([A-Za-z0-9_-]{1,200})$/);
   if (ytt && req.method === 'POST') {
@@ -642,7 +725,7 @@ async function api(req, env, url) {
     return antwort({ ok: true });
   }
 
-  const m = pfad.match(/^\/api\/post\/([A-Za-z0-9_-]{1,200})\/(fertig|bild|freigeben|ueberspringen|jetzt|manuell|eigenesbild|pruefen|tiktok)$/);
+  const m = pfad.match(/^\/api\/post\/([A-Za-z0-9_-]{1,200})\/(fertig|bild|freigeben|ueberspringen|jetzt|manuell|eigenesbild|pruefen|tiktok|vorlage)$/);
   if (m && req.method === 'POST') {
     const [, id, aktion] = m;
     const z = (await s.lies('post:' + id)) || {};
@@ -655,6 +738,24 @@ async function api(req, env, url) {
         if (aktion === 'freigeben') z.freigegeben = body.an !== false; else z.uebersprungen = body.an !== false;
         if (body.an !== false) { z.fehler = z.version ? '' : z.fehler; z.versuche = 0; }
       }
+      await s.schreib('post:' + id, z);
+      return antwort({ ok: true });
+    }
+    // Vorlage für diesen Post: { id } selbst wählen, { id: '' } = wieder automatisch, { wuerfeln: true } = eine andere
+    if (aktion === 'vorlage') {
+      const body = await json();
+      if (z.gepostet) return fehler('Dieser Post ist schon gepostet.');
+      if (body.wuerfeln) {
+        const [cfg, liste, daten] = await Promise.all([ladeCfg(s), s.liste('vorlage:'), datenLaden(s)]);
+        const p = bauePlan(daten, cfg, Date.now()).find(x => x.id === id);
+        if (!p) return fehler('Diesen Post gibt es nicht (mehr).', 404);
+        const pool = vorlagenPool(p.typ, p.serie, Object.values(liste), cfg).filter(x => x !== z.vorlage);
+        if (!pool.length) return fehler('Keine andere Vorlage für diese Art da – im Reiter „🧩 Vorlagen“ welche anlegen.');
+        z.vorlage = pool[Math.floor(Math.random() * pool.length)]; z.vorlageFest = true;
+      } else if (body.id) {
+        if (body.id !== 'kreids' && !(await s.lies('vorlage:' + String(body.id).replace(/[^a-z0-9]/g, '')))) return fehler('Vorlage nicht gefunden.', 404);
+        z.vorlage = body.id; z.vorlageFest = true;
+      } else { delete z.vorlage; delete z.vorlageFest; }
       await s.schreib('post:' + id, z);
       return antwort({ ok: true });
     }
@@ -771,6 +872,13 @@ export default {
         const h = { 'Content-Type': 'image/jpeg', 'Cache-Control': 'public, max-age=86400', ...CORS };
         if (url.searchParams.has('laden')) h['Content-Disposition'] = `attachment; filename="kreids888-${b[1]}.jpg"`;
         return new Response(jpg, { headers: h });
+      }
+      // Eigenes Bild aus der Ablage (für Vorlagen)
+      const ab = url.pathname.match(/^\/ablage\/([a-z0-9]{1,40})$/);
+      if (ab && req.method === 'GET') {
+        const u8 = await speicher(env).lies('ablage:' + ab[1]);
+        if (!u8) return new Response('Kein Bild', { status: 404, headers: CORS });
+        return new Response(u8, { headers: { 'Content-Type': bildTyp(u8) || 'application/octet-stream', 'Cache-Control': 'public, max-age=31536000, immutable', ...CORS } });
       }
       // Hintergrund eines Rennens: KI-/eigenes Bild, sonst das Bild aus dem Streamkalender
       const hg = url.pathname.match(/^\/hintergrund\/([A-Za-z0-9_-]{1,200})$/);

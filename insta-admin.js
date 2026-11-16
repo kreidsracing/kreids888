@@ -101,7 +101,8 @@
     finally { GLEICHT = false; malen(''); zeichnen(); }
   }
   async function bildHochladen(p) {
-    const blob = await window.K888Bilder.post(p, STAND.design);
+    const v = p.vorlage && p.vorlage !== 'kreids' && window.K888Vorlagen ? (STAND.vorlagen || []).find(x => x.id === p.vorlage) : null;
+    const blob = v ? await window.K888Vorlagen.bildFuer(JSON.parse(JSON.stringify(v)), p, STAND.design, VORLAGEN_UMG) : await window.K888Bilder.post(p, STAND.design);
     const r = await fetch(INSTA + `/api/post/${encodeURIComponent(p.id)}/fertig?h=${encodeURIComponent(p.soll)}`, {
       method: 'POST', headers: { Authorization: 'Bearer ' + token(), 'Content-Type': 'image/jpeg' }, body: blob
     });
@@ -210,6 +211,13 @@
     const yt = STAND.youtube || {};
     if (mitThumb && p.yt && yt.verbunden && p.startMs > Date.now()) k.push(`<button class="btn btn-ghost ki-k" data-aktion="yt-planen" data-rk="${esc(p.rennKey)}"><span>▶ ${p.yt.id ? 'YouTube aktualisieren' : 'Jetzt auf YouTube planen'}</span></button>`);
     const h = [];
+    if (p.status !== 'gepostet') {
+      const fmt = p.typ === 'story' || p.typ === 'woche' ? 'story' : 'feed';
+      const passend = (STAND.vorlagen || []).filter(v => v.format === fmt);
+      h.push(`<div class="ki-vwahl">🧩 Vorlage: <select data-vorlage="${id}"><option value="kreids" ${p.vorlage === 'kreids' ? 'selected' : ''}>Kreids-Design</option>${passend.map(v => `<option value="${esc(v.id)}" ${p.vorlage === v.id ? 'selected' : ''}>${esc(v.name)}</option>`).join('')}</select>
+        <button type="button" class="btn btn-ghost ki-k" data-aktion="vwuerfeln" data-id="${id}" title="Andere Vorlage aus dem Wechsel"><span>🎲</span></button>
+        ${p.vorlageFest ? `<button type="button" class="ki-link" data-aktion="vauto" data-id="${id}">selbst gewählt · ↺ automatisch</button>` : ''}</div>`);
+    }
     if (p.fehler) h.push(`<div class="ki-hinweis rot">⚠ ${esc(p.fehler)}</div>`);
     if (p.bildQuelle) h.push(`<div class="ki-dim">Hintergrund: ${esc(p.bildQuelle)}</div>`);
     if (WARTET && WARTET.id === p.id) { const n = (KI[WARTET.quelle] || KI.gemini).name; h.push(`<div class="ki-hinweis gelb">${WARTET.quelle === 'chatgpt' ? '🤖' : '✨'} Wartet auf das Bild aus ${n}: im ${n}-Fenster Rechtsklick aufs Bild → „Bild kopieren“ → hier ins Fenster klicken (oder Strg+V). <button type="button" class="ki-link" data-aktion="ki-ab">Abbrechen</button></div>`); }
@@ -495,7 +503,7 @@
       <p class="hint">${cfg.modus === 'auto' ? 'Posts gehen zur eingestellten Zeit von selbst raus – die Bilder werden gezeichnet, sobald du diesen Reiter öffnest.' : 'Jeder Post wartet, bis du ihn freigibst. Die Bilder werden gezeichnet, sobald du diesen Reiter öffnest.'}</p>
       <div class="ki-malt"${MALT ? '' : ' hidden'}>${esc(MALT)}</div>
       <div class="side ki-reiter">
-        ${[['posts', `🗓 Posts (${liste.length})`], ['thumb', '▶ Thumbnail'], ['zeiten', '⏰ Zeiten & Text'], ['design', '🎨 Aussehen'], ['kanaele', '📡 YouTube & TikTok']].map(([k, t]) =>
+        ${[['posts', `🗓 Posts (${liste.length})`], ['thumb', '▶ Thumbnail'], ['zeiten', '⏰ Zeiten & Text'], ['vorlagen', '🧩 Vorlagen'], ['design', '🎨 Aussehen'], ['kanaele', '📡 YouTube & TikTok']].map(([k, t]) =>
           `<a class="${REITER === k ? 'active' : ''}" data-aktion="reiter" data-wert="${k}">${t}</a>`).join('')}
       </div>
       ${REITER === 'posts' ? `
@@ -509,8 +517,10 @@
         <div class="ki-grid">${zeitenPanel(cfg)}${textPanel(cfg)}</div>
         <div class="actions"><button class="btn btn-red" data-aktion="cfg"><span>💾 Zeiten und Texte speichern</span></button></div>` : ''}
       ${REITER === 'design' ? `<div class="ki-grid">${designPanel(STAND.design)}</div>` : ''}
-      ${REITER === 'kanaele' ? `<div class="ki-grid">${youtubePanel()}${tiktokPanel()}</div>` : ''}`;
+      ${REITER === 'kanaele' ? `<div class="ki-grid">${youtubePanel()}${tiktokPanel()}</div>` : ''}
+      ${REITER === 'vorlagen' ? '<div class="ki-vorlagenbox"></div>' : ''}`;
     if (REITER === 'kanaele') streamsLaden();
+    if (REITER === 'vorlagen' && window.K888Vorlagen) window.K888Vorlagen.editor(BOX.querySelector('.ki-vorlagenbox'), VORLAGEN_UMG);
     if (REITER === 'design') designVorschau();
     if (REITER === 'thumb' && window.K888Thumb) window.K888Thumb.editor(BOX.querySelector('.ki-thumbbox'), THUMB_UMG, THUMB_RK);
     if (REITER === 'posts' && window.K888Thumb) BOX.querySelectorAll('canvas[data-thumb]').forEach(c => {
@@ -536,6 +546,36 @@
     vorlageGespeichert(v) { STAND.thumbVorlage = v; },
     thumbGesetzt(rk, felder) { for (const p of STAND.posts) if (p.rennKey === rk) { p.thumb = { ...(p.thumb || {}), ...felder }; if (felder.vorlage === null) delete p.thumb.vorlage; } }
   };
+
+  // Umgebung für den Vorlagen-Editor (insta-vorlagen.js)
+  const VORLAGEN_UMG = {
+    stand: () => STAND, igApi, meldung,
+    async gespeichert() { await laden(); },
+    async cfgSpeichern(vorlagen) { await igApi('POST', '/api/einstellungen', { cfg: { ...STAND.cfg, vorlagen } }); STAND.cfg.vorlagen = vorlagen; },
+    async ablageHoch(datei) {
+      const blob = await zuWebp(datei);
+      const name = String(datei.name || 'Bild').replace(/\.[a-z0-9]+$/i, '').slice(0, 60);
+      const d = await bildSenden('/api/ablage?name=' + encodeURIComponent(name), blob);
+      (STAND.ablage = STAND.ablage || []).unshift({ id: d.id, name, url: d.url, zeit: Date.now() });
+      return d;
+    }
+  };
+  // Eigene Bilder: WebP (bleibt durchsichtig), höchstens 1600 px
+  async function zuWebp(datei) {
+    const url = URL.createObjectURL(datei);
+    try {
+      const i = await ladeBild(url);
+      for (const max of [1600, 1200, 900]) {
+        const f = Math.min(1, max / Math.max(i.naturalWidth, i.naturalHeight));
+        const c = document.createElement('canvas');
+        c.width = Math.max(1, Math.round(i.naturalWidth * f)); c.height = Math.max(1, Math.round(i.naturalHeight * f));
+        c.getContext('2d').drawImage(i, 0, 0, c.width, c.height);
+        const b = await new Promise(ok => c.toBlob(ok, 'image/webp', 0.9));
+        if (b && b.size < 1.85e6) return b;
+      }
+      throw new Error('Bild ist zu groß.');
+    } finally { URL.revokeObjectURL(url); }
+  }
 
   // ─── Bild → JPEG (max. 1600 px) ───
   function ladeBild(src) {
@@ -706,6 +746,10 @@
       await igApi('POST', `/api/youtube/${encodeURIComponent(b.dataset.rk)}/planen`, {});
       meldung('Livestream ist auf YouTube geplant ✓'); await laden(true);
     });
+    if (a === 'vwuerfeln' || a === 'vauto') return ausfuehren(b, async () => {
+      await igApi('POST', `/api/post/${encodeURIComponent(id)}/vorlage`, a === 'vwuerfeln' ? { wuerfeln: true } : { id: '' });
+      await laden();
+    });
     if (a === 'tiktok') return ausfuehren(b, async () => {
       await bildSicher(id);
       await igApi('POST', `/api/post/${encodeURIComponent(id)}/tiktok`, {});
@@ -788,6 +832,11 @@
 
   async function aenderung(ev) {
     const t = ev.target;
+    if (t.dataset.vorlage) {
+      try { await igApi('POST', `/api/post/${encodeURIComponent(t.dataset.vorlage)}/vorlage`, { id: t.value }); await laden(); }
+      catch (e) { meldung(e.message, 1); }
+      return;
+    }
     if (!(t.dataset.eigenesbild && t.files && t.files[0])) return;
     try {
       meldung('Bild wird hochgeladen …');
@@ -806,6 +855,9 @@
 #instaApp .ki-oben{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:14px;margin-bottom:8px}
 #instaApp .ki-oben>div:first-child{display:flex;flex-direction:column;gap:3px}
 #instaApp .ki-konto{font-weight:600}
+#instaApp .ki-vwahl{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:6px 0;font-size:14px}
+#instaApp .ki-vwahl select{width:auto;min-width:180px;padding:6px 8px}
+#instaApp .ki-vwahl .ki-k{padding:6px 10px}
 #instaApp .ki-erledigt summary{cursor:pointer;list-style:none}
 #instaApp .ki-erledigt summary::-webkit-details-marker{display:none}
 #instaApp .ki-erledigt summary h3{display:inline-block;margin:0}
@@ -885,7 +937,7 @@
   // Zeichnen (insta-bilder.js) und Thumbnail-Editor (insta-thumb.js) nachladen
   let SKRIPTE = null;
   function skripte() {
-    if (!SKRIPTE) SKRIPTE = Promise.all(['insta-bilder.js', 'insta-thumb.js'].map(n => new Promise((ok, nein) => {
+    if (!SKRIPTE) SKRIPTE = Promise.all(['insta-bilder.js', 'insta-thumb.js', 'insta-vorlagen.js'].map(n => new Promise((ok, nein) => {
       const s = document.createElement('script'); s.src = BASIS + n + '?v=' + Date.now();
       s.onload = ok; s.onerror = () => nein(new Error('Konnte ' + n + ' nicht laden'));
       document.head.appendChild(s);
