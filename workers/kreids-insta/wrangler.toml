@@ -10,7 +10,7 @@
 name = "kreids-insta"
 main = "src/index.js"
 compatibility_date = "2025-09-01"
-compatibility_flags = ["nodejs_compat"]
+compatibility_flags = ["nodejs_compat", "global_fetch_strictly_public"]   # darf kreids888-admin (gleiches Konto) abfragen
 workers_dev = true
 keep_vars = true
 
