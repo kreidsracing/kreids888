@@ -19,7 +19,8 @@
   const dauer = (s) => { if (s == null || s < 0) return "–"; s = Math.round(s); const h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60); return h ? h + ":" + pad(m) + ":" + pad(s % 60) : m + ":" + pad(s % 60); };
   const uhr = (ms) => new Date(ms).toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" });
   const norm = (s) => String(s || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9]+/g, " ").trim();
-  const istF2F = (a, st) => !!a && ((st.ich && a.i === st.ich.idx) || (st.session.meineTeams || []).includes(a.team) || /\bf2f\b|flag ?to ?flag/i.test(a.team || ""));
+  // F2F-Auto: Auto des Senders, eigenes Team, F2F im Teamnamen oder (vom Server am Fahrernamen erkannt) ein anderer F2F-Fahrer im Rennen
+  const istF2F = (a, st) => !!a && ((st.ich && a.i === st.ich.idx) || (Array.isArray(st.f2f) && st.f2f.includes(a.i)) || (st.session.meineTeams || []).includes(a.team) || /\bf2f\b|flag ?to ?flag/i.test(a.team || ""));
   const TYP = { "Race": "Rennen", "Lone Qualify": "Quali", "Open Qualify": "Quali", "Qualify": "Quali", "Practice": "Training", "Lone Practice": "Training", "Warmup": "Warm-up", "Offline Testing": "Testfahrt" };
 
   const HINWEIS = `<div class="spt-hinweis"><b>So kommen Rennen hierher:</b> Wer fährt, braucht <b>FF Overlay</b> (oder die kreids888 Toolbox) offen und oben rechts mit <b>„Mit F2F verbinden"</b> angemeldet. Dann erscheint die Session hier automatisch, auch wenn mehrere von euch gleichzeitig in verschiedenen Rennen sind. Sprit und Strategie sieht man nur, wenn der Fahrer am Steuer das Programm laufen hat. Welche Sessions hier erscheinen (Teamrennen, Einzelrennen, Offline-Testfahrten), legt der Admin fest.</div>`;
@@ -286,7 +287,8 @@
     if (S.ereignisse.size > 500) S.ereignisse = new Map([...S.ereignisse].sort((x, y) => (x[1].w || 0) - (y[1].w || 0)).slice(-500));
     if (j.ich && j.ich.sprit != null) S.sprit = { ...j.ich, t: j.t, runde: (j.autos.find(a => a.i === j.ich.idx) || {}).runde };
     const unsere = j.autos.filter(a => istF2F(a, j));
-    if (S.auto == null || !j.autos.some(a => a.i === S.auto)) S.auto = (unsere[0] || j.autos[0] || {}).i ?? null;
+    // Standard: Auto des Senders, sonst das erste F2F-Auto; umschalten über die Knöpfe in „Unser Auto"
+    if (S.auto == null || !j.autos.some(a => a.i === S.auto)) S.auto = (unsere.find(a => j.ich && a.i === j.ich.idx) || unsere[0] || j.autos[0] || {}).i ?? null;
     // Abstandsverlauf jedes Autos zu seinem Vordermann in der Klasse merken (Schlüssel hinten:vorne, für ± Vorne/Hinten)
     const f = klassenFeld(j);
     for (const liste of Object.values(f)) {
