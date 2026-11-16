@@ -66,6 +66,12 @@ export async function posten({ token, uid, bildUrl, typ, text, tags, kiHinweis }
   return pub.id;
 }
 
+// Gibt es den Post auf Instagram wirklich? → { id, typ, link, zeit }
+export async function pruefen(token, mediaId) {
+  const d = await ig(`${host(token)}/${mediaId}?fields=id,media_type,media_product_type,permalink,timestamp&${q(token)}`);
+  return { id: d.id, typ: d.media_product_type || d.media_type || '', link: d.permalink || '', zeit: d.timestamp || '' };
+}
+
 // Nur Instagram-Token (60 Tage) lassen sich verlängern. Systemnutzer-Token laufen nicht ab.
 export function verlaengerbar(token) { return istIg(token); }
 export function tokenVerlaengern(token) {

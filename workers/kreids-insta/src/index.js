@@ -12,7 +12,7 @@
 import { DurableObject } from 'cloudflare:workers';
 import { ADMIN, ERG_TAGE, ladeDaten, bauePlan, eigeneRennen, rennKey, inhaltSchluessel, kurzHash, bildtext, platzText } from './plan.js';
 import { kiBild, sprueche, STIMMUNGEN, KAMERAS, autos } from './ki.js';
-import { konto, posten, tokenVerlaengern, verlaengerbar } from './insta.js';
+import { konto, posten, pruefen, tokenVerlaengern, verlaengerbar } from './insta.js';
 import { istUhrzeit } from './zeit.js';
 
 // ─── Speicher (Durable Object, SQLite) ──────────────────────
@@ -242,7 +242,7 @@ async function zyklus(env) {
   for (const p of plan) {
     const z = st['post:' + p.id] || {};
     if (z.gepostet || z.uebersprungen || (z.versuche || 0) >= 3) continue;
-    if (p.postMs <= jetzt && (cfg.modus === 'auto' || z.freigegeben)) await veroeffentlichen(env, s, p, design, cfg);
+    if (p.postMs <= jetzt && ((cfg.modus === 'auto' && jetzt - p.postMs < VERPASST_NACH) || z.freigegeben)) await veroeffentlichen(env, s, p, design, cfg);
   }
   // 2. KI-Hintergründe für die Rennen der nächsten 48 Stunden (höchstens 2 pro Lauf)
   let ki = 2;
@@ -302,13 +302,17 @@ async function istAdmin(req) {
   return ok;
 }
 
-function status(z, cfg) {
+const VERPASST_NACH = 30 * 60000;
+function status(z, cfg, p, jetzt) {
   if (z.gepostet) return 'gepostet';
   if (z.uebersprungen) return 'uebersprungen';
   if (z.fehler && z.fehler !== BILD_FEHLT) return 'fehler';
   if (cfg.modus === 'freigabe' && !z.freigegeben) return 'wartet';
+  if (!z.freigegeben && p && jetzt - p.postMs > VERPASST_NACH) return 'verpasst';
   return 'geplant';
 }
+const TYP_AUS_ID = id => /^woche_/.test(id) ? 'woche' : (String(id).match(/_(ank|story|erg)$/) || [])[1] || '';
+const DATUM_AUS_ID = id => (String(id).match(/(\d{4}-\d{2}-\d{2})_(ank|story|erg)$/) || [])[1] || '';
 const QUELLE = { eigen: 'Eigenes Bild', gemini: 'Gemini-App', chatgpt: 'ChatGPT-App', ki: 'Cloudflare-KI' };
 
 async function stand(env, s) {
@@ -336,7 +340,7 @@ async function stand(env, s) {
       postMs: p.postMs, startMs: p.startMs, qualiMs: p.qualiMs || p.startMs, rennMs: p.rennMs || p.startMs, liveMs: p.liveMs, tage: p.tage || 0,
       klassen: p.klassen, reverseGrid: p.reverseGrid, spruch, liste: p.liste || null, bisDatum: p.bisDatum || '', pose: p.pose || '',
       ergebnis: p.ergebnis || null, platz: p.ergebnis ? platzText(p.ergebnis) : '', eigenesErgebnis: !!p.eigenesErgebnis,
-      status: status(z, cfg), freigegeben: !!z.freigegeben, fehler: z.fehler || '', kiFehler: bgv ? '' : (m.kiFehler || ''),
+      status: status(z, cfg, p, jetzt), freigegeben: !!z.freigegeben, fehler: z.fehler || '', kiFehler: bgv ? '' : (m.kiFehler || ''),
       gepostet: z.gepostet || null,
       bild: z.version ? `${env.ORIGIN}/bild/${p.id}/${z.version}.jpg` : '',
       soll, veraltet: !!z.version && z.hash !== soll,
@@ -348,7 +352,23 @@ async function stand(env, s) {
       text: p.typ === 'story' || p.typ === 'woche' ? '' : bildtext(p, cfg, design)
     };
   });
+  // Erledigt (gepostet) und nicht mehr geplante, nicht gepostete Posts der letzten 36 Stunden
+  const imPlan = new Set(plan.map(p => p.id));
+  const erledigt = Object.entries(st).map(([k, z]) => {
+    if (!z) return null;
+    const id = k.slice(5), wann = (z.gepostet && z.gepostet.zeit) || z.postMs || 0;
+    if (jetzt - wann > 36 * 3600000) return null;
+    if (!z.gepostet && (imPlan.has(id) || !z.version || z.uebersprungen)) return null;
+    const i = z.info || {};
+    return {
+      id, typ: i.typ || TYP_AUS_ID(id), titel: i.titel || '', serie: i.serie || '', nr: i.nr || 0, track: i.track || '', layout: i.layout || '', datum: i.datum || DATUM_AUS_ID(id), bisDatum: i.bisDatum || '',
+      wann, imPlan: imPlan.has(id), fehler: z.fehler || '',
+      gepostet: z.gepostet ? { zeit: z.gepostet.zeit || 0, manuell: !!z.gepostet.manuell, mediaId: z.gepostet.mediaId || '' } : null,
+      bild: z.version ? `${env.ORIGIN}/bild/${id}/${z.version}.jpg` : ''
+    };
+  }).filter(Boolean).sort((a, b) => b.wann - a.wann);
   return {
+    erledigt,
     cfg, design: { ...design, logoBild: design.logoUrl ? `${env.ORIGIN}/logo.png?v=${kurzHash(design.logoUrl)}` : '' },
     posts, offen: daten.offen || [], thumbVorlage: vorlage || null,
     konto: { verbunden: !!k.verbunden, username: k.username || '', fehler: k.fehler || '' },
@@ -456,20 +476,30 @@ async function api(req, env, url) {
     return antwort({ ok: true });
   }
 
-  const m = pfad.match(/^\/api\/post\/([A-Za-z0-9_-]{1,200})\/(fertig|bild|freigeben|ueberspringen|jetzt|manuell|eigenesbild)$/);
+  const m = pfad.match(/^\/api\/post\/([A-Za-z0-9_-]{1,200})\/(fertig|bild|freigeben|ueberspringen|jetzt|manuell|eigenesbild|pruefen)$/);
   if (m && req.method === 'POST') {
     const [, id, aktion] = m;
     const z = (await s.lies('post:' + id)) || {};
     if (aktion === 'manuell' || aktion === 'freigeben' || aktion === 'ueberspringen') {
       const body = await json();
       if (aktion === 'manuell') {
-        if (body.an === false) delete z.gepostet; else { z.gepostet = { zeit: Date.now(), manuell: true }; z.fehler = ''; }
+        if (body.an === false) { delete z.gepostet; z.freigegeben = false; z.versuche = 0; z.fehler = ''; z.laeuft = 0; }
+        else { z.gepostet = { zeit: Date.now(), manuell: true }; z.fehler = ''; }
       } else {
         if (aktion === 'freigeben') z.freigegeben = body.an !== false; else z.uebersprungen = body.an !== false;
         if (body.an !== false) { z.fehler = z.version ? '' : z.fehler; z.versuche = 0; }
       }
       await s.schreib('post:' + id, z);
       return antwort({ ok: true });
+    }
+    // Auf Instagram nachsehen, ob es den geposteten Post wirklich gibt
+    if (aktion === 'pruefen') {
+      const mid = z.gepostet && z.gepostet.mediaId;
+      if (!mid) return fehler(z.gepostet ? 'Als selbst gepostet markiert – dazu gibt es keine Instagram-Nummer.' : 'Dieser Post wurde nicht über das Dashboard gepostet.');
+      const token = await aktuellerToken(env, s);
+      if (!token) return fehler('Kein Instagram-Token eingetragen.');
+      try { return antwort({ ok: true, ...(await pruefen(token, mid)) }); }
+      catch (e) { return antwort({ ok: false, fehler: e.message, mediaId: mid }); }
     }
     const rk = rennKey(id);
     // Fertiges Bild vom Dashboard (im Browser gezeichnet, JPEG)
@@ -483,6 +513,7 @@ async function api(req, env, url) {
       z.version = (z.version || 0) + 1;
       z.hash = String(url.searchParams.get('h') || '').slice(0, 20);
       z.postMs = p.postMs;
+      z.info = { typ: p.typ, titel: p.titel || '', serie: p.serie || '', nr: p.nr || 0, track: p.track || '', layout: p.layout || '', datum: p.datum || '', bisDatum: p.bisDatum || '' };
       z.erstellt = Date.now();
       z.ki = !!bgv && !!bgm && bgm.quelle === 'ki';
       if (z.fehler === BILD_FEHLT) z.fehler = '';
@@ -517,7 +548,8 @@ async function api(req, env, url) {
       z.versuche = 0; z.fehler = ''; await s.schreib('post:' + id, z);
       const neu = await veroeffentlichen(env, s, p, design, cfg);
       if (neu.fehler) return fehler(neu.fehler, 502);
-      return antwort({ ok: true });
+      if (!neu.gepostet) return fehler('Wird gerade schon vom automatischen Lauf gepostet – in 2 Minuten „🔄 Neu laden“.', 409);
+      return antwort({ ok: true, mediaId: neu.gepostet.mediaId || '' });
     }
   }
   return fehler('Unbekannte Anfrage.', 404);

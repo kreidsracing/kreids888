@@ -57,12 +57,12 @@ export function bauePlan(daten, cfg, jetzt) {
       const tage = Math.max(0, cfg.ankuendigung.tage | 0);
       let postMs = berlinZuMs(tageZurueck(datum, tage), cfg.ankuendigung.zeit);
       if (postMs > startMs - 3600000) postMs = startMs - 3 * 3600000;
-      if (postMs <= bis && postMs >= jetzt - 30 * 60000) posts.push({ ...basis, typ: 'ank', tage, postMs, id: key + '_ank' });
+      if (postMs <= bis && jetzt < startMs) posts.push({ ...basis, typ: 'ank', tage, postMs, id: key + '_ank' });
     }
     if (cfg.story.aktiv) {
       let postMs = berlinZuMs(datum, cfg.story.zeit);
       if (postMs > startMs - 1800000) postMs = startMs - 2 * 3600000;
-      if (postMs <= bis && jetzt < startMs - 30 * 60000) posts.push({ ...basis, typ: 'story', postMs, id: key + '_story' });
+      if (postMs <= bis && jetzt < rennMs + 3600000) posts.push({ ...basis, typ: 'story', postMs, id: key + '_story' });
     }
   }
   // Ergebnisse: nur Rennen der letzten 5 Tage (sonst würde beim Start die ganze Historie gepostet)
@@ -101,7 +101,7 @@ export function bauePlan(daten, cfg, jetzt) {
     for (let w = 0; w < 2; w++) {
       const sonntag = tageZurueck(heute, -(bisSonntag + 7 * w));
       const postMs = berlinZuMs(sonntag, cfg.woche.zeit);
-      if (postMs < jetzt - 30 * 60000) continue;
+      if (postMs < jetzt - 6 * 3600000) continue;
       const montag = tageZurueck(sonntag, -1), bisDatum = tageZurueck(sonntag, -7);
       const liste = [];
       for (const e of daten.eintraege) {

@@ -111,7 +111,7 @@
   // ─── Zeichnen ───
   const STATUS = {
     wartet: ['Wartet auf Freigabe', 'gelb'], geplant: ['Geplant', 'blau'],
-    fehler: ['Fehler', 'rot'], uebersprungen: ['Übersprungen', 'grau']
+    fehler: ['Fehler', 'rot'], uebersprungen: ['Übersprungen', 'grau'], verpasst: ['Nicht gepostet – Zeit verpasst', 'rot']
   };
   const TYP = { ank: '📣 Ankündigung · Feed', story: '📱 Raceday · Story', erg: '🏁 Ergebnis · Feed', woche: '🗓 Wochenplan · Story' };
   const datumKurz = d => String(d || '').split('-').reverse().slice(0, 2).join('.') + '.';
@@ -126,6 +126,36 @@
         <button class="btn btn-ghost ki-k" data-aktion="th-edit" data-rk="${esc(p.rennKey)}"><span>✎ Bearbeiten</span></button>
       </div>
     </div>`;
+
+  // ✅ Erledigt / nicht gepostet (letzte 36 Std.)
+  const PRUEF = {};
+  let ERL_OFFEN = false;
+  function erledigtZeile(e) {
+    const id = esc(e.id);
+    const name = e.typ === 'woche' ? titel(e) : (titel(e) || (e.datum ? 'Rennen am ' + datumKurz(e.datum) : ''));
+    const st = e.gepostet
+      ? (e.gepostet.manuell ? `<span class="ki-chip grau">Als selbst gepostet markiert</span>` : `<span class="ki-chip gruen">Über das Dashboard gepostet</span>`) + ` <span class="ki-dim">${esc(zeit(e.gepostet.zeit))}</span>`
+      : `<span class="ki-chip rot">Nicht gepostet</span>${e.fehler ? ` <span class="ki-dim">${esc(e.fehler)}</span>` : ''}`;
+    const pr = PRUEF[e.id];
+    const prText = !pr ? '' : pr.ok
+      ? `<div class="ki-hinweis">✓ Instagram hat ihn (${esc(pr.typ === 'STORY' ? 'Story' : pr.typ || 'Post')}${pr.zeit ? ', ' + esc(zeit(Date.parse(pr.zeit))) : ''})${pr.link ? ` · <a class="ki-link" href="${esc(pr.link)}" target="_blank" rel="noopener">öffnen</a>` : ''}</div>`
+      : `<div class="ki-hinweis rot">✗ Instagram kennt diesen Post nicht: ${esc(pr.fehler || '')}</div>`;
+    const k = [];
+    if (e.gepostet && e.gepostet.mediaId) k.push(`<button class="btn btn-ghost ki-k" data-aktion="pruefen" data-id="${id}"><span>🔍 Auf Instagram prüfen</span></button>`);
+    if (e.gepostet) k.push(`<button class="btn btn-ghost ki-k" data-aktion="zurueck" data-id="${id}" data-api="${e.gepostet.manuell ? '0' : '1'}"><span>↩ Rückgängig</span></button>`);
+    if (e.bild) k.push(`<a class="btn btn-ghost ki-k" href="${esc(e.bild)}?laden=1" download><span>📥 Bild laden</span></a>`);
+    return `<div class="ki-erl">
+      ${e.bild ? `<a href="${esc(e.bild)}" target="_blank" rel="noopener" class="ki-erl-bild"><img src="${esc(e.bild)}" alt="" loading="lazy"></a>` : '<div class="ki-erl-bild"></div>'}
+      <div class="ki-erl-text">
+        <div class="ki-dim">${esc(TYP[e.typ] || e.typ)}</div>
+        <div><b>${name}</b></div>
+        <div>${st}</div>
+        ${e.gepostet || e.imPlan ? '' : '<div class="ki-dim">Liegt außerhalb der Planung – nur noch zum Laden.</div>'}
+        ${prText}
+        <div class="ki-knoepfe">${k.join('')}</div>
+      </div>
+    </div>`;
+  }
 
   function postKarte(p, modus, mitThumb) {
     const [stText, stFarbe] = STATUS[p.status] || ['?', 'grau'];
@@ -148,14 +178,15 @@
     if (p.status !== 'uebersprungen') k.push(kn('jetzt', '🚀 Jetzt posten'));
     if (!woche) k.push(`<label class="btn btn-ghost ki-k ki-datei" title="Eigenes Hintergrundbild (z. B. iRacing-Screenshot) für alle Posts dieses Rennens"><span>📤 Eigenes Bild</span><input type="file" accept="image/*" data-eigenesbild="${id}"></label>`);
     if (p.bild) k.push(`<a class="btn btn-ghost ki-k" href="${esc(p.bild)}?laden=1" download><span>📥 Bild laden</span></a>`);
-    if (p.bild) k.push(kn('manuell', '✓ Selbst gepostet', 'data-an="1"', 'Wenn du das Bild selbst in der Insta-App gepostet hast'));
+    if (p.bild) k.push(kn('manuell', '✓ Hab ich selbst gepostet', 'data-an="1"', 'Nur klicken, wenn du das Bild schon selbst in der Insta-App gepostet hast – hier wird nichts gepostet'));
     if (p.eigenesErgebnis) k.push(`<button class="btn btn-ghost ki-k" data-aktion="erg-weg" data-rk="${esc(p.rennKey)}"><span>✕ Ergebnis löschen</span></button>`);
     const h = [];
     if (p.fehler) h.push(`<div class="ki-hinweis rot">⚠ ${esc(p.fehler)}</div>`);
     if (p.bildQuelle) h.push(`<div class="ki-dim">Hintergrund: ${esc(p.bildQuelle)}</div>`);
     if (WARTET && WARTET.id === p.id) { const n = (KI[WARTET.quelle] || KI.gemini).name; h.push(`<div class="ki-hinweis gelb">${WARTET.quelle === 'chatgpt' ? '🤖' : '✨'} Wartet auf das Bild aus ${n}: im ${n}-Fenster Rechtsklick aufs Bild → „Bild kopieren“ → hier ins Fenster klicken (oder Strg+V). <button type="button" class="ki-link" data-aktion="ki-ab">Abbrechen</button></div>`); }
     if (p.kiFehler) h.push(`<div class="ki-hinweis">KI-Bild ging nicht (${esc(p.kiFehler)}). Bis dahin gibt es einen Ersatz-Hintergrund.</div>`);
-    if (p.typ === 'story') h.push('<div class="ki-hinweis">Link-Sticker geht nur von Hand: „📥 Bild laden“ → in der Insta-App als Story posten → hier „✓ Selbst gepostet“.</div>');
+    if (p.typ === 'story') h.push('<div class="ki-hinweis">Link-Sticker geht nur von Hand: „📥 Bild laden“ → in der Insta-App als Story posten → hier „✓ Hab ich selbst gepostet“.</div>');
+    if (p.status === 'verpasst') h.push('<div class="ki-hinweis rot">Die Zeit ist vorbei, der Post ist nicht rausgegangen. „🚀 Jetzt posten“ schickt ihn sofort.</div>');
     const text = p.text ? `<details class="ki-text"><summary>Text unter dem Post</summary><pre>${esc(p.text)}</pre></details>` : '';
     const wann = woche ? `${(p.liste || []).length} Termine in dieser Woche`
       : p.typ === 'erg'
@@ -381,7 +412,8 @@
         ${offen.length ? `<div class="ki-panel"><h3>🏁 Ergebnis eintragen</h3><div class="ki-dim" style="margin-bottom:10px">Deine eigenen Rennen der letzten 5 Tage. SPR-Ergebnisse kommen von selbst.</div>${offen.map(ergebnisForm).join('')}</div>` : ''}
         <div class="ki-leiste"><button class="btn btn-ghost ki-k" data-aktion="laden"><span>🔄 Neu laden</span></button></div>
         ${hilfe()}
-        ${liste.length ? liste.map(p => postKarte(p, cfg.modus, p.typ === 'story' || p.typ === 'erg' || (p.typ === 'ank' && !mitStory.has(p.rennKey)))).join('') : '<p class="hint">Keine Rennen oder Streams in den nächsten 3 Wochen im Streamkalender.</p>'}` : ''}
+        ${liste.length ? liste.map(p => postKarte(p, cfg.modus, p.typ === 'story' || p.typ === 'erg' || (p.typ === 'ank' && !mitStory.has(p.rennKey)))).join('') : '<p class="hint">Keine Rennen oder Streams in den nächsten 3 Wochen im Streamkalender.</p>'}
+        ${(STAND.erledigt || []).length ? `<details class="ki-panel ki-erledigt"${ERL_OFFEN ? ' open' : ''}><summary><h3>✅ Erledigt & nicht gepostet · letzte 36 Std. (${STAND.erledigt.length})</h3></summary>${STAND.erledigt.map(erledigtZeile).join('')}</details>` : ''}` : ''}
       ${REITER === 'thumb' ? '<div class="ki-thumbbox"></div>' : ''}
       ${REITER === 'zeiten' ? `
         <div class="ki-grid">${zeitenPanel(cfg)}${textPanel(cfg)}</div>
@@ -588,7 +620,21 @@
       return kiStarten(p, a);
     }
     if (a === 'ki-ab') { WARTET = null; return zeichnen(); }
+    if (a === 'pruefen') return ausfuehren(b, async () => {
+      PRUEF[id] = await igApi('POST', `/api/post/${encodeURIComponent(id)}/pruefen`, {});
+      zeichnen();
+    });
+    if (a === 'zurueck') return ausfuehren(b, async () => {
+      if (!confirm(b.dataset.api === '1'
+        ? 'Wieder als offen markieren?\n\nFalls er doch auf Instagram ist, bleibt er dort – vorher mit „🔍 Auf Instagram prüfen“ nachsehen.'
+        : 'Wieder als offen markieren?')) return;
+      await igApi('POST', `/api/post/${encodeURIComponent(id)}/manuell`, { an: false });
+      delete PRUEF[id];
+      meldung('Wieder offen – steht oben in der Liste (falls noch in der Planung).');
+      await laden();
+    });
     if (a === 'manuell') return ausfuehren(b, async () => {
+      if (b.dataset.an === '1' && !confirm('Hier wird NICHTS gepostet.\n\nNur als erledigt markieren, weil du es schon selbst in der Insta-App gepostet hast?')) return;
       await igApi('POST', `/api/post/${encodeURIComponent(id)}/manuell`, { an: b.dataset.an === '1' });
       meldung('Als selbst gepostet markiert.');
       await laden();
@@ -638,6 +684,17 @@
 #instaApp .ki-oben{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:14px;margin-bottom:8px}
 #instaApp .ki-oben>div:first-child{display:flex;flex-direction:column;gap:3px}
 #instaApp .ki-konto{font-weight:600}
+#instaApp .ki-erledigt summary{cursor:pointer;list-style:none}
+#instaApp .ki-erledigt summary::-webkit-details-marker{display:none}
+#instaApp .ki-erledigt summary h3{display:inline-block;margin:0}
+#instaApp .ki-erledigt summary h3::before{content:'▸ ';color:var(--steel)}
+#instaApp .ki-erledigt[open] summary h3::before{content:'▾ '}
+#instaApp .ki-erl{display:flex;gap:14px;align-items:flex-start;padding:12px 0;border-top:1px solid var(--line)}
+#instaApp .ki-erl:first-of-type{margin-top:10px}
+#instaApp .ki-erl-bild{flex:0 0 72px;height:96px;background:#111;display:block}
+#instaApp .ki-erl-bild img{width:100%;height:100%;object-fit:contain;display:block}
+#instaApp .ki-erl-text{flex:1;min-width:0}
+#instaApp .ki-erl-text .ki-knoepfe{margin-top:8px}
 #instaApp .ki-modus{display:flex;border:1px solid var(--line)}
 #instaApp .ki-modus button{background:transparent;border:0;color:var(--steel);font-family:var(--disp);font-weight:800;font-size:13px;letter-spacing:.08em;text-transform:uppercase;padding:10px 16px;cursor:pointer}
 #instaApp .ki-modus button+button{border-left:1px solid var(--line)}
@@ -659,7 +716,7 @@
 #instaApp .ki-titel{font-family:var(--disp);font-weight:800;font-size:18px;text-transform:uppercase;letter-spacing:.02em}
 #instaApp .ki-chip{font-family:var(--disp);font-weight:700;font-size:11px;letter-spacing:.08em;text-transform:uppercase;padding:3px 8px;border:1px solid}
 #instaApp .ki-chip.gelb{color:#f5c518;border-color:rgba(245,197,24,.4)}#instaApp .ki-chip.blau{color:#7cb8f5;border-color:rgba(55,138,221,.45)}
-#instaApp .ki-chip.rot{color:#ff6b75;border-color:rgba(225,19,36,.5)}#instaApp .ki-chip.grau{color:var(--steel);border-color:var(--line)}
+#instaApp .ki-chip.rot{color:#ff6b75;border-color:rgba(225,19,36,.5)}#instaApp .ki-chip.gruen{color:#3fbf5f;border-color:rgba(63,191,95,.45)}#instaApp .ki-chip.grau{color:var(--steel);border-color:var(--line)}
 #instaApp .ki-hinweis{font-size:13px;color:var(--steel);background:#0b0c10;border:1px solid var(--line);padding:6px 10px}
 #instaApp .ki-hinweis.rot{color:#ff6b75;border-color:rgba(225,19,36,.45)}#instaApp .ki-hinweis.gelb{color:#f5c518;border-color:rgba(245,197,24,.45)}
 #instaApp .ki-hilfe{background:#0d0e13;border:1px solid var(--line);padding:8px 12px;margin-bottom:12px;font-size:14px}
@@ -720,6 +777,7 @@
         BOX = box;
         box.addEventListener('click', klick);
         box.addEventListener('change', aenderung);
+        box.addEventListener('toggle', ev => { if (ev.target.classList && ev.target.classList.contains('ki-erledigt')) ERL_OFFEN = ev.target.open; }, true);
         box.addEventListener('input', ev => { if (ev.target.closest('.ki-design')) designGeaendert(); });
         box.addEventListener('pointerdown', dRunter);
         window.addEventListener('pointermove', dBewegen);
