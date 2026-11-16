@@ -530,7 +530,7 @@
       <p class="hint">${cfg.modus === 'auto' ? 'Posts gehen zur eingestellten Zeit von selbst raus – die Bilder werden gezeichnet, sobald du diesen Reiter öffnest.' : 'Jeder Post wartet, bis du ihn freigibst. Die Bilder werden gezeichnet, sobald du diesen Reiter öffnest.'}</p>
       <div class="ki-malt"${MALT ? '' : ' hidden'}>${esc(MALT)}</div>
       <div class="side ki-reiter">
-        ${[['posts', `🗓 Posts (${liste.length})`], ['thumb', '▶ Thumbnail'], ['zeiten', '⏰ Zeiten & Text'], ['vorlagen', '🧩 Vorlagen'], ['design', '🎨 Aussehen'], ['kanaele', '📡 YouTube & TikTok']].map(([k, t]) =>
+        ${[['posts', `🗓 Posts (${liste.length})`], ['thumb', '▶ Thumbnail'], ['zeiten', '⏰ Zeiten & Text'], ['vorlagen', '🧩 Vorlagen'], ['zuteilung', '🔁 Zuteilung'], ['design', '🎨 Aussehen'], ['kanaele', '📡 YouTube & TikTok']].map(([k, t]) =>
           `<a class="${REITER === k ? 'active' : ''}" data-aktion="reiter" data-wert="${k}">${t}</a>`).join('')}
       </div>
       ${REITER === 'posts' ? `
@@ -545,9 +545,11 @@
         <div class="actions"><button class="btn btn-red" data-aktion="cfg"><span>💾 Zeiten und Texte speichern</span></button></div>` : ''}
       ${REITER === 'design' ? `<div class="ki-grid">${designPanel(STAND.design)}</div>` : ''}
       ${REITER === 'kanaele' ? `<div class="ki-grid">${youtubePanel()}${tiktokPanel()}</div>` : ''}
-      ${REITER === 'vorlagen' ? '<div class="ki-vorlagenbox"></div>' : ''}`;
+      ${REITER === 'vorlagen' ? '<div class="ki-vorlagenbox"></div>' : ''}
+      ${REITER === 'zuteilung' ? '<div class="ki-zuteilungbox"></div>' : ''}`;
     if (REITER === 'kanaele') streamsLaden();
     if (REITER === 'vorlagen' && window.K888Vorlagen) window.K888Vorlagen.editor(BOX.querySelector('.ki-vorlagenbox'), VORLAGEN_UMG);
+    if (REITER === 'zuteilung' && window.K888Vorlagen) window.K888Vorlagen.zuteilung(BOX.querySelector('.ki-zuteilungbox'), VORLAGEN_UMG);
     if (REITER === 'design') designVorschau();
     if (REITER === 'thumb' && window.K888Thumb) window.K888Thumb.editor(BOX.querySelector('.ki-thumbbox'), THUMB_UMG, THUMB_RK);
     if (REITER === 'posts' && window.K888Thumb) BOX.querySelectorAll('canvas[data-thumb]').forEach(c => {

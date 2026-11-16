@@ -982,7 +982,8 @@ export default {
       if (qv && (req.method === 'GET' || req.method === 'HEAD')) {
         const s = speicher(env), info = await s.lies('video:' + qv[1]);
         if (!info || !info.fertig) return new Response('Kein Video', { status: 404, headers: CORS });
-        return strom(req, s, `vteil:${qv[1]}:`, info.teile, info.groesse, info.typ || 'video/mp4');
+        // .mov (H.264) spielt Chrome nur als video/mp4 ab
+        return strom(req, s, `vteil:${qv[1]}:`, info.teile, info.groesse, !info.typ || /quicktime|x-m4v/.test(info.typ) ? 'video/mp4' : info.typ);
       }
       const ov = url.pathname.match(/^\/pvideo\/([A-Za-z0-9_-]{1,200})\/(\d+)\.mp4$/);
       if (ov && (req.method === 'GET' || req.method === 'HEAD')) {

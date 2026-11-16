@@ -102,12 +102,14 @@
     if (!vids.length) return null;
     const renn = p && p.thumb && p.thumb.video;
     if (renn) { const x = vids.find(y => y.id === renn); if (x) return x; }
-    if (v.hg.quelle !== 'video') return null;
+    if (v.hg.quelle !== 'video') return null;   // (Social-Design ruft das mit quelle 'video' auf, wenn „Video“ gewählt ist)
     if (v.hg.video && v.hg.video !== 'zufall' && v.hg.video !== 'rennen') return vids.find(y => y.id === v.hg.video) || vids[zahlAus(String(p && p.id)) % vids.length];
     return vids[zahlAus(String(p && p.id)) % vids.length];
   }
-  const animiert = v => (v.elemente || []).some(e => e.an !== false && (e.typ === 'animation' || (e.anim && e.anim !== 'kein')));
-  const istVideo = (v, p, umg) => !!v && (animiert(v) || !!videoQuelle(v, p, umg));
+  const animiert = v => (v.elemente || []).some(e => e.an !== false && (e.typ === 'animation' || (e.anim && e.anim !== 'kein')))
+    || (v.hg && v.hg.quelle === 'social' && !!((window.K888_OVERLAYS || []).find(o => o.id === v.hg.design) || {}).anim);
+  const sozVideo = (v, p, umg) => v && v.hg && v.hg.quelle === 'social' ? videoQuelle({ ...v, hg: { ...v.hg, quelle: v.hg.designBild === 'video' ? 'video' : 'x' } }, p, umg) : null;
+  const istVideo = (v, p, umg) => !!v && (animiert(v) || !!videoQuelle(v, p, umg) || !!sozVideo(v, p, umg));
   let MUXER = null;
   function muxerLaden() {
     if (window.Mp4Muxer) return Promise.resolve();
@@ -202,6 +204,17 @@
     else g.fillStyle = hg.farbe || '#0a0b0e';
     g.fillRect(0, 0, B, H);
     let img = null;
+    if (hg.quelle === 'social') {
+      // Bild im Design: Video (des Rennens bzw. gewählt) › Bild des Rennens › eigenes Bild › keins
+      let medien = null;
+      const vq = videoQuelle({ ...v, hg: { ...hg, quelle: hg.designBild === 'video' ? 'video' : 'x' } }, p, umg);
+      if (vq) { medien = opt.video || null; if (!medien) { medien = await videoElement(vq.url); if (medien) await suchen(medien, Math.min((hg.videoStart || 0) + 1, Math.max(0, (medien.duration || 1) - 0.1))); } }
+      else if (hg.designBild === 'ablage') medien = await bild(bildUrl({ quelle: 'ablage', datei: hg.ablage }, umg));
+      else if (hg.designBild !== 'kein') medien = await bild(p.hg);
+      await sozialDesign(g, v, p, design, umg, H, opt.zeit, medien);
+      info.w = B; info.h = H;
+      return;
+    }
     if (hg.quelle === 'kreids' && window.K888Bilder) {
       const key = JSON.stringify([p.id, p.spruch, p.hg, design.farbe1, design.logoBild]);
       if (!KREIDS.has(key)) KREIDS.set(key, window.K888Bilder.post({ ...p, klassen: p.klassen || [] }, design).then(b => createImageBitmap(b)).catch(() => null));
@@ -381,6 +394,123 @@
       g.restore();
     });
     el._box = { x: x0, y: y0, w: b, h: hGes };
+  }
+
+  // ─── Social-Designs (dieselben Designs wie im Social-Bild, kreids888.com/overlays/overlays.js) ───
+  let OVERLAYS = null, SOZ_FONTS = null;
+  function overlaysLaden() {
+    if (window.K888_OVERLAYS && window.K888_OVERLAYS.length) return Promise.resolve(window.K888_OVERLAYS);
+    if (!OVERLAYS) OVERLAYS = new Promise((ok, nein) => {
+      const sc = document.createElement('script'); sc.src = site() + 'overlays/overlays.js?v=' + Date.now();
+      sc.onload = () => ok(window.K888_OVERLAYS || []); sc.onerror = () => { OVERLAYS = null; nein(new Error('Social-Designs nicht geladen')); };
+      document.head.appendChild(sc);
+    });
+    return OVERLAYS;
+  }
+  function sozFonts() {
+    if (!SOZ_FONTS) SOZ_FONTS = Promise.all([['Saira Condensed', 'saira-condensed', [500, 600, 700, 800, 900]], ['Barlow', 'barlow', [400, 500, 600, 700]]].flatMap(([fam, datei, ws]) => ws.map(w => {
+      const f = new FontFace(fam, `url(${site()}fonts/${datei}-latin-${w}-normal.woff2)`, { weight: String(w) }); document.fonts.add(f); return f.load().catch(() => null);
+    })));
+    return SOZ_FONTS;
+  }
+  const SOZ_ICON = { youtube: 'M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12z' };
+  function sozHilfe(dunkel) {
+    const ROT = '#e11324';
+    const skala = f => String(f).replace(/rgba\(([^,]+),([^,]+),([^,]+),\s*([\d.]+)\)/, (m, r, g, b, a) => `rgba(${r},${g},${b},${+a * dunkel})`);
+    const h = {
+      ROT,
+      icon(c, name, x, y, size, color) { if (!SOZ_ICON[name]) return; c.save(); c.translate(x, y); c.scale(size / 24, size / 24); c.fillStyle = color || '#fff'; c.fill(new Path2D(SOZ_ICON[name]), 'evenodd'); c.restore(); },
+      markenIcon(c, name, x, y, size) { h.icon(c, name, x, y, size, name === 'youtube' ? '#ff0000' : '#fff'); },
+      motto(c, s, x, y, size, align) {
+        const w = String(s || '').toUpperCase().split(/\s+/).filter(Boolean);
+        c.save(); c.font = h.f(900, size); if ('letterSpacing' in c) c.letterSpacing = Math.round(size * 0.03) + 'px';
+        const leer = c.measureText(' ').width, br = w.map(x => c.measureText(x).width), ges = br.reduce((a, b) => a + b, 0) + leer * Math.max(0, w.length - 1);
+        let xx = align === 'right' ? x - ges : x; c.textAlign = 'left';
+        w.forEach((t, i) => { c.fillStyle = i === 0 ? ROT : '#fff'; c.fillText(t, xx, y); xx += br[i] + leer; });
+        c.restore();
+      },
+      f: (w, size, fam) => `${w} ${Math.round(size * 10) / 10}px "${fam || 'Saira Condensed'}"`,
+      text(c, s, x, y, font, color, align, spacing) {
+        c.save(); c.font = font; c.fillStyle = color; c.textAlign = align || 'left';
+        const px = +(font.match(/([\d.]+)px/) || [0, 0])[1]; if ('letterSpacing' in c) c.letterSpacing = Math.round(px * (spacing || 0)) + 'px';
+        c.fillText(s, x, y); c.restore();
+      },
+      verlauf(c, x0, y0, x1, y1, stops) { const g = c.createLinearGradient(x0, y0, x1, y1); stops.forEach(st => g.addColorStop(st[0], skala(st[1]))); c.fillStyle = g; c.fillRect(0, 0, c.canvas.width, c.canvas.height); },
+      abdunkeln(c, W, H, farbe) { c.fillStyle = skala(farbe); c.fillRect(0, 0, W, H); },
+      schraeg(c, x, y, w, hh, sk, color) { c.fillStyle = color; c.beginPath(); c.moveTo(x + sk, y); c.lineTo(x + w + sk, y); c.lineTo(x + w - sk, y + hh); c.lineTo(x - sk, y + hh); c.closePath(); c.fill(); },
+      ecken(c, x, y, w, hh, len, th, color) { c.fillStyle = color; [[x, y, 1, 1], [x + w, y, -1, 1], [x, y + hh, 1, -1], [x + w, y + hh, -1, -1]].forEach(e => { c.fillRect(e[2] > 0 ? e[0] : e[0] - len, e[3] > 0 ? e[1] : e[1] - th, len, th); c.fillRect(e[2] > 0 ? e[0] : e[0] - th, e[3] > 0 ? e[1] : e[1] - len, th, len); }); },
+      logo(c, x, y, size) { c.save(); c.font = h.f(900, size); c.textAlign = 'left'; c.fillStyle = '#fff'; c.fillText('KREIDS', x, y); const w = c.measureText('KREIDS').width; c.fillStyle = ROT; c.fillText('888', x + w, y); c.restore(); },
+      t: (key, std) => std,
+      startnummer(c, x, y, hh, align) {
+        const nr = '#888'; c.save(); c.font = h.f(900, Math.round(hh * 0.62));
+        const w = c.measureText(nr).width + hh * 0.7, x0 = align === 'right' ? x - w : x;
+        c.fillStyle = 'rgba(10,11,14,.85)'; c.fillRect(x0, y, w, hh); c.fillStyle = ROT; c.fillRect(x0, y, 8, hh);
+        c.fillStyle = '#fff'; c.textAlign = 'center'; c.fillText(nr, x0 + w / 2 + 4, y + hh * 0.74); c.restore();
+      },
+      fuss(c, x1, x2, y, footer) { c.fillStyle = 'rgba(255,255,255,.16)'; c.fillRect(x1, y - 76, x2 - x1, 2); c.fillStyle = ROT; c.fillRect(x1, y - 76, 140, 4); h.logo(c, x1, y - 8, 46); h.motto(c, footer, x2, y - 10, 38, 'right'); },
+      umbruch(c, s, maxW) {
+        const out = [];
+        String(s || '').replace(/\r/g, '').trim().replace(/\n\s*\n\s*/g, '\n\n').split('\n').forEach(abs => {
+          if (!abs.trim()) { out.push(''); return; }
+          let zeile = '';
+          abs.split(/\s+/).filter(Boolean).forEach(wort => {
+            const test = zeile ? zeile + ' ' + wort : wort;
+            if (c.measureText(test).width <= maxW) { zeile = test; return; }
+            if (zeile) out.push(zeile);
+            while (c.measureText(wort).width > maxW && wort.length > 1) { let n = wort.length; while (n > 1 && c.measureText(wort.slice(0, n)).width > maxW) n--; out.push(wort.slice(0, n)); wort = wort.slice(n); }
+            zeile = wort;
+          });
+          if (zeile) out.push(zeile);
+        });
+        return out;
+      },
+      passend(c, s, maxW, maxZ, start, min, w, fam, lh) {
+        let size = start, z;
+        for (; size >= min; size -= 2) { c.font = h.f(w, size, fam); z = h.umbruch(c, s, maxW); if (z.length <= maxZ) break; }
+        if (size < min) { const budget = start * (1 + (maxZ - 1) * lh), boden = Math.max(22, Math.round(min * 0.75)); for (size = min; size > boden; size--) { c.font = h.f(w, size, fam); z = h.umbruch(c, s, maxW); if (size * (1 + (z.length - 1) * lh) <= budget) break; } }
+        c.font = h.f(w, size, fam); z = h.umbruch(c, s, maxW);
+        return { zeilen: String(s || '').trim() ? z : [], groesse: size, lh, w, fam, hoehe: z.length ? size * (1 + (z.length - 1) * lh) : 0 };
+      },
+      zeilen(c, t, x, y, color, spacing, align) { t.zeilen.forEach((z, i) => h.text(c, z, x, y + t.groesse * 0.82 + i * t.groesse * t.lh, h.f(t.w, t.groesse, t.fam), color, align || 'left', spacing ? spacing * 0.02 : 0)); },
+      qrMatrix: () => null,
+      linie(c, x, y, w, th) { const g = c.createLinearGradient(x, 0, x + w, 0); g.addColorStop(0, ROT); g.addColorStop(1, '#ff7a1a'); c.fillStyle = g; c.fillRect(x, y, w, th); },
+      fenster(c, d, x, y, w, hh) {
+        c.fillStyle = '#000'; c.fillRect(x, y, w, hh); h.bild(c, d, x, y, w, hh);
+        c.strokeStyle = 'rgba(255,255,255,.14)'; c.lineWidth = 2; c.strokeRect(x + 1, y + 1, w - 2, hh - 2);
+      },
+      passGroesse(c, s, maxW, start, min, w, spacing) { let size = start; s = String(s || ''); for (; size > min; size--) { c.font = h.f(w || 900, size); if (c.measureText(s).width + (spacing || 0) * size * s.length <= maxW) break; } c.font = h.f(w || 900, size); return size; },
+      hatMedium: d => !!(d.img && (d.img.videoWidth || d.img.naturalWidth || d.img.width)),
+      wortGroesse(c, s, maxW, start, w, fam) { const wo = String(s || '').split(/\s+/).filter(Boolean); let size = start; for (; size > 20; size -= 2) { c.font = h.f(w, size, fam); if (wo.every(x => c.measureText(x).width <= maxW)) break; } return size; },
+      qr(c, d, x, y) { h._qr = { x, y }; return true; },
+      zielMelden() { /* nur im Social-Bild */ },
+      bild(c, d, x, y, w, hh) {
+        c.save(); c.beginPath(); c.rect(x, y, w, hh); c.clip();
+        if (h.hatMedium(d)) {
+          const iw = d.img.videoWidth || d.img.naturalWidth || d.img.width, ih = d.img.videoHeight || d.img.naturalHeight || d.img.height;
+          const sc = Math.max(w / iw, hh / ih) * (d.view.zoom || 1), dw = iw * sc, dh = ih * sc;
+          c.drawImage(d.img, x + (w - dw) * (d.view.x ?? 0.5), y + (hh - dh) * (d.view.y ?? 0.5), dw, dh);
+        } else {
+          const g = c.createRadialGradient(x + w * 0.75, y + hh * 0.2, 20, x + w * 0.6, y + hh * 0.3, Math.max(w, hh));
+          g.addColorStop(0, '#3a0a10'); g.addColorStop(0.45, '#14161d'); g.addColorStop(1, '#0a0b0e'); c.fillStyle = g; c.fillRect(x, y, w, hh);
+          c.strokeStyle = 'rgba(255,255,255,.035)'; c.lineWidth = 2; for (let i = -hh; i < w; i += 28) { c.beginPath(); c.moveTo(x + i, y); c.lineTo(x + i + hh, y + hh); c.stroke(); }
+        }
+        c.restore();
+      }
+    };
+    return h;
+  }
+  const SOZ_TEXT_STD = { kicker: '{countdown}', title: '{spruch}', text: '{serie} · {runde}', footer: 'Kreids888 Simracing', platz: '{platz}', strecke: '{strecke}', wann: '{wochentag} {zeit} Uhr', rundenzeit: '' };
+  const SOZ_FELDER = [['kicker', 'Kleine Zeile oben'], ['title', 'Überschrift'], ['text', 'Text'], ['strecke', 'Strecke'], ['wann', 'Wann'], ['platz', 'Platz'], ['rundenzeit', 'Rundenzeit'], ['footer', 'Fußzeile']];
+  async function sozialDesign(g, v, p, design, umg, H, t, medien) {
+    const liste = await overlaysLaden(); await sozFonts();
+    const ov = liste.find(o => o.id === v.hg.design) || liste[0]; if (!ov) return;
+    const w = werte(p, design), tx = { ...SOZ_TEXT_STD, ...(v.hg.texte || {}) }, f = k => fuellen(tx[k], w);
+    const d = { kicker: gross(f('kicker')), title: f('title'), text: tx.text === '{termine}' || /\{termine\}/.test(tx.text) ? '' : f('text'), footer: f('footer'), platz: f('platz'), strecke: f('strecke'), wann: f('wann'), rundenzeit: f('rundenzeit'),
+      zeit: t == null ? (ov.anim ? 3.5 : null) : t, aufn: t != null, qr: '', img: medien, view: { zoom: v.hg.zoom || 1, x: v.hg.x ?? 0.5, y: v.hg.y ?? 0.5, ox: 0, oy: 0 }, img2: null, view2: { zoom: 1, ox: 0, oy: 0 }, rundenzeit2: '', ziel: null, woche: { liste: [], geladen: true } };
+    if (/\{termine\}/.test(tx.text)) d.text = (p.liste && p.liste.length ? p.liste : beispielWoche()).map(e => { const b = window.K888Bilder ? window.K888Bilder.berlin(e.liveMs) : { wt: '', zeit: '' }; return `${gross(b.wt || '')} ${b.zeit} ${gross(e.track || e.titel || e.serie || 'Termin')} – ${[e.serie, e.nr ? 'Runde ' + e.nr : ''].filter(Boolean).join(' · ')}`; }).join('\n');
+    g.save();
+    try { ov.draw(g, B, H, d, sozHilfe(v.hg.designDunkel ?? 0.6)); } catch (e) { console.error(e); }
+    g.restore();
   }
 
   // ─── Animations-Ebenen: Startampel, Alarm, Streckenrunde, Zielflagge, Countdown, Blitz, Speed-Linien ───
@@ -608,7 +738,8 @@
   }
   async function videoFuer(v, p, design, umg, fortschritt) {
     await muxerLaden();
-    const H = HOEHE[v.format], vq = videoQuelle(v, p, umg);
+    if (v.hg && v.hg.quelle === 'social') await overlaysLaden();
+    const H = HOEHE[v.format], vq = videoQuelle(v, p, umg) || sozVideo(v, p, umg);
     let vid = null;
     if (vq) { vid = await videoElement(vq.url, true); if (!vid) throw new Error('Hintergrund-Video lädt nicht.'); }
     const start = vid ? klemm(v.hg.videoStart || 0, 0, Math.max(0, vid.duration - 0.5)) : 0;
@@ -810,10 +941,11 @@
   const vorlagen = () => E.umg.stand().vorlagen || [];
   const elAkt = () => (E.v ? E.v.elemente.find(e => e.id === E.sel) || null : null);
   // Post für die Vorschau: passend zur Art der Vorlage
-  function vorschauPost() {
-    const posts = E.umg.stand().posts || [], arten = (E.v && E.v.fuer && E.v.fuer.length ? E.v.fuer : FUER[E.v ? E.v.format : 'feed'].map(x => x[0]));
+  function vorschauPost() { return postFuer(E.v, E.umg, E.postId); }
+  function postFuer(v, umg, postId, typWunsch) {
+    const posts = umg.stand().posts || [], arten = typWunsch ? [typWunsch] : (v && v.fuer && v.fuer.length ? v.fuer : FUER[v ? v.format : 'feed'].map(x => x[0]));
     const passt = posts.filter(p => arten.includes(p.typ));
-    let p = passt.find(x => x.id === E.postId) || passt[0];
+    let p = passt.find(x => x.id === postId) || passt[0];
     if (!p) {
       const r = posts.find(x => x.typ !== 'woche') || {};
       const typ = arten[0] || 'ank';
@@ -822,42 +954,48 @@
     }
     return p;
   }
-  // Zuordnen: welche Vorlagen kommen bei welcher Art dran (erst bauen, dann hier anhaken)
-  function wechselPanel() {
-    const cfg = E.umg.stand().cfg.vorlagen || {};
-    const zeile = ([typ, name]) => {
-      const c = cfg[typ] || {}, passend = vorlagen().filter(v => v.format === formatVon(typ)), eigene = passend.filter(v => (v.fuer || []).includes(typ) && v.an !== false);
-      return `<div class="kv-wz">
-        <div class="kv-wkopf"><b>${name}</b><span class="ki-dim">${formatVon(typ) === 'story' ? 'Story 9:16' : 'Feed 4:5'}</span>
-          <select data-w="modus" data-typ="${typ}">${[['reihe', 'Der Reihe nach'], ['zufall', 'Zufällig'], ['fest', 'Immer dieselbe']].map(([k, n]) => `<option value="${k}" ${(c.modus || 'reihe') === k ? 'selected' : ''}>${n}</option>`).join('')}</select>
-          ${(c.modus || 'reihe') === 'fest' ? `<select data-w="fest" data-typ="${typ}"><option value="kreids">Kreids-Design</option>${eigene.map(v => `<option value="${esc(v.id)}" ${c.fest === v.id ? 'selected' : ''}>${esc(v.name)}</option>`).join('')}</select>` : ''}</div>
-        <div class="kv-zuord">
-          <label class="chk"><input type="checkbox" data-w="kreids" data-typ="${typ}" ${c.kreids !== false ? 'checked' : ''}> Kreids-Design</label>
-          ${passend.map(v => `<label class="chk"><input type="checkbox" data-zuord="${esc(v.id)}" data-typ="${typ}" ${(v.fuer || []).includes(typ) ? 'checked' : ''}> ${esc(v.name)}</label>`).join('') || `<span class="ki-dim">Noch keine ${formatVon(typ) === 'story' ? 'Story' : 'Feed'}-Vorlage gebaut</span>`}
-        </div>
-      </div>`;
-    };
-    return `<div class="ki-panel"><h3>🔁 Zuordnen & Wechsel</h3><div class="ki-dim">Erst Vorlagen bauen und speichern – dann hier pro Art anhaken, welche drankommen.</div>${ARTEN.map(zeile).join('')}
-      <div class="ki-knoepfe"><button class="btn btn-ghost ki-k" data-v="verteilen"><span>🔀 Offene Posts neu verteilen</span></button></div>
-      <div class="ki-dim">Neue Posts bekommen ihre Vorlage beim Öffnen. Auf jeder Post-Karte kannst du sie auch selbst wählen.</div></div>`;
-  }
   function listePanel() {
     const l = vorlagen();
-    return `<div class="ki-panel"><h3>🧩 Deine Vorlagen (${l.length})</h3>
+    return `<div class="ki-panel"><h3>🧩 Deine Vorlagen (${l.length})</h3><div class="ki-dim" style="margin-bottom:10px">Hier nur bauen. Wo sie drankommen, stellst du im Reiter „🔁 Zuteilung“ ein.</div>
       <div class="kv-liste">${l.map(v => `<button type="button" class="kv-karte${v.id === E.id ? ' an' : ''}${v.an === false ? ' aus' : ''}" data-v="oeffnen" data-id="${esc(v.id)}">
         <canvas data-mini="${esc(v.id)}" width="108" height="${v.format === 'story' ? 192 : 135}"></canvas>
-        <span>${esc(v.name)}</span><small>${esc((v.fuer || []).map(f => (ARTEN.find(a => a[0] === f) || [])[1] || f).join(', ') || 'noch für nichts')}${v.an === false ? ' · aus' : ''}</small></button>`).join('') || '<p class="hint">Noch keine eigene Vorlage – unten einen Vorschlag nehmen oder leer anfangen.</p>'}</div>
-      <div class="ki-reihe" style="margin-top:12px">
-        <div class="ki-fg" style="flex:1 1 260px"><label>Neue Vorlage</label><select data-v="neuwahl">
-          <option value="leer-feed">Leer · Feed 4:5 (Ankündigung, Ergebnis)</option><option value="leer-story">Leer · Story 9:16 (Raceday, Wochenplan)</option>
-          ${['Klassisch', 'Ausgefallen', 'Animiert', 'Mit Video'].map(gr => `<optgroup label="${gr}${gr === 'Animiert' || gr === 'Mit Video' ? ' – geht als Video raus' : ''}">${VORSCHLAEGE.map((v, i) => [v, i]).filter(([v]) => (v.gruppe || 'Klassisch') === gr).map(([v, i]) => `<option value="v${i}">${esc(v.name)} · ${v.format === 'story' ? 'Story' : 'Feed'}</option>`).join('')}</optgroup>`).join('')}</select></div>
-        <button class="btn btn-red ki-k" data-v="neu"><span>+ Anlegen</span></button>
-      </div></div>`;
+        <span>${esc(v.name)}</span><small>${v.format === 'story' ? 'Story 9:16' : 'Feed 4:5'}</small></button>`).join('') || '<p class="hint">Noch keine eigene Vorlage – unten einen Vorschlag nehmen oder leer anfangen.</p>'}</div>
+      <div class="ki-knoepfe" style="margin-top:12px"><button class="btn btn-red ki-k" data-v="neuauf"><span>${E.neuOffen ? '✕ Auswahl schließen' : '＋ Neue Vorlage'}</span></button></div>
+      ${E.neuOffen ? neuGalerie() : ''}</div>`;
+  }
+  // Alle Startpunkte als Bilder: leer, meine Vorschläge, alle Social-Designs
+  function starter(key) {
+    const fmt = E.neuFormat || 'story';
+    if (key === 'leer') return { name: 'Neue Vorlage', format: fmt, fuer: [], hg: HG({}), elemente: [mit('text', { inhalt: '{strecke}', x: 80, y: fmt === 'story' ? 700 : 760, groesse: 140, schrift: 'anton', gewicht: 400 })] };
+    if (key.startsWith('v')) { const n = kopie(VORSCHLAEGE[+key.slice(1)]); delete n.gruppe; n.elemente.forEach(e => { e.id = neueId(); }); return n; }
+    const ov = (window.K888_OVERLAYS || []).find(o => o.id === key.slice(2)) || {};
+    return { name: ov.name || 'Social-Design', format: fmt, fuer: [], dauer: ov.anim ? 6 : 8, hg: HG({ quelle: 'social', design: ov.id, designBild: 'rennen', texte: { ...SOZ_TEXT_STD }, designDunkel: 0.6, dunkel: 0, verlauf: 'kein' }), elemente: [] };
+  }
+  function neuGalerie() {
+    const fmt = E.neuFormat || 'story', ovs = window.K888_OVERLAYS || [];
+    if (!ovs.length) overlaysLaden().then(() => { if (E.neuOffen) aufbauen(); }).catch(() => {});
+    const kachel = (key, name, info) => `<button type="button" class="kv-neu" data-v="neuaus" data-wert="${esc(key)}"><canvas data-nmini="${esc(key)}" width="${fmt === 'story' ? 108 : 120}" height="${fmt === 'story' ? 192 : 150}"></canvas><span>${esc(name)}</span>${info ? `<small>${esc(info)}</small>` : ''}</button>`;
+    const gruppe = (titel, inhalt) => inhalt ? `<div class="kv-ngruppe"><b>${esc(titel)}</b><div class="kv-nreihe">${inhalt}</div></div>` : '';
+    const vs = gr => VORSCHLAEGE.map((v, i) => [v, i]).filter(([v]) => v.format === fmt && (v.gruppe || 'Klassisch') === gr).map(([v, i]) => kachel('v' + i, v.name, gr === 'Animiert' || gr === 'Mit Video' ? '🎬 Video' : '')).join('');
+    return `<div class="kv-galerie">
+      <div class="ki-modus" role="group"><button type="button" class="${fmt === 'story' ? 'an' : ''}" data-v="neuformat" data-wert="story">Story 9:16</button><button type="button" class="${fmt === 'feed' ? 'an' : ''}" data-v="neuformat" data-wert="feed">Feed 4:5</button></div>
+      <div class="ki-dim">${fmt === 'story' ? 'Für Raceday-Story und Wochenplan' : 'Für Ankündigung und Ergebnis'} · Bild anklicken = Vorlage anlegen</div>
+      ${gruppe('Leer', kachel('leer', 'Leer anfangen'))}
+      ${gruppe('Klassisch', vs('Klassisch'))}${gruppe('Ausgefallen', vs('Ausgefallen'))}${gruppe('Animiert', vs('Animiert'))}${gruppe('Mit Video', vs('Mit Video'))}
+      ${gruppe('Social-Designs (wie im Social-Bild)', ovs.map(o => kachel('s:' + o.id, o.name, o.anim ? '🎬 Video' : '')).join('') || '<span class="ki-dim">Lädt …</span>')}
+    </div>`;
+  }
+  async function nMinis() {
+    for (const c of E.box.querySelectorAll('canvas[data-nmini]')) {
+      if (!E.neuOffen) return;
+      const v = starter(c.dataset.nmini), gross = document.createElement('canvas');
+      try { await zeichnen(gross, v, postFuer(v, E.umg, ''), E.umg.stand().design, E.umg); if (c.isConnected) c.getContext('2d').drawImage(gross, 0, 0, c.width, c.height); } catch (e) { /* egal */ }
+    }
   }
   function aufbauen() {
     const v = E.v;
     E.box.innerHTML = `<div class="kv">
-      <div class="ki-grid">${listePanel()}${wechselPanel()}</div>
+      ${listePanel()}
       ${v ? `<div class="kv-haupt">
         <div class="kv-links">
           <div class="ki-reihe">
@@ -877,9 +1015,6 @@
         </div>
         <div class="kv-rechts">
           <div class="ki-panel"><h3>Vorlage · ${v.format === 'story' ? 'Story 9:16' : 'Feed 4:5'}</h3>
-            <div class="ki-fg"><label>Gilt für</label><div class="ki-reihe">${FUER[v.format].map(([k, n]) => `<label class="chk"><input type="checkbox" data-fuer="${k}" ${(v.fuer || []).includes(k) ? 'checked' : ''}> ${n}</label>`).join('')}</div></div>
-            <div class="ki-fg"><label>Nur für diese Serien (keine = alle)</label><div class="ki-reihe">${serien().map(s => `<label class="chk"><input type="checkbox" data-serie="${esc(s)}" ${(v.serien || []).includes(s) ? 'checked' : ''}> ${esc(s)}</label>`).join('') || '<span class="ki-dim">Keine Serien in der Planung</span>'}</div></div>
-            <label class="chk"><input type="checkbox" data-f="v.an" ${v.an !== false ? 'checked' : ''}> Im Wechsel dabei</label>
             ${regler('v.dauer', `Video-Länge: ${klemm(v.dauer || 8, 2, MAX_SEK)} Sek. (nur mit Animation oder Video)`, v.dauer || 8, 2, MAX_SEK, 1)}
             <div class="ki-dim">${istVideo(v, vorschauPost(), E.umg) ? '🎬 Diese Vorlage geht als <b>Video</b> raus (Story-Video bzw. Reel, TikTok-Video).' : '🖼 Diese Vorlage geht als Bild raus.'}</div>
           </div>
@@ -887,7 +1022,9 @@
             <div class="kt-ebenen">${[...v.elemente].reverse().map(e => `<div class="kt-ebene${e.id === E.sel ? ' an' : ''}" data-v="waehle" data-id="${esc(e.id)}">
               <input type="checkbox" data-sichtbar="${esc(e.id)}" ${e.an !== false ? 'checked' : ''} title="ein/aus"><span>${esc(ebenenName(e))}</span>
               <button type="button" data-v="hoch" data-id="${esc(e.id)}" title="nach vorne">▲</button><button type="button" data-v="runter" data-id="${esc(e.id)}" title="nach hinten">▼</button></div>`).join('')}</div>
-            <div class="ki-knoepfe"><button class="btn btn-ghost ki-k" data-v="plus" data-typ="text"><span>+ Text</span></button><button class="btn btn-ghost ki-k" data-v="plus" data-typ="bild"><span>+ Bild</span></button><button class="btn btn-ghost ki-k" data-v="plus" data-typ="form"><span>+ Form</span></button>${v.format === 'story' ? '<button class="btn btn-ghost ki-k" data-v="plus" data-typ="termine"><span>+ Termine</span></button>' : ''}<button class="btn btn-ghost ki-k" data-v="plus" data-typ="animation"><span>+ Animation</span></button></div>
+            <div class="ki-knoepfe"><button class="btn btn-ghost ki-k" data-v="plus" data-typ="text"><span>+ Text</span></button><button class="btn btn-ghost ki-k" data-v="plus" data-typ="bild"><span>+ Bild</span></button><button class="btn btn-ghost ki-k" data-v="plus" data-typ="form"><span>+ Form</span></button>${v.format === 'story' ? '<button class="btn btn-ghost ki-k" data-v="plus" data-typ="termine"><span>+ Termine</span></button>' : ''}</div>
+            <div class="kv-bausteine"><span class="ki-dim">✨ Animation dazu:</span>${[['ampel', '🚦 Startampel'], ['alarm', '🚨 Alarm'], ['strecke', '🏎 Strecke'], ['flagge', '🏁 Zielflagge'], ['countdown', '3-2-1 GO'], ['blitz', '⚡ Blitz'], ['speed', '💨 Speed']].map(([k, n]) => `<button type="button" data-v="plusanim" data-art="${k}">${n}</button>`).join('')}</div>
+            <div class="ki-dim">Leuchten, Glitch, Umriss, 3D: Text anklicken → „Effekt“. Bewegung: Ebene anklicken → „🎬 Bewegung“.</div>
           </div>
           <div class="ki-panel"><h3>${esc(elAkt() ? ebenenName(elAkt()) : 'Eigenschaften')}</h3>${eigenschaften(elAkt())}</div>
           <div class="ki-panel"><h3>Hintergrund</h3>${hgPanel(v.hg)}</div>
@@ -903,7 +1040,7 @@
       cv.addEventListener('wheel', rad, { passive: false });
     }
     neuZeichnen();
-    minis();
+    minis(); sMinis(); if (E.neuOffen) nMinis();
   }
   function serien() {
     const s = new Set();
@@ -985,13 +1122,27 @@
     const kreids = hg.quelle === 'kreids';
     const vids = E.umg.stand().videos || [];
     const ueber = `<div class="ki-fg"><label>Darüber</label><select data-f="hg.overlay">${[['kein', 'Nichts'], ['scanlines', 'TV-Linien'], ['raster', 'Punkt-Raster'], ['vignette', 'Dunkle Ecken'], ['rauschen', 'Filmkorn'], ['karbon', 'Karbon-Muster']].map(([k, n]) => `<option value="${k}" ${(hg.overlay || 'kein') === k ? 'selected' : ''}>${n}</option>`).join('')}</select></div>`;
-    return `<div class="ki-fg"><label>Hintergrund</label><select data-f="hg.quelle">${[['rennen', 'Bild des Rennens (KI/Kalender)'], ['ablage', 'Eigenes Bild (Ablage)'], ['video', '🎬 Video (eigene Videos)'], ['farbe', 'Nur Farbe'], ['kreids', 'Fertiges Kreids-Design als Grundlage']].map(([k, n]) => `<option value="${k}" ${hg.quelle === k ? 'selected' : ''}>${n}</option>`).join('')}</select></div>
+    const ovs = window.K888_OVERLAYS || [];
+    if (hg.quelle === 'social' && !ovs.length) overlaysLaden().then(() => aufbauen()).catch(() => {});
+    const sozial = hg.quelle === 'social' ? `
+      <div class="ki-fg"><label>Social-Design (wie im Social-Bild)</label></div>
+      <div class="kv-sgal">${ovs.map(o => `<button type="button" data-v="sdesign" data-wert="${esc(o.id)}" class="${hg.design === o.id ? 'an' : ''}"><canvas data-smini="${esc(o.id)}" width="90" height="${E.v.format === 'story' ? 160 : 112}"></canvas><span>${esc(o.name)}${o.anim ? ' 🎬' : ''}</span></button>`).join('') || '<span class="ki-dim">Lädt …</span>'}</div>
+      ${SOZ_FELDER.map(([k, n]) => `<div class="ki-fg"><label>${esc(n)}</label>${k === 'text' ? `<textarea rows="3" data-f="hg.texte.${k}">${esc((hg.texte || {})[k] ?? SOZ_TEXT_STD[k])}</textarea>` : `<input type="text" data-f="hg.texte.${k}" value="${esc((hg.texte || {})[k] ?? SOZ_TEXT_STD[k])}">`}</div>`).join('')}
+      <div class="ki-dim">Platzhalter wie oben, z. B. {strecke} {spruch} {platz}. Für den Wochenplan bei Text: {termine}</div>
+      <div class="ki-fg"><label>Bild im Design</label><select data-f="hg.designBild">${[['rennen', 'Bild des Rennens'], ['video', '🎬 Video'], ['ablage', 'Eigenes Bild (Ablage)'], ['kein', 'Keins']].map(([k, n]) => `<option value="${k}" ${(hg.designBild || 'rennen') === k ? 'selected' : ''}>${n}</option>`).join('')}</select></div>
+      ${hg.designBild === 'video' ? `<div class="ki-fg"><label>Welches Video</label><select data-f="hg.video"><option value="rennen" ${!hg.video || hg.video === 'rennen' ? 'selected' : ''}>Video des Rennens, sonst zufällig</option><option value="zufall" ${hg.video === 'zufall' ? 'selected' : ''}>Zufällig</option>${(E.umg.stand().videos || []).map(x => `<option value="${esc(x.id)}" ${hg.video === x.id ? 'selected' : ''}>${esc(x.name)}</option>`).join('')}</select></div>${regler('hg.videoStart', `Video ab Sekunde ${(hg.videoStart || 0).toFixed(1)}`, hg.videoStart || 0, 0, 120, 0.5)}` : ''}
+      ${hg.designBild === 'ablage' ? `<div class="kt-gal">${(E.umg.stand().ablage || []).map(a => `<button type="button" data-v="hgbild" data-wert="${esc(a.id)}" class="${hg.ablage === a.id ? 'an' : ''}"><img src="${esc(a.url)}" alt="" loading="lazy"></button>`).join('')}</div>` : ''}
+      ${regler('hg.zoom', 'Bild-Zoom', hg.zoom || 1, 1, 2.5, 0.01)}
+      ${regler('hg.designDunkel', 'Abdunkeln im Design', hg.designDunkel ?? 0.6, 0, 1, 0.01)}
+      <div class="ki-dim">Deine eigenen Ebenen (Texte, Bilder, Animationen) liegen oben drauf.</div>` : '';
+    return `<div class="ki-fg"><label>Hintergrund</label><select data-f="hg.quelle">${[['rennen', 'Bild des Rennens (KI/Kalender)'], ['ablage', 'Eigenes Bild (Ablage)'], ['video', '🎬 Video (eigene Videos)'], ['social', '🎨 Social-Design (Rahmen, TV, Ampel, Neon …)'], ['farbe', 'Nur Farbe'], ['kreids', 'Fertiges Kreids-Design als Grundlage']].map(([k, n]) => `<option value="${k}" ${hg.quelle === k ? 'selected' : ''}>${n}</option>`).join('')}</select></div>
+      ${sozial}
       ${hg.quelle === 'video' ? `<div class="ki-fg"><label>Welches Video</label><select data-f="hg.video"><option value="rennen" ${!hg.video || hg.video === 'rennen' ? 'selected' : ''}>Video des Rennens, sonst zufällig</option><option value="zufall" ${hg.video === 'zufall' ? 'selected' : ''}>Zufällig aus deinen Videos</option>${vids.map(x => `<option value="${esc(x.id)}" ${hg.video === x.id ? 'selected' : ''}>${esc(x.name)}</option>`).join('')}</select></div>
         ${regler('hg.videoStart', `Video ab Sekunde ${(hg.videoStart || 0).toFixed(1)}`, hg.videoStart || 0, 0, 120, 0.5)}
         ${vids.length ? '' : '<div class="ki-hinweis">Noch keine Videos – unten bei „🎬 Eigene Videos“ hochladen.</div>'}` : ''}
       ${ueber}
       ${hg.quelle === 'ablage' ? (ab.length ? `<div class="kt-gal">${ab.map(a => `<button type="button" data-v="hgbild" data-wert="${esc(a.id)}" class="${hg.ablage === a.id ? 'an' : ''}" title="${esc(a.name)}"><img src="${esc(a.url)}" alt="" loading="lazy"></button>`).join('')}</div>` : '<div class="ki-dim">Erst unten ein Bild hochladen.</div>') : ''}
-      ${kreids ? '<div class="ki-dim">Das fertige Design (wie bisher) liegt ganz unten – deine Ebenen kommen oben drauf.</div>' : `
+      ${hg.quelle === 'social' ? '' : kreids ? '<div class="ki-dim">Das fertige Design (wie bisher) liegt ganz unten – deine Ebenen kommen oben drauf.</div>' : `
       <div class="ki-reihe"><div class="ki-fg"><label>Farbe</label><input type="color" data-f="hg.farbe" value="${esc(hg.farbe || '#0a0b0e')}"></div>
         <label class="chk"><input type="checkbox" data-v="hgverlauf" ${hg.farbe2 ? 'checked' : ''}> Farbverlauf</label>${hg.farbe2 ? `<div class="ki-fg"><label>bis</label><input type="color" data-f="hg.farbe2" value="${esc(hg.farbe2)}"></div>` : ''}</div>
       ${hg.quelle !== 'farbe' ? regler('hg.zoom', 'Zoom', hg.zoom, 1, 2.5, 0.01) : ''}
@@ -1036,6 +1187,14 @@
       if (cv && !E.spielt) E.info = await sichtbarZeichnen(cv, { auswahl: E.sel, editor: true });
     } finally { zeichnetGerade = false; if (nochmal) { nochmal = false; neuZeichnen(); } }
   }
+  async function sMinis() {
+    if (!E.v || E.v.hg.quelle !== 'social') return;
+    const p = vorschauPost();
+    for (const c of E.box.querySelectorAll('canvas[data-smini]')) {
+      const gross = document.createElement('canvas');
+      try { await zeichnen(gross, { ...kopie(E.v), elemente: [], hg: { ...E.v.hg, design: c.dataset.smini } }, p, E.umg.stand().design, E.umg); c.getContext('2d').drawImage(gross, 0, 0, c.width, c.height); } catch (e) { /* egal */ }
+    }
+  }
   async function minis() {
     for (const c of E.box.querySelectorAll('canvas[data-mini]')) {
       const v = vorlagen().find(x => x.id === c.dataset.mini); if (!v) continue;
@@ -1049,7 +1208,7 @@
   async function abspielen() {
     if (E.spielt) { E.spielt = false; return aufbauen(); }
     E.spielt = true; aufbauen();
-    const p = vorschauPost(), vq = videoQuelle(E.v, p, E.umg), vid = vq ? await videoElement(vq.url) : null;
+    const p = vorschauPost(), vq = videoQuelle(E.v, p, E.umg) || sozVideo(E.v, p, E.umg), vid = vq ? await videoElement(vq.url) : null;
     const dauer = dauerVon(E.v, vid), t0 = performance.now();
     if (vid) { vid.currentTime = E.v.hg.videoStart || 0; vid.play().catch(() => {}); }
     const schritt = async () => {
@@ -1110,8 +1269,6 @@
   function eingabe(ev) {
     const t = ev.target;
     const typ = t.dataset.typ;
-    if (t.dataset.w && ev.type === 'change') return wechselAendern(t.dataset.w, typ, t.type === 'checkbox' ? t.checked : t.value);
-    if (t.dataset.zuord && ev.type === 'change') return zuordnen(t.dataset.zuord, typ, t.checked, t);
     if (!E.v) return;
     if (t.dataset.v === 'post' && ev.type === 'change') { E.postId = t.value; return neuZeichnen(); }
     if (t.dataset.v === 'abhoch' && ev.type === 'change') return hochladen(t);
@@ -1124,9 +1281,11 @@
     if (f === 'v.name') { E.v.name = wert; return geaendert(false); }
     if (f === 'v.an') { E.v.an = wert; return geaendert(false); }
     if (f === 'v.dauer') { E.v.dauer = wert; const l = t.closest('.ki-fg').querySelector('label'); if (l) l.textContent = `Video-Länge: ${wert} Sek. (nur mit Animation oder Video)`; return geaendert(false); }
+    if (f.startsWith('hg.texte.')) { E.v.hg.texte = { ...SOZ_TEXT_STD, ...(E.v.hg.texte || {}), [f.slice(9)]: wert }; return geaendert(false); }
     if (f.startsWith('hg.')) {
       E.v.hg[f.slice(3)] = wert;
-      return geaendert(ev.type === 'change' && ['hg.quelle', 'hg.verlauf', 'hg.streifen', 'hg.video'].includes(f));
+      if (f === 'hg.quelle' && wert === 'social' && !E.v.hg.design) E.v.hg.design = ((window.K888_OVERLAYS || [])[0] || {}).id || 'rennbericht';
+      return geaendert(ev.type === 'change' && ['hg.quelle', 'hg.verlauf', 'hg.streifen', 'hg.video', 'hg.designBild'].includes(f));
     }
     const e = elAkt(); if (!e) return;
     if (f === 'gewicht' || f === 'zeilen') wert = parseInt(wert, 10);
@@ -1134,24 +1293,6 @@
     if (f === 'schrift') e.gewicht = gewichtVon(wert, e.gewicht || 900);
     if (t.type === 'range' && ['animStart', 'animDauer', 'tempo'].includes(f)) { const l = t.closest('.ki-fg').querySelector('label'); if (l) l.textContent = f === 'tempo' ? `Tempo ×${wert.toFixed(1)}` : f === 'animStart' ? `Start nach ${wert.toFixed(1)} Sek.` : `Dauer ${wert.toFixed(1)} Sek.`; }
     geaendert(ev.type === 'change' && ['verlauf', 'box', 'quelle', 'art', 'schrift', 'anim', 'effekt'].includes(f));
-  }
-  async function zuordnen(id, typ, an, box) {
-    const v = vorlagen().find(x => x.id === id); if (!v) return;
-    const s = new Set(v.fuer || []); an ? s.add(typ) : s.delete(typ);
-    const neu = { ...kopie(v), fuer: [...s] };
-    box.disabled = true;
-    try {
-      await E.umg.igApi('POST', '/api/vorlage', { vorlage: neu });
-      v.fuer = neu.fuer;
-      if (E.v && E.id === id) E.v.fuer = [...neu.fuer];
-      E.umg.meldung(an ? `„${v.name}“ kommt jetzt bei ${(ARTEN.find(a => a[0] === typ) || [])[1] || typ} dran.` : `„${v.name}“ ist dort raus.`);
-      aufbauen();
-    } catch (e) { box.checked = !an; box.disabled = false; E.umg.meldung(e.message, 1); }
-  }
-  async function wechselAendern(was, typ, wert) {
-    const cfg = E.umg.stand().cfg, v = { ...(cfg.vorlagen || {}) };
-    v[typ] = { modus: 'reihe', kreids: true, ...(v[typ] || {}), [was]: wert };
-    try { await E.umg.cfgSpeichern(v); E.umg.meldung('Gespeichert.'); aufbauen(); } catch (e) { E.umg.meldung(e.message, 1); }
   }
   async function hochladen(input) {
     const f = input.files && input.files[0]; input.value = '';
@@ -1189,18 +1330,17 @@
       if (E.dirty && E.id !== id && !confirm('Änderungen an der offenen Vorlage verwerfen?')) return;
       const x = vorlagen().find(y => y.id === id); E.v = x ? kopie(x) : null; E.id = id; E.sel = ''; E.dirty = false; E.postId = ''; E.spielt = false; return aufbauen();
     }
-    if (v === 'neu') {
+    if (v === 'neuauf') { E.neuOffen = !E.neuOffen; return aufbauen(); }
+    if (v === 'neuformat') { E.neuFormat = b.dataset.wert; return aufbauen(); }
+    if (v === 'neuaus') {
       if (E.dirty && !confirm('Änderungen an der offenen Vorlage verwerfen?')) return;
-      const w = E.box.querySelector('[data-v="neuwahl"]').value;
-      let n;
-      if (w === 'leer-feed' || w === 'leer-story') { const format = w.slice(5); n = { name: 'Neue Vorlage', format, fuer: [], hg: HG({}), elemente: [mit('text', { inhalt: '{strecke}', x: 80, y: format === 'story' ? 700 : 760, groesse: 140, schrift: 'anton', gewicht: 400 })] }; }
-      else { const vs = VORSCHLAEGE[+w.slice(1)]; n = kopie(vs); delete n.gruppe; n.elemente.forEach(e => { e.id = neueId(); }); }
-      E.spielt = false;
+      const n = starter(b.dataset.wert);
+      E.spielt = false; E.neuOffen = false;
       n.an = true; n.serien = [];
       E.v = n; E.id = ''; E.sel = ''; E.postId = ''; E.dirty = true;
       return aufbauen();
     }
-    if (!E.v && v !== 'verteilen' && v !== 'abweg' && v !== 'abnimm') return;
+    if (!E.v && v !== 'abweg' && v !== 'abnimm') return;
     if (v === 'waehle') { E.sel = id; return aufbauen(); }
     if (v === 'hoch' || v === 'runter') {
       const l = E.v.elemente, i = l.findIndex(e => e.id === id), j = v === 'hoch' ? i + 1 : i - 1;
@@ -1213,6 +1353,8 @@
     if (v === 'plh') { const e = elAkt(); if (!e) return; e.inhalt = (e.inhalt === 'NEUER TEXT' ? '' : (e.inhalt || '') + (e.inhalt ? ' ' : '')) + b.dataset.wert; return geaendert(true); }
     if (v === 'bild') { const e = elAkt(); if (!e) return; e.datei = b.dataset.wert; if (e.quelle === 'team') e.schwarzWeg = !!(TEAM().find(x => x[0] === e.datei) || [])[2]; return geaendert(true); }
     if (v === 'hgbild') { E.v.hg.ablage = b.dataset.wert; return geaendert(true); }
+    if (v === 'sdesign') { E.v.hg.design = b.dataset.wert; return geaendert(true); }
+    if (v === 'plusanim') { const n = mit('animation', { art: b.dataset.art, ...({ alarm: { x: 390, y: 150, b: 300 }, strecke: { x: 90, y: 260, b: 900 }, flagge: { x: 600, y: 80, b: 420 }, countdown: { x: 290, y: 400, b: 500, farbe: '#ffffff', farbe2: '#22c55e' }, blitz: { x: 30, y: 30, b: 90, farbe: '#ffffff', animStart: 1 }, speed: { x: 0, y: HOEHE[E.v.format] - 440, b: 1080, h: 420, farbe: '#ffffff', animStart: 0 } }[b.dataset.art] || {}) }); E.v.elemente.push(n); E.sel = n.id; return geaendert(true); }
     if (v === 'hgverlauf') { E.v.hg.farbe2 = b.checked ? '#1a1d24' : ''; return geaendert(true); }
     if (v === 'formverlauf') { const e = elAkt(); if (!e) return; e.farbe2 = b.checked ? '#ffd400' : ''; return geaendert(true); }
     if (v === 'abnimm') {
@@ -1226,16 +1368,12 @@
       await E.umg.igApi('POST', `/api/ablage/${encodeURIComponent(id)}/weg`, {});
       E.umg.stand().ablage = (E.umg.stand().ablage || []).filter(x => x.id !== id); aufbauen();
     });
-    if (v === 'verteilen') return knopf(async () => {
-      if (!confirm('Alle offenen Posts bekommen neu ihre Vorlage nach dem eingestellten Wechsel. Selbst gewählte Vorlagen werden auch neu verteilt.')) return;
-      await E.umg.igApi('POST', '/api/vorlagen/verteilen', {}); E.umg.meldung('Neu verteilt – die Bilder werden neu gezeichnet.'); await E.umg.gespeichert();
-    });
     if (v === 'speichern') return knopf(async () => {
       const d = await E.umg.igApi('POST', '/api/vorlage', { vorlage: { ...kopie(E.v), id: E.id || undefined } });
       E.id = d.id; E.v.id = d.id; E.v.v = d.v; E.dirty = false;
       const l = vorlagen(), i = l.findIndex(x => x.id === d.id);
       if (i >= 0) l[i] = kopie(E.v); else l.push(kopie(E.v));
-      E.umg.meldung((E.v.fuer || []).length ? 'Vorlage gespeichert.' : 'Vorlage gespeichert – oben bei „🔁 Zuordnen & Wechsel“ anhaken, wo sie drankommt.'); await E.umg.gespeichert();
+      E.umg.meldung((E.v.fuer || []).length ? 'Vorlage gespeichert.' : 'Vorlage gespeichert – im Reiter „🔁 Zuteilung“ anhaken, wo sie drankommt.'); await E.umg.gespeichert();
     });
     if (v === 'kopie') { const n = kopie(E.v); n.name = (n.name || 'Vorlage') + ' (Kopie)'; delete n.id; n.elemente.forEach(e => { e.id = neueId(); }); E.v = n; E.id = ''; E.dirty = true; return aufbauen(); }
     if (v === 'verwerfen') { const x = vorlagen().find(y => y.id === E.id); E.v = x ? kopie(x) : null; if (!x) E.id = ''; E.dirty = false; E.sel = ''; return aufbauen(); }
@@ -1246,6 +1384,99 @@
       E.v = null; E.id = ''; E.dirty = false; E.sel = '';
       E.umg.meldung('Vorlage gelöscht.'); await E.umg.gespeichert();
     });
+  }
+
+  // ═══ Reiter „🔁 Zuteilung“: welche Vorlagen kommen bei welcher Art dran, Wechsel, Serien ═══
+  let Z = null;
+  const zVorlagen = () => Z.umg.stand().vorlagen || [];
+  function zuteilung(box, umg) {
+    if (!Z) Z = { box: null, umg };
+    Z.umg = umg;
+    if (Z.box !== box) { Z.box = box; box.addEventListener('change', zEingabe); box.addEventListener('click', zKlick); }
+    zAufbauen();
+  }
+  function zAufbauen() {
+    const cfg = Z.umg.stand().cfg.vorlagen || {}, l = zVorlagen();
+    const art = ([typ, name]) => {
+      const c = cfg[typ] || {}, fmt = formatVon(typ), passend = l.filter(v => v.format === fmt);
+      const dabei = passend.filter(v => (v.fuer || []).includes(typ));
+      const kachel = (id, name, an, extra) => `<label class="kv-kachel${an ? ' an' : ''}"><canvas data-zmini="${esc(id)}" data-typ="${typ}" width="${fmt === 'story' ? 120 : 150}" height="${fmt === 'story' ? 213 : 188}"></canvas>
+          <span><input type="checkbox" ${extra} ${an ? 'checked' : ''}> ${esc(name)}</span></label>`;
+      return `<div class="ki-panel"><div class="kv-wkopf"><h3>${name}</h3><span class="ki-dim">${fmt === 'story' ? 'Story 9:16' : 'Feed 4:5'} · ${dabei.length + (c.kreids !== false ? 1 : 0)} im Wechsel</span>
+          <select data-w="modus" data-typ="${typ}">${[['reihe', 'Der Reihe nach'], ['zufall', 'Zufällig'], ['fest', 'Immer dieselbe']].map(([k, n]) => `<option value="${k}" ${(c.modus || 'reihe') === k ? 'selected' : ''}>${n}</option>`).join('')}</select>
+          ${(c.modus || 'reihe') === 'fest' ? `<select data-w="fest" data-typ="${typ}"><option value="kreids">Kreids-Design</option>${dabei.map(v => `<option value="${esc(v.id)}" ${c.fest === v.id ? 'selected' : ''}>${esc(v.name)}</option>`).join('')}</select>` : ''}</div>
+        <div class="kv-kacheln">${kachel('kreids', 'Kreids-Design', c.kreids !== false, `data-w="kreids" data-typ="${typ}"`)}${passend.map(v => kachel(v.id, v.name, (v.fuer || []).includes(typ), `data-zuord="${esc(v.id)}" data-typ="${typ}"`)).join('')}</div>
+        ${passend.length ? '' : `<div class="ki-dim">Noch keine ${fmt === 'story' ? 'Story' : 'Feed'}-Vorlage gebaut – im Reiter „🧩 Vorlagen“ anlegen.</div>`}</div>`;
+    };
+    const serien = [...new Set([...(Z.umg.stand().posts || []).map(p => p.serie).filter(Boolean), ...l.flatMap(v => v.serien || [])])].sort();
+    Z.box.innerHTML = `<div class="kv">
+      <p class="hint">Haken an = diese Vorlage kommt bei dieser Art dran. Mehrere Haken = sie wechseln sich ab.</p>
+      <div class="ki-grid">${ARTEN.map(art).join('')}</div>
+      <div class="ki-panel"><h3>🏁 Nur für bestimmte Serien</h3>
+        <div class="ki-dim" style="margin-bottom:8px">Ohne Haken gilt eine Vorlage für alle Serien. Gibt es für eine Serie eigene Vorlagen, kommen bei ihr nur diese dran.</div>
+        ${l.length && serien.length ? `<table class="kv-serien"><tr><th></th>${serien.map(s => `<th>${esc(s)}</th>`).join('')}</tr>${l.map(v => `<tr><td>${esc(v.name)} <span class="ki-dim">${v.format === 'story' ? 'Story' : 'Feed'}</span></td>${serien.map(s => `<td><input type="checkbox" data-zserie="${esc(v.id)}" data-wert="${esc(s)}" ${(v.serien || []).includes(s) ? 'checked' : ''}></td>`).join('')}</tr>`).join('')}</table>` : '<div class="ki-dim">Noch keine Vorlagen oder Serien.</div>'}
+      </div>
+      <div class="ki-knoepfe"><button class="btn btn-ghost ki-k" data-z="verteilen"><span>🔀 Offene Posts neu verteilen</span></button></div>
+      <div class="ki-dim">Neue Posts bekommen ihre Vorlage beim Öffnen. Schon verteilte behalten sie – außer du klickst „Neu verteilen“. Auf jeder Post-Karte kannst du sie auch einzeln ändern.</div>
+    </div>`;
+    zMinis();
+  }
+  const KREIDS_MINI = new Map();
+  async function zMinis() {
+    for (const c of Z.box.querySelectorAll('canvas[data-zmini]')) {
+      const id = c.dataset.zmini, typ = c.dataset.typ, g = c.getContext('2d');
+      try {
+        if (id === 'kreids') {
+          const p = postFuer(null, Z.umg, '', typ);
+          if (!KREIDS_MINI.has(typ)) KREIDS_MINI.set(typ, window.K888Bilder.post({ ...p, klassen: p.klassen || [] }, Z.umg.stand().design).then(b => createImageBitmap(b)).catch(() => null));
+          const img = await KREIDS_MINI.get(typ); if (img) g.drawImage(img, 0, 0, c.width, c.height);
+        } else {
+          const v = zVorlagen().find(x => x.id === id); if (!v) continue;
+          const gross = document.createElement('canvas');
+          await zeichnen(gross, kopie(v), postFuer(v, Z.umg, '', typ), Z.umg.stand().design, Z.umg);
+          g.drawImage(gross, 0, 0, c.width, c.height);
+        }
+      } catch (e) { /* egal */ }
+    }
+  }
+  async function vorlageSpeichernMeta(v, aenderung, box) {
+    const neu = { ...kopie(v), ...aenderung };
+    if (box) box.disabled = true;
+    try {
+      await Z.umg.igApi('POST', '/api/vorlage', { vorlage: neu });
+      Object.assign(v, aenderung);
+      if (E && E.v && E.id === v.id && !E.dirty) Object.assign(E.v, kopie(aenderung));
+      return true;
+    } catch (e) { Z.umg.meldung(e.message, 1); if (box) { box.checked = !box.checked; box.disabled = false; } return false; }
+  }
+  async function zEingabe(ev) {
+    const t = ev.target, typ = t.dataset.typ;
+    if (t.dataset.w) {
+      const cfg = Z.umg.stand().cfg, v = { ...(cfg.vorlagen || {}) };
+      v[typ] = { modus: 'reihe', kreids: true, ...(v[typ] || {}), [t.dataset.w]: t.type === 'checkbox' ? t.checked : t.value };
+      try { await Z.umg.cfgSpeichern(v); Z.umg.meldung('Gespeichert.'); } catch (e) { Z.umg.meldung(e.message, 1); }
+      return zAufbauen();
+    }
+    if (t.dataset.zuord) {
+      const v = zVorlagen().find(x => x.id === t.dataset.zuord); if (!v) return;
+      const s = new Set(v.fuer || []); t.checked ? s.add(typ) : s.delete(typ);
+      if (await vorlageSpeichernMeta(v, { fuer: [...s] }, t)) Z.umg.meldung(t.checked ? `„${v.name}“ kommt jetzt bei ${(ARTEN.find(a => a[0] === typ) || [])[1]} dran.` : `„${v.name}“ ist dort raus.`);
+      return zAufbauen();
+    }
+    if (t.dataset.zserie) {
+      const v = zVorlagen().find(x => x.id === t.dataset.zserie); if (!v) return;
+      const s = new Set(v.serien || []); t.checked ? s.add(t.dataset.wert) : s.delete(t.dataset.wert);
+      if (await vorlageSpeichernMeta(v, { serien: [...s] }, t)) Z.umg.meldung('Gespeichert.');
+    }
+  }
+  async function zKlick(ev) {
+    const b = ev.target.closest('[data-z]'); if (!b || !Z.box.contains(b)) return;
+    if (b.dataset.z === 'verteilen') {
+      if (!confirm('Alle offenen Posts bekommen neu ihre Vorlage nach deiner Zuteilung – auch einzeln gewählte. Weiter?')) return;
+      b.disabled = true;
+      try { await Z.umg.igApi('POST', '/api/vorlagen/verteilen', {}); Z.umg.meldung('Neu verteilt – die Bilder werden neu gezeichnet.'); await Z.umg.gespeichert(); }
+      catch (e) { Z.umg.meldung(e.message, 1); b.disabled = false; }
+    }
   }
 
   const css = document.createElement('style');
@@ -1264,6 +1495,29 @@
 #instaApp .kv-wkopf{display:flex;flex-wrap:wrap;align-items:center;gap:10px}
 #instaApp .kv-wkopf b{min-width:150px}#instaApp .kv-wz select{width:auto}
 #instaApp .kv-zuord{display:flex;flex-wrap:wrap;gap:4px 16px;margin-top:6px}
+#instaApp .kv-wkopf h3{margin:0}
+#instaApp .kv-sgal{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;max-height:420px;overflow:auto;margin-bottom:10px}
+#instaApp .kv-sgal button{display:flex;flex-direction:column;align-items:center;gap:3px;padding:4px;background:#0b0c10;border:2px solid var(--line);color:#fff;cursor:pointer;font-size:11px}
+#instaApp .kv-sgal button.an{border-color:var(--red)}#instaApp .kv-sgal canvas{width:100%;height:auto;background:#000}
+#instaApp .kv-galerie{margin-top:12px;border-top:1px solid var(--line);padding-top:12px}
+#instaApp .kv-galerie .ki-modus{display:inline-flex;margin-bottom:6px}
+#instaApp .kv-ngruppe{margin-top:14px}#instaApp .kv-ngruppe b{display:block;margin-bottom:6px}
+#instaApp .kv-nreihe{display:flex;flex-wrap:wrap;gap:8px}
+#instaApp .kv-neu{display:flex;flex-direction:column;align-items:center;gap:4px;padding:6px;background:#0b0c10;border:2px solid var(--line);color:#fff;cursor:pointer;font-size:12px;width:136px}
+#instaApp .kv-neu:hover{border-color:var(--red)}#instaApp .kv-neu canvas{background:#000;width:100%;height:auto}#instaApp .kv-neu small{color:var(--steel)}
+#instaApp .kv-bausteine{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:8px 0}
+#instaApp .kv-bausteine button{background:#0d0e13;border:1px solid var(--line);color:#fff;font-size:13px;padding:6px 10px;cursor:pointer}
+#instaApp .kv-bausteine button:hover{border-color:var(--red)}
+#instaApp .kv-kacheln{display:flex;flex-wrap:wrap;gap:10px;margin-top:12px}
+#instaApp .kv-kachel{display:flex;flex-direction:column;align-items:center;gap:6px;padding:8px;background:#0b0c10;border:2px solid var(--line);cursor:pointer;font-size:13px;max-width:170px}
+#instaApp .kv-kachel.an{border-color:var(--red)}
+#instaApp .kv-kachel canvas{background:#000;display:block}
+#instaApp .kv-kachel span{display:flex;align-items:center;gap:6px;text-align:center}
+#instaApp .kv-kachel input{accent-color:var(--red);width:16px;height:16px}
+#instaApp .kv-serien{border-collapse:collapse;font-size:14px}
+#instaApp .kv-serien th,#instaApp .kv-serien td{padding:6px 10px;border-bottom:1px solid var(--line);text-align:center}
+#instaApp .kv-serien td:first-child{text-align:left}
+#instaApp .kv-serien input{accent-color:var(--red);width:16px;height:16px}
 #instaApp .kv-plh{display:flex;flex-wrap:wrap;gap:4px;margin:6px 0 10px}
 #instaApp .kv-plh button{background:#0d0e13;border:1px solid var(--line);color:var(--steel);font-size:12px;padding:3px 6px;cursor:pointer}
 #instaApp .kv-plh button:hover{color:#fff;border-color:var(--red)}
@@ -1279,5 +1533,5 @@
 #instaApp .kv-anim select{width:auto}`;
   document.head.appendChild(css);
 
-  window.K888Vorlagen = { editor, zeichnen, bildFuer, videoFuer, istVideo, VORSCHLAEGE, SCHRIFTEN, formatVon, ARTEN };
+  window.K888Vorlagen = { editor, zuteilung, zeichnen, bildFuer, videoFuer, istVideo, VORSCHLAEGE, SCHRIFTEN, formatVon, ARTEN };
 })();
