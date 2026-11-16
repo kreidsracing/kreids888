@@ -81,6 +81,22 @@
         try { await bildHochladen(p); } catch (e) { meldung('Bild „' + (TYP[p.typ] || p.typ) + '“ ging nicht: ' + e.message, 1); }
       }
       if (todo.length) { STAND = await igApi('GET', '/api/stand'); }
+      // YouTube: Thumbnails der Rennen, die bald geplant werden, zeichnen und an den Worker geben
+      const yt = STAND.youtube || {}, ytc = STAND.cfg.youtube || {};
+      if (yt.verbunden && ytc.aktiv !== false && window.K888Thumb) {
+        const bald = rennenListe().filter(r => (r.typ === 'story' || r.typ === 'ank') && r.startMs > Date.now() && r.startMs - Date.now() < ((ytc.tage || 3) + 1) * 86400000);
+        let m = 0;
+        for (const r of bald) {
+          const h = thumbHash(r);
+          if (r.ytThumbH === h) continue;
+          malen(`▶ YouTube-Thumbnails … ${++m}`);
+          try {
+            const d = await window.K888Thumb.datei(window.K888Thumb.fuerRennen(STAND.thumbVorlage, r), r, STAND.design);
+            await bildSenden(`/api/ytthumb/${encodeURIComponent(r.rennKey)}?h=${h}&s=${r.startMs}`, d.blob);
+            for (const p of STAND.posts) if (p.rennKey === r.rennKey) p.ytThumbH = h;
+          } catch (e) { meldung('YouTube-Thumbnail ging nicht: ' + e.message, 1); }
+        }
+      }
     } catch (e) { meldung(e.message, 1); }
     finally { GLEICHT = false; malen(''); zeichnen(); }
   }
@@ -93,6 +109,12 @@
     if (!r.ok) throw new Error(d.error || ('Fehler ' + r.status));
     p.bild = d.bild; p.veraltet = false;
     return d;
+  }
+  // Fingerabdruck eines Thumbnails (ändert sich etwas → neu zeichnen und hochladen)
+  function thumbHash(r) {
+    const t = JSON.stringify([STAND.thumbVorlage, r.thumb || null, r.spruch, r.track, r.layout, r.serie, r.nr, r.titel, r.liveMs, r.startMs, r.hg, r.ergebnis, STAND.design.farbe1, STAND.design.logoBild]);
+    let h = 0x811c9dc5; for (let i = 0; i < t.length; i++) { h ^= t.charCodeAt(i); h = Math.imul(h, 0x01000193); }
+    return (h >>> 0).toString(36);
   }
   // Vor dem Posten/Freigeben: aktuelles Bild sicherstellen
   async function bildSicher(id) {
@@ -144,6 +166,9 @@
     if (e.gepostet && e.gepostet.mediaId) k.push(`<button class="btn btn-ghost ki-k" data-aktion="pruefen" data-id="${id}"><span>🔍 Auf Instagram prüfen</span></button>`);
     if (e.gepostet) k.push(`<button class="btn btn-ghost ki-k" data-aktion="zurueck" data-id="${id}" data-api="${e.gepostet.manuell ? '0' : '1'}"><span>↩ Rückgängig</span></button>`);
     if (e.bild) k.push(`<a class="btn btn-ghost ki-k" href="${esc(e.bild)}?laden=1" download><span>📥 Bild laden</span></a>`);
+    const tk = STAND.tiktok || {};
+    if (tk.verbunden && e.imPlan && e.bild && !(e.tiktok && e.tiktok.zeit)) k.push(`<button class="btn btn-ghost ki-k" data-aktion="tiktok" data-id="${id}"><span>♪ An TikTok</span></button>`);
+    const ttText = !tk.verbunden || !e.tiktok ? '' : e.tiktok.zeit ? `<div class="ki-dim">♪ TikTok: Entwurf gesendet ${esc(zeit(e.tiktok.zeit))}</div>` : e.tiktok.fehler ? `<div class="ki-hinweis rot">♪ TikTok: ${esc(e.tiktok.fehler)}</div>` : '';
     return `<div class="ki-erl">
       ${e.bild ? `<a href="${esc(e.bild)}" target="_blank" rel="noopener" class="ki-erl-bild"><img src="${esc(e.bild)}" alt="" loading="lazy"></a>` : '<div class="ki-erl-bild"></div>'}
       <div class="ki-erl-text">
@@ -151,7 +176,7 @@
         <div><b>${name}</b></div>
         <div>${st}</div>
         ${e.gepostet || e.imPlan ? '' : '<div class="ki-dim">Liegt außerhalb der Planung – nur noch zum Laden.</div>'}
-        ${prText}
+        ${prText}${ttText}
         <div class="ki-knoepfe">${k.join('')}</div>
       </div>
     </div>`;
@@ -180,6 +205,10 @@
     if (p.bild) k.push(`<a class="btn btn-ghost ki-k" href="${esc(p.bild)}?laden=1" download><span>📥 Bild laden</span></a>`);
     if (p.bild) k.push(kn('manuell', '✓ Hab ich selbst gepostet', 'data-an="1"', 'Nur klicken, wenn du das Bild schon selbst in der Insta-App gepostet hast – hier wird nichts gepostet'));
     if (p.eigenesErgebnis) k.push(`<button class="btn btn-ghost ki-k" data-aktion="erg-weg" data-rk="${esc(p.rennKey)}"><span>✕ Ergebnis löschen</span></button>`);
+    const tk = STAND.tiktok || {}, ttTypen = ((STAND.cfg.tiktok || {}).typen) || [];
+    if (tk.verbunden && p.bild && !(p.tiktok && p.tiktok.zeit)) k.push(kn('tiktok', '♪ An TikTok', '', 'Bild als Entwurf in deine TikTok-Inbox schicken'));
+    const yt = STAND.youtube || {};
+    if (mitThumb && p.yt && yt.verbunden && p.startMs > Date.now()) k.push(`<button class="btn btn-ghost ki-k" data-aktion="yt-planen" data-rk="${esc(p.rennKey)}"><span>▶ ${p.yt.id ? 'YouTube aktualisieren' : 'Jetzt auf YouTube planen'}</span></button>`);
     const h = [];
     if (p.fehler) h.push(`<div class="ki-hinweis rot">⚠ ${esc(p.fehler)}</div>`);
     if (p.bildQuelle) h.push(`<div class="ki-dim">Hintergrund: ${esc(p.bildQuelle)}</div>`);
@@ -188,6 +217,17 @@
     if (p.typ === 'story') h.push('<div class="ki-hinweis">Link-Sticker geht nur von Hand: „📥 Bild laden“ → in der Insta-App als Story posten → hier „✓ Hab ich selbst gepostet“.</div>');
     if (p.status === 'verpasst') h.push('<div class="ki-hinweis rot">Die Zeit ist vorbei, der Post ist nicht rausgegangen. „🚀 Jetzt posten“ schickt ihn sofort.</div>');
     const text = p.text ? `<details class="ki-text"><summary>Text unter dem Post</summary><pre>${esc(p.text)}</pre></details>` : '';
+    // Status YouTube / TikTok
+    if (mitThumb && p.yt && yt.verbunden) {
+      if (p.yt.id) h.push(`<div class="ki-dim">▶ YouTube: geplant · <a class="ki-link" href="https://www.youtube.com/watch?v=${esc(p.yt.id)}" target="_blank" rel="noopener">ansehen</a>${p.yt.thumbH ? ' · Thumbnail drin' : ''}</div>`);
+      else if (p.startMs > Date.now()) h.push(`<div class="ki-dim">▶ YouTube: wird ${esc((STAND.cfg.youtube || {}).tage || 3)} Tage vorher automatisch geplant</div>`);
+      if (p.yt.fehler) h.push(`<div class="ki-hinweis rot">▶ YouTube: ${esc(p.yt.fehler)}</div>`);
+    }
+    if (tk.verbunden && ttTypen.includes(p.typ)) {
+      if (p.tiktok && p.tiktok.zeit) h.push(`<div class="ki-dim">♪ TikTok: Entwurf gesendet ${esc(zeit(p.tiktok.zeit))} – in der TikTok-App fertig machen (24 Std.)</div>`);
+      else h.push('<div class="ki-dim">♪ TikTok: geht zur gleichen Zeit als Entwurf in deine Inbox</div>');
+      if (p.tiktok && p.tiktok.fehler) h.push(`<div class="ki-hinweis rot">♪ TikTok: ${esc(p.tiktok.fehler)}</div>`);
+    }
     const wann = woche ? `${(p.liste || []).length} Termine in dieser Woche`
       : p.typ === 'erg'
       ? `Rennen vom ${esc(new Date(p.startMs).toLocaleDateString('de-DE', { timeZone: 'Europe/Berlin', weekday: 'short', day: '2-digit', month: '2-digit' }))} · <b>${esc(p.platz)}</b>`
@@ -227,6 +267,56 @@
     </ol>
     <div class="ki-dim">Beim ersten Mal fragt Chrome nach der Zwischenablage → „Zulassen“. Klappt das Zurückklicken nicht: im Dashboard Strg+V drücken.</div>
   </details>`;
+
+  // 📡 YouTube: Livestreams planen · TikTok: Entwürfe
+  let STREAMS = null;
+  function youtubePanel() {
+    const y = STAND.youtube || {}, c = STAND.cfg.youtube || {};
+    const status = !y.eingerichtet ? '<div class="ki-hinweis">Noch nicht eingerichtet: In Cloudflare fehlen GOOGLE_CLIENT_ID und GOOGLE_CLIENT_SECRET (siehe Anleitung).</div>'
+      : y.verbunden ? `<div class="ki-konto gruen">● Verbunden${y.kanal ? ' mit <b>' + esc(y.kanal) + '</b>' : ''}</div>`
+        : '<div class="ki-konto rot">● Nicht verbunden</div>';
+    return `<div class="ki-panel"><h3>▶ YouTube · Livestreams planen</h3>
+      ${status}
+      ${y.fehler ? `<div class="ki-hinweis rot">⚠ ${esc(y.fehler)}</div>` : ''}
+      <div class="ki-knoepfe">${y.eingerichtet ? (y.verbunden ? '<button class="btn btn-ghost ki-k" data-aktion="trennen" data-wert="youtube"><span>Trennen</span></button>' : '<button class="btn btn-red ki-k" data-aktion="verbinden" data-wert="youtube"><span>Mit YouTube verbinden</span></button>') : ''}</div>
+      <label class="chk"><input type="checkbox" id="ki-yt-an" ${c.aktiv !== false ? 'checked' : ''}> Rennen automatisch als Livestream planen (mit Thumbnail)</label>
+      <div class="ki-reihe">
+        <div class="ki-fg"><label for="ki-yt-tage">Tage vorher</label><input id="ki-yt-tage" type="number" min="1" max="14" value="${esc(c.tage || 3)}"></div>
+        <div class="ki-fg"><label for="ki-yt-sicht">Sichtbarkeit</label><select id="ki-yt-sicht"><option value="public" ${c.sichtbar !== 'unlisted' ? 'selected' : ''}>Öffentlich</option><option value="unlisted" ${c.sichtbar === 'unlisted' ? 'selected' : ''}>Nicht gelistet</option></select></div>
+        <div class="ki-fg" style="flex:1 1 220px"><label for="ki-yt-stream">Stream-Schlüssel (OBS)</label><select id="ki-yt-stream"><option value="">– in YouTube Studio wählen –</option>${(STREAMS || (c.stream ? [{ id: c.stream, name: 'gespeicherter Schlüssel' }] : [])).map(x => `<option value="${esc(x.id)}" ${c.stream === x.id ? 'selected' : ''}>${esc(x.name)}</option>`).join('')}</select></div>
+      </div>
+      <div class="ki-fg"><label for="ki-yt-titel">Titel</label><input id="ki-yt-titel" type="text" maxlength="200" value="${esc(c.titel || '')}"></div>
+      <div class="ki-fg"><label for="ki-yt-text">Beschreibung</label><textarea id="ki-yt-text" rows="6">${esc(c.beschreibung || '')}</textarea></div>
+      <div class="ki-dim">Platzhalter: {spruch} {strecke} {serie} {runde} {titel} {datum} {wochentag} {zeit} {klassen}. Der Spruch kommt vom Thumbnail. Titel höchstens 100 Zeichen.</div>
+      <div class="ki-knoepfe"><button class="btn btn-red ki-k" data-aktion="kanal-speichern"><span>💾 Speichern</span></button></div>
+    </div>`;
+  }
+  function tiktokPanel() {
+    const t = STAND.tiktok || {}, typen = ((STAND.cfg.tiktok || {}).typen) || [];
+    const status = !t.eingerichtet ? '<div class="ki-hinweis">Noch nicht eingerichtet: In Cloudflare fehlen TIKTOK_CLIENT_KEY und TIKTOK_CLIENT_SECRET (siehe Anleitung).</div>'
+      : t.verbunden ? `<div class="ki-konto gruen">● Verbunden${t.name ? ' mit <b>' + esc(t.name) + '</b>' : ''}</div>` : '<div class="ki-konto rot">● Nicht verbunden</div>';
+    const art = (k, n) => `<label class="chk"><input type="checkbox" data-tt="${k}" ${typen.includes(k) ? 'checked' : ''}> ${n}</label>`;
+    return `<div class="ki-panel"><h3>♪ TikTok · Entwürfe</h3>
+      ${status}
+      <div class="ki-knoepfe">${t.eingerichtet ? (t.verbunden ? '<button class="btn btn-ghost ki-k" data-aktion="trennen" data-wert="tiktok"><span>Trennen</span></button>' : '<button class="btn btn-red ki-k" data-aktion="verbinden" data-wert="tiktok"><span>Mit TikTok verbinden</span></button>') : ''}</div>
+      <div class="ki-fg"><label>Zusätzlich als Entwurf an TikTok</label><div class="ki-reihe">${art('story', 'Raceday-Story')}${art('woche', 'Wochenplan')}${art('erg', 'Ergebnis')}${art('ank', 'Ankündigung')}</div></div>
+      <div class="ki-dim">Geht zur gleichen Zeit wie bei Instagram raus. Du bekommst eine Nachricht in der TikTok-App: Musik dazu und selbst posten – innerhalb von 24 Stunden.</div>
+      <div class="ki-knoepfe"><button class="btn btn-red ki-k" data-aktion="kanal-speichern"><span>💾 Speichern</span></button></div>
+    </div>`;
+  }
+  async function streamsLaden() {
+    if (STREAMS || !(STAND.youtube || {}).verbunden) return;
+    try { STREAMS = (await igApi('GET', '/api/youtube/streams')).streams || []; if (REITER === 'kanaele') zeichnen(); }
+    catch (e) { STREAMS = []; meldung(e.message, 1); }
+  }
+  function kanaeleAusFormular() {
+    const v = id => document.getElementById(id);
+    return {
+      ...STAND.cfg,
+      youtube: { aktiv: v('ki-yt-an').checked, tage: parseInt(v('ki-yt-tage').value, 10) || 3, sichtbar: v('ki-yt-sicht').value, stream: v('ki-yt-stream').value, titel: v('ki-yt-titel').value, beschreibung: v('ki-yt-text').value },
+      tiktok: { typen: [...BOX.querySelectorAll('[data-tt]')].filter(x => x.checked).map(x => x.dataset.tt) }
+    };
+  }
 
   function zeitenPanel(cfg) {
     const a = cfg.ankuendigung, s = cfg.story, e = cfg.ergebnis;
@@ -405,7 +495,7 @@
       <p class="hint">${cfg.modus === 'auto' ? 'Posts gehen zur eingestellten Zeit von selbst raus – die Bilder werden gezeichnet, sobald du diesen Reiter öffnest.' : 'Jeder Post wartet, bis du ihn freigibst. Die Bilder werden gezeichnet, sobald du diesen Reiter öffnest.'}</p>
       <div class="ki-malt"${MALT ? '' : ' hidden'}>${esc(MALT)}</div>
       <div class="side ki-reiter">
-        ${[['posts', `🗓 Posts (${liste.length})`], ['thumb', '▶ Thumbnail'], ['zeiten', '⏰ Zeiten & Text'], ['design', '🎨 Aussehen']].map(([k, t]) =>
+        ${[['posts', `🗓 Posts (${liste.length})`], ['thumb', '▶ Thumbnail'], ['zeiten', '⏰ Zeiten & Text'], ['design', '🎨 Aussehen'], ['kanaele', '📡 YouTube & TikTok']].map(([k, t]) =>
           `<a class="${REITER === k ? 'active' : ''}" data-aktion="reiter" data-wert="${k}">${t}</a>`).join('')}
       </div>
       ${REITER === 'posts' ? `
@@ -418,7 +508,9 @@
       ${REITER === 'zeiten' ? `
         <div class="ki-grid">${zeitenPanel(cfg)}${textPanel(cfg)}</div>
         <div class="actions"><button class="btn btn-red" data-aktion="cfg"><span>💾 Zeiten und Texte speichern</span></button></div>` : ''}
-      ${REITER === 'design' ? `<div class="ki-grid">${designPanel(STAND.design)}</div>` : ''}`;
+      ${REITER === 'design' ? `<div class="ki-grid">${designPanel(STAND.design)}</div>` : ''}
+      ${REITER === 'kanaele' ? `<div class="ki-grid">${youtubePanel()}${tiktokPanel()}</div>` : ''}`;
+    if (REITER === 'kanaele') streamsLaden();
     if (REITER === 'design') designVorschau();
     if (REITER === 'thumb' && window.K888Thumb) window.K888Thumb.editor(BOX.querySelector('.ki-thumbbox'), THUMB_UMG, THUMB_RK);
     if (REITER === 'posts' && window.K888Thumb) BOX.querySelectorAll('canvas[data-thumb]').forEach(c => {
@@ -532,6 +624,7 @@
   }
   const bildDatei = liste => [...(liste || [])].find(x => /^image\//.test(x.type));
   window.addEventListener('focus', () => setTimeout(ausZwischenablage, 150));
+  window.addEventListener('message', ev => { if (ev.data && typeof ev.data.k888verbunden === 'boolean') { STREAMS = null; laden(true); meldung(ev.data.k888verbunden ? 'Verbunden ✓' : 'Verbinden ging nicht – siehe Fenster.', !ev.data.k888verbunden); } });
   document.addEventListener('visibilitychange', () => { if (!document.hidden) setTimeout(ausZwischenablage, 150); });
   document.addEventListener('paste', ev => {
     if (!WARTET || UEBERNIMMT || !sichtbar()) return;
@@ -590,6 +683,34 @@
     }
     if (a === 'dformat') { DFORMAT = b.dataset.wert; BOX.querySelectorAll('[data-aktion="dformat"]').forEach(x => x.classList.toggle('active', x === b)); return designVorschau(true); }
     if (a === 'dreset') { DLAYOUT = window.K888Bilder.layoutAus({}); return designGeaendert(); }
+    if (a === 'verbinden') return ausfuehren(b, async () => {
+      const d = await igApi('POST', '/api/verbinden/' + b.dataset.wert, {});
+      const f = window.open(d.url, 'k888-login', 'popup=yes,width=520,height=760');
+      if (!f) meldung('Das Anmelde-Fenster wurde blockiert: Pop-ups erlauben und nochmal klicken.', 1);
+      else meldung('Im neuen Fenster anmelden und erlauben – danach geht es hier von selbst weiter.');
+    });
+    if (a === 'trennen') return ausfuehren(b, async () => {
+      if (!confirm('Verbindung wirklich trennen?')) return;
+      await igApi('POST', '/api/trennen/' + b.dataset.wert, {}); STREAMS = null; await laden(true);
+    });
+    if (a === 'kanal-speichern') return ausfuehren(b, async () => {
+      await igApi('POST', '/api/einstellungen', { cfg: kanaeleAusFormular() });
+      meldung('Gespeichert.'); await laden();
+    });
+    if (a === 'yt-planen') return ausfuehren(b, async () => {
+      const r = rennenListe().find(x => x.rennKey === b.dataset.rk);
+      if (r && window.K888Thumb) {   // aktuelles Thumbnail gleich mitgeben
+        const h = thumbHash(r);
+        if (r.ytThumbH !== h) { const d = await window.K888Thumb.datei(window.K888Thumb.fuerRennen(STAND.thumbVorlage, r), r, STAND.design); await bildSenden(`/api/ytthumb/${encodeURIComponent(r.rennKey)}?h=${h}&s=${r.startMs}`, d.blob); }
+      }
+      await igApi('POST', `/api/youtube/${encodeURIComponent(b.dataset.rk)}/planen`, {});
+      meldung('Livestream ist auf YouTube geplant ✓'); await laden(true);
+    });
+    if (a === 'tiktok') return ausfuehren(b, async () => {
+      await bildSicher(id);
+      await igApi('POST', `/api/post/${encodeURIComponent(id)}/tiktok`, {});
+      meldung('Entwurf ist in deiner TikTok-Inbox ✓'); await laden(true);
+    });
     if (a === 'th-edit') { REITER = 'thumb'; THUMB_RK = b.dataset.rk; zeichnen(); window.scrollTo(0, 0); return; }
     if (a === 'th-laden') return ausfuehren(b, async () => {
       const r = rennenListe().find(x => x.rennKey === b.dataset.rk); if (!r || !window.K888Thumb) return;

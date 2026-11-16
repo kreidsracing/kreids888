@@ -25,7 +25,7 @@
 
   // ─── Standard-Vorlage ───
   const STANDARD = {
-    version: 1, varianten: true,
+    version: 1, varianten: { seite: true, farben: true, pose: true, team: true, spruch: true, ausschnitt: true },
     hg: { zoom: 1, x: 0.5, y: 0.35, dunkel: 0.15, links: 0.85, leiste: true },
     elemente: [
       { id: 'team', typ: 'team', an: false, bild: 'f2f-logo.webp', schwarzWeg: true, x: 1560, y: 40, b: 300 },
@@ -56,40 +56,52 @@
     for (const e of v.elemente) { e.x = B - e.x; e.rechts = !e.rechts; if (e.typ === 'pers') e.spiegeln = !e.spiegeln; }
     v.hg.seite = v.hg.seite === 'rechts' ? 'links' : 'rechts';
   }
+  // Was von selbst wechselt (einstellbar): alte Vorlagen mit varianten: true/false werden übernommen
+  const VARIANTEN = [['seite', 'Seite'], ['farben', 'Farben'], ['pose', 'Pose'], ['team', 'Team-Bild'], ['spruch', 'Spruch-Stil'], ['ausschnitt', 'Bildausschnitt']];
+  function variantenAus(v) {
+    const w = v && v.varianten, an = w !== false;
+    const o = {}; for (const [k] of VARIANTEN) o[k] = w && typeof w === 'object' ? w[k] !== false : an;
+    return o;
+  }
   function variante(basis, seed) {
-    const v = kopie(basis), rnd = zufall(seed);
-    const wahl = l => l[Math.floor(rnd() * l.length)], um = (w, p) => w * (1 + (rnd() * 2 - 1) * p);
+    const v = kopie(basis), rnd = zufall(seed), an = variantenAus(basis);
+    const wahl = l => l[Math.floor(rnd() * l.length)];
+    // Alle Würfe immer in derselben Reihenfolge – so ändert ein Haken nicht die anderen Teile
+    const w = { seite: rnd() < 0.5, pal: wahl(PALETTEN), box: wahl(['schraeg', 'schraeg', 'box']), schraeg: rnd() < 0.8, verlauf: rnd() < 0.4,
+      gr: rnd() * 2 - 1, dy: rnd() * 2 - 1, pose: wahl(POSEN)[0], ph: rnd() * 2 - 1, team: wahl(TEAM)[0], zoom: rnd(), hx: rnd(), hy: rnd() };
     // Farben nach Rolle: Hauptfarbe = Kästen, Akzent = gelbe Texte
     const kasten = v.elemente.find(e => e.typ === 'text' && e.box && e.box !== 'kein');
     const akz = v.elemente.find(e => e.typ === 'text' && /\{serie\}/.test(e.inhalt || ''));
     const HAUPT = new Set(['#e11324', String(kasten ? kasten.boxFarbe : '').toLowerCase()]);
     const AKZENT = new Set(['#ffd400', String(akz ? akz.farbe : '').toLowerCase()]);
-    const [haupt, akzent] = wahl(PALETTEN);
+    const [haupt, akzent] = w.pal;
     const farbe = c => { const k = String(c || '').toLowerCase(); return HAUPT.has(k) ? haupt : AKZENT.has(k) ? akzent : c; };
-    if (rnd() < 0.5) seitenTausch(v);
+    if (an.seite && w.seite) seitenTausch(v);
     for (const e of v.elemente) {
       if (e.typ === 'text') {
-        e.boxFarbe = farbe(e.boxFarbe); e.farbe = farbe(e.farbe); e.farbe2 = farbe(e.farbe2);
-        if (/\{spruch\}/.test(e.inhalt || '')) {
-          if (e.box && e.box !== 'kein') e.box = wahl(['schraeg', 'schraeg', 'box']);
-          e.schraeg = rnd() < 0.8;
-          e.verlauf = e.box === 'kein' && rnd() < 0.4; e.farbe2 = akzent;
-          e.groesse = Math.round(um(e.groesse || 120, 0.08));
-          e.y = Math.round(e.y + (rnd() * 2 - 1) * 35);
+        if (an.farben) { e.boxFarbe = farbe(e.boxFarbe); e.farbe = farbe(e.farbe); e.farbe2 = farbe(e.farbe2); }
+        if (an.spruch && /\{spruch\}/.test(e.inhalt || '')) {
+          if (e.box && e.box !== 'kein') e.box = w.box;
+          e.schraeg = w.schraeg;
+          e.verlauf = e.box === 'kein' && w.verlauf; if (an.farben) e.farbe2 = akzent;
+          e.groesse = Math.round((e.groesse || 120) * (1 + w.gr * 0.08));
+          e.y = Math.round(e.y + w.dy * 35);
         }
-      } else if (e.typ === 'pers') {
-        e.bild = wahl(POSEN)[0];
+      } else if (e.typ === 'pers' && an.pose) {
+        e.bild = w.pose;
         const unten = Math.max(H + 10, (e.y || 0) + (e.h || 900));   // unten bündig, sonst sieht man die Schnittkante
-        e.h = Math.round(um(e.h || 900, 0.06));
+        e.h = Math.round((e.h || 900) * (1 + w.ph * 0.06));
         e.y = unten - e.h;
-      } else if (e.typ === 'team' && e.an !== false) {
-        e.bild = wahl(TEAM)[0]; e.schwarzWeg = !!(TEAM.find(x => x[0] === e.bild) || [])[2];
+      } else if (e.typ === 'team' && e.an !== false && an.team) {
+        e.bild = w.team; e.schwarzWeg = !!(TEAM.find(x => x[0] === e.bild) || [])[2];
       }
     }
-    v.hg.leisteFarbe = haupt;
-    v.hg.zoom = +(1 + rnd() * 0.25).toFixed(2);
-    v.hg.x = +(0.25 + rnd() * 0.5).toFixed(2);
-    v.hg.y = +(0.2 + rnd() * 0.35).toFixed(2);
+    if (an.farben) v.hg.leisteFarbe = haupt;
+    if (an.ausschnitt) {
+      v.hg.zoom = +(1 + w.zoom * 0.25).toFixed(2);
+      v.hg.x = +(0.25 + w.hx * 0.5).toFixed(2);
+      v.hg.y = +(0.2 + w.hy * 0.35).toFixed(2);
+    }
     return v;
   }
   // Vorlage, mit der ein Rennen gezeichnet wird: eigene des Rennens › Variante der Grundvorlage › Grundvorlage
@@ -97,7 +109,7 @@
     const t = (r && r.thumb) || {};
     if (t.vorlage && Array.isArray(t.vorlage.elemente)) return vorlageAus(t.vorlage);
     const basis = vorlageAus(basisRoh);
-    if (basis.varianten === false || !r) return basis;
+    if (!r || !Object.values(variantenAus(basis)).some(Boolean)) return basis;
     return variante(basis, (zahlAus(String(r.rennKey || '')) ^ (t.seed || 0)) >>> 0);
   }
 
@@ -344,7 +356,9 @@
             <button class="btn btn-ghost ki-k" data-t="standard"><span>↺ Standard-Vorlage</span></button>
             <span class="kt-dirty">${E.dirty ? '● Änderungen noch nicht gespeichert' : ''}</span>
           </div>
-          <label class="chk"><input type="checkbox" data-t="varianten" ${vorlageAus(E.umg.stand().thumbVorlage).varianten !== false ? 'checked' : ''}> Jedes Rennen sieht von selbst anders aus (Seite, Farben, Pose, Team-Bild, Spruch-Stil, Ausschnitt)</label>
+          <div class="ki-fg" style="margin-top:6px"><label>Wechselt von selbst pro Rennen</label>
+            <div class="ki-reihe">${(an => VARIANTEN.map(([k, n]) => `<label class="chk"><input type="checkbox" data-t="varianten" data-wert="${k}" ${an[k] ? 'checked' : ''}> ${n}</label>`).join(''))(variantenAus(vorlageAus(E.umg.stand().thumbVorlage)))}</div>
+          </div>
           <div class="ki-dim">${r && r.thumb && r.thumb.vorlage ? '📌 Dieses Rennen hat sein eigenes Aussehen (festgehalten).' : '🎲 Dieses Rennen zeigt seine eigene Variante.'}</div>
         </div>
         <div class="kt-rechts">
@@ -490,7 +504,7 @@
       if (E.dirty && !confirm('Änderungen an diesem Thumbnail verwerfen?')) { t.value = E.rk; return; }
       E.rk = t.value; E.sprueche = []; E.dirty = false; E.v = fuerRennen(E.umg.stand().thumbVorlage, rennenAkt()); return aufbauen();
     }
-    if (t.dataset.t === 'varianten' && ev.type === 'change') return variantenSchalten(t.checked);
+    if (t.dataset.t === 'varianten' && ev.type === 'change') return variantenSchalten(t.dataset.wert, t.checked);
     if (t.dataset.t === 'spruch') {
       const r = rennenAkt(); if (!r) return;
       r.spruch = t.value; E.umg.spruchGesetzt(r.rennKey, t.value);
@@ -509,13 +523,15 @@
     // Felder, die andere Felder ein-/ausblenden → neu aufbauen (nur bei „change“, sonst springt der Cursor)
     geaendert(ev.type === 'change' && ['verlauf', 'box'].includes(f));
   }
-  async function variantenSchalten(an) {
-    const basis = vorlageAus(E.umg.stand().thumbVorlage); basis.varianten = an;
+  async function variantenSchalten(was, ja) {
+    const basis = vorlageAus(E.umg.stand().thumbVorlage);
+    basis.varianten = { ...variantenAus(basis), [was]: ja };
+    const an = Object.values(basis.varianten).some(Boolean);
     try {
       await E.umg.igApi('POST', '/api/thumbvorlage', { vorlage: kopie(basis) });
       E.umg.vorlageGespeichert(kopie(basis));
       if (!E.dirty) E.v = fuerRennen(basis, rennenAkt());
-      E.umg.meldung(an ? 'Jedes Rennen sieht jetzt anders aus.' : 'Alle Rennen nutzen wieder dieselbe Vorlage.');
+      E.umg.meldung(an ? 'Gespeichert – gilt für alle Rennen ohne festgehaltenes Aussehen.' : 'Nichts wechselt mehr: alle Rennen nutzen dieselbe Vorlage.');
       aufbauen();
     } catch (e) { E.umg.meldung(e.message, 1); }
   }
@@ -578,12 +594,12 @@
     });
     if (t === 'speichern') return knopf(async () => {
       const r = rennenAkt();
-      const neu = kopie(E.v); neu.varianten = vorlageAus(E.umg.stand().thumbVorlage).varianten !== false;
+      const neu = kopie(E.v); neu.varianten = variantenAus(vorlageAus(E.umg.stand().thumbVorlage));
       await E.umg.igApi('POST', '/api/thumbvorlage', { vorlage: neu });
       E.umg.vorlageGespeichert(neu);
       if (r) await rennenThumb(r, { vorlage: kopie(E.v) });   // dieses Rennen behält genau dieses Aussehen
       E.dirty = false;
-      E.umg.meldung(neu.varianten ? 'Als Vorlage gespeichert – die anderen Rennen bekommen davon ihre eigenen Varianten.' : 'Als Vorlage für alle Rennen gespeichert.');
+      E.umg.meldung(Object.values(neu.varianten).some(Boolean) ? 'Als Vorlage gespeichert – die anderen Rennen bekommen davon ihre eigenen Varianten.' : 'Als Vorlage für alle Rennen gespeichert.');
     });
     if (t === 'standard') {
       if (!confirm('Auf die Standard-Vorlage zurücksetzen? (Gilt erst nach dem Speichern.)')) return;

@@ -14,6 +14,8 @@ import { ADMIN, ERG_TAGE, ladeDaten, bauePlan, eigeneRennen, rennKey, inhaltSchl
 import { kiBild, sprueche, STIMMUNGEN, KAMERAS, autos } from './ki.js';
 import { konto, posten, pruefen, tokenVerlaengern, verlaengerbar } from './insta.js';
 import { istUhrzeit } from './zeit.js';
+import { ytEingerichtet, ytAnmeldeLink, ytCodeTauschen, ytZugang, ytKanal, ytStreams, ytPlanen, ytThumbnail, ytTexte } from './youtube.js';
+import { ttEingerichtet, ttAnmeldeLink, ttCodeTauschen, ttZugang, ttKonto, ttEntwurf } from './tiktok.js';
 
 // ─── Speicher (Durable Object, SQLite) ──────────────────────
 export class Speicher extends DurableObject {
@@ -32,6 +34,12 @@ const CFG_STANDARD = {
   story: { aktiv: true, zeit: '12:00' },
   ergebnis: { aktiv: true, zeit: '18:00' },
   woche: { aktiv: true, zeit: '17:00', pose: 'pose_02_zeigt_auf_dich.png' },   // Wochenplan-Story sonntags
+  // YouTube: geplanter Livestream pro Rennen (X Tage vorher), Thumbnail kommt automatisch aus dem Editor
+  youtube: { aktiv: true, tage: 3, sichtbar: 'public', stream: '',
+    titel: '🔴 {spruch} | {strecke} – {serie} {runde}',
+    beschreibung: 'Live ab {zeit} Uhr: {serie} · {runde} · {strecke}\n{klassen}\n\n🌐 kreids888.com\n#simracing #iracing #kreids888' },
+  // TikTok: diese Post-Arten gehen zusätzlich als Entwurf in die TikTok-Inbox
+  tiktok: { typen: ['story', 'woche', 'erg'] },
   typen: ['Rennen', 'Stream'],
   liveAb: 'quali',
   kiHinweis: true,
@@ -70,6 +78,15 @@ function cfgPruefen(e) {
   c.ankuendigung = { aktiv: a.aktiv !== false, tage: Math.max(0, Math.min(14, parseInt(a.tage, 10) || 0)), zeit: istUhrzeit(a.zeit) ? a.zeit : '19:00' };
   c.story = { aktiv: st.aktiv !== false, zeit: istUhrzeit(st.zeit) ? st.zeit : '12:00' };
   c.ergebnis = { aktiv: er.aktiv !== false, zeit: istUhrzeit(er.zeit) ? er.zeit : '18:00' };
+  const yt = e.youtube || {}, ytStd = CFG_STANDARD.youtube;
+  c.youtube = {
+    aktiv: yt.aktiv !== false, tage: Math.max(1, Math.min(14, parseInt(yt.tage, 10) || ytStd.tage)), sichtbar: yt.sichtbar === 'unlisted' ? 'unlisted' : 'public',
+    stream: /^[A-Za-z0-9_-]{0,80}$/.test(String(yt.stream || '')) ? String(yt.stream || '') : '',
+    titel: typeof yt.titel === 'string' && yt.titel.trim() ? yt.titel.slice(0, 200) : ytStd.titel,
+    beschreibung: typeof yt.beschreibung === 'string' ? yt.beschreibung.slice(0, 4000) : ytStd.beschreibung
+  };
+  const tk = e.tiktok || {};
+  c.tiktok = { typen: Array.isArray(tk.typen) ? ['ank', 'story', 'erg', 'woche'].filter(t => tk.typen.includes(t)) : CFG_STANDARD.tiktok.typen.slice() };
   const wo = e.woche || {};
   c.woche = { aktiv: wo.aktiv !== false, zeit: istUhrzeit(wo.zeit) ? wo.zeit : '17:00', pose: /^[A-Za-z0-9_.-]{1,80}\.(png|webp)$/.test(String(wo.pose || '')) || wo.pose === '' ? wo.pose : CFG_STANDARD.woche.pose };
   c.typen = Array.isArray(e.typen) ? TYPEN.filter(t => e.typen.includes(t)) : CFG_STANDARD.typen.slice();
@@ -88,7 +105,9 @@ async function ladeCfg(s) {
     ankuendigung: { ...CFG_STANDARD.ankuendigung, ...(c.ankuendigung || {}) },
     story: { ...CFG_STANDARD.story, ...(c.story || {}) },
     ergebnis: { ...CFG_STANDARD.ergebnis, ...(c.ergebnis || {}) },
-    woche: { ...CFG_STANDARD.woche, ...(c.woche || {}) }
+    woche: { ...CFG_STANDARD.woche, ...(c.woche || {}) },
+    youtube: { ...CFG_STANDARD.youtube, ...(c.youtube || {}) },
+    tiktok: { ...CFG_STANDARD.tiktok, ...(c.tiktok || {}) }
   });
 }
 async function ladeDesign(s) { return { ...DESIGN_STANDARD, ...((await s.lies('design')) || {}) }; }
@@ -229,6 +248,72 @@ async function veroeffentlichen(env, s, post, design, cfg) {
   return zust;
 }
 
+// ─── YouTube: Livestreams planen ────────────────────────────
+// Ein Rennen = Daten der Story (sonst Ankündigung) + Spruch aus dem Thumbnail. Zustand unter yt:<rennen>,
+// Thumbnail-Datei (vom Dashboard gezeichnet) unter ytb:<rennen>, dazu ytbh:<rennen> = { h, typ }.
+function ytRennenListe(plan, thrs) {
+  const m = new Map();
+  for (const p of plan) {
+    if (p.typ !== 'story' && p.typ !== 'ank') continue;
+    const rk = rennKey(p.id), alt = m.get(rk);
+    if (!alt || p.typ === 'story') m.set(rk, { ...p, rennKey: rk, spruch: ((thrs['thr:' + rk] || {}).spruch) || '' });
+  }
+  return [...m.values()].sort((a, b) => a.startMs - b.startMs);
+}
+async function ytEinRennen(env, s, zugang, r, cfg, erzwingen) {
+  const z = (await s.lies('yt:' + r.rennKey)) || {};
+  if (!erzwingen && z.fehler && Date.now() - (z.zeit || 0) < 3600000) return z;
+  const hash = kurzHash(JSON.stringify([ytTexte(r, cfg.youtube), r.liveMs, cfg.youtube.sichtbar]));
+  try {
+    if (!z.id || z.hash !== hash || erzwingen) { z.id = await ytPlanen(zugang, r, cfg.youtube, z.id); z.hash = hash; }
+    const th = await s.lies('ytbh:' + r.rennKey);
+    if (th && th.h && th.h !== z.thumbH) {
+      const bytes = await s.lies('ytb:' + r.rennKey);
+      if (bytes) { await ytThumbnail(zugang, z.id, bytes, th.typ === 'png' ? 'image/png' : 'image/jpeg'); z.thumbH = th.h; }
+    }
+    z.fehler = '';
+  } catch (e) {
+    z.fehler = String((e && e.message) || e).slice(0, 300);
+    // Livestream wurde in YouTube gelöscht → beim nächsten Mal neu anlegen
+    if (/not ?found|liveBroadcastNotFound|videoNotFound/i.test(z.fehler)) { delete z.id; delete z.hash; delete z.thumbH; }
+  }
+  z.zeit = Date.now(); z.startMs = r.startMs;
+  await s.schreib('yt:' + r.rennKey, z);
+  return z;
+}
+async function ytAbgleich(env, s, plan, cfg, jetzt) {
+  if (!cfg.youtube.aktiv || !ytEingerichtet(env) || !(await s.lies('yt:token'))) return;
+  const zugang = await ytZugang(env, s);
+  const thrs = await s.liste('thr:');
+  let n = 2;   // höchstens 2 Rennen pro Lauf (Gratis-Tarif)
+  for (const r of ytRennenListe(plan, thrs)) {
+    if (r.startMs <= jetzt || r.startMs - jetzt > cfg.youtube.tage * 86400000) continue;
+    const z = (await s.lies('yt:' + r.rennKey)) || {};
+    const th = await s.lies('ytbh:' + r.rennKey);
+    const hash = kurzHash(JSON.stringify([ytTexte(r, cfg.youtube), r.liveMs, cfg.youtube.sichtbar]));
+    if (z.id && z.hash === hash && (!th || th.h === z.thumbH)) continue;
+    if (n-- <= 0) break;
+    await ytEinRennen(env, s, zugang, r, cfg, false);
+  }
+}
+
+// ─── TikTok: Entwurf in die Inbox ───────────────────────────
+async function ttSenden(env, s, post, cfg, design) {
+  const z = (await s.lies('post:' + post.id)) || {};
+  if (!z.version) throw new Error('Bild fehlt noch – den Instagram-Reiter einmal öffnen.');
+  const zugang = await ttZugang(env, s);
+  const titel = post.typ === 'woche' ? 'Stream Week' : [post.track || post.titel, post.serie].filter(Boolean).join(' · ');
+  const text = post.typ === 'woche' || post.typ === 'story' ? '#simracing #iracing #kreids888' : bildtext(post, cfg, design);
+  try {
+    const id = await ttEntwurf(zugang, `${env.ORIGIN}/bild/${post.id}/${z.version}.jpg`, titel, text);
+    z.tiktok = { zeit: Date.now(), publishId: id };
+  } catch (e) {
+    z.tiktok = { ...(z.tiktok || {}), fehler: String((e && e.message) || e).slice(0, 300), versuche: ((z.tiktok && z.tiktok.versuche) || 0) + 1, zuletzt: Date.now() };
+  }
+  await s.schreib('post:' + post.id, z);
+  return z.tiktok;
+}
+
 // ─── Zeitplan (alle 10 Minuten) ─────────────────────────────
 async function zyklus(env) {
   const s = speicher(env);
@@ -244,6 +329,21 @@ async function zyklus(env) {
     if (z.gepostet || z.uebersprungen || (z.versuche || 0) >= 3) continue;
     if (p.postMs <= jetzt && ((cfg.modus === 'auto' && jetzt - p.postMs < VERPASST_NACH) || z.freigegeben)) await veroeffentlichen(env, s, p, design, cfg);
   }
+  // 1b. TikTok-Entwürfe (gleiche Zeit wie Instagram, eigene Versuche; nur frische Posts, alte nur per Knopf)
+  if (cfg.tiktok.typen.length && ttEingerichtet(env) && await s.lies('tt:token')) {
+    const st2 = await s.liste('post:');
+    for (const p of plan) {
+      if (!cfg.tiktok.typen.includes(p.typ) || p.postMs > jetzt) continue;
+      const z = st2['post:' + p.id] || {};
+      if (z.uebersprungen || !z.version) continue;
+      const frisch = jetzt - p.postMs < 6 * 3600000 || (z.gepostet && jetzt - (z.gepostet.zeit || 0) < 6 * 3600000);
+      if (!frisch || !((cfg.modus === 'auto' && jetzt - p.postMs < VERPASST_NACH) || z.freigegeben || z.gepostet)) continue;
+      if (z.tiktok && (z.tiktok.zeit || (z.tiktok.versuche || 0) >= 3 || jetzt - (z.tiktok.zuletzt || 0) < 3600000)) continue;
+      try { await ttSenden(env, s, p, cfg, design); } catch (e) { /* nächster Lauf */ }
+    }
+  }
+  // 1c. YouTube-Livestreams planen
+  try { await ytAbgleich(env, s, plan, cfg, jetzt); } catch (e) { await s.schreib('yt:fehler', { zeit: jetzt, text: String(e.message || e).slice(0, 300) }); }
   // 2. KI-Hintergründe für die Rennen der nächsten 48 Stunden (höchstens 2 pro Lauf)
   let ki = 2;
   const gesehen = new Set();
@@ -286,6 +386,9 @@ async function zyklus(env) {
   for (const [k, r] of Object.entries(await s.liste('renn:'))) if (alt(r && r.startMs)) weg.push(k, 'merg:' + k.slice(5));
   for (const [k, t] of Object.entries(await s.liste('thr:'))) if (alt(t && t.startMs)) weg.push(k);
   for (const [k, t] of Object.entries(await s.liste('kbu:'))) if (alt(t && t.startMs)) weg.push(k);
+  for (const [k, t] of Object.entries(await s.liste('ytbh:'))) if (alt(t && t.startMs)) weg.push(k, 'ytb:' + k.slice(5));
+  for (const [k, t] of Object.entries(await s.liste('yt:'))) if (k !== 'yt:token' && k !== 'yt:fehler' && k !== 'yt:kanal' && t && t.startMs && alt(t.startMs)) weg.push(k);
+  for (const [k, o] of Object.entries(await s.liste('os:'))) if (!o || o.zeit < jetzt - 30 * 60000) weg.push(k);
   for (const pre of ['th:', 'thb:', 'nz:', 'nb:']) weg.push(...Object.keys(await s.liste(pre)));
   const tagHeute = new Date().toISOString().slice(0, 10);
   for (const k of Object.keys(await s.liste('ki:'))) if (k !== 'ki:' + tagHeute) weg.push(k);
@@ -336,8 +439,8 @@ const QUELLE = { eigen: 'Eigenes Bild', gemini: 'Gemini-App', chatgpt: 'ChatGPT-
 async function stand(env, s) {
   const jetzt = Date.now();
   const tag = new Date().toISOString().slice(0, 10);
-  const [cfg, design, st, lauf, kiHeute, bgvs, bgms, kbus, thrs, vorlage] = await Promise.all([ladeCfg(s), ladeDesign(s), s.liste('post:'), s.lies('lauf'),
-    s.lies('ki:' + tag), s.liste('bgv:'), s.liste('bgm:'), s.liste('kbu:'), s.liste('thr:'), s.lies('thumbvorlage')]);
+  const [cfg, design, st, lauf, kiHeute, bgvs, bgms, kbus, thrs, vorlage, ytz, ytbh, ttTok, ytFehler] = await Promise.all([ladeCfg(s), ladeDesign(s), s.liste('post:'), s.lies('lauf'),
+    s.lies('ki:' + tag), s.liste('bgv:'), s.liste('bgm:'), s.liste('kbu:'), s.liste('thr:'), s.lies('thumbvorlage'), s.liste('yt:'), s.liste('ytbh:'), s.lies('tt:token'), s.lies('yt:fehler')]);
   const daten = await datenLaden(s, jetzt);
   const plan = bauePlan(daten, cfg, jetzt);
   const k = await kontoLesen(env, s, false);
@@ -366,6 +469,9 @@ async function stand(env, s) {
       bildQuelle: bgv ? (QUELLE[m.quelle] || '') + (m.modell ? ' (' + m.modell + ')' : '') : p.kalenderBild ? 'Bild aus dem Streamkalender' : '',
       rennKey: rk,
       thumb: thrs['thr:' + rk] || null,
+      yt: p.typ === 'story' || p.typ === 'ank' ? (({ id, fehler, zeit, thumbH }) => ({ id: id || '', fehler: fehler || '', zeit: zeit || 0, thumbH: thumbH || '' }))(ytz['yt:' + rk] || {}) : null,
+      ytThumbH: (ytbh['ytbh:' + rk] || {}).h || '',
+      tiktok: z.tiktok ? { zeit: z.tiktok.zeit || 0, fehler: z.tiktok.zeit ? '' : (z.tiktok.fehler || '') } : null,
       autos: autos(p, design.fahrzeuge || ''),
       text: p.typ === 'story' || p.typ === 'woche' ? '' : bildtext(p, cfg, design)
     };
@@ -382,6 +488,7 @@ async function stand(env, s) {
       id, typ: i.typ || TYP_AUS_ID(id), titel: i.titel || '', serie: i.serie || '', nr: i.nr || 0, track: i.track || '', layout: i.layout || '', datum: i.datum || DATUM_AUS_ID(id), bisDatum: i.bisDatum || '',
       wann, imPlan: imPlan.has(id), fehler: z.fehler || '',
       gepostet: z.gepostet ? { zeit: z.gepostet.zeit || 0, manuell: !!z.gepostet.manuell, mediaId: z.gepostet.mediaId || '' } : null,
+      tiktok: z.tiktok ? { zeit: z.tiktok.zeit || 0, fehler: z.tiktok.zeit ? '' : (z.tiktok.fehler || '') } : null,
       bild: z.version ? `${env.ORIGIN}/bild/${id}/${z.version}.jpg` : ''
     };
   }).filter(Boolean).sort((a, b) => b.wann - a.wann);
@@ -390,6 +497,8 @@ async function stand(env, s) {
     cfg, design: { ...design, logoBild: design.logoUrl ? `${env.ORIGIN}/logo.png?v=${kurzHash(design.logoUrl)}` : '' },
     posts, offen: daten.offen || [], thumbVorlage: vorlage || null,
     konto: { verbunden: !!k.verbunden, username: k.username || '', fehler: k.fehler || '' },
+    youtube: { eingerichtet: ytEingerichtet(env), verbunden: !!ytz['yt:token'], kanal: (ytz['yt:kanal'] || {}).name || '', fehler: ytFehler && ytFehler.zeit > Date.now() - 3600000 ? ytFehler.text : '' },
+    tiktok: { eingerichtet: ttEingerichtet(env), verbunden: !!ttTok, name: (ttTok && ttTok.name) || '' },
     lauf: lauf || null, jetzt,
     ki: { genutzt: kiHeute || 0, max: KI_PRO_TAG, frei: Math.max(0, KI_PRO_TAG - (kiHeute || 0)) }
   };
@@ -444,6 +553,38 @@ async function api(req, env, url) {
   if (pfad === '/api/konto' && req.method === 'POST') {
     const k = await kontoLesen(env, s, true);
     return antwort({ verbunden: !!k.verbunden, username: k.username || '', fehler: k.fehler || '' });
+  }
+
+  // YouTube / TikTok verbinden: Anmelde-Link mit Einmal-Schlüssel (state), Rückweg /oauth/<dienst>
+  const vb = pfad.match(/^\/api\/(verbinden|trennen)\/(youtube|tiktok)$/);
+  if (vb && req.method === 'POST') {
+    const [, was, dienst] = vb;
+    if (was === 'trennen') { await s.loesch(dienst === 'youtube' ? ['yt:token', 'yt:kanal'] : ['tt:token']); return antwort({ ok: true }); }
+    if (dienst === 'youtube' ? !ytEingerichtet(env) : !ttEingerichtet(env)) return fehler('Erst die Zugangsdaten in Cloudflare eintragen (siehe Anleitung).');
+    const state = [...crypto.getRandomValues(new Uint8Array(18))].map(b => b.toString(16).padStart(2, '0')).join('');
+    await s.schreib('os:' + state, { dienst, zeit: Date.now() });
+    return antwort({ url: dienst === 'youtube' ? ytAnmeldeLink(env, state) : ttAnmeldeLink(env, state) });
+  }
+  if (pfad === '/api/youtube/streams' && req.method === 'GET') {
+    try { return antwort({ streams: await ytStreams(await ytZugang(env, s)) }); } catch (e) { return fehler(e.message, 502); }
+  }
+  const ytp = pfad.match(/^\/api\/youtube\/([A-Za-z0-9_-]{1,200})\/planen$/);
+  if (ytp && req.method === 'POST') {
+    const [cfg, thrs] = await Promise.all([ladeCfg(s), s.liste('thr:')]);
+    const plan = bauePlan(await datenLaden(s), cfg, Date.now());
+    const r = ytRennenListe(plan, thrs).find(x => x.rennKey === ytp[1]);
+    if (!r) return fehler('Dieses Rennen ist nicht (mehr) in der Planung.', 404);
+    const z = await ytEinRennen(env, s, await ytZugang(env, s), r, cfg, true);
+    return z.fehler ? fehler(z.fehler, 502) : antwort({ ok: true, id: z.id });
+  }
+  // Thumbnail-Datei fürs YouTube-Video (vom Dashboard gezeichnet, PNG oder JPG unter 2 MB)
+  const ytt = pfad.match(/^\/api\/ytthumb\/([A-Za-z0-9_-]{1,200})$/);
+  if (ytt && req.method === 'POST') {
+    const u8 = await bildAusBody(req, 2e6);
+    if (!u8) return fehler('Thumbnail ungültig (PNG/JPG unter 2 MB).');
+    await s.schreib('ytb:' + ytt[1], u8);
+    await s.schreib('ytbh:' + ytt[1], { h: String(url.searchParams.get('h') || '').slice(0, 20), typ: bildTyp(u8) === 'image/png' ? 'png' : 'jpg', startMs: Number(url.searchParams.get('s')) || Date.now(), zeit: Date.now() });
+    return antwort({ ok: true });
   }
 
   // YouTube-Thumbnail: Vorlage für alle Rennen
@@ -501,7 +642,7 @@ async function api(req, env, url) {
     return antwort({ ok: true });
   }
 
-  const m = pfad.match(/^\/api\/post\/([A-Za-z0-9_-]{1,200})\/(fertig|bild|freigeben|ueberspringen|jetzt|manuell|eigenesbild|pruefen)$/);
+  const m = pfad.match(/^\/api\/post\/([A-Za-z0-9_-]{1,200})\/(fertig|bild|freigeben|ueberspringen|jetzt|manuell|eigenesbild|pruefen|tiktok)$/);
   if (m && req.method === 'POST') {
     const [, id, aktion] = m;
     const z = (await s.lies('post:' + id)) || {};
@@ -568,6 +709,10 @@ async function api(req, env, url) {
       const r = await hintergrundKI(env, s, p, design, cfg, wunsch, !!body.neu);
       return antwort({ ok: r.ok, kiFehler: r.kiFehler || '' });
     }
+    if (aktion === 'tiktok') {
+      try { const t = await ttSenden(env, s, p, cfg, design); return t.zeit ? antwort({ ok: true }) : fehler(t.fehler || 'TikTok ging nicht.', 502); }
+      catch (e) { return fehler(e.message, 502); }
+    }
     if (aktion === 'jetzt') {
       if (z.gepostet) return fehler('Dieser Post ist schon auf Instagram.');
       z.versuche = 0; z.fehler = ''; await s.schreib('post:' + id, z);
@@ -578,6 +723,39 @@ async function api(req, env, url) {
     }
   }
   return fehler('Unbekannte Anfrage.', 404);
+}
+
+// Seite nach der Anmeldung (im Anmelde-Fenster)
+function seite(ok, text) {
+  return new Response(`<!doctype html><html lang="de"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Kreids888</title>
+<body style="margin:0;min-height:100vh;display:grid;place-items:center;background:#0a0b0e;color:#f2f4f8;font:18px/1.5 system-ui,sans-serif;text-align:center">
+<div><div style="font-size:54px">${ok ? '✅' : '⚠️'}</div><p>${text}</p><p style="color:#8a91a3;font-size:14px">Dieses Fenster kannst du schließen.</p></div>
+<script>try{window.opener&&window.opener.postMessage({k888verbunden:${ok}},'*')}catch(e){}${ok ? 'setTimeout(function(){window.close()},2500)' : ''}</script></body></html>`,
+    { status: ok ? 200 : 400, headers: { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' } });
+}
+async function anmeldungFertig(env, url, dienst) {
+  const s = speicher(env);
+  const state = String(url.searchParams.get('state') || ''), code = String(url.searchParams.get('code') || '');
+  const o = /^[0-9a-f]{36}$/.test(state) ? await s.lies('os:' + state) : null;
+  if (!o || o.dienst !== dienst || Date.now() - o.zeit > 30 * 60000) return seite(false, 'Anmeldung abgelaufen – bitte im Dashboard nochmal auf „Verbinden“ klicken.');
+  await s.loesch(['os:' + state]);
+  if (!code) return seite(false, 'Anmeldung abgebrochen' + (url.searchParams.get('error') ? ' (' + String(url.searchParams.get('error')).replace(/[<>&"]/g, '') + ')' : '') + '.');
+  try {
+    if (dienst === 'youtube') {
+      const t = await ytCodeTauschen(env, code);
+      if (!t.refresh) return seite(false, 'Google hat keinen Dauer-Zugang geschickt. Bitte unter myaccount.google.com/permissions die App entfernen und nochmal verbinden.');
+      await s.schreib('yt:token', t);
+      const k = await ytKanal(t.access).catch(() => null);
+      await s.schreib('yt:kanal', k || { name: '' });
+      return seite(true, 'YouTube ist verbunden' + (k && k.name ? ' mit <b>' + k.name.replace(/[<>&"]/g, '') + '</b>' : '') + '.');
+    }
+    const t = await ttCodeTauschen(env, code);
+    const k = await ttKonto(t.access).catch(() => ({ name: '' }));
+    await s.schreib('tt:token', { ...t, name: k.name || '' });
+    return seite(true, 'TikTok ist verbunden' + (k.name ? ' mit <b>' + k.name.replace(/[<>&"]/g, '') + '</b>' : '') + '.');
+  } catch (e) {
+    return seite(false, String((e && e.message) || e).replace(/[<>&"]/g, '').slice(0, 200));
+  }
 }
 
 export default {
@@ -608,6 +786,13 @@ export default {
         return (await durchreichen(d.logoUrl)) || new Response('Kein Logo', { status: 404, headers: CORS });
       }
       if (url.pathname.startsWith('/api/')) return await api(req, env, url);
+      // Rückweg nach der Anmeldung bei YouTube/TikTok
+      const oa = url.pathname.match(/^\/oauth\/(youtube|tiktok)$/);
+      if (oa && req.method === 'GET') return await anmeldungFertig(env, url, oa[1]);
+      // Bestätigungsdatei für das TikTok-Entwicklerportal (Link-Anfang dieses Workers)
+      if (env.TIKTOK_PRUEFDATEI && url.pathname === '/' + String(env.TIKTOK_PRUEFDATEI).trim()) {
+        return new Response(String(env.TIKTOK_PRUEFINHALT || ''), { headers: { 'Content-Type': 'text/plain; charset=utf-8' } });
+      }
       if (url.pathname === '/') return new Response('kreids-insta läuft.', { headers: { 'Content-Type': 'text/plain; charset=utf-8' } });
       return new Response('Nicht gefunden', { status: 404 });
     } catch (e) {
