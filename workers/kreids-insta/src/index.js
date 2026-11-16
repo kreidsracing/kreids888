@@ -14,7 +14,7 @@ import { ADMIN, ERG_TAGE, ladeDaten, bauePlan, eigeneRennen, rennKey, inhaltSchl
 import { kiBild, sprueche, STIMMUNGEN, KAMERAS, autos } from './ki.js';
 import { konto, posten, pruefen, tokenVerlaengern, verlaengerbar } from './insta.js';
 import { istUhrzeit } from './zeit.js';
-import { ytEingerichtet, ytAnmeldeLink, ytCodeTauschen, ytZugang, ytKanal, ytStreams, ytPlanen, ytThumbnail, ytTexte } from './youtube.js';
+import { ytEingerichtet, ytAnmeldeLink, ytCodeTauschen, ytZugang, ytKanal, ytStreams, ytPlanen, ytThumbnail, ytTexte, ytLetzteBeschreibung, ytInfos } from './youtube.js';
 import { ttEingerichtet, ttAnmeldeLink, ttCodeTauschen, ttZugang, ttKonto, ttEntwurf, ttVideoEntwurf } from './tiktok.js';
 
 // ─── Speicher (Durable Object, SQLite) ──────────────────────
@@ -37,7 +37,8 @@ const CFG_STANDARD = {
   // Vorlagen-Wechsel pro Art: reihe | zufall | fest (+ fest = Vorlagen-ID), kreids = fertiges Kreids-Design mit im Wechsel
   vorlagen: { ank: { modus: 'reihe', kreids: true, fest: '' }, story: { modus: 'reihe', kreids: true, fest: '' }, erg: { modus: 'reihe', kreids: true, fest: '' }, woche: { modus: 'reihe', kreids: true, fest: '' } },
   // YouTube: geplanter Livestream pro Rennen (X Tage vorher), Thumbnail kommt automatisch aus dem Editor
-  youtube: { aktiv: true, tage: 3, sichtbar: 'public', stream: '',
+  // beschrQuelle: 'letzter' = Beschreibung vom letzten eigenen YouTube-Stream, 'eigen' = Text unten
+  youtube: { aktiv: true, tage: 3, sichtbar: 'public', stream: '', beschrQuelle: 'letzter',
     titel: '🔴 {spruch} | {strecke} – {serie} {runde}',
     beschreibung: 'Live ab {zeit} Uhr: {serie} · {runde} · {strecke}\n{klassen}\n\n🌐 kreids888.com\n#simracing #iracing #kreids888' },
   // TikTok: diese Post-Arten gehen zusätzlich als Entwurf in die TikTok-Inbox
@@ -113,7 +114,8 @@ function cfgPruefen(e) {
     aktiv: yt.aktiv !== false, tage: Math.max(1, Math.min(14, parseInt(yt.tage, 10) || ytStd.tage)), sichtbar: yt.sichtbar === 'unlisted' ? 'unlisted' : 'public',
     stream: /^[A-Za-z0-9_-]{0,80}$/.test(String(yt.stream || '')) ? String(yt.stream || '') : '',
     titel: typeof yt.titel === 'string' && yt.titel.trim() ? yt.titel.slice(0, 200) : ytStd.titel,
-    beschreibung: typeof yt.beschreibung === 'string' ? yt.beschreibung.slice(0, 4000) : ytStd.beschreibung
+    beschreibung: typeof yt.beschreibung === 'string' ? yt.beschreibung.slice(0, 4000) : ytStd.beschreibung,
+    beschrQuelle: yt.beschrQuelle === 'eigen' ? 'eigen' : 'letzter'
   };
   const tk = e.tiktok || {};
   c.tiktok = { typen: Array.isArray(tk.typen) ? ['ank', 'story', 'erg', 'woche'].filter(t => tk.typen.includes(t)) : CFG_STANDARD.tiktok.typen.slice() };
@@ -300,12 +302,40 @@ function ytRennenListe(plan, thrs) {
   }
   return [...m.values()].sort((a, b) => a.startMs - b.startMs);
 }
-async function ytEinRennen(env, s, zugang, r, cfg, erzwingen) {
+// yt:-Schlüssel, die kein Rennen sind
+const YT_META = ['yt:token', 'yt:fehler', 'yt:kanal', 'yt:eigene', 'yt:beschr'];
+const ytHash = (r, cfg, beschr) => kurzHash(JSON.stringify([ytTexte(r, cfg.youtube, beschr), r.liveMs, cfg.youtube.sichtbar]));
+// IDs aller Livestreams, die das Dashboard angelegt hat (die zählen nicht als „eigener“ Stream für die Beschreibung)
+async function ytEigene(s) {
+  const l = new Set((await s.lies('yt:eigene')) || []);
+  for (const [k, z] of Object.entries(await s.liste('yt:'))) if (!YT_META.includes(k) && z && z.id) l.add(z.id);
+  return l;
+}
+async function ytEigeneMerken(s, id) {
+  const l = (await s.lies('yt:eigene')) || [];
+  if (!l.includes(id)) { l.push(id); await s.schreib('yt:eigene', l.slice(-300)); }
+}
+// Beschreibung für die Streams: vom letzten eigenen YouTube-Stream (alle 3 Std. neu geholt). '' = eigener Text.
+async function ytBeschreibung(s, zugang, cfg, frisch) {
+  if (cfg.youtube.beschrQuelle === 'eigen') return '';
+  let b = await s.lies('yt:beschr');
+  if (zugang && (!b || frisch || Date.now() - (b.geholt || 0) > 3 * 3600000)) {
+    try { const x = await ytLetzteBeschreibung(zugang, await ytEigene(s)); b = { ...(x || { text: '' }), geholt: Date.now() }; await s.schreib('yt:beschr', b); }
+    catch (e) { /* alte Beschreibung behalten */ }
+  }
+  return (b && b.text) || '';
+}
+async function ytEinRennen(env, s, zugang, r, cfg, erzwingen, beschr) {
   const z = (await s.lies('yt:' + r.rennKey)) || {};
   if (!erzwingen && z.fehler && Date.now() - (z.zeit || 0) < 3600000) return z;
-  const hash = kurzHash(JSON.stringify([ytTexte(r, cfg.youtube), r.liveMs, cfg.youtube.sichtbar]));
+  const hash = ytHash(r, cfg, beschr);
   try {
-    if (!z.id || z.hash !== hash || erzwingen) { z.id = await ytPlanen(zugang, r, cfg.youtube, z.id); z.hash = hash; }
+    if (!z.id || z.hash !== hash || erzwingen) {
+      const neu = !z.id;
+      z.id = await ytPlanen(zugang, r, cfg.youtube, z.id, beschr); z.hash = hash;
+      z.titel = ytTexte(r, cfg.youtube, beschr).titel;
+      if (neu) await ytEigeneMerken(s, z.id);
+    }
     const th = await s.lies('ytbh:' + r.rennKey);
     if (th && th.h && th.h !== z.thumbH) {
       const bytes = await s.lies('ytb:' + r.rennKey);
@@ -317,7 +347,7 @@ async function ytEinRennen(env, s, zugang, r, cfg, erzwingen) {
     // Livestream wurde in YouTube gelöscht → beim nächsten Mal neu anlegen
     if (/not ?found|liveBroadcastNotFound|videoNotFound/i.test(z.fehler)) { delete z.id; delete z.hash; delete z.thumbH; }
   }
-  z.zeit = Date.now(); z.startMs = r.startMs;
+  z.zeit = Date.now(); z.startMs = r.startMs; z.liveMs = r.liveMs || r.startMs;
   await s.schreib('yt:' + r.rennKey, z);
   return z;
 }
@@ -325,15 +355,15 @@ async function ytAbgleich(env, s, plan, cfg, jetzt) {
   if (!cfg.youtube.aktiv || !ytEingerichtet(env) || !(await s.lies('yt:token'))) return;
   const zugang = await ytZugang(env, s);
   const thrs = await s.liste('thr:');
+  const beschr = await ytBeschreibung(s, zugang, cfg);
   let n = 2;   // höchstens 2 Rennen pro Lauf (Gratis-Tarif)
   for (const r of ytRennenListe(plan, thrs)) {
     if (r.startMs <= jetzt || r.startMs - jetzt > cfg.youtube.tage * 86400000) continue;
     const z = (await s.lies('yt:' + r.rennKey)) || {};
     const th = await s.lies('ytbh:' + r.rennKey);
-    const hash = kurzHash(JSON.stringify([ytTexte(r, cfg.youtube), r.liveMs, cfg.youtube.sichtbar]));
-    if (z.id && z.hash === hash && (!th || th.h === z.thumbH)) continue;
+    if (z.id && z.hash === ytHash(r, cfg, beschr) && (!th || th.h === z.thumbH)) continue;
     if (n-- <= 0) break;
-    await ytEinRennen(env, s, zugang, r, cfg, false);
+    await ytEinRennen(env, s, zugang, r, cfg, false, beschr);
   }
 }
 
@@ -432,7 +462,7 @@ async function zyklus(env) {
   for (const [k, t] of Object.entries(await s.liste('thr:'))) if (alt(t && t.startMs)) weg.push(k);
   for (const [k, t] of Object.entries(await s.liste('kbu:'))) if (alt(t && t.startMs)) weg.push(k);
   for (const [k, t] of Object.entries(await s.liste('ytbh:'))) if (alt(t && t.startMs)) weg.push(k, 'ytb:' + k.slice(5));
-  for (const [k, t] of Object.entries(await s.liste('yt:'))) if (k !== 'yt:token' && k !== 'yt:fehler' && k !== 'yt:kanal' && t && t.startMs && alt(t.startMs)) weg.push(k);
+  for (const [k, t] of Object.entries(await s.liste('yt:'))) if (!YT_META.includes(k) && t && t.startMs && alt(t.startMs)) weg.push(k);
   for (const [k, o] of Object.entries(await s.liste('os:'))) if (!o || o.zeit < jetzt - 30 * 60000) weg.push(k);
   for (const pre of ['th:', 'thb:', 'nz:', 'nb:']) weg.push(...Object.keys(await s.liste(pre)));
   const tagHeute = new Date().toISOString().slice(0, 10);
@@ -664,13 +694,30 @@ async function api(req, env, url) {
   if (pfad === '/api/youtube/streams' && req.method === 'GET') {
     try { return antwort({ streams: await ytStreams(await ytZugang(env, s)) }); } catch (e) { return fehler(e.message, 502); }
   }
+  // Vom Dashboard angelegte Livestreams + die übernommene Beschreibung (für den Reiter „YouTube & TikTok“)
+  if (pfad === '/api/youtube/liste' && req.method === 'GET') {
+    try {
+      const cfg = await ladeCfg(s), zugang = await ytZugang(env, s);
+      await ytBeschreibung(s, zugang, cfg, url.searchParams.get('neu') === '1');
+      const b = cfg.youtube.beschrQuelle === 'eigen' ? null : await s.lies('yt:beschr');
+      const zs = Object.entries(await s.liste('yt:')).filter(([k, z]) => !YT_META.includes(k) && z && z.id).map(([k, z]) => ({ ...z, rk: k.slice(3) }));
+      const infos = await ytInfos(zugang, zs.map(z => z.id));
+      const streams = zs.map(z => {
+        const i = infos[z.id];
+        return { rk: z.rk, id: z.id, titel: (i && i.titel) || z.titel || '', start: (i && i.start) || z.liveMs || z.startMs || 0, status: i ? i.status : 'geloescht',
+          sichtbar: i ? i.sichtbar : '', bild: (i && i.bild) || '', thumb: !!z.thumbH, fehler: z.fehler || '' };
+      }).sort((a, b) => a.start - b.start);
+      return antwort({ beschreibung: b && b.text ? { text: b.text, titel: b.titel || '', zeit: b.zeit || 0 } : null, streams });
+    } catch (e) { return fehler(e.message, 502); }
+  }
   const ytp = pfad.match(/^\/api\/youtube\/([A-Za-z0-9_-]{1,200})\/planen$/);
   if (ytp && req.method === 'POST') {
     const [cfg, thrs] = await Promise.all([ladeCfg(s), s.liste('thr:')]);
     const plan = bauePlan(await datenLaden(s), cfg, Date.now());
     const r = ytRennenListe(plan, thrs).find(x => x.rennKey === ytp[1]);
     if (!r) return fehler('Dieses Rennen ist nicht (mehr) in der Planung.', 404);
-    const z = await ytEinRennen(env, s, await ytZugang(env, s), r, cfg, true);
+    const zugang = await ytZugang(env, s);
+    const z = await ytEinRennen(env, s, zugang, r, cfg, true, await ytBeschreibung(s, zugang, cfg));
     return z.fehler ? fehler(z.fehler, 502) : antwort({ ok: true, id: z.id });
   }
   // ─── Vorlagen ───

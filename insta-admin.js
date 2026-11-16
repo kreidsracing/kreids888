@@ -321,10 +321,52 @@
         <div class="ki-fg" style="flex:1 1 220px"><label for="ki-yt-stream">Stream-Schlüssel (OBS)</label><select id="ki-yt-stream"><option value="">– in YouTube Studio wählen –</option>${(STREAMS || (c.stream ? [{ id: c.stream, name: 'gespeicherter Schlüssel' }] : [])).map(x => `<option value="${esc(x.id)}" ${c.stream === x.id ? 'selected' : ''}>${esc(x.name)}</option>`).join('')}</select></div>
       </div>
       <div class="ki-fg"><label for="ki-yt-titel">Titel</label><input id="ki-yt-titel" type="text" maxlength="200" value="${esc(c.titel || '')}"></div>
-      <div class="ki-fg"><label for="ki-yt-text">Beschreibung</label><textarea id="ki-yt-text" rows="6">${esc(c.beschreibung || '')}</textarea></div>
+      <div class="ki-fg"><label for="ki-yt-bq">Beschreibung</label><select id="ki-yt-bq"><option value="letzter" ${c.beschrQuelle !== 'eigen' ? 'selected' : ''}>Automatisch vom letzten eigenen YouTube-Stream</option><option value="eigen" ${c.beschrQuelle === 'eigen' ? 'selected' : ''}>Eigener Text</option></select></div>
+      <div class="ki-ytbeschr">${ytBeschrHtml()}</div>
+      <div class="ki-fg ki-yt-eigen"><textarea id="ki-yt-text" rows="6">${esc(c.beschreibung || '')}</textarea></div>
       <div class="ki-dim">Platzhalter: {spruch} {strecke} {serie} {runde} {titel} {datum} {wochentag} {zeit} {klassen}. Der Spruch kommt vom Thumbnail. Titel höchstens 100 Zeichen.</div>
       <div class="ki-knoepfe"><button class="btn btn-red ki-k" data-aktion="kanal-speichern"><span>💾 Speichern</span></button></div>
+      ${y.verbunden ? `<h3>📺 Angelegte Livestreams</h3><div class="ki-ytliste">${ytListeHtml()}</div>` : ''}
     </div>`;
+  }
+  // Übernommene Beschreibung + vom Dashboard angelegte Livestreams (kommt von YouTube, wird nachgeladen)
+  let YTLISTE = null;
+  function ytBeschrHtml() {
+    const eigen = ((document.getElementById('ki-yt-bq') || {}).value || (STAND.cfg.youtube || {}).beschrQuelle) === 'eigen';
+    const box = document.querySelector('#instaApp .ki-yt-eigen');
+    const b = YTLISTE && YTLISTE.beschreibung;
+    if (box) box.style.display = eigen || (YTLISTE && !b) ? '' : 'none';
+    if (eigen) return '';
+    if (!(STAND.youtube || {}).verbunden) return '<div class="ki-dim">Erst mit YouTube verbinden.</div>';
+    if (!YTLISTE) return '<div class="ki-dim">Wird von YouTube geholt …</div>';
+    if (!b) return '<div class="ki-hinweis gelb">Kein eigener Stream mit Beschreibung gefunden – solange gilt dieser Text:</div>';
+    return `<div class="ki-dim">Von: <b>${esc(b.titel || 'letzter Stream')}</b>${b.zeit ? ' · ' + esc(zeit(b.zeit)) : ''} · <a href="#" class="ki-link" data-aktion="yt-neu">🔄 neu holen</a></div>
+      <pre class="ki-ytvorschau">${esc(b.text)}</pre>`;
+  }
+  function ytListeHtml() {
+    if (!YTLISTE) return '<div class="ki-dim">Wird geladen …</div>';
+    const l = YTLISTE.streams || [];
+    if (!l.length) return `<div class="ki-dim">Noch keine – sie werden ${esc((STAND.cfg.youtube || {}).tage || 3)} Tage vor dem Rennen angelegt.</div>`;
+    const st = { created: ['geplant', 'blau'], ready: ['geplant', 'blau'], testStarting: ['Test', 'gelb'], testing: ['Test', 'gelb'], liveStarting: ['startet', 'gelb'], live: ['live', 'rot'], complete: ['beendet', 'grau'], revoked: ['abgebrochen', 'grau'], geloescht: ['in YouTube gelöscht', 'grau'] };
+    return l.map(x => {
+      const [t, f] = st[x.status] || [x.status || '?', 'grau'];
+      const weg = x.status === 'geloescht';
+      return `<div class="ki-ytstream${x.status === 'complete' || weg ? ' alt' : ''}">
+        ${x.bild ? `<img src="${esc(x.bild)}" alt="" loading="lazy">` : '<div class="ki-ytleer">▶</div>'}
+        <div class="ki-ytinfo"><b>${esc(x.titel || 'Livestream')}</b>
+          <div class="ki-dim">${x.start ? esc(zeit(x.start)) : ''} <span class="ki-chip ${f}">${esc(t)}</span>${x.sichtbar === 'unlisted' ? ' <span class="ki-chip grau">nicht gelistet</span>' : ''}${x.thumb ? '' : ' <span class="ki-chip gelb">ohne Thumbnail</span>'}</div>
+          ${x.fehler ? `<div class="ki-hinweis rot">⚠ ${esc(x.fehler)}</div>` : ''}
+          ${weg ? '' : `<div class="ki-dim"><a class="ki-link" href="https://studio.youtube.com/video/${esc(x.id)}/livestreaming" target="_blank" rel="noopener">YouTube Studio</a> · <a class="ki-link" href="https://www.youtube.com/watch?v=${esc(x.id)}" target="_blank" rel="noopener">ansehen</a></div>`}
+        </div></div>`;
+    }).join('');
+  }
+  async function ytListeLaden(neu) {
+    if (!(STAND.youtube || {}).verbunden || (YTLISTE && !neu)) return;
+    try { YTLISTE = await igApi('GET', '/api/youtube/liste' + (neu ? '?neu=1' : '')); }
+    catch (e) { YTLISTE = { beschreibung: null, streams: [] }; meldung('YouTube: ' + e.message, 1); }
+    const b = BOX && BOX.querySelector('.ki-ytbeschr'), l = BOX && BOX.querySelector('.ki-ytliste');
+    if (b) b.innerHTML = ytBeschrHtml();
+    if (l) l.innerHTML = ytListeHtml();
   }
   function tiktokPanel() {
     const t = STAND.tiktok || {}, typen = ((STAND.cfg.tiktok || {}).typen) || [];
@@ -348,7 +390,7 @@
     const v = id => document.getElementById(id);
     return {
       ...STAND.cfg,
-      youtube: { aktiv: v('ki-yt-an').checked, tage: parseInt(v('ki-yt-tage').value, 10) || 3, sichtbar: v('ki-yt-sicht').value, stream: v('ki-yt-stream').value, titel: v('ki-yt-titel').value, beschreibung: v('ki-yt-text').value },
+      youtube: { aktiv: v('ki-yt-an').checked, tage: parseInt(v('ki-yt-tage').value, 10) || 3, sichtbar: v('ki-yt-sicht').value, stream: v('ki-yt-stream').value, titel: v('ki-yt-titel').value, beschreibung: v('ki-yt-text').value, beschrQuelle: v('ki-yt-bq').value },
       tiktok: { typen: [...BOX.querySelectorAll('[data-tt]')].filter(x => x.checked).map(x => x.dataset.tt) }
     };
   }
@@ -547,7 +589,7 @@
       ${REITER === 'kanaele' ? `<div class="ki-grid">${youtubePanel()}${tiktokPanel()}</div>` : ''}
       ${REITER === 'vorlagen' ? '<div class="ki-vorlagenbox"></div>' : ''}
       ${REITER === 'zuteilung' ? '<div class="ki-zuteilungbox"></div>' : ''}`;
-    if (REITER === 'kanaele') streamsLaden();
+    if (REITER === 'kanaele') { streamsLaden(); ytListeLaden(); const b = BOX.querySelector('.ki-ytbeschr'); if (b) b.innerHTML = ytBeschrHtml(); }
     if (REITER === 'vorlagen' && window.K888Vorlagen) window.K888Vorlagen.editor(BOX.querySelector('.ki-vorlagenbox'), VORLAGEN_UMG);
     if (REITER === 'zuteilung' && window.K888Vorlagen) window.K888Vorlagen.zuteilung(BOX.querySelector('.ki-zuteilungbox'), VORLAGEN_UMG);
     if (REITER === 'design') designVorschau();
@@ -777,12 +819,13 @@
     });
     if (a === 'trennen') return ausfuehren(b, async () => {
       if (!confirm('Verbindung wirklich trennen?')) return;
-      await igApi('POST', '/api/trennen/' + b.dataset.wert, {}); STREAMS = null; await laden(true);
+      await igApi('POST', '/api/trennen/' + b.dataset.wert, {}); STREAMS = null; YTLISTE = null; await laden(true);
     });
     if (a === 'kanal-speichern') return ausfuehren(b, async () => {
       await igApi('POST', '/api/einstellungen', { cfg: kanaeleAusFormular() });
-      meldung('Gespeichert.'); await laden();
+      meldung('Gespeichert. Schon angelegte Livestreams werden beim nächsten Lauf angepasst.'); YTLISTE = null; await laden();
     });
+    if (a === 'yt-neu') { ev.preventDefault(); YTLISTE = null; const x = BOX.querySelector('.ki-ytbeschr'); if (x) x.innerHTML = ytBeschrHtml(); return ytListeLaden(true); }
     if (a === 'yt-planen') return ausfuehren(b, async () => {
       const r = rennenListe().find(x => x.rennKey === b.dataset.rk);
       if (r && window.K888Thumb) {   // aktuelles Thumbnail gleich mitgeben
@@ -878,6 +921,7 @@
 
   async function aenderung(ev) {
     const t = ev.target;
+    if (t.id === 'ki-yt-bq') { const x = BOX.querySelector('.ki-ytbeschr'); if (x) x.innerHTML = ytBeschrHtml(); return; }
     if (t.dataset.rvideo !== undefined) {
       try { await igApi('POST', `/api/thumb/${encodeURIComponent(t.dataset.rvideo)}`, { video: t.value, startMs: Number(t.dataset.start) || Date.now() }); meldung(t.value ? 'Video gesetzt – die Posts dieses Rennens werden als Video gezeichnet.' : 'Video entfernt.'); await laden(); }
       catch (e) { meldung(e.message, 1); }
@@ -944,6 +988,10 @@
 #instaApp .ki-chip{font-family:var(--disp);font-weight:700;font-size:11px;letter-spacing:.08em;text-transform:uppercase;padding:3px 8px;border:1px solid}
 #instaApp .ki-chip.gelb{color:#f5c518;border-color:rgba(245,197,24,.4)}#instaApp .ki-chip.blau{color:#7cb8f5;border-color:rgba(55,138,221,.45)}
 #instaApp .ki-chip.rot{color:#ff6b75;border-color:rgba(225,19,36,.5)}#instaApp .ki-chip.gruen{color:#3fbf5f;border-color:rgba(63,191,95,.45)}#instaApp .ki-chip.grau{color:var(--steel);border-color:var(--line)}
+#instaApp .ki-ytvorschau{white-space:pre-wrap;font:13px/1.45 var(--body,inherit);color:#d6d8de;background:#0b0c10;border:1px solid var(--line);padding:8px 10px;margin:0;max-height:180px;overflow:auto}
+#instaApp .ki-ytstream{display:flex;gap:12px;align-items:flex-start;padding:8px 0;border-top:1px solid var(--line)}#instaApp .ki-ytstream.alt{opacity:.55}
+#instaApp .ki-ytstream img,#instaApp .ki-ytleer{width:128px;aspect-ratio:16/9;object-fit:cover;flex:none;background:#000;display:grid;place-items:center;color:var(--steel)}
+#instaApp .ki-ytinfo{display:flex;flex-direction:column;gap:4px;min-width:0}
 #instaApp .ki-hinweis{font-size:13px;color:var(--steel);background:#0b0c10;border:1px solid var(--line);padding:6px 10px}
 #instaApp .ki-hinweis.rot{color:#ff6b75;border-color:rgba(225,19,36,.45)}#instaApp .ki-hinweis.gelb{color:#f5c518;border-color:rgba(245,197,24,.45)}
 #instaApp .ki-hilfe{background:#0d0e13;border:1px solid var(--line);padding:8px 12px;margin-bottom:12px;font-size:14px}

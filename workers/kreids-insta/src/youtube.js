@@ -91,16 +91,50 @@ function fuellen(vorlage, r) {
   }).filter(z => z !== null).join('\n')
     .replace(/(\s*[·|–-]\s*){2,}/g, ' · ').replace(/^[\s·|–-]+|[\s·|–-]+$/gm, '').replace(/\n{3,}/g, '\n\n').trim();
 }
-// Titel (max. 100 Zeichen, ohne < >) und Beschreibung (max. 5000)
-export function ytTexte(r, cfg) {
+// Titel (max. 100 Zeichen, ohne < >) und Beschreibung (max. 5000).
+// beschr = Beschreibung vom letzten eigenen YouTube-Stream (unverändert übernommen), sonst der eigene Text mit Platzhaltern
+export function ytTexte(r, cfg, beschr) {
   const titel = fuellen(cfg.titel, r).replace(/[<>]/g, '').replace(/\s+/g, ' ').slice(0, 100) || (r.titel || 'Livestream');
-  const beschreibung = fuellen(cfg.beschreibung, r).replace(/[<>]/g, '').slice(0, 5000);
+  const beschreibung = (beschr ? String(beschr) : fuellen(cfg.beschreibung, r)).replace(/[<>]/g, '').slice(0, 5000);
   return { titel, beschreibung };
 }
 
+// Alle eigenen Livestreams (auch „Jetzt streamen“), höchstens 4 Seiten à 50
+async function alleBroadcasts(zugang) {
+  const l = [];
+  let seite = '';
+  for (let i = 0; i < 4; i++) {
+    const d = await yt(zugang, '/liveBroadcasts?part=id,snippet,status&mine=true&broadcastType=all&maxResults=50' + (seite ? '&pageToken=' + encodeURIComponent(seite) : ''));
+    l.push(...(d.items || []));
+    if (!(seite = d.nextPageToken)) break;
+  }
+  return l;
+}
+// Beschreibung vom zuletzt gestreamten Livestream, der NICHT vom Dashboard angelegt wurde
+export async function ytLetzteBeschreibung(zugang, eigene) {
+  const wann = x => Date.parse(x.snippet.actualStartTime || x.snippet.publishedAt || x.snippet.scheduledStartTime || '') || 0;
+  const l = (await alleBroadcasts(zugang))
+    .filter(x => x.snippet && !eigene.has(x.id) && String(x.snippet.description || '').trim())
+    .sort((a, b) => wann(b) - wann(a));
+  const x = l[0];
+  return x ? { text: x.snippet.description, quelle: x.id, titel: x.snippet.title || '', zeit: wann(x) } : null;
+}
+// Aktueller Stand der vom Dashboard angelegten Livestreams (Titel, Bild, Status)
+export async function ytInfos(zugang, ids) {
+  const m = {};
+  for (let i = 0; i < ids.length && i < 100; i += 50) {
+    const d = await yt(zugang, '/liveBroadcasts?part=id,snippet,status&maxResults=50&id=' + ids.slice(i, i + 50).map(encodeURIComponent).join(','));
+    for (const x of d.items || []) {
+      const sn = x.snippet || {}, t = sn.thumbnails || {}, st = x.status || {};
+      m[x.id] = { titel: sn.title || '', start: Date.parse(sn.scheduledStartTime || '') || 0, status: st.lifeCycleStatus || '', sichtbar: st.privacyStatus || '', bild: (t.medium || t.high || t.default || {}).url || '' };
+    }
+  }
+  return m;
+}
+
 // Livestream anlegen bzw. ändern. Gibt die Broadcast-ID zurück.
-export async function ytPlanen(zugang, r, cfg, alteId) {
-  const { titel, beschreibung } = ytTexte(r, cfg);
+export async function ytPlanen(zugang, r, cfg, alteId, beschr) {
+  const { titel, beschreibung } = ytTexte(r, cfg, beschr);
   const start = new Date(r.liveMs || r.startMs).toISOString();
   const snippet = { title: titel, description: beschreibung, scheduledStartTime: start };
   const status = { privacyStatus: cfg.sichtbar === 'unlisted' ? 'unlisted' : 'public', selfDeclaredMadeForKids: false };
