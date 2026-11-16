@@ -501,7 +501,7 @@
     if (!BOX) return;
     if (!STAND) {
       BOX.innerHTML = `<h2>📸 Instagram</h2>` + (FEHLER
-        ? `<p class="msg err">⚠ ${esc(FEHLER)}</p><p class="hint">Läuft der Worker <b>kreids-insta</b> schon? <button class="btn btn-ghost ki-k" data-aktion="laden"><span>Nochmal laden</span></button></p>`
+        ? `<p class="msg err">⚠ ${esc(FEHLER)}</p><p class="hint">${/einloggen/.test(FEHLER) ? '<button class="btn btn-red ki-k" data-aktion="neulogin"><span>🔑 Neu einloggen</span></button> ' : ''}<button class="btn btn-ghost ki-k" data-aktion="laden"><span>Nochmal laden</span></button></p>`
         : '<p class="hint">Lade Instagram-Planung …</p>');
       return;
     }
@@ -759,6 +759,7 @@
     const b = ev.target.closest('[data-aktion]'); if (!b || !BOX.contains(b)) return;
     const a = b.dataset.aktion, id = b.dataset.id;
     if (a === 'laden') return laden();
+    if (a === 'neulogin') { try { localStorage.removeItem('k888_token'); } catch (e) { /* egal */ } location.reload(); return; }
     if (a === 'reiter') {
       REITER = b.dataset.wert; if (!DAENDERUNG) { DTEAM = null; DLAYOUT = null; }
       if (REITER === 'posts' && SPRUCH_NEU) { SPRUCH_NEU = false; return laden(); }

@@ -459,13 +459,15 @@ async function istAdmin(req) {
   if (!t) return false;
   const c = PRUEFUNG.get(t);
   if (c && c.bis > Date.now()) return c.ok;
-  let ok = false;
+  // ok: true = eingeloggt, false = Login abgelaufen, null = Dashboard hat nicht geantwortet (nicht merken)
+  let ok = null;
   try {
     const r = await fetch(ADMIN + '/api/check', { headers: { Authorization: 'Bearer ' + t } });
-    if (r.ok) { const d = await r.json().catch(() => ({})); ok = d.ok === true; }
-  } catch (e) { ok = false; }
+    if (r.ok) { const d = await r.json().catch(() => null); if (d && typeof d.ok === 'boolean') ok = d.ok; }
+    else if (r.status === 401 || r.status === 403) ok = false;
+  } catch (e) { ok = null; }
   if (PRUEFUNG.size > 200) PRUEFUNG.clear();
-  PRUEFUNG.set(t, { ok, bis: Date.now() + 5 * 60000 });
+  if (ok !== null) PRUEFUNG.set(t, { ok, bis: Date.now() + (ok ? 5 * 60000 : 10000) });
   return ok;
 }
 
@@ -608,7 +610,9 @@ async function bildAusBody(req, max) {
 }
 
 async function api(req, env, url) {
-  if (!(await istAdmin(req))) return fehler('Bitte im Kreids-Dashboard neu einloggen.', 403);
+  const admin = await istAdmin(req);
+  if (admin === null) return fehler('Das Kreids-Dashboard antwortet gerade nicht – in einer Minute „Nochmal laden“.', 503);
+  if (!admin) return fehler('Bitte im Kreids-Dashboard neu einloggen.', 403);
   const s = speicher(env);
   const pfad = url.pathname;
   const json = () => req.json().catch(() => ({}));
