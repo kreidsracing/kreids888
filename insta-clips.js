@@ -43,16 +43,37 @@
       hooks: ['DAS GING SCHIEF', 'AUTSCH.', 'TOTALSCHADEN', 'DAS TUT WEH'], unten: 'WAS HÄTTEST DU GEMACHT?',
       text: 'Das ging schief 💥 Was hättest du gemacht? 👇\n\n#simracing #iracing #crash #simracer #kreids888',
       hilfe: 'Für Abflüge und Crashs. Mit Wackeln und CRASH-Stempel in der Zeitlupe.' },
-    { id: 'hotlap', name: 'Hotlap-Challenge', emoji: '⏱️', farbe: '#b44dff', tag: 'HOTLAP', zl: false, wieder: 'NOCHMAL!', felder: true,
+    { id: 'hotlap', name: 'Hotlap-Challenge', emoji: '⏱️', farbe: '#b44dff', tag: 'HOTLAP', zl: false, wieder: 'NOCHMAL!',
+      felder: [['rundenzeit', 'Rundenzeit', '1:52.414'], ['strecke', 'Strecke', 'Spa'], ['auto', 'Auto', 'Porsche 992 Cup']], pflicht: 'rundenzeit',
+      zeigen: 'rundenzeit', zeigenLabel: 'RUNDENZEIT', info: c => [c.strecke, c.auto].filter(Boolean).join(' · '), feldTipp: 'Die Zeit kommt am Ende groß ins Bild.',
       hooks: ['SCHAFFST DU DAS?', 'SCHLAG MEINE ZEIT', 'BIST DU SCHNELLER?'], unten: 'SCHREIB DEINE ZEIT!',
       text: c => `Hotlap${c.strecke ? ' ' + c.strecke : ''}${c.rundenzeit ? ' ⏱ ' + c.rundenzeit : ''} – schaffst du das? Schreib deine Zeit in die Kommentare 👇\n\n#simracing #iracing #hotlap #simracer #kreids888`,
       hilfe: 'Eine schnelle Runde. Trag die Rundenzeit ein, sie kommt am Ende groß ins Bild. Die Leute posten ihre Zeiten.' },
     { id: 'highlight', name: 'Highlight', emoji: '🔥', farbe: '#ff1f3d', tag: 'HIGHLIGHT', zl: false, wieder: 'NOCHMAL!',
       hooks: ['WAS FÜR EIN MOMENT', 'DAS MUSST DU SEHEN', 'PURES SIMRACING', 'GÄNSEHAUT'], unten: 'FOLG FÜR MEHR SIMRACING',
       text: 'Was für ein Moment 🔥 Folg für mehr Simracing!\n\n#simracing #iracing #simracer #racing #kreids888',
-      hilfe: 'Für alles andere: schöne Szenen, Starts, Zieleinläufe.' }
+      hilfe: 'Für alles andere: schöne Szenen, Starts, Zieleinläufe.' },
+    { id: 'start', name: 'Start-Chaos', emoji: '🚦', farbe: '#ffd400', tag: 'START', zl: true, wieder: 'NOCHMAL IN ZEITLUPE',
+      hooks: ['WER KOMMT DURCH?', 'START-CHAOS', 'KURVE 1. WIE IMMER.', 'ALLE AUF EINMAL'], unten: 'WO WÄRST DU HINGEFAHREN?',
+      text: 'Start-Chaos 🚦 Wer kommt hier heil durch? Wo wärst du hingefahren? 👇\n\n#simracing #iracing #racestart #simracer #kreids888',
+      hilfe: 'Für Rennstarts und die erste Kurve – da passiert immer was.' },
+    { id: 'finish', name: 'Knappes Finish', emoji: '🏁', farbe: '#00ffa3', tag: 'ZIEL', zl: true, wieder: 'FOTOFINISH',
+      hooks: ['KNAPPER GEHT’S NICHT', 'FOTOFINISH', 'WER WAR VORNE?', 'ZEHNTEL ENTSCHEIDEN'], unten: 'WIE KNAPP WAR’S BEI DIR?',
+      felder: [['abstand', 'Abstand im Ziel', '0,042 s']], zeigen: 'abstand', zeigenLabel: 'ABSTAND IM ZIEL', info: () => 'ABSTAND IM ZIEL',
+      feldTipp: 'Der Abstand kommt am Ende groß ins Bild. Leer lassen geht auch.',
+      text: c => `Knapper geht’s nicht 🏁${c.abstand ? ' ' + c.abstand + ' Abstand im Ziel!' : ''} Wie knapp war’s bei dir schon mal? 👇\n\n#simracing #iracing #photofinish #simracer #kreids888`,
+      hilfe: 'Für Zieleinläufe, bei denen es um Zehntel geht.' },
+    { id: 'fail', name: 'Fail des Tages', emoji: '🤡', farbe: '#ff4fd8', tag: 'FAIL', zl: true, wieder: 'NOCHMAL. LANGSAM.', stempel: 'FAIL',
+      hooks: ['FAIL DES TAGES', 'DAS WAR NIX', 'PROFI AM WERK', 'UND TSCHÜSS'], unten: 'SCHON MAL PASSIERT? EHRLICH!',
+      text: 'Fail des Tages 🤡 Ist dir das auch schon passiert? Sei ehrlich 👇\n\n#simracing #iracing #fail #simracer #kreids888',
+      hilfe: 'Dreher, Verbremser, Patzer – Fails gehen immer. Mit FAIL-Stempel in der Zeitlupe.' },
+    { id: 'duell', name: 'Duell', emoji: '⚔️', farbe: '#3d7bff', tag: 'DUELL', zl: true, wieder: 'GANZ GENAU HINSEHEN',
+      hooks: ['WER GEWINNT?', 'RAD AN RAD', 'DUELL!', 'KEINER GIBT NACH'], unten: 'WER GEWINNT? TIPP AB!',
+      text: 'Rad an Rad ⚔️ Wer gewinnt das Duell? Tipp ab in den Kommentaren 👇\n\n#simracing #iracing #battle #simracer #kreids888',
+      hilfe: 'Für Zweikämpfe Rad an Rad. Die Leute tippen, wer gewinnt.' }
   ];
-  const FARBEN = ['#ff2d6f', '#5cff1f', '#18e8ff', '#ff7a00', '#b44dff', '#ff1f3d', '#ffd400'];
+  const LOOKS = [['neon', '✨ Neon'], ['tv', '📺 TV-Sendung']];
+  const FARBEN = ['#ff2d6f', '#5cff1f', '#18e8ff', '#ff7a00', '#b44dff', '#ff1f3d', '#ffd400', '#00ffa3', '#ff4fd8', '#3d7bff'];
   const vorlage = c => VORLAGEN.find(v => v.id === c.vorlage) || VORLAGEN[0];
   const vorlageText = (v, c) => (typeof v.text === 'function' ? v.text(c || {}) : v.text);
   const kw = () => { const d = new Date(); const t = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate())); const tag = t.getUTCDay() || 7; t.setUTCDate(t.getUTCDate() + 4 - tag); const j = new Date(Date.UTC(t.getUTCFullYear(), 0, 1)); return Math.ceil(((t - j) / 86400000 + 1) / 7); };
@@ -167,11 +188,14 @@
 
   // ─── Ein Bild zeichnen (Vorschau und Video benutzen dieselbe Funktion) ───
   let KLEIN = null;
-  function weichesBild(g, vid, farbe) {   // Clip unscharf als Hintergrund (klein zeichnen, groß ziehen)
+  function unscharf(g, vid) {   // Clip unscharf über das ganze Bild (klein zeichnen, groß ziehen)
     if (!KLEIN) KLEIN = leinwand(96, 54);
     const k = KLEIN.getContext('2d'); k.drawImage(vid, 0, 0, 96, 54);
     const hh = H + 400, ww = hh * 96 / 54;
     g.save(); g.imageSmoothingEnabled = true; g.imageSmoothingQuality = 'high'; g.drawImage(KLEIN, (B - ww) / 2, -200, ww, hh); g.restore();
+  }
+  function weichesBild(g, vid, farbe) {   // Clip unscharf als Hintergrund
+    unscharf(g, vid);
     g.fillStyle = 'rgba(0,0,0,.55)'; g.fillRect(0, 0, B, H);
     g.save(); g.globalAlpha = 0.8; g.drawImage(grund(farbe), 0, 0); g.restore();
   }
@@ -202,6 +226,22 @@
     g.restore();
   }
 
+  // Großer Wert am Ende (Rundenzeit, Abstand): am Ende der Zeitlupe, ohne Zeitlupe am Ende des Clips
+  function ergebnis(v, c, p, t) {
+    if (!v.zeigen) return null;
+    const wert = String(c[v.zeigen] || '').trim(); if (!wert) return null;
+    const a = (p.R ? p.D + p.R : p.D) - 2.4;
+    if (t < a) return null;
+    return { q: fp(t, a, a + 0.3), wert, label: v.zeigenLabel || '', info: GROSS(v.info ? v.info(c) : '') };
+  }
+  // Stempel (CRASH, FAIL) in der Zeitlupe
+  function stempel(g, t, p, v, f, x, y) {
+    const s2 = fp(t, p.D + 0.05, p.D + 0.3);
+    if (!v.stempel || s2 <= 0) return;
+    g.save(); g.translate(x, y); g.rotate(-0.18); const k = 1 + (1 - eo(s2)) * 1.6; g.scale(k, k); g.globalAlpha = 0.92 * Math.min(1, s2 * 1.6);
+    RU(g, 150); const w = g.measureText(v.stempel).width + 80; g.strokeStyle = f; g.lineWidth = 12; g.shadowColor = f; g.shadowBlur = 30; rr(g, -w / 2, -125, w, 175, 18); g.stroke();
+    g.fillStyle = f; g.textAlign = 'center'; g.fillText(v.stempel, 0, 12); g.restore();
+  }
   // Lichtreflex, der über die Chrom-Schrift wischt (q: 0…1)
   let GLANZ = null;
   function glanz(g, ch, x, y, q, staerke) {
@@ -219,6 +259,7 @@
   const flackern = t => (t < 0.1 ? 0 : t < 0.18 ? 1 : t < 0.24 ? 0.2 : t < 0.36 ? 1 : t < 0.4 ? 0.35 : 1);
 
   function zeichne(g, t, c, p, m, vid) {
+    if (c.look === 'tv') return zeichneTV(g, t, c, p, m, vid);
     const v = vorlage(c), f = c.farbe || v.farbe, zoom = c.modus === 'zoom';
     const outro = t >= p.T - OUTRO, rz = !outro && t >= p.D && t < p.D + p.R, imClip = !outro;
     const [sx, sy] = rz && v.stempel ? schuetteln(t - p.D) : [0, 0];
@@ -281,19 +322,14 @@
       if (rz) {
         const q = fp(t, p.D, p.D + 0.25), aus = fp(t, p.D + 1.6, p.D + 1.9);
         if (q > 0 && aus < 1) { const bd = band(v.wieder, f, 44); g.save(); g.globalAlpha = 1 - aus; g.translate(-(1 - eo(q)) * B, 0); g.drawImage(bd.c, B / 2 - bd.bandW / 2 - 40, (zoom ? 700 : fy + 40) - 60); g.restore(); }
-        if (v.stempel) {
-          const s2 = fp(t, p.D + 0.05, p.D + 0.3);
-          if (s2 > 0) { g.save(); g.translate(B / 2, (zoom ? 980 : fy + fh / 2 + 20)); g.rotate(-0.18); const k = 1 + (1 - eo(s2)) * 1.6; g.scale(k, k); g.globalAlpha = 0.92 * Math.min(1, s2 * 1.6);
-            RU(g, 150); const w = g.measureText(v.stempel).width + 80; g.strokeStyle = f; g.lineWidth = 12; g.shadowColor = f; g.shadowBlur = 30; rr(g, -w / 2, -125, w, 175, 18); g.stroke();
-            g.fillStyle = f; g.textAlign = 'center'; g.fillText(v.stempel, 0, 12); g.restore(); }
-        }
+        stempel(g, t, p, v, f, B / 2, zoom ? 980 : fy + fh / 2 + 20);
       }
-      // Hotlap: Rundenzeit groß am Ende des Hauptteils
-      if (v.felder && c.rundenzeit && t >= p.D - 2.2) {
-        const q = fp(t, p.D - 2.2, p.D - 1.9), ch = chrom(String(c.rundenzeit).trim(), 150, f, 900);
-        g.save(); g.translate(B / 2, zoom ? 1120 : fy + fh - 40); const k = 0.7 + 0.3 * eob(q); g.scale(k, k); g.globalAlpha = Math.min(1, q * 2); g.drawImage(ch.c, -ch.mitte, -ch.base); g.restore();
-        const info = GROSS([c.strecke, c.auto].filter(Boolean).join(' · '));
-        if (info) { g.save(); g.globalAlpha = q; SA(g, passt(g, info, 900, 52, SA)); g.textAlign = 'center'; g.fillStyle = '#fff'; g.shadowColor = '#000'; g.shadowBlur = 12; g.fillText(info, B / 2, (zoom ? 1120 : fy + fh - 40) + 70); g.restore(); }
+      // Rundenzeit / Abstand groß am Ende
+      const erg = ergebnis(v, c, p, t);
+      if (erg) {
+        const ch = chrom(erg.wert, 150, f, 900), yy = zoom ? 1120 : fy + fh - 40;
+        g.save(); g.translate(B / 2, yy); const k = 0.7 + 0.3 * eob(erg.q); g.scale(k, k); g.globalAlpha = Math.min(1, erg.q * 2); g.drawImage(ch.c, -ch.mitte, -ch.base); g.restore();
+        if (erg.info) { g.save(); g.globalAlpha = erg.q; SA(g, passt(g, erg.info, 900, 52, SA)); g.textAlign = 'center'; g.fillStyle = '#fff'; g.shadowColor = '#000'; g.shadowBlur = 12; g.fillText(erg.info, B / 2, yy + 70); g.restore(); }
       }
       // Frage unten als Neon-Band, Pfeile zu den Kommentaren
       const ub = fp(t, 0.9, 1.25);
@@ -336,6 +372,166 @@
     if (q3 > 0) { g.save(); g.globalAlpha = q3; const hp = passt(g, m.handle, 960, 84, RU, 40); neonText(g, m.handle, B / 2, 1225, hp, f, RU, 'center'); SA(g, 44, 700); g.textAlign = 'center'; g.fillStyle = 'rgba(255,255,255,.85)'; g.fillText('SIMRACING-CLIPS · IRACING', B / 2, 1300); g.restore(); }
   }
 
+  // ═══ Look „📺 TV-Sendung“: Senderlogo, LIVE/REPLAY, Schlagzeile, Bildschirm, Bauchbinde, Laufschrift ═══
+  const SAx = w => (g, px) => SA(g, px, w);
+  function studio(farbe) {   // Studio-Hintergrund: dunkel, Lichtkegel, feines Zeilenraster
+    return merk('studio' + farbe, () => {
+      const c = leinwand(B, H), g = c.getContext('2d');
+      const lg = g.createLinearGradient(0, 0, 0, H); lg.addColorStop(0, '#070a12'); lg.addColorStop(0.5, '#0b1020'); lg.addColorStop(1, '#04060a');
+      g.fillStyle = lg; g.fillRect(0, 0, B, H);
+      licht(g, B / 2, 360, 950, farbe, 0.17); licht(g, B / 2, H - 260, 850, farbe, 0.13);
+      g.save(); g.globalCompositeOperation = 'lighter';
+      for (let i = 0; i < 6; i++) {
+        const x = 60 + i * 190, gr = g.createLinearGradient(x, 0, x + 200, H * 0.62); gr.addColorStop(0, hexA(farbe, 0.11)); gr.addColorStop(1, hexA(farbe, 0));
+        g.fillStyle = gr; g.beginPath(); g.moveTo(x - 26, 0); g.lineTo(x + 26, 0); g.lineTo(x + 250, H * 0.62); g.lineTo(x + 50, H * 0.62); g.closePath(); g.fill();
+      }
+      g.restore();
+      g.fillStyle = 'rgba(255,255,255,.022)'; for (let y = 0; y < H; y += 4) g.fillRect(0, y, B, 1);
+      return c;
+    });
+  }
+  function tvKopf(g, t, m, f, replay) {   // Senderlogo links, LIVE / REPLAY rechts, Neon-Linie
+    const y = 146;
+    logoRing(g, 88, y + 38, 36, f, m.logo, t);
+    g.save(); SA(g, passt(g, m.name, 420, 50, SAx(900), 28), 900); g.fillStyle = '#fff'; g.fillText(m.name, 142, y + 56); const w = g.measureText(m.name).width; g.restore();
+    pille(g, 'TV', 142 + w + 14, y + 13, f, 30, true);
+    const txt = replay ? 'REPLAY' : 'LIVE', farbe = replay ? f : '#ff2a2a';
+    g.save(); SA(g, 40, 900); const bw = g.measureText(txt).width + 78, bx = B - 48 - bw, by = y + 11;
+    g.shadowColor = farbe; g.shadowBlur = 22; g.fillStyle = farbe; g.fillRect(bx, by, bw, 56); g.shadowBlur = 0;
+    g.fillStyle = replay ? '#06080a' : '#fff'; g.fillText(txt, bx + 54, by + 43);
+    if (replay || Math.floor(t * 2) % 2 === 0) { g.beginPath(); g.arc(bx + 29, by + 28, 10, 0, Math.PI * 2); g.fill(); }
+    g.restore();
+    g.save(); g.fillStyle = f; g.shadowColor = f; g.shadowBlur = 18; g.fillRect(40, y + 94, B - 80, 4); g.restore();
+  }
+  function tvSchlagzeile(g, t, c, v, f) {   // Etikett + Schlagzeile, wischen von links rein
+    const zeilen = zweiZeilen(GROSS(c.hook || v.hooks[0])), px = zeilen.length > 1 ? 120 : 136, x0 = 40, y0 = 298, bw = B - 80;
+    const q1 = eo(fp(t, 0.15, 0.4)), q2 = eo(fp(t, 0.28, 0.62));
+    if (q1 > 0) {
+      g.save(); g.beginPath(); g.rect(x0, y0, bw * q1, 62); g.clip();
+      SA(g, 40, 900); const tx = tagText(v), tw = g.measureText(tx).width + 50;
+      g.fillStyle = f; g.shadowColor = f; g.shadowBlur = 16; g.fillRect(x0, y0, tw, 62); g.shadowBlur = 0; g.fillStyle = '#06080a'; g.fillText(tx, x0 + 25, y0 + 46);
+      g.restore();
+    }
+    if (q2 <= 0) return;
+    const y = y0 + 62, h = zeilen.length * px * 1.0 + 50;
+    g.save(); g.beginPath(); g.rect(x0, y, bw * q2, h); g.clip();
+    g.fillStyle = 'rgba(8,11,20,.9)'; g.fillRect(x0, y, bw, h);
+    g.fillStyle = f; g.shadowColor = f; g.shadowBlur = 22; g.fillRect(x0, y, 14, h); g.shadowBlur = 0;
+    zeilen.forEach((z, i) => { SA(g, passt(g, z, bw - 90, px, SAx(900), 40), 900); g.fillStyle = '#fff'; g.shadowColor = hexA(f, 0.7); g.shadowBlur = 20; g.fillText(z, x0 + 46, y + 22 + px * 0.84 + i * px); });
+    // Lichtstreifen über den Kasten (alle 3,2 s)
+    const gq = ((t - 1.1) % 3.2) / 0.7;
+    if (t > 1.1 && gq <= 1) { const bx = x0 - 300 + (bw + 600) * gq, gr = g.createLinearGradient(bx, 0, bx + 220, 0); gr.addColorStop(0, 'rgba(255,255,255,0)'); gr.addColorStop(0.5, 'rgba(255,255,255,.16)'); gr.addColorStop(1, 'rgba(255,255,255,0)'); g.shadowBlur = 0; g.fillStyle = gr; g.fillRect(x0, y, bw, h); }
+    g.restore();
+  }
+  function tvBildschirm(g, t, p, f, vid, rz) {   // Clip als Fernsehbild: geht an wie ein alter Fernseher
+    const fx = 40, fy = 676, fw = 1000, fh = 562, an = eo(fp(t, 0.04, 0.3)), hh = Math.max(4, fh * an);
+    g.save(); g.beginPath(); g.rect(fx, fy + (fh - hh) / 2, fw, hh); g.clip();
+    g.fillStyle = '#000'; g.fillRect(fx, fy, fw, fh);
+    if (vid) quellBild(g, vid, fx, fy, fw, fh, rz ? 1.12 : 1, 0);
+    if (an < 1) { g.fillStyle = `rgba(255,255,255,${0.85 * (1 - an)})`; g.fillRect(fx, fy, fw, fh); }
+    g.fillStyle = 'rgba(0,0,0,.09)'; for (let y = fy; y < fy + fh; y += 4) g.fillRect(fx, y, fw, 1);
+    g.save(); SA(g, 30, 900); g.textAlign = 'right'; g.fillStyle = 'rgba(255,255,255,.6)'; g.fillText('K888 TV', fx + fw - 20, fy + 44); g.restore();
+    if (rz) pille(g, 'ZEITLUPE 0.5×', fx + 18, fy + 16, f, 26, true);
+    g.restore();
+    g.save(); g.strokeStyle = 'rgba(255,255,255,.92)'; g.lineWidth = 4; g.strokeRect(fx - 2, fy - 2, fw + 4, fh + 4);
+    g.strokeStyle = f; g.shadowColor = f; g.shadowBlur = 26; g.lineWidth = 3; g.strokeRect(fx - 9, fy - 9, fw + 18, fh + 18); g.restore();
+    const pr = kl(t / (p.T - OUTRO), 0, 1);
+    g.fillStyle = 'rgba(255,255,255,.12)'; g.fillRect(fx, fy + fh + 16, fw, 6);
+    g.save(); g.fillStyle = f; g.shadowColor = f; g.shadowBlur = 14; g.fillRect(fx, fy + fh + 16, fw * pr, 6); g.restore();
+  }
+  function tvEtikett(g, x, y, label, f) {
+    SA(g, 34, 900); const lw = g.measureText(label).width + 44;
+    g.save(); g.fillStyle = f; g.shadowColor = f; g.shadowBlur = 16; g.fillRect(x, y, lw, 52); g.restore();
+    g.fillStyle = '#06080a'; g.fillText(label, x + 22, y + 38);
+  }
+  function tvBauchbinde(g, label, text, f, q) {   // Bauchbinde unter dem Bild: Etikett + weißer Kasten
+    if (q <= 0) return;
+    const x = 40, y = 1272;
+    g.save(); g.translate(-(1 - eo(q)) * (B + 60), 0);
+    tvEtikett(g, x, y, label, f);
+    const px = passt(g, text, B - 170, 60, SAx(900), 30); SA(g, px, 900);
+    const tw = Math.min(B - 80, g.measureText(text).width + 100);
+    g.fillStyle = '#f4f6fa'; g.fillRect(x, y + 52, tw, 94);
+    g.fillStyle = f; g.fillRect(x + tw - 12, y + 52, 12, 94);
+    g.fillStyle = '#0a0d16'; g.fillText(text, x + 36, y + 52 + 47 + px * 0.36);
+    g.restore();
+  }
+  function tvErgebnis(g, erg, f) {   // Rundenzeit / Abstand als Ergebnis-Einblendung
+    const x = 40, y = 1272, info = erg.info && erg.info !== erg.label ? erg.info : '';
+    g.save(); g.translate(-(1 - eo(erg.q)) * (B + 60), 0);
+    tvEtikett(g, x, y, erg.label, f);
+    const px = passt(g, erg.wert, info ? 540 : 880, 82, OR, 40); OR(g, px); const ww = g.measureText(erg.wert).width;
+    let tw = ww + 100, ipx = 0;
+    if (info) { ipx = passt(g, info, Math.max(120, B - 80 - tw - 50), 40, SAx(700), 20); SA(g, ipx, 700); tw += g.measureText(info).width + 44; }
+    tw = Math.min(B - 80, tw);
+    g.fillStyle = '#f4f6fa'; g.fillRect(x, y + 52, tw, 110); g.fillStyle = f; g.fillRect(x + tw - 12, y + 52, 12, 110);
+    OR(g, px); g.fillStyle = '#0a0d16'; g.fillText(erg.wert, x + 36, y + 52 + 55 + px * 0.36);
+    if (info) { SA(g, ipx, 700); g.fillStyle = '#3a4152'; g.fillText(info, x + 36 + ww + 34, y + 52 + 55 + ipx * 0.36); }
+    g.restore();
+  }
+  function tvLaufschrift(g, t, m, f) {   // Laufschrift ganz unten, Sender links, FOLGEN rechts
+    const y = 1462, h = 72, links = 236, rechts = 250;
+    g.fillStyle = 'rgba(5,7,12,.95)'; g.fillRect(0, y, B, h);
+    g.save(); g.fillStyle = f; g.shadowColor = f; g.shadowBlur = 14; g.fillRect(0, y - 4, B, 4); g.restore();
+    const txt = `+++ SIMRACING-CLIPS VON ${m.handle} +++ FOLGEN NICHT VERGESSEN +++ SCHREIB DEINE MEINUNG IN DIE KOMMENTARE `;
+    g.save(); g.beginPath(); g.rect(links, y, B - links - rechts, h); g.clip();
+    SA(g, 42, 700); const w = g.measureText(txt).width; g.fillStyle = '#fff';
+    for (let x = links - ((t * 170) % w); x < B; x += w) g.fillText(txt, x, y + 50);
+    g.restore();
+    g.save(); g.fillStyle = f; g.fillRect(0, y, links, h); SA(g, passt(g, m.name, links - 40, 40, SAx(900), 22), 900); g.fillStyle = '#06080a'; g.fillText(m.name, 22, y + 50); g.restore();
+    g.save(); g.fillStyle = 'rgba(5,7,12,1)'; g.fillRect(B - rechts, y, rechts, h); g.restore();
+    const puls = 1 + 0.06 * Math.max(0, Math.sin(t * Math.PI * 2));
+    g.save(); g.translate(B - rechts / 2 + 4, y + h / 2); g.scale(puls, puls); pille(g, '+ FOLGEN', -104, -26, f, 32, true); g.restore();
+  }
+  function tvWischer(g, t, f, m, t0) {   // Replay-Übergang: Neon-Band mit Logo wischt quer durchs Bild
+    const d = t - t0; if (d < 0 || d > 0.5) return;
+    const q = d / 0.5, s = 560, x = -s - 420 + q * (B + 2 * s + 840);
+    g.save(); g.fillStyle = f; g.shadowColor = f; g.shadowBlur = 50;
+    g.beginPath(); g.moveTo(x, 0); g.lineTo(x + s, 0); g.lineTo(x + s - 420, H); g.lineTo(x - 420, H); g.closePath(); g.fill();
+    g.shadowBlur = 0; g.globalAlpha = 0.55; g.fillStyle = '#fff';
+    g.beginPath(); g.moveTo(x + s, 0); g.lineTo(x + s + 46, 0); g.lineTo(x + s - 374, H); g.lineTo(x + s - 420, H); g.closePath(); g.fill();
+    g.globalAlpha = 1; const cx = x + s / 2 - 210, cy = H / 2;
+    logoRing(g, cx, cy - 70, 96, '#ffffff', m.logo, t);
+    SA(g, 96, 900); g.textAlign = 'center'; g.fillStyle = '#06080a'; g.fillText('REPLAY', cx, cy + 112);
+    g.restore();
+  }
+  function tvAbspann(g, t, m, f) {   // kurz Testbild, dann „BLEIB DRAN!“
+    if (t < 0.24) {
+      ['#c0c0c0', '#c0c000', '#00c0c0', '#00c000', '#c000c0', '#c00000', '#0000c0'].forEach((x, i) => { g.fillStyle = x; g.fillRect(Math.floor(i * B / 7), 0, Math.ceil(B / 7) + 1, H * 0.72); });
+      ['#0000c0', '#131313', '#c000c0', '#131313', '#00c0c0', '#131313', '#c0c0c0'].forEach((x, i) => { g.fillStyle = x; g.fillRect(Math.floor(i * B / 7), H * 0.72, Math.ceil(B / 7) + 1, H * 0.08); });
+      g.fillStyle = '#05070c'; g.fillRect(0, H * 0.8, B, H * 0.2);
+      g.save(); g.fillStyle = '#000'; g.fillRect(B / 2 - 300, H * 0.36, 600, 140); SA(g, 84, 900); g.textAlign = 'center'; g.fillStyle = '#fff'; g.fillText('K888 TV', B / 2, H * 0.36 + 102); g.restore();
+      return;
+    }
+    g.drawImage(studio(f), 0, 0);
+    const q = eob(fp(t, 0.24, 0.62)), q2 = eo(fp(t, 0.4, 0.75)), q3 = eo(fp(t, 0.6, 0.95));
+    g.save(); g.translate(B / 2, 690); g.scale(q, q); logoRing(g, 0, 0, 160, f, m.logo, t); g.restore();
+    if (q2 > 0) { g.save(); g.globalAlpha = q2; SA(g, passt(g, 'BLEIB DRAN!', 980, 156, SAx(900)), 900); g.textAlign = 'center'; g.fillStyle = '#fff'; g.shadowColor = f; g.shadowBlur = 40; g.fillText('BLEIB DRAN!', B / 2, 1045); g.restore(); }
+    if (q3 > 0) {
+      g.save(); g.globalAlpha = q3; neonText(g, m.handle, B / 2, 1150, passt(g, m.handle, 960, 80, RU, 40), f, RU, 'center');
+      SA(g, 42, 700); g.textAlign = 'center'; g.fillStyle = 'rgba(255,255,255,.82)'; g.fillText('SIMRACING-CLIPS · IRACING', B / 2, 1330); g.restore();
+      const puls = 1 + 0.06 * Math.max(0, Math.sin(t * Math.PI * 2));
+      g.save(); g.globalAlpha = q3; g.translate(B / 2, 1236); g.scale(puls, puls); pille(g, '+ FOLGEN', -116, -30, f, 36, true); g.restore();
+    }
+  }
+  function zeichneTV(g, t, c, p, m, vid) {
+    const v = vorlage(c), f = c.farbe || v.farbe;
+    if (t >= p.T - OUTRO) return tvAbspann(g, t - (p.T - OUTRO), m, f);
+    const rz = t >= p.D && t < p.D + p.R, [sx, sy] = rz && v.stempel ? schuetteln(t - p.D) : [0, 0];
+    g.save(); g.translate(sx, sy);
+    if (vid) { unscharf(g, vid); g.save(); g.globalAlpha = 0.88; g.drawImage(studio(f), 0, 0); g.restore(); } else g.drawImage(studio(f), 0, 0);
+    tvKopf(g, t, m, f, rz);
+    tvSchlagzeile(g, t, c, v, f);
+    tvBildschirm(g, t, p, f, vid, rz);
+    if (rz) stempel(g, t, p, v, f, B / 2, 977);
+    const erg = ergebnis(v, c, p, t);
+    if (erg) tvErgebnis(g, erg, f);
+    else tvBauchbinde(g, 'FRAGE AN DICH', GROSS(v.unten), f, fp(t, 0.9, 1.25));
+    tvLaufschrift(g, t, m, f);
+    g.restore();
+    if (p.R) tvWischer(g, t, f, m, p.D - 0.25);
+  }
+
   // ─── Ton: Clip-Ton + Zeitlupe (tiefer) + eigene Effekt-Sounds, auf gleiche Lautheit ───
   const TON_RATE = 48000;
   let RAUSCH = null;
@@ -370,10 +566,18 @@
     const glitch = (t, d, vol) => { for (let z = t; z < t + d; z += 0.035) { const n = rn(z, 0.03), hp = ctx.createBiquadFilter(), g = ctx.createGain(); hp.type = 'highpass'; hp.frequency.value = 1500 + Math.random() * 4000; g.gain.setValueAtTime(vol * (0.4 + Math.random() * 0.6), z); g.gain.exponentialRampToValueAtTime(0.0001, z + 0.028); n.connect(hp); hp.connect(g); g.connect(aus); } };
     const anstieg = (t, d, vol) => { const n = rn(t, d), hp = ctx.createBiquadFilter(), g = ctx.createGain(); hp.type = 'highpass'; hp.frequency.setValueAtTime(200, t); hp.frequency.exponentialRampToValueAtTime(7000, t + d); g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(vol, t + d); g.gain.linearRampToValueAtTime(0.0001, t + d + 0.02); n.connect(hp); hp.connect(g); g.connect(aus); };
     const ton = (t, f, d, vol) => { const o = ctx.createOscillator(), g = ctx.createGain(); o.type = 'sine'; o.frequency.value = f; g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(vol, t + 0.01); g.gain.exponentialRampToValueAtTime(0.0001, t + d); o.connect(g); g.connect(aus); o.start(t); o.stop(t + d + 0.05); };
-    zisch(0, 0.2, 0.25); wumms(0.12, 0.75); glitch(0.12, 0.35, 0.18);
-    zisch(0.85, 0.4, 0.15);
-    if (p.R) { zisch(p.D - 0.25, 0.3, 0.3, true); wumms(p.D, 0.8, true); }
-    anstieg(p.T - OUTRO - 0.7, 0.7, 0.3); wumms(p.T - OUTRO, 0.9, true); [1318, 1661, 1976].forEach((fq, i) => ton(p.T - OUTRO + 0.25 + i * 0.07, fq, 1.2, 0.08));
+    const jingle = (t, vol) => { [523.25, 659.25, 783.99, 1046.5].forEach((fq, i) => { const o = ctx.createOscillator(), g = ctx.createGain(); o.type = 'triangle'; o.frequency.value = fq; g.gain.setValueAtTime(0.0001, t + i * 0.09); g.gain.linearRampToValueAtTime(vol, t + i * 0.09 + 0.01); g.gain.exponentialRampToValueAtTime(0.0001, t + i * 0.09 + (i === 3 ? 1.1 : 0.35)); o.connect(g); g.connect(aus); o.start(t + i * 0.09); o.stop(t + i * 0.09 + 1.2); }); };
+    if (c.look === 'tv') {
+      const n = rn(0, 0.16), hp = ctx.createBiquadFilter(), gn = ctx.createGain(); hp.type = 'highpass'; hp.frequency.value = 900; gn.gain.setValueAtTime(0.22, 0); gn.gain.exponentialRampToValueAtTime(0.0001, 0.16); n.connect(hp); hp.connect(gn); gn.connect(aus);
+      wumms(0.05, 0.55); jingle(0.3, 0.11); zisch(0.3, 0.35, 0.16); zisch(0.9, 0.35, 0.13);
+      if (p.R) { zisch(p.D - 0.3, 0.55, 0.32); wumms(p.D, 0.7, true); }
+      ton(p.T - OUTRO, 1000, 0.24, 0.07); jingle(p.T - OUTRO + 0.26, 0.12); wumms(p.T - OUTRO + 0.24, 0.8, true);
+    } else {
+      zisch(0, 0.2, 0.25); wumms(0.12, 0.75); glitch(0.12, 0.35, 0.18);
+      zisch(0.85, 0.4, 0.15);
+      if (p.R) { zisch(p.D - 0.25, 0.3, 0.3, true); wumms(p.D, 0.8, true); }
+      anstieg(p.T - OUTRO - 0.7, 0.7, 0.3); wumms(p.T - OUTRO, 0.9, true); [1318, 1661, 1976].forEach((fq, i) => ton(p.T - OUTRO + 0.25 + i * 0.07, fq, 1.2, 0.08));
+    }
     const buf = await ctx.startRendering();
     // Lautheit angleichen (Ziel ≈ −15 dBFS, Spitzen unter −1 dB)
     let su = 0, sp = 0; for (let ch = 0; ch < 2; ch++) { const d = buf.getChannelData(ch); for (let i = 0; i < d.length; i++) { su += d[i] * d[i]; sp = Math.max(sp, Math.abs(d[i])); } }
@@ -649,7 +853,7 @@
   // ═══════════════════════════════════════════════════════════
   // Oberfläche
   // ═══════════════════════════════════════════════════════════
-  let BOX = null, UMG = null, MAT = null, ARBEIT = '';
+  let BOX = null, UMG = null, MAT = null, ARBEIT = '', LETZTER_LOOK = 'neon';
   const OFFEN = { 'kc-so': null, 'kc-raus': false, 'kc-einst': false };   // aufgeklappte Bereiche bleiben offen
   const CLIPS = [];          // reingezogene Clips, der erste ist im Editor
   const VOR = { vid: null, url: '', canvas: null, lauf: 0, ton: false, c: null };   // Vorschau
@@ -667,7 +871,7 @@
       v.onloadedmetadata = () => {
         const dauer = v.duration || 0, vl = VORLAGEN[0];
         ok(dauer >= 2 ? { id: Math.random().toString(36).slice(2), datei, url, name: datei.name, dauer, start: Math.max(0, dauer - 15), ende: dauer,
-          vorlage: vl.id, hook: vl.hooks[0], zeitlupe: vl.zl, modus: 'ganz', versatz: 0, farbe: vl.farbe, text: vorlageText(vl, {}), textEigen: false, rundenzeit: '', strecke: '', auto: '',
+          vorlage: vl.id, hook: vl.hooks[0], zeitlupe: vl.zl, modus: 'ganz', versatz: 0, farbe: vl.farbe, text: vorlageText(vl, {}), textEigen: false, look: LETZTER_LOOK,
           insta: true, tiktok: !!(stand().tiktok && stand().tiktok.verbunden), postMs: 0 } : null);
       };
       v.onerror = () => ok(null);
@@ -727,18 +931,18 @@
         ${tipp(esc(v.hilfe))}
         <div class="kc-schritt">2 · Spruch & Look</div>
         <label class="kc-feld">Spruch oben<div class="kc-zeile"><input type="text" maxlength="40" value="${esc(c.hook)}" data-c="hook"><button type="button" class="btn ki-k" data-c="wuerfeln" title="Anderer Spruch">🎲</button></div>${tipp('Der erste Satz entscheidet, ob jemand stehen bleibt. Kurz und frech. 🎲 = anderer Vorschlag.')}</label>
-        ${v.felder ? `<div class="kc-felder">
-          <label class="kc-feld">Rundenzeit<input type="text" maxlength="12" placeholder="1:52.414" value="${esc(c.rundenzeit)}" data-c="rundenzeit"></label>
-          <label class="kc-feld">Strecke<input type="text" maxlength="40" placeholder="Spa" value="${esc(c.strecke)}" data-c="strecke"></label>
-          <label class="kc-feld">Auto<input type="text" maxlength="40" placeholder="Porsche 992 Cup" value="${esc(c.auto)}" data-c="auto"></label></div>
-          ${tipp('Die Zeit kommt am Ende groß ins Bild.')}` : ''}
+        ${v.felder ? `<div class="kc-felder">${v.felder.map(([k, label, ph]) => `<label class="kc-feld">${esc(label)}<input type="text" maxlength="40" placeholder="${esc(ph)}" value="${esc(c[k] || '')}" data-c="feld" data-feld="${k}"></label>`).join('')}</div>
+          ${tipp(esc(v.feldTipp || ''))}` : ''}
+        <div class="kc-umschalt kc-looks">${LOOKS.map(([k, n]) => `<button type="button" class="${(c.look || 'neon') === k ? 'an' : ''}" data-c="look" data-wert="${k}">${n}</button>`).join('')}</div>
         <div class="kc-farben">${FARBEN.map(f => `<button type="button" class="kc-farbe${f === c.farbe ? ' an' : ''}" style="--f:${f}" data-c="farbe" data-wert="${f}" aria-label="Neonfarbe ${f}"></button>`).join('')}<span class="kc-dim">Neonfarbe</span></div>
         <div class="kc-felder">
-          <div class="kc-umschalt"><button type="button" class="${c.modus !== 'zoom' ? 'an' : ''}" data-c="modus" data-wert="ganz">▭ Ganzes Bild</button><button type="button" class="${c.modus === 'zoom' ? 'an' : ''}" data-c="modus" data-wert="zoom">▯ Zoom</button></div>
+          ${c.look === 'tv' ? '' : `<div class="kc-umschalt"><button type="button" class="${c.modus !== 'zoom' ? 'an' : ''}" data-c="modus" data-wert="ganz">▭ Ganzes Bild</button><button type="button" class="${c.modus === 'zoom' ? 'an' : ''}" data-c="modus" data-wert="zoom">▯ Zoom</button></div>`}
           <label class="kc-check"><input type="checkbox" data-c="zeitlupe" ${c.zeitlupe ? 'checked' : ''}> <span><b>Zeitlupe</b> vom Ende</span></label>
         </div>
-        ${c.modus === 'zoom' ? `<label class="kc-feld">Bildausschnitt<input type="range" min="-1" max="1" step="0.05" value="${c.versatz}" data-c="versatz"></label>` : ''}
-        ${tipp('Ganzes Bild: Clip im Neon-Rahmen. Zoom: Clip füllt das ganze Handy (Seiten werden abgeschnitten). Zeitlupe: die letzten Sekunden nochmal halb so schnell.')}
+        ${c.modus === 'zoom' && c.look !== 'tv' ? `<label class="kc-feld">Bildausschnitt<input type="range" min="-1" max="1" step="0.05" value="${c.versatz}" data-c="versatz"></label>` : ''}
+        ${tipp(c.look === 'tv'
+          ? 'TV-Sendung: wie eine Live-Übertragung mit Schlagzeile, LIVE/REPLAY, Bauchbinde und Laufschrift. Zeitlupe: die letzten Sekunden nochmal halb so schnell, mit Replay-Übergang.'
+          : 'Neon: Chrom-Schrift im Neon-Rahmen. Ganzes Bild: Clip im Rahmen. Zoom: Clip füllt das ganze Handy (Seiten werden abgeschnitten). Zeitlupe: die letzten Sekunden nochmal halb so schnell.')}
         <div class="kc-schritt">3 · Schnitt</div>
         <div class="kc-schnitt">
           <label class="kc-feld">Anfang <b data-c="start-wert">${sek(p.a)}</b><input type="range" min="0" max="${c.dauer}" step="0.1" value="${p.a}" data-c="start"></label>
@@ -849,7 +1053,8 @@
   async function einplanen(nurLaden) {
     const c = CLIPS[0]; if (!c || ARBEIT) return;
     if (!nurLaden && !c.insta && !c.tiktok) return UMG.meldung('Bitte Instagram oder TikTok anhaken.', 1);
-    if (vorlage(c).felder && !c.rundenzeit) return UMG.meldung('Bitte die Rundenzeit eintragen.', 1);
+    const vp = vorlage(c), pf = vp.pflicht && vp.felder.find(x => x[0] === vp.pflicht);
+    if (pf && !String(c[pf[0]] || '').trim()) return UMG.meldung(`Bitte „${pf[1]}“ eintragen.`, 1);
     let id = '';
     try {
       arbeit('🎬 Video wird gebaut … 0 %');
@@ -882,6 +1087,7 @@
     if (a === 'wuerfeln' && c) { const h = vorlage(c).hooks, i = (h.indexOf(c.hook) + 1) % h.length; c.hook = h[i]; zeichnen(); return; }
     if (a === 'farbe' && c) { c.farbe = b.dataset.wert; zeichnen(); return; }
     if (a === 'modus' && c) { c.modus = b.dataset.wert; zeichnen(); return; }
+    if (a === 'look' && c) { c.look = LETZTER_LOOK = b.dataset.wert; zeichnen(); return; }
     if (a === 'ton') { VOR.ton = !VOR.ton; if (VOR.vid) VOR.vid.muted = !VOR.ton; b.textContent = VOR.ton ? '🔊' : '🔇'; return; }
     if (a === 'einplanen') return einplanen(false);
     if (a === 'laden') return einplanen(true);
@@ -907,8 +1113,8 @@
     const t = ev.target, c = CLIPS[0]; if (!c || !t.dataset || !BOX.contains(t)) return;
     const a = t.dataset.c;
     if (a === 'hook') c.hook = t.value;
-    else if (a === 'rundenzeit' || a === 'strecke' || a === 'auto') {
-      c[a] = t.value;
+    else if (a === 'feld') {
+      c[t.dataset.feld] = t.value;
       if (!c.textEigen && typeof vorlage(c).text === 'function') { c.text = vorlageText(vorlage(c), c); const ta = BOX.querySelector('[data-c="text"]'); if (ta) ta.value = c.text; }
     }
     else if (a === 'text') { c.text = t.value; c.textEigen = true; }
@@ -994,6 +1200,8 @@
 .kc-app .kc-umschalt{display:flex;border:1px solid var(--line,#23262f)}
 .kc-app .kc-umschalt button{background:transparent;border:0;color:var(--steel,#8b929c);font:700 13px var(--body,inherit);padding:10px 14px;cursor:pointer}
 .kc-app .kc-umschalt button.an{background:#ff2d6f;color:#fff}
+.kc-app .kc-looks{align-self:flex-start}
+.kc-app .kc-looks button{font-size:14px;padding:11px 16px}
 .kc-app .kc-check{display:flex;gap:8px;align-items:flex-start;font-size:14px;color:#fff;cursor:pointer}
 .kc-app .kc-check input{margin-top:3px;accent-color:#ff2d6f;width:18px;height:18px}
 .kc-app .kc-check.aus{opacity:.5;cursor:default}
