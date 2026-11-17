@@ -70,13 +70,31 @@
     { id: 'duell', name: 'Duell', emoji: '⚔️', farbe: '#3d7bff', tag: 'DUELL', zl: true, wieder: 'GANZ GENAU HINSEHEN',
       hooks: ['WER GEWINNT?', 'RAD AN RAD', 'DUELL!', 'KEINER GIBT NACH'], unten: ['WER GEWINNT? TIPP AB!', 'WER WAR STÄRKER?', 'FAIR ODER ZU HART?'],
       text: 'Rad an Rad ⚔️ Wer gewinnt das Duell? Tipp ab in den Kommentaren 👇\n\n#simracing #iracing #battle #simracer #kreids888',
-      hilfe: 'Für Zweikämpfe Rad an Rad. Die Leute tippen, wer gewinnt.' }
+      hilfe: 'Für Zweikämpfe Rad an Rad. Die Leute tippen, wer gewinnt.' },
+    { id: 'raten', name: 'Welche Strecke?', emoji: '🗺️', farbe: '#5cff1f', tag: 'RATEN', zl: false, wieder: 'NOCHMAL IN ZEITLUPE', countdown: true, gross: true,
+      hooks: ['WELCHE STRECKE?', 'ERKENNST DU DIE STRECKE?', 'WO BIN ICH HIER?', 'NUR PROFIS WISSEN’S'], unten: ['SCHREIB DEINEN TIPP!', 'TIPP AB – AUFLÖSUNG AM ENDE', 'WER WEISS ES ZUERST?'],
+      felder: [['strecke', 'Strecke (Auflösung)', 'Spa-Francorchamps']], pflicht: 'strecke', zeigen: 'strecke', zeigenLabel: 'AUFLÖSUNG', info: () => 'RICHTIG GERATEN?',
+      feldTipp: 'Wird erst ganz am Ende gezeigt (mit 3-2-1). Vorher raten die Leute in den Kommentaren.',
+      text: 'Welche Strecke ist das? 🗺️ Schreib deinen Tipp in die Kommentare – die Auflösung kommt am Ende 👇\n\n#simracing #iracing #racetrack #simracer #kreids888',
+      hilfe: 'Ratespiel: Die Leute tippen die Strecke, am Ende kommt die Auflösung. Bringt viele Kommentare.' },
+    { id: 'jetzt', name: 'Was passiert jetzt?', emoji: '⏸️', farbe: '#ff9f1c', tag: 'RÄTSEL', zl: true, wieder: 'NOCHMAL IN ZEITLUPE', pause: true,
+      hooks: ['WAS PASSIERT JETZT?', 'RATE MAL', 'GLEICH KNALLT’S', 'PASS GENAU AUF'], unten: ['WAS PASSIERT? TIPP AB!', 'CRASH ODER SAVE?', 'SCHREIB DEINEN TIPP!'],
+      text: 'Was passiert jetzt? 🤔 Tipp ab, bevor du weiterschaust! 👇\n\n#simracing #iracing #guess #simracer #kreids888',
+      hilfe: 'Der Clip hält kurz vor der Action an, Countdown 3-2-1, dann geht’s weiter. Wo er anhält, stellst du bei „Schnitt“ ein.' },
+    { id: 'wagnis', name: 'Hättest du’s gewagt?', emoji: '😬', farbe: '#ff1f3d', tag: 'RISIKO', zl: true, wieder: 'NOCHMAL GANZ LANGSAM',
+      hooks: ['HÄTTEST DU’S GEWAGT?', 'ALLES ODER NICHTS', 'MUTIG ODER DUMM?', 'VOLLES RISIKO'], unten: ['JA ODER NEIN? KOMMENTIER!', 'MUTIG ODER DUMM?', 'WÄRST DU AUCH GEGANGEN?'],
+      text: 'Hättest du’s gewagt? 😬 Ja oder nein? 👇\n\n#simracing #iracing #sendit #simracer #kreids888',
+      hilfe: 'Für riskante Manöver: Lücke, Spätbremser, außen rum.' },
+    { id: 'regen', name: 'Regen-Chaos', emoji: '🌧️', farbe: '#00c2ff', tag: 'REGEN', zl: true, wieder: 'NOCHMAL. LANGSAM.', regen: true,
+      hooks: ['REGEN-CHAOS', 'WER BLEIBT DRAUF?', 'AQUAPLANING!', 'NASS. NÄSSER. SPA.'], unten: ['WER BLEIBT DRAUF?', 'SLICKS ODER REGENREIFEN?', 'WER FLIEGT ZUERST RAUS?'],
+      text: 'Regen-Chaos 🌧️ Wer bleibt hier drauf? 👇\n\n#simracing #iracing #rain #simracer #kreids888',
+      hilfe: 'Für Regenrennen: mit Regen und Blitz im Bild, Donner und Regen im Ton.' }
   ];
   const LOOKS = [['neon', '✨ Neon'], ['tv', '📺 TV-Sendung']];
   const WIEDER = ['NOCHMAL GENAU HINSCHAUEN', 'NOCHMAL IN ZEITLUPE', 'GANZ GENAU HINSEHEN', 'NOCHMAL. LANGSAM.', 'WIE?!', 'AUTSCH. NOCHMAL.', 'SO GEHT DAS', 'FOTOFINISH'];
   const frageVon = (c, v) => GROSS(String(c.unten || '').trim() || v.unten[0]);
   const wiederVon = (c, v) => GROSS(String(c.wieder || '').trim() || v.wieder);
-  const FARBEN = ['#ff2d6f', '#5cff1f', '#18e8ff', '#ff7a00', '#b44dff', '#ff1f3d', '#ffd400', '#00ffa3', '#ff4fd8', '#3d7bff'];
+  const FARBEN = ['#ff2d6f', '#5cff1f', '#18e8ff', '#ff7a00', '#b44dff', '#ff1f3d', '#ffd400', '#00ffa3', '#ff4fd8', '#3d7bff', '#ff9f1c', '#00c2ff'];
   const vorlage = c => VORLAGEN.find(v => v.id === c.vorlage) || VORLAGEN[0];
   const vorlageText = (v, c) => (typeof v.text === 'function' ? v.text(c || {}) : v.text);
   const kw = () => { const d = new Date(); const t = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate())); const tag = t.getUTCDay() || 7; t.setUTCDate(t.getUTCDate() + 4 - tag); const j = new Date(Date.UTC(t.getUTCFullYear(), 0, 1)); return Math.ceil(((t - j) / 86400000 + 1) / 7); };
@@ -183,10 +201,13 @@
   }
 
   // ─── Zeitplan eines Clips: Hauptteil · Zeitlupe vom Ende (halbe Geschwindigkeit) · Abspann ───
+  // Bei „Was passiert jetzt?“ hält der Clip bei F an (FD Sekunden, Countdown 3-2-1) und läuft dann weiter
+  const HALT = 2.4;
   function zeitplan(c) {
-    const dauer = c.dauer || 10, a = kl(c.start || 0, 0, Math.max(0, dauer - 1)), b = kl(c.ende || dauer, a + 1, dauer);
-    const D = b - a, Z = c.zeitlupe ? Math.min(3, D * 0.4) : 0, R = Z * 2, T = D + R + OUTRO;
-    return { a, b, D, Z, R, T, quelle: t => (t < D ? a + t : t < D + R ? b - Z + (t - D) / 2 : null) };
+    const dauer = c.dauer || 10, a = kl(c.start || 0, 0, Math.max(0, dauer - 1)), b = kl(c.ende || dauer, a + 1, dauer), v = vorlage(c);
+    const FD = v.pause ? HALT : 0, F = v.pause ? kl(c.halt != null ? c.halt : b - 2.5, a + 0.5, b - 0.3) : b, h = F - a;
+    const D0 = b - a, D = D0 + FD, Z = c.zeitlupe ? Math.min(3, D0 * 0.4) : 0, R = Z * 2, T = D + R + OUTRO;
+    return { a, b, D, Z, R, T, F, FD, h, quelle: t => (t < h ? a + t : t < h + FD ? F : t < D ? a + t - FD : t < D + R ? b - Z + (t - D) / 2 : null) };
   }
 
   // ─── Ein Bild zeichnen (Vorschau und Video benutzen dieselbe Funktion) ───
@@ -229,10 +250,43 @@
     g.restore();
   }
 
+  // Countdown 3-2-1: beim Anhalten (Was passiert jetzt?) und vor der Auflösung (Welche Strecke?)
+  function countdownStart(v, p) {
+    if (v.pause) return p.h + 0.15;
+    if (v.countdown) return (p.R ? p.D + p.R : p.D) - 2.4 - 1.5;
+    return null;
+  }
+  function countdown(g, t, v, p, f, x, y, tv) {
+    const s0 = countdownStart(v, p); if (s0 == null) return;
+    const lang = v.pause ? 0.7 : 0.5, i = Math.floor((t - s0) / lang);
+    if (t < s0 || i > 2) return;
+    const q = ((t - s0) % lang) / lang, k = 1.25 - 0.25 * eob(Math.min(1, q * 2.2)), zahl = String(3 - i);
+    g.save(); g.translate(x, y); g.scale(k, k); g.globalAlpha = q > 0.85 ? (1 - q) / 0.15 : 1;
+    g.strokeStyle = f; g.lineWidth = 10; g.shadowColor = f; g.shadowBlur = 30;
+    g.beginPath(); g.arc(0, 0, 150, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * (1 - q)); g.stroke();
+    if (tv) { OR(g, 200); g.textAlign = 'center'; g.fillStyle = '#fff'; g.shadowBlur = 20; g.fillText(zahl, 0, 72); }
+    else { const ch = chrom(zahl, 260, f, 400); g.shadowBlur = 0; g.drawImage(ch.c, -ch.mitte, -ch.base + 92); }
+    g.restore();
+  }
+  const angehalten = (v, p, t) => v.pause && t >= p.h && t < p.h + p.FD;
+  // Regen über das Bild (schräge Striche) + Blitz am Anfang und in der Mitte
+  function regen(g, t, p) {
+    const r = zufallR(42);
+    g.save(); g.lineCap = 'round';
+    for (let i = 0; i < 260; i++) {
+      const x0 = r() * (B + 400) - 100, v = 1700 + r() * 1000, len = 40 + r() * 80, ph = r() * (H + 300), dick = r() < 0.25 ? 3.2 : 2;
+      const y = ((t * v + ph) % (H + 300)) - 150, x = x0 - (y + 150) * 0.22;
+      g.strokeStyle = `rgba(210,230,255,${0.28 + r() * 0.36})`; g.lineWidth = dick;
+      g.beginPath(); g.moveTo(x, y); g.lineTo(x - len * 0.22, y + len); g.stroke();
+    }
+    g.restore();
+    for (const z of [0.45, p.D * 0.55]) { const d = t - z; if (d >= 0 && d < 0.32) { const a = d < 0.06 ? 0.55 : d < 0.12 ? 0.1 : d < 0.18 ? 0.4 : 0.4 * (1 - (d - 0.18) / 0.14); g.fillStyle = `rgba(220,235,255,${Math.max(0, a)})`; g.fillRect(0, 0, B, H); } }
+  }
   // Großer Wert am Ende (Rundenzeit, Abstand): am Ende der Zeitlupe, ohne Zeitlupe am Ende des Clips
   function ergebnis(v, c, p, t) {
     if (!v.zeigen) return null;
-    const wert = String(c[v.zeigen] || '').trim(); if (!wert) return null;
+    const roh = String(c[v.zeigen] || '').trim(); if (!roh) return null;
+    const wert = v.gross ? GROSS(roh) : roh;
     const a = (p.R ? p.D + p.R : p.D) - 2.4;
     if (t < a) return null;
     return { q: fp(t, a, a + 0.3), wert, label: v.zeigenLabel || '', info: GROSS(v.info ? v.info(c) : '') };
@@ -287,6 +341,9 @@
         g.restore();
         g.save(); g.globalAlpha = fl; rr(g, fx, fy, fw, fh, 14); g.strokeStyle = hexA(f, 0.55); g.lineWidth = 3; g.shadowColor = f; g.shadowBlur = 22; g.stroke(); g.restore();
       }
+      const halt = angehalten(v, p, t);
+      if (halt) { g.fillStyle = 'rgba(0,0,0,.42)'; if (zoom) g.fillRect(0, 0, B, H); else { g.save(); rr(g, fx, fy, fw, fh, 14); g.clip(); g.fillRect(fx, fy, fw, fh); g.restore(); } }
+      if (v.regen) { g.fillStyle = 'rgba(40,90,170,.14)'; g.fillRect(zoom ? 0 : fx, zoom ? 0 : fy, zoom ? B : fw, zoom ? H : fh); regen(g, t, p); }
       g.save(); g.globalAlpha = fl;
       if (!zoom) ecken(g, fx - 10, fy - 10, fw + 20, fh + 20, f, 74);
       else ecken(g, 34, 296, B - 68, 1258, f, 90);
@@ -297,6 +354,7 @@
         pille(g, 'REPLAY 0.5×', fx + 40, sy0, '#ff2a2a', 30, false);
         if (Math.floor(t * 3) % 2 === 0) { g.save(); g.fillStyle = '#ff2a2a'; g.shadowColor = '#ff2a2a'; g.shadowBlur = 16; g.beginPath(); g.arc(fx + 18, sy0 + 24, 11, 0, Math.PI * 2); g.fill(); g.restore(); }
       }
+      else if (halt) pille(g, '❚❚ PAUSE', fx + 6, sy0, f, 30, true);
       else pille(g, tagText(v), fx + 6, sy0, f, 30, true);
       if (vid) { g.save(); OR(g, 34); g.textAlign = 'right'; g.shadowColor = f; g.shadowBlur = 14; g.fillStyle = '#fff'; g.fillText(uhr(p.quelle(t) || 0), fx + fw - 6, sy0 + 38); g.restore(); }
       // Fortschritt
@@ -327,6 +385,7 @@
         if (q > 0 && aus < 1) { const bd = band(wiederVon(c, v), f, 44); g.save(); g.globalAlpha = 1 - aus; g.translate(-(1 - eo(q)) * B, 0); g.drawImage(bd.c, B / 2 - bd.bandW / 2 - 40, (zoom ? 760 : fy + 40) - 60); g.restore(); }
         stempel(g, t, p, v, f, B / 2, zoom ? 1010 : fy + fh / 2 + 20);
       }
+      countdown(g, t, v, p, f, B / 2, zoom ? 1000 : fy + fh / 2, false);
       // Rundenzeit / Abstand groß am Ende
       const erg = ergebnis(v, c, p, t);
       if (erg) {
@@ -393,12 +452,13 @@
       return c;
     });
   }
-  function tvKopf(g, t, m, f, replay) {   // Senderlogo links, LIVE / REPLAY rechts, Neon-Linie
+  function tvKopf(g, t, m, f, status) {   // Senderlogo links, LIVE / PAUSE / REPLAY rechts, Neon-Linie
+    const replay = status !== 'live';
     const y = 298;
     logoRing(g, 76, y + 27, 28, f, m.logo, t);
     g.save(); SA(g, passt(g, m.name, 440, 44, SAx(900), 26), 900); g.fillStyle = '#fff'; g.fillText(m.name, 120, y + 43); const w = g.measureText(m.name).width; g.restore();
     pille(g, 'TV', 120 + w + 12, y + 5, f, 27, true);
-    const txt = replay ? 'REPLAY' : 'LIVE', farbe = replay ? f : '#ff2a2a';
+    const txt = status === 'pause' ? 'PAUSE' : replay ? 'REPLAY' : 'LIVE', farbe = replay ? f : '#ff2a2a';
     g.save(); SA(g, 36, 900); const bw = g.measureText(txt).width + 70, bx = B - 44 - bw, by = y + 2;
     g.shadowColor = farbe; g.shadowBlur = 20; g.fillStyle = farbe; g.fillRect(bx, by, bw, 50); g.shadowBlur = 0;
     g.fillStyle = replay ? '#06080a' : '#fff'; g.fillText(txt, bx + 48, by + 38);
@@ -460,7 +520,7 @@
     g.restore();
   }
   function tvErgebnis(g, erg, f) {   // Rundenzeit / Abstand als Ergebnis-Einblendung
-    const x = 40, y = 1326, info = erg.info && erg.info !== erg.label ? erg.info : '';
+    const x = 40, y = 1326, info = erg.info && erg.info !== erg.label && erg.wert.length <= 12 ? erg.info : '';
     g.save(); g.translate(-(1 - eo(erg.q)) * (B + 60), 0);
     tvEtikett(g, x, y, erg.label, f);
     const px = passt(g, erg.wert, info ? 540 : 880, 82, OR, 40); OR(g, px); const ww = g.measureText(erg.wert).width;
@@ -523,9 +583,13 @@
     const rz = t >= p.D && t < p.D + p.R, [sx, sy] = rz && v.stempel ? schuetteln(t - p.D) : [0, 0];
     g.save(); g.translate(sx, sy);
     if (vid) { unscharf(g, vid); g.save(); g.globalAlpha = 0.88; g.drawImage(studio(f), 0, 0); g.restore(); } else g.drawImage(studio(f), 0, 0);
-    tvKopf(g, t, m, f, rz);
+    const halt = angehalten(v, p, t);
+    tvKopf(g, t, m, f, halt ? 'pause' : rz ? 'replay' : 'live');
     tvSchlagzeile(g, t, c, v, f);
     tvBildschirm(g, t, p, f, vid, rz);
+    if (halt) { g.fillStyle = 'rgba(0,0,0,.45)'; g.fillRect(40, 730, 1000, 562); }
+    if (v.regen) { g.fillStyle = 'rgba(40,90,170,.14)'; g.fillRect(40, 730, 1000, 562); regen(g, t, p); }
+    countdown(g, t, v, p, f, B / 2, 1011, true);
     if (rz) stempel(g, t, p, v, f, B / 2, 1031);
     const erg = ergebnis(v, c, p, t);
     if (erg) tvErgebnis(g, erg, f);
@@ -545,8 +609,16 @@
     const rn = (t, d) => { const s = ctx.createBufferSource(); s.buffer = rauschen(ctx); s.loop = true; s.start(t); s.stop(t + d); return s; };
     if (quelle) {
       const h = ctx.createBufferSource(); h.buffer = quelle; const hg = ctx.createGain(); h.connect(hg); hg.connect(aus);
-      hg.gain.setValueAtTime(0.9, 0); hg.gain.setValueAtTime(0.9, Math.max(0, p.D - 0.08)); hg.gain.linearRampToValueAtTime(0.0001, p.D);
-      h.start(0, p.a, p.D);
+      if (p.FD) {   // bis zum Anhalten, dann Stille, dann weiter ab dem Haltepunkt
+        hg.gain.setValueAtTime(0.9, 0); hg.gain.setValueAtTime(0.9, Math.max(0, p.h - 0.04)); hg.gain.linearRampToValueAtTime(0.0001, p.h);
+        h.start(0, p.a, p.h);
+        const h2 = ctx.createBufferSource(); h2.buffer = quelle; const hg2 = ctx.createGain(); h2.connect(hg2); hg2.connect(aus);
+        hg2.gain.setValueAtTime(0.0001, p.h + p.FD); hg2.gain.linearRampToValueAtTime(0.9, p.h + p.FD + 0.05); hg2.gain.setValueAtTime(0.9, Math.max(p.h + p.FD + 0.05, p.D - 0.08)); hg2.gain.linearRampToValueAtTime(0.0001, p.D);
+        h2.start(p.h + p.FD, p.F, p.b - p.F);
+      } else {
+        hg.gain.setValueAtTime(0.9, 0); hg.gain.setValueAtTime(0.9, Math.max(0, p.D - 0.08)); hg.gain.linearRampToValueAtTime(0.0001, p.D);
+        h.start(0, p.a, p.D);
+      }
       if (p.R) {
         const z = ctx.createBufferSource(); z.buffer = quelle; z.playbackRate.value = 0.5;
         const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 2400;
@@ -569,6 +641,22 @@
     const glitch = (t, d, vol) => { for (let z = t; z < t + d; z += 0.035) { const n = rn(z, 0.03), hp = ctx.createBiquadFilter(), g = ctx.createGain(); hp.type = 'highpass'; hp.frequency.value = 1500 + Math.random() * 4000; g.gain.setValueAtTime(vol * (0.4 + Math.random() * 0.6), z); g.gain.exponentialRampToValueAtTime(0.0001, z + 0.028); n.connect(hp); hp.connect(g); g.connect(aus); } };
     const anstieg = (t, d, vol) => { const n = rn(t, d), hp = ctx.createBiquadFilter(), g = ctx.createGain(); hp.type = 'highpass'; hp.frequency.setValueAtTime(200, t); hp.frequency.exponentialRampToValueAtTime(7000, t + d); g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(vol, t + d); g.gain.linearRampToValueAtTime(0.0001, t + d + 0.02); n.connect(hp); hp.connect(g); g.connect(aus); };
     const ton = (t, f, d, vol) => { const o = ctx.createOscillator(), g = ctx.createGain(); o.type = 'sine'; o.frequency.value = f; g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(vol, t + 0.01); g.gain.exponentialRampToValueAtTime(0.0001, t + d); o.connect(g); g.connect(aus); o.start(t); o.stop(t + d + 0.05); };
+    const tick = (t, vol) => { const o = ctx.createOscillator(), g = ctx.createGain(); o.type = 'square'; o.frequency.value = 1800; g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.06); o.connect(g); g.connect(aus); o.start(t); o.stop(t + 0.08); wumms(t, vol * 2.2, true); };
+    const v = vorlage(c), cs = countdownStart(v, p);
+    if (cs != null) { const lang = v.pause ? 0.7 : 0.5; for (let i = 0; i < 3; i++) tick(cs + i * lang, 0.16); }
+    if (v.pause) {   // Plattenstopp beim Anhalten, Knall beim Weiterlaufen
+      const o = ctx.createOscillator(), g = ctx.createGain(); o.type = 'sawtooth'; o.frequency.setValueAtTime(420, p.h); o.frequency.exponentialRampToValueAtTime(40, p.h + 0.35);
+      g.gain.setValueAtTime(0.16, p.h); g.gain.exponentialRampToValueAtTime(0.0001, p.h + 0.4); o.connect(g); g.connect(aus); o.start(p.h); o.stop(p.h + 0.45);
+      wumms(p.h + p.FD, 0.85);
+    }
+    if (v.countdown) wumms((p.R ? p.D + p.R : p.D) - 2.4, 0.85);
+    if (v.regen) {   // Regen die ganze Zeit, Donner zum Blitz
+      const n = rn(0, p.T - OUTRO), hp = ctx.createBiquadFilter(), lp = ctx.createBiquadFilter(), g = ctx.createGain();
+      hp.type = 'highpass'; hp.frequency.value = 500; lp.type = 'lowpass'; lp.frequency.value = 7000;
+      g.gain.setValueAtTime(0.0001, 0); g.gain.linearRampToValueAtTime(0.09, 0.4); g.gain.setValueAtTime(0.09, p.T - OUTRO - 0.4); g.gain.linearRampToValueAtTime(0.0001, p.T - OUTRO);
+      n.connect(hp); hp.connect(lp); lp.connect(g); g.connect(aus);
+      for (const z of [0.5, p.D * 0.55 + 0.05]) { const d = rn(z, 2.6), l2 = ctx.createBiquadFilter(), g2 = ctx.createGain(); l2.type = 'lowpass'; l2.frequency.value = 260; g2.gain.setValueAtTime(0.0001, z); g2.gain.linearRampToValueAtTime(0.7, z + 0.08); g2.gain.exponentialRampToValueAtTime(0.0001, z + 2.5); d.connect(l2); l2.connect(g2); g2.connect(aus); wumms(z, 0.5, true); }
+    }
     const jingle = (t, vol) => { [523.25, 659.25, 783.99, 1046.5].forEach((fq, i) => { const o = ctx.createOscillator(), g = ctx.createGain(); o.type = 'triangle'; o.frequency.value = fq; g.gain.setValueAtTime(0.0001, t + i * 0.09); g.gain.linearRampToValueAtTime(vol, t + i * 0.09 + 0.01); g.gain.exponentialRampToValueAtTime(0.0001, t + i * 0.09 + (i === 3 ? 1.1 : 0.35)); o.connect(g); g.connect(aus); o.start(t + i * 0.09); o.stop(t + i * 0.09 + 1.2); }); };
     if (c.look === 'tv') {
       const n = rn(0, 0.16), hp = ctx.createBiquadFilter(), gn = ctx.createGain(); hp.type = 'highpass'; hp.frequency.value = 900; gn.gain.setValueAtTime(0.22, 0); gn.gain.exponentialRampToValueAtTime(0.0001, 0.16); n.connect(hp); hp.connect(gn); gn.connect(aus);
@@ -953,7 +1041,9 @@
           <label class="kc-feld">Anfang <b data-c="start-wert">${sek(p.a)}</b><input type="range" min="0" max="${c.dauer}" step="0.1" value="${p.a}" data-c="start"></label>
           <label class="kc-feld">Ende <b data-c="ende-wert">${sek(p.b)}</b><input type="range" min="0" max="${c.dauer}" step="0.1" value="${p.b}" data-c="ende"></label>
         </div>
-        ${tipp(`Clip ist ${sek(c.dauer)} lang. Genommen werden ${sek(p.D)}${p.R ? ' + Zeitlupe' : ''}. Am besten 8 bis 20 Sekunden, die Action ans Ende.`)}
+        ${v.pause ? `<label class="kc-feld">Anhalten bei <b data-c="halt-wert">${sek(p.F)}</b><input type="range" min="${p.a}" max="${p.b}" step="0.1" value="${p.F}" data-c="halt"></label>
+          ${tipp('Kurz bevor es knallt. Dann kommt 3-2-1 und der Clip läuft weiter.')}` : ''}
+        ${tipp(`Clip ist ${sek(c.dauer)} lang. Genommen werden ${sek(p.b - p.a)}${p.FD ? ' + Pause' : ''}${p.R ? ' + Zeitlupe' : ''}. Am besten 8 bis 20 Sekunden, die Action ans Ende.`)}
         <div class="kc-schritt">4 · Text & Termin</div>
         <label class="kc-feld">Text unter dem Post<textarea rows="4" maxlength="2200" data-c="text">${esc(c.text)}</textarea>${tipp('Mit Frage am Ende – Kommentare bringen Reichweite. Höchstens 5 Hashtags.')}</label>
         <div class="kc-felder">
@@ -1009,15 +1099,17 @@
     }
     VOR.vid.muted = !VOR.ton;
     VOR.canvas = cv; const g = cv.getContext('2d'), mein = ++VOR.lauf, vid = VOR.vid;
-    let phase = '', outroStart = 0;
+    let phase = '', outroStart = 0, haltStart = 0, gehalten = false;
     const schritt = () => {
       if (VOR.lauf !== mein) return;
       const cl = CLIPS[0];
       if (!cv.isConnected || !cl || cl.url !== VOR.url) { vid.pause(); return; }   // Reiter gewechselt oder Clip weg → Video anhalten
       const p = zeitplan(cl);
       let t;
-      if (phase === '' || phase === 'neu') { vid.playbackRate = 1; vid.currentTime = p.a; vid.play().catch(() => {}); phase = 'haupt'; }
-      if (phase === 'haupt') { t = vid.currentTime - p.a; if (vid.currentTime >= p.b - 0.03 || vid.ended) { if (p.R) { phase = 'lupe'; vid.currentTime = p.b - p.Z; vid.playbackRate = 0.5; vid.play().catch(() => {}); } else { phase = 'outro'; vid.pause(); outroStart = performance.now(); } } }
+      if (phase === '' || phase === 'neu') { vid.playbackRate = 1; vid.currentTime = p.a; vid.play().catch(() => {}); phase = 'haupt'; gehalten = false; }
+      if (phase === 'haupt' && p.FD && !gehalten && vid.currentTime >= p.F - 0.02) { vid.pause(); phase = 'halt'; haltStart = performance.now(); }
+      if (phase === 'halt') { const d = (performance.now() - haltStart) / 1000; t = p.h + Math.min(d, p.FD - 0.001); if (d >= p.FD) { gehalten = true; phase = 'haupt'; vid.play().catch(() => {}); } }
+      if (phase === 'haupt') { t = vid.currentTime - p.a + (gehalten ? p.FD : 0); if (vid.currentTime >= p.b - 0.03 || vid.ended) { if (p.R) { phase = 'lupe'; vid.currentTime = p.b - p.Z; vid.playbackRate = 0.5; vid.play().catch(() => {}); } else { phase = 'outro'; vid.pause(); outroStart = performance.now(); } } }
       if (phase === 'lupe') { t = p.D + (vid.currentTime - (p.b - p.Z)) * 2; if (vid.currentTime >= p.b - 0.03 || vid.ended) { phase = 'outro'; vid.pause(); outroStart = performance.now(); } }
       if (phase === 'outro') { t = p.T - OUTRO + (performance.now() - outroStart) / 1000; if (t >= p.T) { phase = 'neu'; t = p.T - 0.01; } }
       g.setTransform(cv.width / B, 0, 0, cv.height / H, 0, 0); g.clearRect(0, 0, B, H);
@@ -1128,6 +1220,10 @@
     }
     else if (a === 'text') { c.text = t.value; c.textEigen = true; }
     else if (a === 'versatz') c.versatz = +t.value;
+    else if (a === 'halt') {
+      c.halt = +t.value; const p = zeitplan(c), hw = BOX.querySelector('[data-c="halt-wert"]'); if (hw) hw.textContent = sek(p.F);
+      if (VOR.vid) VOR.vid.currentTime = Math.max(p.a, p.F - 1.5);
+    }
     else if (a === 'start' || a === 'ende') {
       const v = +t.value;
       if (a === 'start') c.start = Math.min(v, (c.ende || c.dauer) - 1); else c.ende = Math.max(v, (c.start || 0) + 1);
@@ -1144,7 +1240,7 @@
     if (a === 'zeitlupe') { c.zeitlupe = t.checked; zeichnen(); }
     else if (a === 'insta' || a === 'tiktok') c[a] = t.checked;
     else if (a === 'postms') c.postMs = t.value ? new Date(t.value).getTime() : 0;
-    else if (a === 'start' || a === 'ende') zeichnen();
+    else if (a === 'start' || a === 'ende' || a === 'halt') zeichnen();
   }
   window.K888Clips = {
     VORLAGEN, bauen, zeitplan, zeichne, material, schriften, vorschaubild,
