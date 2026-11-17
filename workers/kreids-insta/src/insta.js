@@ -22,6 +22,18 @@ async function ig(url, opts) {
 }
 const q = token => `access_token=${encodeURIComponent(token)}`;
 
+// Instagram erlaubt seit Dezember 2025 höchstens 5 Hashtags pro Post/Reel (mehr → Post kann scheitern).
+// Die ersten 5 bleiben, doppelte und weitere fliegen raus.
+export function hashtagsBegrenzen(text, max = 5) {
+  let n = 0;
+  const da = new Set();
+  return String(text || '').replace(/(^|\s)#([\p{L}\p{N}_]+)/gu, (m, vor, tag) => {
+    const k = tag.toLowerCase();
+    if (da.has(k) || n >= max) return vor;
+    da.add(k); n++; return m;
+  }).replace(/[ \t]{2,}/g, ' ').replace(/[ \t]+$/gm, '').replace(/\n{3,}/g, '\n\n').trim();
+}
+
 // Konto finden: { user_id, username }
 export async function konto(token, uidVorgabe) {
   const H = host(token);
@@ -46,7 +58,8 @@ export async function konto(token, uidVorgabe) {
 }
 
 // videoUrl: Video-Post (Story → STORIES, Feed → REELS); dann dauert die Verarbeitung länger
-export async function posten({ token, uid, bildUrl, videoUrl, typ, text, tags, kiHinweis }) {
+// Reels: thumbMs = Titelbild (Millisekunden ins Video), test = Test-Reel (zuerst nur Nicht-Followern zeigen)
+export async function posten({ token, uid, bildUrl, videoUrl, typ, text, tags, kiHinweis, thumbMs, test }) {
   const H = host(token);
   const p = new URLSearchParams({ access_token: token });
   if (videoUrl) p.set('video_url', videoUrl); else p.set('image_url', bildUrl);
@@ -54,8 +67,13 @@ export async function posten({ token, uid, bildUrl, videoUrl, typ, text, tags, k
     p.set('media_type', 'STORIES');
     if (tags && tags.length) p.set('user_tags', JSON.stringify(tags.map(u => ({ username: u, x: 0.5, y: 0.82 }))));
   } else {
-    p.set('caption', text || '');
-    if (videoUrl) { p.set('media_type', 'REELS'); p.set('share_to_feed', 'true'); }
+    p.set('caption', hashtagsBegrenzen(text));
+    if (videoUrl) {
+      p.set('media_type', 'REELS');
+      if (thumbMs) p.set('thumb_offset', String(Math.round(thumbMs)));
+      if (test) p.set('trial_params', JSON.stringify({ graduation_strategy: 'SS_PERFORMANCE' }));
+      else p.set('share_to_feed', 'true');
+    }
   }
   if (kiHinweis) p.set('is_ai_generated', 'true');
   const c = await ig(`${H}/${uid}/media`, { method: 'POST', body: p });

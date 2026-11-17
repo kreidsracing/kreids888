@@ -7,13 +7,14 @@
 // • Der Worker plant, holt KI-Hintergründe (Cloudflare-KI, gratis), speichert und postet.
 // • YouTube-Thumbnail: Vorlage + Spruch pro Rennen werden hier gespeichert, gezeichnet wird im Browser.
 // • Nur mit Dashboard-Login nutzbar (Token wird bei kreids888-admin /api/check geprüft)
-// Routen: GET /bild/:id/:v.jpg · GET /hintergrund/:rennen · GET /logo.png · /api/* (Bearer-Token)
+// • 🎬 Clips (Clip-Fabrik): fertige Neon-Videos aus dem Dashboard, eins pro Tag als Reel (+ TikTok-Entwurf)
+// Routen: GET /bild/:id/:v.jpg · GET /hintergrund/:rennen · GET /logo.png · GET /cvideo/:id/:v.mp4 · GET /cbild/:id.jpg · /api/* (Bearer-Token)
 // ═══════════════════════════════════════════════════════════
 import { DurableObject } from 'cloudflare:workers';
 import { ADMIN, ERG_TAGE, ladeDaten, bauePlan, eigeneRennen, rennKey, inhaltSchluessel, kurzHash, bildtext, platzText } from './plan.js';
 import { kiBild, sprueche, STIMMUNGEN, KAMERAS, autos } from './ki.js';
 import { konto, posten, pruefen, tokenVerlaengern, verlaengerbar } from './insta.js';
-import { istUhrzeit } from './zeit.js';
+import { istUhrzeit, berlin, berlinZuMs, tageZurueck } from './zeit.js';
 import { ytEingerichtet, ytAnmeldeLink, ytCodeTauschen, ytZugang, ytKanal, ytStreams, ytPlanen, ytThumbnail, ytTexte, ytLetzteBeschreibung, ytInfos } from './youtube.js';
 import { ttEingerichtet, ttAnmeldeLink, ttCodeTauschen, ttZugang, ttKonto, ttEntwurf, ttVideoEntwurf } from './tiktok.js';
 
@@ -412,6 +413,90 @@ async function ttSenden(env, s, post, cfg, design) {
   return z.tiktok;
 }
 
+// ─── 🎬 Clips (Clip-Fabrik) ─────────────────────────────────
+// Das Dashboard baut aus einem Clip ein fertiges Neon-Video (MP4) und lädt es in Stücken hoch.
+// clip:<id> = { id, vorlage, titel, text, postMs, insta, tiktok, test, thumbMs, video, gepostet, tt, fehler, versuche }
+// cvteil:<id>:<v>:<n> = Video-Stücke · cbild:<id> = Vorschaubild · clipcfg = { zeit, test }
+const CLIP_STANDARD = { zeit: '18:30', test: true };
+async function ladeClipCfg(s) {
+  const c = (await s.lies('clipcfg')) || {};
+  return { zeit: istUhrzeit(c.zeit) ? c.zeit : CLIP_STANDARD.zeit, test: c.test !== false, testFehler: c.testFehler || '', testFehlerZeit: c.testFehlerZeit || 0 };
+}
+// Clip ist ganz draußen (Instagram und/oder TikTok, je nachdem was angehakt war)
+const clipDraussen = c => (c.insta === false || !!c.gepostet) && (!c.tiktok || !!c.tt);
+function clipPruefen(c, b) {
+  const n = { ...c };
+  if (typeof b.vorlage === 'string') n.vorlage = b.vorlage.replace(/[^a-z0-9]/g, '').slice(0, 20);
+  if (typeof b.titel === 'string') n.titel = b.titel.replace(/[<>]/g, '').slice(0, 80);
+  if (typeof b.text === 'string') n.text = b.text.replace(/[<>]/g, '').slice(0, 2200);
+  if (b.postMs !== undefined) { const t = Number(b.postMs); if (t > Date.now() - 60000 && t < Date.now() + 120 * 86400000) n.postMs = t; }
+  for (const k of ['insta', 'tiktok', 'test']) if (b[k] !== undefined) n[k] = b[k] !== false;
+  if (b.thumbMs !== undefined) n.thumbMs = Math.max(0, Math.min(90000, Math.round(Number(b.thumbMs) || 0)));
+  if (b.dauer !== undefined) n.dauer = Math.max(0, Math.min(180, Number(b.dauer) || 0));
+  return n;
+}
+// Nächster freier Tag zur eingestellten Uhrzeit (ein Clip pro Tag)
+async function naechsterClipPlatz(s, jetzt = Date.now()) {
+  const cfg = await ladeClipCfg(s), clips = Object.values(await s.liste('clip:'));
+  const belegt = new Set(clips.filter(c => c && c.postMs).map(c => berlin(c.postMs).datum));
+  const heute = berlin(jetzt).datum;
+  for (let i = 0; i < 90; i++) {
+    const tag = tageZurueck(heute, -i), ms = berlinZuMs(tag, cfg.zeit);
+    if (ms > jetzt + 5 * 60000 && !belegt.has(tag)) return ms;
+  }
+  return jetzt + 3600000;
+}
+const clipTeile = c => (c && c.video ? Array.from({ length: c.video.teile || 0 }, (_, i) => `cvteil:${c.id}:${c.video.v}:${i}`) : []);
+// Posten: Instagram-Reel (wahlweise als Test-Reel) und TikTok-Entwurf, jedes mit eigenen Versuchen
+async function clipPosten(env, s, id) {
+  let c = await s.lies('clip:' + id);
+  if (!c) throw new Error('Clip nicht gefunden.');
+  if (!c.video) { c.fehler = 'Video fehlt noch – im Dashboard nochmal „Bauen“.'; await s.schreib('clip:' + id, c); return c; }
+  if (c.laeuft && Date.now() - c.laeuft < 5 * 60000) return c;
+  c.laeuft = Date.now();
+  await s.schreib('clip:' + id, c);
+  const videoUrl = `${env.ORIGIN}/cvideo/${id}/${c.video.v}.mp4`, cfg = await ladeClipCfg(s);
+  if (c.insta && !c.gepostet) {
+    try {
+      const token = await aktuellerToken(env, s);
+      if (!token) throw new Error('Kein Instagram-Token eingetragen.');
+      const k = await kontoLesen(env, s, false);
+      if (!k.verbunden) throw new Error(k.fehler || 'Instagram nicht verbunden.');
+      // Test-Reel ging zuletzt nicht → eine Woche lang gleich normal posten, dann wieder probieren
+      let test = c.test !== false && cfg.test && !(cfg.testFehler && Date.now() - cfg.testFehlerZeit < 7 * 86400000), mediaId;
+      try { mediaId = await posten({ token, uid: k.user_id, videoUrl, typ: 'reel', text: c.text || '', thumbMs: c.thumbMs || 0, test }); }
+      catch (e) {
+        const msg = String((e && e.message) || e);
+        if (!test || /verarbeiten/.test(msg)) throw e;
+        // Test-Reels gehen (noch) nicht bei diesem Konto → normal posten und merken
+        mediaId = await posten({ token, uid: k.user_id, videoUrl, typ: 'reel', text: c.text || '', thumbMs: c.thumbMs || 0 });
+        test = false;
+        await s.schreib('clipcfg', { ...cfg, testFehler: msg.slice(0, 200), testFehlerZeit: Date.now() });
+      }
+      c.gepostet = { zeit: Date.now(), mediaId, test };
+      try { c.gepostet.link = (await pruefen(token, mediaId)).link || ''; } catch (e) { /* Link ist nur schön */ }
+      c.fehler = '';
+    } catch (e) { c.fehler = String((e && e.message) || e).slice(0, 400); c.versuche = (c.versuche || 0) + 1; }
+  }
+  if (c.tiktok && !c.tt && ttEingerichtet(env) && await s.lies('tt:token')) {
+    try { c.tt = { zeit: Date.now(), publishId: await ttVideoEntwurf(await ttZugang(env, s), videoUrl) }; c.ttFehler = ''; }
+    catch (e) { c.ttFehler = String((e && e.message) || e).slice(0, 300); c.ttVersuche = (c.ttVersuche || 0) + 1; }
+  }
+  c.laeuft = 0;
+  await s.schreib('clip:' + id, c);
+  return c;
+}
+async function clipsListe(env, s) {
+  const roh = await s.liste('clip:');
+  return Object.values(roh).filter(c => c && c.id).sort((a, b) => (a.postMs || 0) - (b.postMs || 0)).map(c => ({
+    id: c.id, vorlage: c.vorlage || '', titel: c.titel || '', text: c.text || '', postMs: c.postMs || 0, dauer: c.dauer || 0,
+    insta: c.insta !== false, tiktok: !!c.tiktok, test: c.test !== false,
+    video: c.video ? `${env.ORIGIN}/cvideo/${c.id}/${c.video.v}.mp4` : '', bild: c.bild ? `${env.ORIGIN}/cbild/${c.id}.jpg?v=${c.bild}` : '',
+    gepostet: c.gepostet ? { zeit: c.gepostet.zeit || 0, link: c.gepostet.link || '', test: !!c.gepostet.test } : null,
+    tt: c.tt ? { zeit: c.tt.zeit || 0 } : null, fehler: c.fehler || '', ttFehler: c.ttFehler || '', versuche: c.versuche || 0
+  }));
+}
+
 // ─── Zeitplan (alle 10 Minuten) ─────────────────────────────
 async function zyklus(env) {
   const s = speicher(env);
@@ -440,6 +525,16 @@ async function zyklus(env) {
       try { await ttSenden(env, s, p, cfg, design); } catch (e) { /* nächster Lauf */ }
     }
   }
+  // 1b2. 🎬 Clips: fällige posten (Instagram und TikTok je mit eigenen Versuchen, höchstens 24 Std. zu spät)
+  try {
+    const tok = ttEingerichtet(env) && !!(await s.lies('tt:token'));
+    for (const c of Object.values(await s.liste('clip:'))) {
+      if (!c || !c.video || !c.postMs || c.postMs > jetzt || jetzt - c.postMs > 24 * 3600000) continue;
+      const insta = c.insta !== false && !c.gepostet && (c.versuche || 0) < 3;
+      const tt = c.tiktok && !c.tt && tok && (c.ttVersuche || 0) < 3;
+      if (insta || tt) await clipPosten(env, s, c.id);
+    }
+  } catch (e) { /* nächster Lauf */ }
   // 1c. YouTube-Livestreams planen
   try { await ytAbgleich(env, s, plan, cfg, jetzt); } catch (e) { await s.schreib('yt:fehler', { zeit: jetzt, text: String(e.message || e).slice(0, 300) }); }
   // 2. KI-Hintergründe für die Rennen der nächsten 48 Stunden (höchstens 2 pro Lauf)
@@ -490,6 +585,7 @@ async function zyklus(env) {
   for (const [k, t] of Object.entries(await s.liste('ytbh:'))) if (alt(t && t.startMs)) weg.push(k, 'ytb:' + k.slice(5));
   for (const [k, t] of Object.entries(await s.liste('yt:'))) if (!YT_META.includes(k) && t && t.startMs && alt(t.startMs)) weg.push(k);
   for (const [k, o] of Object.entries(await s.liste('os:'))) if (!o || o.zeit < jetzt - 30 * 60000) weg.push(k);
+  for (const c of Object.values(await s.liste('clip:'))) if (c && c.postMs && c.postMs < jetzt - (clipDraussen(c) ? 14 : 30) * 86400000) weg.push('clip:' + c.id, 'cbild:' + c.id, ...clipTeile(c));
   for (const pre of ['th:', 'thb:', 'nz:', 'nb:']) weg.push(...Object.keys(await s.liste(pre)));
   const tagHeute = new Date().toISOString().slice(0, 10);
   for (const k of Object.keys(await s.liste('ki:'))) if (k !== 'ki:' + tagHeute) weg.push(k);
@@ -640,7 +736,9 @@ async function stand(env, s) {
       video: z.istVideo && z.video ? `${env.ORIGIN}/pvideo/${id}/${z.video.v}.mp4` : ''
     };
   }).filter(Boolean).sort((a, b) => b.wann - a.wann);
+  const [clips, clipcfg] = await Promise.all([clipsListe(env, s), ladeClipCfg(s)]);
   return {
+    clips, clipcfg,
     erledigt, vorlagen,
     videos: Object.entries(videosRoh).filter(([, v]) => v && v.fertig).map(([k, v]) => ({ id: k.slice(6), name: v.name || '', ton: !!v.ton, dauer: v.dauer || 0, url: `${env.ORIGIN}/video/${k.slice(6)}`, zeit: v.zeit || 0 })).sort((a, b) => b.zeit - a.zeit),
     ablage: Object.entries(ablageRoh).map(([k, a]) => ({ id: k.slice(11), name: a.name || '', url: `${env.ORIGIN}/ablage/${k.slice(11)}`, zeit: a.zeit || 0 })).sort((a, b) => b.zeit - a.zeit),
@@ -700,6 +798,67 @@ async function api(req, env, url) {
     }
     await s.schreib('design', neu);
     return antwort({ ok: true });
+  }
+
+  // ─── 🎬 Clips ───
+  if (pfad === '/api/clips/einstellungen' && req.method === 'POST') {
+    const b = await json(), alt = await ladeClipCfg(s);
+    const neuTest = b.test !== undefined ? b.test !== false : alt.test;
+    await s.schreib('clipcfg', { zeit: istUhrzeit(b.zeit) ? b.zeit : alt.zeit, test: neuTest, testFehler: neuTest && !alt.test ? '' : alt.testFehler, testFehlerZeit: neuTest && !alt.test ? 0 : alt.testFehlerZeit });
+    return antwort({ ok: true, clipcfg: await ladeClipCfg(s) });
+  }
+  if (pfad === '/api/clip/neu' && req.method === 'POST') {
+    const b = await json(), id = 'c' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+    const c = clipPruefen({ id, erstellt: Date.now(), insta: true, tiktok: false, test: true }, b);
+    if (!c.postMs) c.postMs = await naechsterClipPlatz(s);
+    await s.schreib('clip:' + id, c);
+    return antwort({ ok: true, id, postMs: c.postMs, teil: TEIL });
+  }
+  if (pfad === '/api/clips/platz' && req.method === 'GET') return antwort({ postMs: await naechsterClipPlatz(s) });
+  const cp = pfad.match(/^\/api\/clip\/([a-z0-9]{1,40})\/(videoteil|videofertig|bild|aendern|weg|jetzt)(?:\/(\d{1,3}))?$/);
+  if (cp && req.method === 'POST') {
+    const [, id, was, nr] = cp;
+    const c = await s.lies('clip:' + id);
+    if (!c) return fehler('Clip nicht gefunden.', 404);
+    if (was === 'videoteil') {
+      const v = Number(url.searchParams.get('v')) || 0, u8 = new Uint8Array(await req.arrayBuffer());
+      if (!v || !u8.length || u8.length > TEIL || !(Number(nr) >= 0 && Number(nr) < 40)) return fehler('Stück ungültig.');
+      await s.schreib(`cvteil:${id}:${v}:${Number(nr)}`, u8);
+      return antwort({ ok: true });
+    }
+    if (was === 'videofertig') {
+      const v = Number(url.searchParams.get('v')) || 0, b = await json(), teile = Number(b.teile) || 0, groesse = Number(b.groesse) || 0;
+      const da = Object.keys(await s.liste(`cvteil:${id}:${v}:`)).length;
+      if (!v || !teile || da !== teile || groesse > VIDEO_MAX) return fehler(`Video unvollständig (${da} von ${teile}).`);
+      const alt = c.video;
+      c.video = { v, teile, groesse, zeit: Date.now() };
+      if (c.fehler && /Video fehlt/.test(c.fehler)) c.fehler = '';
+      await s.schreib('clip:' + id, c);
+      if (alt && alt.v !== v) await s.loesch(clipTeile({ ...c, video: alt }));
+      return antwort({ ok: true, video: `${env.ORIGIN}/cvideo/${id}/${v}.mp4` });
+    }
+    if (was === 'bild') {
+      const u8 = await bildAusBody(req, 900000);
+      if (!u8) return fehler('Vorschaubild ungültig.');
+      await s.schreib('cbild:' + id, u8);
+      c.bild = Date.now(); await s.schreib('clip:' + id, c);
+      return antwort({ ok: true });
+    }
+    if (was === 'aendern') {
+      if (clipDraussen(c)) return fehler('Dieser Clip ist schon draußen.');
+      const n = clipPruefen(c, await json());
+      if (n.postMs !== c.postMs) { n.versuche = 0; n.ttVersuche = 0; n.fehler = ''; }
+      await s.schreib('clip:' + id, n);
+      return antwort({ ok: true });
+    }
+    if (was === 'weg') { await s.loesch(['clip:' + id, 'cbild:' + id, ...clipTeile(c)]); return antwort({ ok: true }); }
+    if (was === 'jetzt') {
+      if (clipDraussen(c)) return fehler('Dieser Clip ist schon gepostet.');
+      c.versuche = 0; c.ttVersuche = 0; c.laeuft = 0; await s.schreib('clip:' + id, c);
+      const r = await clipPosten(env, s, id);
+      if (r.fehler && !r.gepostet) return fehler(r.fehler, 502);
+      return antwort({ ok: true, gepostet: !!r.gepostet, link: (r.gepostet && r.gepostet.link) || '', tiktok: !!r.tt, ttFehler: r.ttFehler || '' });
+    }
   }
 
   if (pfad === '/api/konto' && req.method === 'POST') {
@@ -1063,6 +1222,19 @@ export default {
         const s = speicher(env), z = await s.lies('post:' + ov[1]);
         if (!z || !z.video || String(z.video.v) !== ov[2]) return new Response('Kein Video', { status: 404, headers: CORS });
         return strom(req, s, `pvteil:${ov[1]}:${ov[2]}:`, z.video.teile, z.video.groesse, 'video/mp4');
+      }
+      // 🎬 Clip-Video (mit Range, für Instagram/TikTok) und Vorschaubild
+      const cvid = url.pathname.match(/^\/cvideo\/([a-z0-9]{1,40})\/(\d+)\.mp4$/);
+      if (cvid && (req.method === 'GET' || req.method === 'HEAD')) {
+        const s = speicher(env), c = await s.lies('clip:' + cvid[1]);
+        if (!c || !c.video || String(c.video.v) !== cvid[2]) return new Response('Kein Video', { status: 404, headers: CORS });
+        return strom(req, s, `cvteil:${cvid[1]}:${cvid[2]}:`, c.video.teile, c.video.groesse, 'video/mp4');
+      }
+      const cb = url.pathname.match(/^\/cbild\/([a-z0-9]{1,40})\.jpg$/);
+      if (cb && req.method === 'GET') {
+        const u8 = await speicher(env).lies('cbild:' + cb[1]);
+        if (!u8) return new Response('Kein Bild', { status: 404, headers: CORS });
+        return new Response(u8, { headers: { 'Content-Type': bildTyp(u8) || 'image/jpeg', 'Cache-Control': 'public, max-age=86400', ...CORS } });
       }
       // Eigenes Bild aus der Ablage (für Vorlagen)
       const ab = url.pathname.match(/^\/ablage\/([a-z0-9]{1,40})$/);
