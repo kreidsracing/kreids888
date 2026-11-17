@@ -28,51 +28,54 @@
   // ─── Vorlagen: jede mit eigener Neonfarbe, Sprüchen, Frage unten und Text für den Post ───
   const VORLAGEN = [
     { id: 'schuld', name: 'Wer war schuld?', emoji: '⚖️', farbe: '#ff2d6f', tag: 'VORFALL', zl: true, wieder: 'NOCHMAL GENAU HINSCHAUEN',
-      hooks: ['WER WAR SCHULD?', 'WER IST SCHULD?', 'RENNUNFALL ODER PECH?', 'DEINE MEINUNG?'], unten: 'A ODER B? KOMMENTIER!',
+      hooks: ['WER WAR SCHULD?', 'WER IST SCHULD?', 'RENNUNFALL ODER PECH?', 'DEINE MEINUNG?'], unten: ['A ODER B? KOMMENTIER!', 'WER WAR SCHULD? SCHREIB’S REIN!', 'RENNUNFALL ODER STRAFE?'],
       text: 'Wer war hier schuld? 🤔 A oder B? Schreib’s in die Kommentare 👇\n\n#simracing #iracing #racingincident #simracer #kreids888',
       hilfe: 'Für Unfälle und Szenen, über die man streiten kann. Die Leute kommentieren – das bringt Reichweite.' },
     { id: 'ueberholer', name: 'Überholer der Woche', emoji: '🚀', farbe: '#5cff1f', tag: 'KW {kw}', zl: true, wieder: 'SO GEHT DAS',
-      hooks: ['ÜBERHOLER DER WOCHE', 'SO GEHT ÜBERHOLEN', 'AUSGEBREMST!', 'VORBEI. EINFACH VORBEI.'], unten: 'WIE VIELE PUNKTE? 1 BIS 10',
+      hooks: ['ÜBERHOLER DER WOCHE', 'SO GEHT ÜBERHOLEN', 'AUSGEBREMST!', 'VORBEI. EINFACH VORBEI.'], unten: ['WIE VIELE PUNKTE? 1 BIS 10', 'SAUBER ODER ZU HART?', 'HÄTTEST DU’S AUCH GEWAGT?'],
       text: 'Überholer der Woche 🚀 Wie viele Punkte gibst du? 1 bis 10 👇\n\n#simracing #iracing #overtake #simracer #kreids888',
       hilfe: 'Dein bester Überholer. Am besten jede Woche einen, immer gleich – so erkennt man dich.' },
     { id: 'save', name: 'Save des Tages', emoji: '😮‍💨', farbe: '#18e8ff', tag: 'SAVE', zl: true, wieder: 'WIE?!',
-      hooks: ['SAVE DES TAGES', 'DAS WAR KNAPP', 'WIE HAB ICH DAS GEHALTEN?!', 'FAST WAR’S VORBEI'], unten: 'HÄTTEST DU’S GEHALTEN?',
+      hooks: ['SAVE DES TAGES', 'DAS WAR KNAPP', 'WIE HAB ICH DAS GEHALTEN?!', 'FAST WAR’S VORBEI'], unten: ['HÄTTEST DU’S GEHALTEN?', 'GLÜCK ODER KÖNNEN?', 'SCHON MAL SO GERETTET?'],
       text: 'Das war knapp 😮‍💨 Hättest du den gehalten? 👇\n\n#simracing #iracing #save #simracer #kreids888',
       hilfe: 'Wenn du das Auto gerade noch gefangen hast.' },
     { id: 'crash', name: 'Crash', emoji: '💥', farbe: '#ff7a00', tag: 'CRASH', zl: true, wieder: 'AUTSCH. NOCHMAL.', stempel: 'CRASH',
-      hooks: ['DAS GING SCHIEF', 'AUTSCH.', 'TOTALSCHADEN', 'DAS TUT WEH'], unten: 'WAS HÄTTEST DU GEMACHT?',
+      hooks: ['DAS GING SCHIEF', 'AUTSCH.', 'TOTALSCHADEN', 'DAS TUT WEH'], unten: ['WAS HÄTTEST DU GEMACHT?', 'WER WAR SCHULD?', 'SCHON MAL SO ABGEFLOGEN?'],
       text: 'Das ging schief 💥 Was hättest du gemacht? 👇\n\n#simracing #iracing #crash #simracer #kreids888',
       hilfe: 'Für Abflüge und Crashs. Mit Wackeln und CRASH-Stempel in der Zeitlupe.' },
     { id: 'hotlap', name: 'Hotlap-Challenge', emoji: '⏱️', farbe: '#b44dff', tag: 'HOTLAP', zl: false, wieder: 'NOCHMAL!',
       felder: [['rundenzeit', 'Rundenzeit', '1:52.414'], ['strecke', 'Strecke', 'Spa'], ['auto', 'Auto', 'Porsche 992 Cup']], pflicht: 'rundenzeit',
       zeigen: 'rundenzeit', zeigenLabel: 'RUNDENZEIT', info: c => [c.strecke, c.auto].filter(Boolean).join(' · '), feldTipp: 'Die Zeit kommt am Ende groß ins Bild.',
-      hooks: ['SCHAFFST DU DAS?', 'SCHLAG MEINE ZEIT', 'BIST DU SCHNELLER?'], unten: 'SCHREIB DEINE ZEIT!',
+      hooks: ['SCHAFFST DU DAS?', 'SCHLAG MEINE ZEIT', 'BIST DU SCHNELLER?'], unten: ['SCHREIB DEINE ZEIT!', 'WER IST SCHNELLER?', 'WIE NAH KOMMST DU RAN?'],
       text: c => `Hotlap${c.strecke ? ' ' + c.strecke : ''}${c.rundenzeit ? ' ⏱ ' + c.rundenzeit : ''} – schaffst du das? Schreib deine Zeit in die Kommentare 👇\n\n#simracing #iracing #hotlap #simracer #kreids888`,
       hilfe: 'Eine schnelle Runde. Trag die Rundenzeit ein, sie kommt am Ende groß ins Bild. Die Leute posten ihre Zeiten.' },
     { id: 'highlight', name: 'Highlight', emoji: '🔥', farbe: '#ff1f3d', tag: 'HIGHLIGHT', zl: false, wieder: 'NOCHMAL!',
-      hooks: ['WAS FÜR EIN MOMENT', 'DAS MUSST DU SEHEN', 'PURES SIMRACING', 'GÄNSEHAUT'], unten: 'FOLG FÜR MEHR SIMRACING',
+      hooks: ['WAS FÜR EIN MOMENT', 'DAS MUSST DU SEHEN', 'PURES SIMRACING', 'GÄNSEHAUT'], unten: ['FOLG FÜR MEHR SIMRACING', 'WIE FINDEST DU’S?', 'MEHR DAVON?'],
       text: 'Was für ein Moment 🔥 Folg für mehr Simracing!\n\n#simracing #iracing #simracer #racing #kreids888',
       hilfe: 'Für alles andere: schöne Szenen, Starts, Zieleinläufe.' },
     { id: 'start', name: 'Start-Chaos', emoji: '🚦', farbe: '#ffd400', tag: 'START', zl: true, wieder: 'NOCHMAL IN ZEITLUPE',
-      hooks: ['WER KOMMT DURCH?', 'START-CHAOS', 'KURVE 1. WIE IMMER.', 'ALLE AUF EINMAL'], unten: 'WO WÄRST DU HINGEFAHREN?',
+      hooks: ['WER KOMMT DURCH?', 'START-CHAOS', 'KURVE 1. WIE IMMER.', 'ALLE AUF EINMAL'], unten: ['WO WÄRST DU HINGEFAHREN?', 'WER IST SCHULD?', 'INNEN ODER AUSSEN?'],
       text: 'Start-Chaos 🚦 Wer kommt hier heil durch? Wo wärst du hingefahren? 👇\n\n#simracing #iracing #racestart #simracer #kreids888',
       hilfe: 'Für Rennstarts und die erste Kurve – da passiert immer was.' },
     { id: 'finish', name: 'Knappes Finish', emoji: '🏁', farbe: '#00ffa3', tag: 'ZIEL', zl: true, wieder: 'FOTOFINISH',
-      hooks: ['KNAPPER GEHT’S NICHT', 'FOTOFINISH', 'WER WAR VORNE?', 'ZEHNTEL ENTSCHEIDEN'], unten: 'WIE KNAPP WAR’S BEI DIR?',
+      hooks: ['KNAPPER GEHT’S NICHT', 'FOTOFINISH', 'WER WAR VORNE?', 'ZEHNTEL ENTSCHEIDEN'], unten: ['WIE KNAPP WAR’S BEI DIR?', 'WER WAR VORNE?', 'SCHON MAL SO KNAPP?'],
       felder: [['abstand', 'Abstand im Ziel', '0,042 s']], zeigen: 'abstand', zeigenLabel: 'ABSTAND IM ZIEL', info: () => 'ABSTAND IM ZIEL',
       feldTipp: 'Der Abstand kommt am Ende groß ins Bild. Leer lassen geht auch.',
       text: c => `Knapper geht’s nicht 🏁${c.abstand ? ' ' + c.abstand + ' Abstand im Ziel!' : ''} Wie knapp war’s bei dir schon mal? 👇\n\n#simracing #iracing #photofinish #simracer #kreids888`,
       hilfe: 'Für Zieleinläufe, bei denen es um Zehntel geht.' },
     { id: 'fail', name: 'Fail des Tages', emoji: '🤡', farbe: '#ff4fd8', tag: 'FAIL', zl: true, wieder: 'NOCHMAL. LANGSAM.', stempel: 'FAIL',
-      hooks: ['FAIL DES TAGES', 'DAS WAR NIX', 'PROFI AM WERK', 'UND TSCHÜSS'], unten: 'SCHON MAL PASSIERT? EHRLICH!',
+      hooks: ['FAIL DES TAGES', 'DAS WAR NIX', 'PROFI AM WERK', 'UND TSCHÜSS'], unten: ['SCHON MAL PASSIERT? EHRLICH!', 'WIE VIELE PUNKTE FÜR DEN FAIL?', 'PASSIERT DIR DAS AUCH?'],
       text: 'Fail des Tages 🤡 Ist dir das auch schon passiert? Sei ehrlich 👇\n\n#simracing #iracing #fail #simracer #kreids888',
       hilfe: 'Dreher, Verbremser, Patzer – Fails gehen immer. Mit FAIL-Stempel in der Zeitlupe.' },
     { id: 'duell', name: 'Duell', emoji: '⚔️', farbe: '#3d7bff', tag: 'DUELL', zl: true, wieder: 'GANZ GENAU HINSEHEN',
-      hooks: ['WER GEWINNT?', 'RAD AN RAD', 'DUELL!', 'KEINER GIBT NACH'], unten: 'WER GEWINNT? TIPP AB!',
+      hooks: ['WER GEWINNT?', 'RAD AN RAD', 'DUELL!', 'KEINER GIBT NACH'], unten: ['WER GEWINNT? TIPP AB!', 'WER WAR STÄRKER?', 'FAIR ODER ZU HART?'],
       text: 'Rad an Rad ⚔️ Wer gewinnt das Duell? Tipp ab in den Kommentaren 👇\n\n#simracing #iracing #battle #simracer #kreids888',
       hilfe: 'Für Zweikämpfe Rad an Rad. Die Leute tippen, wer gewinnt.' }
   ];
   const LOOKS = [['neon', '✨ Neon'], ['tv', '📺 TV-Sendung']];
+  const WIEDER = ['NOCHMAL GENAU HINSCHAUEN', 'NOCHMAL IN ZEITLUPE', 'GANZ GENAU HINSEHEN', 'NOCHMAL. LANGSAM.', 'WIE?!', 'AUTSCH. NOCHMAL.', 'SO GEHT DAS', 'FOTOFINISH'];
+  const frageVon = (c, v) => GROSS(String(c.unten || '').trim() || v.unten[0]);
+  const wiederVon = (c, v) => GROSS(String(c.wieder || '').trim() || v.wieder);
   const FARBEN = ['#ff2d6f', '#5cff1f', '#18e8ff', '#ff7a00', '#b44dff', '#ff1f3d', '#ffd400', '#00ffa3', '#ff4fd8', '#3d7bff'];
   const vorlage = c => VORLAGEN.find(v => v.id === c.vorlage) || VORLAGEN[0];
   const vorlageText = (v, c) => (typeof v.text === 'function' ? v.text(c || {}) : v.text);
@@ -268,13 +271,13 @@
     if (imClip && vid) {
       if (zoom) {
         quellBild(g, vid, -40, -40, B + 80, H + 80, rz ? 1.12 : 1.02 + 0.03 * fp(t, 0, p.D), c.versatz);
-        const v1 = g.createLinearGradient(0, 0, 0, 760); v1.addColorStop(0, 'rgba(3,4,6,.92)'); v1.addColorStop(1, 'rgba(3,4,6,0)'); g.fillStyle = v1; g.fillRect(0, 0, B, 760);
-        const v2 = g.createLinearGradient(0, 1030, 0, H); v2.addColorStop(0, 'rgba(3,4,6,0)'); v2.addColorStop(0.42, 'rgba(3,4,6,.88)'); g.fillStyle = v2; g.fillRect(0, 1030, B, H - 1030);
+        const v1 = g.createLinearGradient(0, 0, 0, 840); v1.addColorStop(0, 'rgba(3,4,6,.92)'); v1.addColorStop(0.45, 'rgba(3,4,6,.8)'); v1.addColorStop(1, 'rgba(3,4,6,0)'); g.fillStyle = v1; g.fillRect(0, 0, B, 840);
+        const v2 = g.createLinearGradient(0, 1100, 0, H); v2.addColorStop(0, 'rgba(3,4,6,0)'); v2.addColorStop(0.4, 'rgba(3,4,6,.88)'); g.fillStyle = v2; g.fillRect(0, 1100, B, H - 1100);
       } else weichesBild(g, vid, f);
     } else g.drawImage(grund(f), 0, 0);
     if (imClip) {
       // Clip im Neon-Rahmen (oder ganzes Bild bei „Zoom“)
-      const fx = zoom ? 34 : 40, fy = zoom ? 640 : 660, fw = zoom ? B - 68 : 1000, fh = zoom ? 640 : 562;
+      const fx = zoom ? 34 : 40, fy = zoom ? 690 : 690, fw = zoom ? B - 68 : 1000, fh = zoom ? 600 : 562;
       const fl = flackern(t);
       if (!zoom && vid) {
         g.save(); rr(g, fx, fy, fw, fh, 14); g.clip();
@@ -286,10 +289,10 @@
       }
       g.save(); g.globalAlpha = fl;
       if (!zoom) ecken(g, fx - 10, fy - 10, fw + 20, fh + 20, f, 74);
-      else ecken(g, 34, 200, B - 68, 1350, f, 90);
+      else ecken(g, 34, 296, B - 68, 1258, f, 90);
       g.restore();
       // Schild oben links am Rahmen, Uhr oben rechts
-      const sy0 = zoom ? 560 : fy - 66;
+      const sy0 = zoom ? 618 : fy - 66;
       if (rz) {
         pille(g, 'REPLAY 0.5×', fx + 40, sy0, '#ff2a2a', 30, false);
         if (Math.floor(t * 3) % 2 === 0) { g.save(); g.fillStyle = '#ff2a2a'; g.shadowColor = '#ff2a2a'; g.shadowBlur = 16; g.beginPath(); g.arc(fx + 18, sy0 + 24, 11, 0, Math.PI * 2); g.fill(); g.restore(); }
@@ -297,14 +300,14 @@
       else pille(g, tagText(v), fx + 6, sy0, f, 30, true);
       if (vid) { g.save(); OR(g, 34); g.textAlign = 'right'; g.shadowColor = f; g.shadowBlur = 14; g.fillStyle = '#fff'; g.fillText(uhr(p.quelle(t) || 0), fx + fw - 6, sy0 + 38); g.restore(); }
       // Fortschritt
-      const pr = kl(t / (p.T - OUTRO), 0, 1), py = 1248;
+      const pr = kl(t / (p.T - OUTRO), 0, 1), py = 1270;
       g.fillStyle = 'rgba(255,255,255,.12)'; g.fillRect(fx, py, fw, 8);
       g.save(); g.fillStyle = f; g.shadowColor = f; g.shadowBlur = 16; g.fillRect(fx, py, fw * pr, 8); g.restore();
       // Spruch oben: knallt rein mit Glitch, pulsiert danach leicht
       const zeilen = zweiZeilen(GROSS(c.hook || v.hooks[0])), px = zeilen.length > 1 ? 150 : 175;
       zeilen.forEach((z, i) => {
         const t0 = 0.12 + i * 0.16, q = fp(t, t0, t0 + 0.32); if (q <= 0) return;
-        const ch = chrom(z, px, f, 990), s = 1 + 0.9 * (1 - eob(q)) + 0.012 * Math.max(0, Math.sin((t - t0) * Math.PI * 2)), cy = (zeilen.length > 1 ? 300 : 360) + i * (px * 0.98);
+        const ch = chrom(z, px, f, 990), s = 1 + 0.9 * (1 - eob(q)) + 0.012 * Math.max(0, Math.sin((t - t0) * Math.PI * 2)), cy = (zeilen.length > 1 ? 428 : 476) + i * (px * 0.98);
         g.save(); g.translate(B / 2, cy); g.scale(s, s); g.globalAlpha = Math.min(1, q * 2.5);
         if (t - t0 < 0.42) {   // Glitch: versetzte Streifen und Farbgeister
           const r = zufallR(Math.floor(t * 30) + i * 7), n = 7, sh = ch.h / n;
@@ -321,25 +324,25 @@
       // Zeitlupe: Band mit Ansage, Crash-Stempel
       if (rz) {
         const q = fp(t, p.D, p.D + 0.25), aus = fp(t, p.D + 1.6, p.D + 1.9);
-        if (q > 0 && aus < 1) { const bd = band(v.wieder, f, 44); g.save(); g.globalAlpha = 1 - aus; g.translate(-(1 - eo(q)) * B, 0); g.drawImage(bd.c, B / 2 - bd.bandW / 2 - 40, (zoom ? 700 : fy + 40) - 60); g.restore(); }
-        stempel(g, t, p, v, f, B / 2, zoom ? 980 : fy + fh / 2 + 20);
+        if (q > 0 && aus < 1) { const bd = band(wiederVon(c, v), f, 44); g.save(); g.globalAlpha = 1 - aus; g.translate(-(1 - eo(q)) * B, 0); g.drawImage(bd.c, B / 2 - bd.bandW / 2 - 40, (zoom ? 760 : fy + 40) - 60); g.restore(); }
+        stempel(g, t, p, v, f, B / 2, zoom ? 1010 : fy + fh / 2 + 20);
       }
       // Rundenzeit / Abstand groß am Ende
       const erg = ergebnis(v, c, p, t);
       if (erg) {
-        const ch = chrom(erg.wert, 150, f, 900), yy = zoom ? 1120 : fy + fh - 40;
+        const ch = chrom(erg.wert, 150, f, 900), yy = zoom ? 1160 : fy + fh - 40;
         g.save(); g.translate(B / 2, yy); const k = 0.7 + 0.3 * eob(erg.q); g.scale(k, k); g.globalAlpha = Math.min(1, erg.q * 2); g.drawImage(ch.c, -ch.mitte, -ch.base); g.restore();
         if (erg.info) { g.save(); g.globalAlpha = erg.q; SA(g, passt(g, erg.info, 900, 52, SA)); g.textAlign = 'center'; g.fillStyle = '#fff'; g.shadowColor = '#000'; g.shadowBlur = 12; g.fillText(erg.info, B / 2, yy + 70); g.restore(); }
       }
       // Frage unten als Neon-Band, Pfeile zu den Kommentaren
       const ub = fp(t, 0.9, 1.25);
       if (ub > 0) {
-        const bd = band(GROSS(v.unten), f, 46), y = 1290;
+        const bd = band(frageVon(c, v), f, 46), y = 1310;
         g.save(); g.translate(-(1 - eo(ub)) * B, 0); g.drawImage(bd.c, B / 2 - bd.bandW / 2 - 40, y - 60); g.restore();
-        if (ub >= 1) chevrons(g, B / 2, y + 96, t, f);
+        if (ub >= 1) chevrons(g, B / 2, y + 92, t, f);
       }
       // Marke unten: Logo im Neon-Ring, Name, Folgen-Schild
-      marke(g, t, m, f, 1462);
+      marke(g, t, m, f, 1490);
     } else outroZeichnen(g, t - (p.T - OUTRO), m, f);
     g.restore();
     // Blitze: Anfang, Zeitlupe, Abspann
@@ -391,40 +394,40 @@
     });
   }
   function tvKopf(g, t, m, f, replay) {   // Senderlogo links, LIVE / REPLAY rechts, Neon-Linie
-    const y = 146;
-    logoRing(g, 88, y + 38, 36, f, m.logo, t);
-    g.save(); SA(g, passt(g, m.name, 420, 50, SAx(900), 28), 900); g.fillStyle = '#fff'; g.fillText(m.name, 142, y + 56); const w = g.measureText(m.name).width; g.restore();
-    pille(g, 'TV', 142 + w + 14, y + 13, f, 30, true);
+    const y = 298;
+    logoRing(g, 76, y + 27, 28, f, m.logo, t);
+    g.save(); SA(g, passt(g, m.name, 440, 44, SAx(900), 26), 900); g.fillStyle = '#fff'; g.fillText(m.name, 120, y + 43); const w = g.measureText(m.name).width; g.restore();
+    pille(g, 'TV', 120 + w + 12, y + 5, f, 27, true);
     const txt = replay ? 'REPLAY' : 'LIVE', farbe = replay ? f : '#ff2a2a';
-    g.save(); SA(g, 40, 900); const bw = g.measureText(txt).width + 78, bx = B - 48 - bw, by = y + 11;
-    g.shadowColor = farbe; g.shadowBlur = 22; g.fillStyle = farbe; g.fillRect(bx, by, bw, 56); g.shadowBlur = 0;
-    g.fillStyle = replay ? '#06080a' : '#fff'; g.fillText(txt, bx + 54, by + 43);
-    if (replay || Math.floor(t * 2) % 2 === 0) { g.beginPath(); g.arc(bx + 29, by + 28, 10, 0, Math.PI * 2); g.fill(); }
+    g.save(); SA(g, 36, 900); const bw = g.measureText(txt).width + 70, bx = B - 44 - bw, by = y + 2;
+    g.shadowColor = farbe; g.shadowBlur = 20; g.fillStyle = farbe; g.fillRect(bx, by, bw, 50); g.shadowBlur = 0;
+    g.fillStyle = replay ? '#06080a' : '#fff'; g.fillText(txt, bx + 48, by + 38);
+    if (replay || Math.floor(t * 2) % 2 === 0) { g.beginPath(); g.arc(bx + 26, by + 25, 9, 0, Math.PI * 2); g.fill(); }
     g.restore();
-    g.save(); g.fillStyle = f; g.shadowColor = f; g.shadowBlur = 18; g.fillRect(40, y + 94, B - 80, 4); g.restore();
+    g.save(); g.fillStyle = f; g.shadowColor = f; g.shadowBlur = 18; g.fillRect(40, y + 66, B - 80, 4); g.restore();
   }
   function tvSchlagzeile(g, t, c, v, f) {   // Etikett + Schlagzeile, wischen von links rein
-    const zeilen = zweiZeilen(GROSS(c.hook || v.hooks[0])), px = zeilen.length > 1 ? 120 : 136, x0 = 40, y0 = 298, bw = B - 80;
+    const zeilen = zweiZeilen(GROSS(c.hook || v.hooks[0])), px = zeilen.length > 1 ? 112 : 128, x0 = 40, y0 = 386, bw = B - 80;
     const q1 = eo(fp(t, 0.15, 0.4)), q2 = eo(fp(t, 0.28, 0.62));
     if (q1 > 0) {
-      g.save(); g.beginPath(); g.rect(x0, y0, bw * q1, 62); g.clip();
-      SA(g, 40, 900); const tx = tagText(v), tw = g.measureText(tx).width + 50;
-      g.fillStyle = f; g.shadowColor = f; g.shadowBlur = 16; g.fillRect(x0, y0, tw, 62); g.shadowBlur = 0; g.fillStyle = '#06080a'; g.fillText(tx, x0 + 25, y0 + 46);
+      g.save(); g.beginPath(); g.rect(x0, y0, bw * q1, 56); g.clip();
+      SA(g, 37, 900); const tx = tagText(v), tw = g.measureText(tx).width + 46;
+      g.fillStyle = f; g.shadowColor = f; g.shadowBlur = 16; g.fillRect(x0, y0, tw, 56); g.shadowBlur = 0; g.fillStyle = '#06080a'; g.fillText(tx, x0 + 23, y0 + 42);
       g.restore();
     }
     if (q2 <= 0) return;
-    const y = y0 + 62, h = zeilen.length * px * 1.0 + 50;
+    const y = y0 + 56, h = zeilen.length * px * 1.0 + 44;
     g.save(); g.beginPath(); g.rect(x0, y, bw * q2, h); g.clip();
     g.fillStyle = 'rgba(8,11,20,.9)'; g.fillRect(x0, y, bw, h);
     g.fillStyle = f; g.shadowColor = f; g.shadowBlur = 22; g.fillRect(x0, y, 14, h); g.shadowBlur = 0;
-    zeilen.forEach((z, i) => { SA(g, passt(g, z, bw - 90, px, SAx(900), 40), 900); g.fillStyle = '#fff'; g.shadowColor = hexA(f, 0.7); g.shadowBlur = 20; g.fillText(z, x0 + 46, y + 22 + px * 0.84 + i * px); });
+    zeilen.forEach((z, i) => { SA(g, passt(g, z, bw - 90, px, SAx(900), 40), 900); g.fillStyle = '#fff'; g.shadowColor = hexA(f, 0.7); g.shadowBlur = 20; g.fillText(z, x0 + 46, y + 19 + px * 0.84 + i * px); });
     // Lichtstreifen über den Kasten (alle 3,2 s)
     const gq = ((t - 1.1) % 3.2) / 0.7;
     if (t > 1.1 && gq <= 1) { const bx = x0 - 300 + (bw + 600) * gq, gr = g.createLinearGradient(bx, 0, bx + 220, 0); gr.addColorStop(0, 'rgba(255,255,255,0)'); gr.addColorStop(0.5, 'rgba(255,255,255,.16)'); gr.addColorStop(1, 'rgba(255,255,255,0)'); g.shadowBlur = 0; g.fillStyle = gr; g.fillRect(x0, y, bw, h); }
     g.restore();
   }
   function tvBildschirm(g, t, p, f, vid, rz) {   // Clip als Fernsehbild: geht an wie ein alter Fernseher
-    const fx = 40, fy = 676, fw = 1000, fh = 562, an = eo(fp(t, 0.04, 0.3)), hh = Math.max(4, fh * an);
+    const fx = 40, fy = 730, fw = 1000, fh = 562, an = eo(fp(t, 0.04, 0.3)), hh = Math.max(4, fh * an);
     g.save(); g.beginPath(); g.rect(fx, fy + (fh - hh) / 2, fw, hh); g.clip();
     g.fillStyle = '#000'; g.fillRect(fx, fy, fw, fh);
     if (vid) quellBild(g, vid, fx, fy, fw, fh, rz ? 1.12 : 1, 0);
@@ -436,8 +439,8 @@
     g.save(); g.strokeStyle = 'rgba(255,255,255,.92)'; g.lineWidth = 4; g.strokeRect(fx - 2, fy - 2, fw + 4, fh + 4);
     g.strokeStyle = f; g.shadowColor = f; g.shadowBlur = 26; g.lineWidth = 3; g.strokeRect(fx - 9, fy - 9, fw + 18, fh + 18); g.restore();
     const pr = kl(t / (p.T - OUTRO), 0, 1);
-    g.fillStyle = 'rgba(255,255,255,.12)'; g.fillRect(fx, fy + fh + 16, fw, 6);
-    g.save(); g.fillStyle = f; g.shadowColor = f; g.shadowBlur = 14; g.fillRect(fx, fy + fh + 16, fw * pr, 6); g.restore();
+    g.fillStyle = 'rgba(255,255,255,.12)'; g.fillRect(fx, fy + fh + 14, fw, 6);
+    g.save(); g.fillStyle = f; g.shadowColor = f; g.shadowBlur = 14; g.fillRect(fx, fy + fh + 14, fw * pr, 6); g.restore();
   }
   function tvEtikett(g, x, y, label, f) {
     SA(g, 34, 900); const lw = g.measureText(label).width + 44;
@@ -446,7 +449,7 @@
   }
   function tvBauchbinde(g, label, text, f, q) {   // Bauchbinde unter dem Bild: Etikett + weißer Kasten
     if (q <= 0) return;
-    const x = 40, y = 1272;
+    const x = 40, y = 1326;
     g.save(); g.translate(-(1 - eo(q)) * (B + 60), 0);
     tvEtikett(g, x, y, label, f);
     const px = passt(g, text, B - 170, 60, SAx(900), 30); SA(g, px, 900);
@@ -457,7 +460,7 @@
     g.restore();
   }
   function tvErgebnis(g, erg, f) {   // Rundenzeit / Abstand als Ergebnis-Einblendung
-    const x = 40, y = 1272, info = erg.info && erg.info !== erg.label ? erg.info : '';
+    const x = 40, y = 1326, info = erg.info && erg.info !== erg.label ? erg.info : '';
     g.save(); g.translate(-(1 - eo(erg.q)) * (B + 60), 0);
     tvEtikett(g, x, y, erg.label, f);
     const px = passt(g, erg.wert, info ? 540 : 880, 82, OR, 40); OR(g, px); const ww = g.measureText(erg.wert).width;
@@ -470,15 +473,15 @@
     g.restore();
   }
   function tvLaufschrift(g, t, m, f) {   // Laufschrift ganz unten, Sender links, FOLGEN rechts
-    const y = 1462, h = 72, links = 236, rechts = 250;
+    const y = 1508, h = 70, links = 236, rechts = 250;
     g.fillStyle = 'rgba(5,7,12,.95)'; g.fillRect(0, y, B, h);
     g.save(); g.fillStyle = f; g.shadowColor = f; g.shadowBlur = 14; g.fillRect(0, y - 4, B, 4); g.restore();
     const txt = `+++ SIMRACING-CLIPS VON ${m.handle} +++ FOLGEN NICHT VERGESSEN +++ SCHREIB DEINE MEINUNG IN DIE KOMMENTARE `;
     g.save(); g.beginPath(); g.rect(links, y, B - links - rechts, h); g.clip();
     SA(g, 42, 700); const w = g.measureText(txt).width; g.fillStyle = '#fff';
-    for (let x = links - ((t * 170) % w); x < B; x += w) g.fillText(txt, x, y + 50);
+    for (let x = links - ((t * 170) % w); x < B; x += w) g.fillText(txt, x, y + 49);
     g.restore();
-    g.save(); g.fillStyle = f; g.fillRect(0, y, links, h); SA(g, passt(g, m.name, links - 40, 40, SAx(900), 22), 900); g.fillStyle = '#06080a'; g.fillText(m.name, 22, y + 50); g.restore();
+    g.save(); g.fillStyle = f; g.fillRect(0, y, links, h); SA(g, passt(g, m.name, links - 40, 40, SAx(900), 22), 900); g.fillStyle = '#06080a'; g.fillText(m.name, 22, y + 49); g.restore();
     g.save(); g.fillStyle = 'rgba(5,7,12,1)'; g.fillRect(B - rechts, y, rechts, h); g.restore();
     const puls = 1 + 0.06 * Math.max(0, Math.sin(t * Math.PI * 2));
     g.save(); g.translate(B - rechts / 2 + 4, y + h / 2); g.scale(puls, puls); pille(g, '+ FOLGEN', -104, -26, f, 32, true); g.restore();
@@ -523,10 +526,10 @@
     tvKopf(g, t, m, f, rz);
     tvSchlagzeile(g, t, c, v, f);
     tvBildschirm(g, t, p, f, vid, rz);
-    if (rz) stempel(g, t, p, v, f, B / 2, 977);
+    if (rz) stempel(g, t, p, v, f, B / 2, 1031);
     const erg = ergebnis(v, c, p, t);
     if (erg) tvErgebnis(g, erg, f);
-    else tvBauchbinde(g, 'FRAGE AN DICH', GROSS(v.unten), f, fp(t, 0.9, 1.25));
+    else tvBauchbinde(g, 'FRAGE AN DICH', frageVon(c, v), f, fp(t, 0.9, 1.25));
     tvLaufschrift(g, t, m, f);
     g.restore();
     if (p.R) tvWischer(g, t, f, m, p.D - 0.25);
@@ -871,7 +874,7 @@
       v.onloadedmetadata = () => {
         const dauer = v.duration || 0, vl = VORLAGEN[0];
         ok(dauer >= 2 ? { id: Math.random().toString(36).slice(2), datei, url, name: datei.name, dauer, start: Math.max(0, dauer - 15), ende: dauer,
-          vorlage: vl.id, hook: vl.hooks[0], zeitlupe: vl.zl, modus: 'ganz', versatz: 0, farbe: vl.farbe, text: vorlageText(vl, {}), textEigen: false, look: LETZTER_LOOK,
+          vorlage: vl.id, hook: vl.hooks[0], unten: vl.unten[0], wieder: vl.wieder, zeitlupe: vl.zl, modus: 'ganz', versatz: 0, farbe: vl.farbe, text: vorlageText(vl, {}), textEigen: false, look: LETZTER_LOOK,
           insta: true, tiktok: !!(stand().tiktok && stand().tiktok.verbunden), postMs: 0 } : null);
       };
       v.onerror = () => ok(null);
@@ -880,7 +883,7 @@
   }
   function vorlageSetzen(c, id) {
     const v = VORLAGEN.find(x => x.id === id) || VORLAGEN[0];
-    c.vorlage = v.id; c.hook = v.hooks[0]; c.zeitlupe = v.zl; c.farbe = v.farbe; c.text = vorlageText(v, c); c.textEigen = false;
+    c.vorlage = v.id; c.hook = v.hooks[0]; c.unten = v.unten[0]; c.wieder = v.wieder; c.zeitlupe = v.zl; c.farbe = v.farbe; c.text = vorlageText(v, c); c.textEigen = false;
   }
   const postText = c => String(c.text || '').replace(/[ \t]{2,}/g, ' ').replace(/[ \t]+\n/g, '\n').trim();
   const sek = s => (Math.round(s * 10) / 10).toLocaleString('de-DE', { minimumFractionDigits: 1 }) + ' s';
@@ -931,6 +934,8 @@
         ${tipp(esc(v.hilfe))}
         <div class="kc-schritt">2 · Spruch & Look</div>
         <label class="kc-feld">Spruch oben<div class="kc-zeile"><input type="text" maxlength="40" value="${esc(c.hook)}" data-c="hook"><button type="button" class="btn ki-k" data-c="wuerfeln" title="Anderer Spruch">🎲</button></div>${tipp('Der erste Satz entscheidet, ob jemand stehen bleibt. Kurz und frech. 🎲 = anderer Vorschlag.')}</label>
+        <label class="kc-feld">Frage unten<div class="kc-zeile"><input type="text" maxlength="40" value="${esc(c.unten || '')}" placeholder="${esc(v.unten[0])}" data-c="unten"><button type="button" class="btn ki-k" data-c="wuerfeln-unten" title="Andere Frage">🎲</button></div>${tipp('Steht im Band unter dem Clip. Eine Frage bringt Kommentare.')}</label>
+        ${c.zeitlupe ? `<label class="kc-feld">Text in der Zeitlupe<div class="kc-zeile"><input type="text" maxlength="40" value="${esc(c.wieder || '')}" placeholder="${esc(v.wieder)}" data-c="wieder"><button type="button" class="btn ki-k" data-c="wuerfeln-wieder" title="Anderer Text">🎲</button></div></label>` : ''}
         ${v.felder ? `<div class="kc-felder">${v.felder.map(([k, label, ph]) => `<label class="kc-feld">${esc(label)}<input type="text" maxlength="40" placeholder="${esc(ph)}" value="${esc(c[k] || '')}" data-c="feld" data-feld="${k}"></label>`).join('')}</div>
           ${tipp(esc(v.feldTipp || ''))}` : ''}
         <div class="kc-umschalt kc-looks">${LOOKS.map(([k, n]) => `<button type="button" class="${(c.look || 'neon') === k ? 'an' : ''}" data-c="look" data-wert="${k}">${n}</button>`).join('')}</div>
@@ -1085,6 +1090,8 @@
     const a = b.dataset.c, c = CLIPS[0], z = b.closest('[data-id]'), id = z && z.dataset.id;
     if (a === 'vorlage' && c) { vorlageSetzen(c, b.dataset.wert); zeichnen(); return; }
     if (a === 'wuerfeln' && c) { const h = vorlage(c).hooks, i = (h.indexOf(c.hook) + 1) % h.length; c.hook = h[i]; zeichnen(); return; }
+    if (a === 'wuerfeln-unten' && c) { const h = vorlage(c).unten, i = (h.indexOf(c.unten) + 1) % h.length; c.unten = h[i]; zeichnen(); return; }
+    if (a === 'wuerfeln-wieder' && c) { const h = [vorlage(c).wieder, ...WIEDER.filter(x => x !== vorlage(c).wieder)], i = (h.indexOf(c.wieder) + 1) % h.length; c.wieder = h[i]; zeichnen(); return; }
     if (a === 'farbe' && c) { c.farbe = b.dataset.wert; zeichnen(); return; }
     if (a === 'modus' && c) { c.modus = b.dataset.wert; zeichnen(); return; }
     if (a === 'look' && c) { c.look = LETZTER_LOOK = b.dataset.wert; zeichnen(); return; }
@@ -1113,6 +1120,8 @@
     const t = ev.target, c = CLIPS[0]; if (!c || !t.dataset || !BOX.contains(t)) return;
     const a = t.dataset.c;
     if (a === 'hook') c.hook = t.value;
+    else if (a === 'unten') c.unten = t.value;
+    else if (a === 'wieder') c.wieder = t.value;
     else if (a === 'feld') {
       c[t.dataset.feld] = t.value;
       if (!c.textEigen && typeof vorlage(c).text === 'function') { c.text = vorlageText(vorlage(c), c); const ta = BOX.querySelector('[data-c="text"]'); if (ta) ta.value = c.text; }
