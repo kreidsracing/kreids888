@@ -553,6 +553,7 @@
     const offen = STAND.offen || [];
     const ki = STAND.ki || { frei: 0, max: 0 };
     const liste = posts.filter(p => p.status !== 'gepostet');
+    const clipsOffen = (STAND.clips || []).filter(c => !((!c.insta || c.gepostet) && (!c.tiktok || c.tt))).length;
     // Thumbnail steht beim Raceday (gibt es keine Story: bei der Ankündigung) und beim Ergebnis
     const mitStory = new Set(posts.filter(p => p.typ === 'story').map(p => p.rennKey));
     const neuAb = new Date(new Date().setUTCHours(24, 0, 0, 0)).toLocaleTimeString('de-DE', { timeZone: 'Europe/Berlin', hour: '2-digit', minute: '2-digit' });
@@ -566,15 +567,15 @@
           <div class="ki-dim">🎨 Cloudflare-KI heute: <b class="${ki.frei ? (ki.frei <= 2 ? 'gelb' : 'gruen') : 'rot'}">${esc(ki.frei)} von ${esc(ki.max)}</b> frei · neue ab ${esc(neuAb)} Uhr</div>
           <div class="ki-dim">${lauf ? `Letzter automatischer Lauf: ${esc(zeit(lauf.zeit))}${lauf.fehler ? ' · ⚠ ' + esc(lauf.fehler) : ''}` : 'Der automatische Lauf hat noch nicht gestartet.'}</div>
         </div>
-        <div class="ki-modus" role="group" aria-label="Posten">
+        ${REITER === 'clips' ? '' : `<div class="ki-modus" role="group" aria-label="Posten">
           <button type="button" class="${cfg.modus === 'freigabe' ? 'an' : ''}" data-aktion="modus" data-wert="freigabe">Mit Freigabe</button>
           <button type="button" class="${cfg.modus === 'auto' ? 'an' : ''}" data-aktion="modus" data-wert="auto">Automatisch</button>
-        </div>
+        </div>`}
       </div>
-      <p class="hint">${cfg.modus === 'auto' ? 'Posts gehen zur eingestellten Zeit von selbst raus – die Bilder werden gezeichnet, sobald du diesen Reiter öffnest.' : 'Jeder Post wartet, bis du ihn freigibst. Die Bilder werden gezeichnet, sobald du diesen Reiter öffnest.'}</p>
+      ${REITER === 'clips' ? '' : `<p class="hint">${cfg.modus === 'auto' ? 'Posts gehen zur eingestellten Zeit von selbst raus – die Bilder werden gezeichnet, sobald du diesen Reiter öffnest.' : 'Jeder Post wartet, bis du ihn freigibst. Die Bilder werden gezeichnet, sobald du diesen Reiter öffnest.'}</p>`}
       <div class="ki-malt"${MALT ? '' : ' hidden'}>${esc(MALT)}</div>
       <div class="side ki-reiter">
-        ${[['posts', `🗓 Posts (${liste.length})`], ['thumb', '▶ Thumbnail'], ['zeiten', '⏰ Zeiten & Text'], ['vorlagen', '🧩 Vorlagen'], ['zuteilung', '🔁 Zuteilung'], ['design', '🎨 Aussehen'], ['kanaele', '📡 YouTube & TikTok']].map(([k, t]) =>
+        ${[['posts', `🗓 Posts (${liste.length})`], ['clips', `🎬 Clips${clipsOffen ? ` (${clipsOffen})` : ''}`], ['thumb', '▶ Thumbnail'], ['zeiten', '⏰ Zeiten & Text'], ['vorlagen', '🧩 Vorlagen'], ['zuteilung', '🔁 Zuteilung'], ['design', '🎨 Aussehen'], ['kanaele', '📡 YouTube & TikTok']].map(([k, t]) =>
           `<a class="${REITER === k ? 'active' : ''}" data-aktion="reiter" data-wert="${k}">${t}</a>`).join('')}
       </div>
       ${REITER === 'posts' ? `
@@ -590,7 +591,9 @@
       ${REITER === 'design' ? `<div class="ki-grid">${designPanel(STAND.design)}</div>` : ''}
       ${REITER === 'kanaele' ? `<div class="ki-grid">${youtubePanel()}${tiktokPanel()}</div>` : ''}
       ${REITER === 'vorlagen' ? '<div class="ki-vorlagenbox"></div>' : ''}
-      ${REITER === 'zuteilung' ? '<div class="ki-zuteilungbox"></div>' : ''}`;
+      ${REITER === 'zuteilung' ? '<div class="ki-zuteilungbox"></div>' : ''}
+      ${REITER === 'clips' ? '<div class="ki-clipsbox"></div>' : ''}`;
+    if (REITER === 'clips' && window.K888Clips) window.K888Clips.start(BOX.querySelector('.ki-clipsbox'), CLIP_UMG);
     if (REITER === 'kanaele') { streamsLaden(); ytListeLaden(); const b = BOX.querySelector('.ki-ytbeschr'); if (b) b.innerHTML = ytBeschrHtml(); }
     if (REITER === 'vorlagen' && window.K888Vorlagen) window.K888Vorlagen.editor(BOX.querySelector('.ki-vorlagenbox'), VORLAGEN_UMG);
     if (REITER === 'zuteilung' && window.K888Vorlagen) window.K888Vorlagen.zuteilung(BOX.querySelector('.ki-zuteilungbox'), VORLAGEN_UMG);
@@ -619,6 +622,9 @@
     vorlageGespeichert(v) { STAND.thumbVorlage = v; },
     thumbGesetzt(rk, felder) { for (const p of STAND.posts) if (p.rennKey === rk) { p.thumb = { ...(p.thumb || {}), ...felder }; if (felder.vorlage === null) delete p.thumb.vorlage; } }
   };
+
+  // Umgebung für die Clip-Fabrik (insta-clips.js)
+  const CLIP_UMG = { stand: () => STAND, igApi, meldung, senden: bildSenden, laden: () => laden(true) };
 
   // Umgebung für den Vorlagen-Editor (insta-vorlagen.js)
   const VORLAGEN_UMG = {
@@ -1040,7 +1046,7 @@
   // Zeichnen (insta-bilder.js) und Thumbnail-Editor (insta-thumb.js) nachladen
   let SKRIPTE = null;
   function skripte() {
-    if (!SKRIPTE) SKRIPTE = Promise.all(['insta-bilder.js', 'insta-thumb.js', 'insta-vorlagen.js'].map(n => new Promise((ok, nein) => {
+    if (!SKRIPTE) SKRIPTE = Promise.all(['insta-bilder.js', 'insta-thumb.js', 'insta-vorlagen.js', 'insta-clips.js'].map(n => new Promise((ok, nein) => {
       const s = document.createElement('script'); s.src = BASIS + n + '?v=' + Date.now();
       s.onload = ok; s.onerror = () => nein(new Error('Konnte ' + n + ' nicht laden'));
       document.head.appendChild(s);
