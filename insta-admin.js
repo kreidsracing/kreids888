@@ -643,6 +643,17 @@
     if (p.status === 'gepostet') return ['Gepostet', 'gruen'];
     return STATUS[p.status] ? [p.status === 'wartet' ? 'Wartet' : STATUS[p.status][0], STATUS[p.status][1]] : ['?', 'grau'];
   }
+  function kpZiele(p) {
+    const tk = STAND.tiktok || {}, auto = tk.verbunden && ((STAND.cfg.tiktok || {}).typen || []).includes(p.typ);
+    const insta = p.status === 'gepostet' ? '<b class="kp-ok">✓ Insta</b>' : p.status === 'uebersprungen' ? '<s>Insta</s>' : 'Insta';
+    const tiktok = p.tiktok && p.tiktok.zeit ? '<b class="kp-ok">✓ TikTok</b>' : p.tiktok && p.tiktok.fehler ? '<b class="kp-weh">⚠ TikTok</b>' : auto && p.status !== 'uebersprungen' ? 'TikTok' : '';
+    return [insta, tiktok].filter(Boolean).join(' + ');
+  }
+  function clipZiele(c) {
+    const insta = c.insta ? (c.gepostet ? '<b class="kp-ok">✓ Insta</b>' : c.fehler ? '<b class="kp-weh">⚠ Insta</b>' : 'Insta') : '';
+    const tiktok = c.tiktok ? (c.tt ? '<b class="kp-ok">✓ TikTok</b>' : c.ttFehler ? '<b class="kp-weh">⚠ TikTok</b>' : 'TikTok') : '';
+    return [insta, tiktok].filter(Boolean).join(' + ');
+  }
   function kpZeile(p, modus) {
     const [st, fa] = kpStatus(p), id = esc(p.id), offen = p.id === OFFEN_ID;
     const frei = istFertig(p) || modus !== 'freigabe' ? '' : p.freigegeben
@@ -652,18 +663,18 @@
     return `<div class="kp-zeile${offen ? ' offen' : ''}${istFertig(p) ? ' fertig' : ''}" style="--f:${ART_FARBE[p.typ] || '#888'}" data-aktion="kp-auf" data-id="${id}">
       <div class="kp-zeit">${esc(wann)}</div>
       ${kpMini(p.bild, STORY_ART.includes(p.typ), p.bild ? '' : '🖌')}
-      <div class="kp-was"><b>${esc(TYP[p.typ] || p.typ)}</b><span>${titel(p)}${p.typ === 'tab' && p.tab && p.tab.platz ? ` · P${esc(p.tab.platz)}` : ''}${p.typ === 'meilen' ? ` · ${esc(p.zahl)}. ${esc(p.wort)}` : ''}${p.edit ? ' · ✎' : ''}</span></div>
+      <div class="kp-was"><b>${esc(TYP[p.typ] || p.typ)}</b><span>${titel(p)}${p.typ === 'tab' && p.tab && p.tab.platz ? ` · P${esc(p.tab.platz)}` : ''}${p.typ === 'meilen' ? ` · ${esc(p.zahl)}. ${esc(p.wort)}` : ''}${p.edit ? ' · ✎' : ''} · ${kpZiele(p)}</span></div>
       <span class="ki-chip ${fa}">${esc(st)}</span>
       <div class="kp-knoepfe">${frei}<button class="btn btn-ghost ki-k" data-aktion="kp-auf" data-id="${id}"><span>${offen ? '▴ Zu' : '✎ Bearbeiten'}</span></button></div>
     </div>`;
   }
   function kpClipZeile(c) {
     const st = c.gepostet ? ['Gepostet', 'gruen'] : c.fehler ? ['Fehler', 'rot'] : ['Geplant', 'blau'];
-    const wohin = [c.insta ? 'Insta' : '', c.tiktok ? 'TikTok' : ''].filter(Boolean).join(' + ');
+    const wohin = clipZiele(c);
     return `<div class="kp-zeile clip${c.gepostet ? ' fertig' : ''}" style="--f:${ART_FARBE.clip}">
       <div class="kp-zeit">${esc(uhrzeit(c.postMs))}</div>
       ${kpMini(c.bild, true, '🎬')}
-      <div class="kp-was"><b>🎬 Clip · ${esc(clipName(c))}</b><span>${esc(c.titel || '')}${wohin ? ' · ' + esc(wohin) : ''}</span></div>
+      <div class="kp-was"><b>🎬 Clip · ${esc(clipName(c))}</b><span>${esc(c.titel || '')}${wohin ? ' · ' + wohin : ''}</span></div>
       <span class="ki-chip ${st[1]}">${st[0]}</span>
       <div class="kp-knoepfe"><button class="btn btn-ghost ki-k" data-aktion="reiter" data-wert="clips"><span>→ Clips</span></button></div>
     </div>`;
@@ -673,11 +684,11 @@
       const t = tagPlus(von, i), hier = liste.filter(e => e.tag === t);
       return `<div class="kp-kt${t === heute ? ' heute' : ''}${t < heute ? ' vorbei' : ''}"><div class="kp-ktkopf"><b>${wtag(t)}</b> ${tagMon(t)}</div>
         ${hier.map(e => {
-          if (e.c) return `<button type="button" class="kp-karte" style="--f:${ART_FARBE.clip}" data-aktion="reiter" data-wert="clips" title="Clip · ${esc(clipName(e.c))}"><span class="kp-kzeit">${esc(uhrzeit(e.ms))}</span><span class="kp-ktext">🎬 ${esc(clipName(e.c))}</span><i class="kp-dot ${e.c.gepostet ? 'gruen' : 'blau'}"></i></button>`;
+          if (e.c) return `<button type="button" class="kp-karte" style="--f:${ART_FARBE.clip}" data-aktion="reiter" data-wert="clips" title="Clip · ${esc(clipName(e.c))}"><span class="kp-kzeit">${esc(uhrzeit(e.ms))}</span><span class="kp-ktext">🎬 ${esc(clipName(e.c))}</span><span class="kp-kziel">${clipZiele(e.c)}</span><i class="kp-dot ${e.c.gepostet ? 'gruen' : 'blau'}"></i></button>`;
           const p = e.p, [st, fa] = kpStatus(p);
           return `<button type="button" class="kp-karte${p.id === OFFEN_ID ? ' offen' : ''}${istFertig(p) ? ' fertig' : ''}" style="--f:${ART_FARBE[p.typ] || '#888'}" data-aktion="kp-auf" data-id="${esc(p.id)}" title="${esc((TYP[p.typ] || '') + ' · ' + st)}">
             ${p.bild ? `<img src="${esc(p.bild)}" alt="" loading="lazy" class="${STORY_ART.includes(p.typ) ? 'hoch' : ''}">` : ''}
-            <span class="kp-kzeit">${esc(p.typ === 'live' ? 'live' : uhrzeit(p.postMs))}</span><span class="kp-ktext">${esc((TYP[p.typ] || p.typ).split(' · ')[0])}</span><i class="kp-dot ${fa}"></i></button>`;
+            <span class="kp-kzeit">${esc(p.typ === 'live' ? 'live' : uhrzeit(p.postMs))}</span><span class="kp-ktext">${esc((TYP[p.typ] || p.typ).split(' · ')[0])}</span><span class="kp-kziel">${kpZiele(p)}</span><i class="kp-dot ${fa}"></i></button>`;
         }).join('') || '<div class="kp-frei-tag"></div>'}</div>`;
     }).join('')}</div></div>`;
   }
@@ -751,7 +762,7 @@
     if (p.eigenesErgebnis) k.push(`<button class="btn btn-ghost ki-k" data-aktion="erg-weg" data-rk="${esc(p.rennKey)}"><span>✕ Ergebnis löschen</span></button>`);
     if (tk.verbunden && p.bild && !(p.tiktok && p.tiktok.zeit)) k.push(kn('tiktok', '♪ An TikTok'));
     if (mitThumb && p.yt && yt.verbunden && p.startMs > Date.now()) k.push(`<button class="btn btn-ghost ki-k" data-aktion="yt-planen" data-rk="${esc(p.rennKey)}"><span>▶ ${p.yt.id ? 'YouTube aktualisieren' : 'Auf YouTube planen'}</span></button>`);
-    const h = [];
+    const h = [`<div class="kp-ziel">Geht an: ${kpZiele(p).replace('TikTok', 'TikTok (Entwurf)')}${p.gepostet && p.gepostet.zeit ? ` <span class="kp-dim">· gepostet ${esc(zeit(p.gepostet.zeit))}</span>` : ''}</div>`];
     if (p.fehler) h.push(`<div class="kp-hinweis rot">⚠ ${esc(p.fehler)}</div>`);
     if (p.status === 'verpasst') h.push('<div class="kp-hinweis rot">Zeit verpasst – „🚀 Jetzt posten“ schickt ihn sofort.</div>');
     if (p.typ === 'live' && !istFertig(p)) h.push(`<div class="kp-hinweis">Geht von selbst raus, sobald du auf YouTube live bist (45 Min. vor bis 3 Std. nach „Live ab“)${modus === 'freigabe' ? ' – vorher freigeben' : ''}.</div>`);
@@ -1494,6 +1505,11 @@
 #instaApp .btn.kp-los:disabled{background:#1a1c24;box-shadow:none;color:var(--steel)}
 #instaApp .kp-ungespeichert{color:#f5c518}
 #instaApp .kp-editor .ki-stream{max-width:100%}
+#instaApp .kp-ok{color:#3fbf5f;font-weight:700}#instaApp .kp-weh{color:#ff6b75;font-weight:700}
+#instaApp .kp-was span b{font:inherit;text-transform:none;letter-spacing:0;text-shadow:none}
+#instaApp .kp-was span b.kp-ok{color:#3fbf5f;font-weight:700}#instaApp .kp-was span b.kp-weh{color:#ff6b75;font-weight:700}
+#instaApp .kp-kziel{font-size:11px;color:var(--steel)}
+#instaApp .kp-ziel{font-size:14px;color:#e6e8ee}
 @media (max-width:700px){
   #instaApp .kp-tag{grid-template-columns:1fr}
   #instaApp .kp-tagname{flex-direction:row;align-items:baseline;gap:8px}
