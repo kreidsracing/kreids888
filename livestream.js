@@ -163,8 +163,13 @@
     if (!entry){ hideAll(); return; }
 
     // 3) Nur mit Thumbnail: zuerst eigenes YouTube-Thumbnail, sonst Bild aus dem Kalender
-    const ytUrl = (stream && stream.videoId) ? THUMB_API + encodeURIComponent(stream.videoId) + "?f=max" : "";
-    const thumb = (await probe(ytUrl)) || (await probe(entry.image));
+    // Alle 10 Min. eine neue Adresse, sonst zeigt der Browser nach einem Thumbnail-Wechsel bis zu 24 Std. das alte Bild
+    const takt = Math.floor(Date.now() / 600000);
+    const vid = (stream && stream.videoId) ? encodeURIComponent(stream.videoId) : "";
+    const eigen = vid ? await probe(THUMB_API + vid + "?f=max&v=" + takt) : null;
+    // Eigenes Thumbnail vorhanden: die Live-Fassung direkt von YouTube ist am aktuellsten
+    const frisch = eigen ? await probe("https://i.ytimg.com/vi/" + vid + "/maxresdefault_live.jpg?v=" + takt) : null;
+    const thumb = frisch || eigen || (await probe(entry.image));
     if (!thumb){ hideAll(); return; }
 
     renderUpcoming(entry, stream, thumb);

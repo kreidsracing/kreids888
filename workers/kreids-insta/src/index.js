@@ -385,8 +385,10 @@ async function ytAbgleich(env, s, plan, cfg, jetzt) {
   }
   let n = 2;   // höchstens 2 Rennen pro Lauf (Gratis-Tarif)
   for (const r of liste) {
-    if (r.startMs <= jetzt || (r.rennKey !== naechstes && r.startMs - jetzt > cfg.youtube.tage * 86400000)) continue;
+    if (r.startMs <= jetzt) continue;
     const z = (await s.lies('yt:' + r.rennKey)) || {};
+    // Noch nicht angelegt und weiter weg als „Tage vorher“: warten. Schon auf YouTube: immer aktuell halten (Text, Zeit, Thumbnail).
+    if (!z.id && r.rennKey !== naechstes && r.startMs - jetzt > cfg.youtube.tage * 86400000) continue;
     const th = await s.lies('ytbh:' + r.rennKey);
     if (z.id && z.hash === ytHash(r, cfg, beschr) && (!th || th.h === z.thumbH)) continue;
     if (n-- <= 0) break;
@@ -890,7 +892,7 @@ async function api(req, env, url) {
       const streams = zs.map(z => {
         const i = infos[z.id];
         return { rk: z.rk, id: z.id, titel: (i && i.titel) || z.titel || '', start: (i && i.start) || z.liveMs || z.startMs || 0, status: i ? i.status : 'geloescht',
-          sichtbar: i ? i.sichtbar : '', bild: (i && i.bild) || '', thumb: !!z.thumbH, fehler: z.fehler || '' };
+          sichtbar: i ? i.sichtbar : '', bild: (i && i.bild) || '', thumb: !!z.thumbH, thumbH: z.thumbH || '', fehler: z.fehler || '' };
       }).sort((a, b) => a.start - b.start);
       return antwort({ beschreibung: b && b.text ? { text: b.text, titel: b.titel || '', zeit: b.zeit || 0 } : null, streams });
     } catch (e) { return fehler(e.message, 502); }

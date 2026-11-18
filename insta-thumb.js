@@ -535,6 +535,12 @@
       aufbauen();
     } catch (e) { E.umg.meldung(e.message, 1); }
   }
+  // Gespeichertes Thumbnail gleich auf YouTube tauschen (wenn der Livestream dort schon angelegt ist)
+  async function aufYoutube(r) {
+    if (!E.umg.ytThumbNeu) return;
+    try { if (await E.umg.ytThumbNeu(r.rennKey)) E.umg.meldung('Thumbnail auf YouTube getauscht ✓ (YouTube zeigt es manchmal erst nach ein paar Minuten)'); }
+    catch (e) { E.umg.meldung('YouTube-Thumbnail: ' + e.message, 1); }
+  }
   // Thumbnail-Angaben eines Rennens speichern (seed, vorlage) und in der Liste merken
   async function rennenThumb(r, felder) {
     await E.umg.igApi('POST', `/api/thumb/${encodeURIComponent(r.rennKey)}`, { ...felder, startMs: r.startMs });
@@ -591,6 +597,7 @@
       const r = rennenAkt(); if (!r) return;
       await rennenThumb(r, { vorlage: kopie(E.v) });
       E.dirty = false; E.umg.meldung('Für dieses Rennen gespeichert.');
+      await aufYoutube(r);
     });
     if (t === 'speichern') return knopf(async () => {
       const r = rennenAkt();
@@ -600,6 +607,8 @@
       if (r) await rennenThumb(r, { vorlage: kopie(E.v) });   // dieses Rennen behält genau dieses Aussehen
       E.dirty = false;
       E.umg.meldung(Object.values(neu.varianten).some(Boolean) ? 'Als Vorlage gespeichert – die anderen Rennen bekommen davon ihre eigenen Varianten.' : 'Als Vorlage für alle Rennen gespeichert.');
+      if (r) await aufYoutube(r);
+      if (E.umg.ytAlleNeu) E.umg.ytAlleNeu();
     });
     if (t === 'standard') {
       if (!confirm('Auf die Standard-Vorlage zurücksetzen? (Gilt erst nach dem Speichern.)')) return;

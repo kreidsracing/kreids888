@@ -354,7 +354,7 @@
       const [t, f] = st[x.status] || [x.status || '?', 'grau'];
       const weg = x.status === 'geloescht';
       return `<div class="ki-ytstream${x.status === 'complete' || weg ? ' alt' : ''}">
-        ${x.bild ? `<img src="${esc(x.bild)}" alt="" loading="lazy">` : '<div class="ki-ytleer">▶</div>'}
+        ${x.bild ? `<img src="${esc(x.bild + (x.bild.includes('?') ? '&' : '?') + 'v=' + (x.thumbH || ''))}" alt="" loading="lazy">` : '<div class="ki-ytleer">▶</div>'}
         <div class="ki-ytinfo"><b>${esc(x.titel || 'Livestream')}</b>
           <div class="ki-dim">${x.start ? esc(zeit(x.start)) : ''} <span class="ki-chip ${f}">${esc(t)}</span>${x.sichtbar === 'unlisted' ? ' <span class="ki-chip grau">nicht gelistet</span>' : ''}${x.thumb ? '' : ' <span class="ki-chip gelb">ohne Thumbnail</span>'}</div>
           ${x.fehler ? `<div class="ki-hinweis rot">⚠ ${esc(x.fehler)}</div>` : ''}
@@ -620,7 +620,24 @@
     stand: () => STAND, igApi, meldung, rennen: rennenListe,
     spruchGesetzt(rk, text) { SPRUCH_NEU = true; for (const p of STAND.posts) if (p.rennKey === rk) { p.thumb = { ...(p.thumb || {}), spruch: text }; p.spruch = text; } },
     vorlageGespeichert(v) { STAND.thumbVorlage = v; },
-    thumbGesetzt(rk, felder) { for (const p of STAND.posts) if (p.rennKey === rk) { p.thumb = { ...(p.thumb || {}), ...felder }; if (felder.vorlage === null) delete p.thumb.vorlage; } }
+    thumbGesetzt(rk, felder) { for (const p of STAND.posts) if (p.rennKey === rk) { p.thumb = { ...(p.thumb || {}), ...felder }; if (felder.vorlage === null) delete p.thumb.vorlage; } },
+    // Nach dem Speichern: Thumbnail gleich neu zeichnen, hochladen und – wenn der Livestream schon auf YouTube steht – sofort dort tauschen
+    async ytThumbNeu(rk) {
+      const r = rennenListe().find(x => x.rennKey === rk);
+      if (!r || !window.K888Thumb || !(STAND.youtube || {}).verbunden || r.startMs <= Date.now()) return false;
+      const h = thumbHash(r);
+      if (r.ytThumbH !== h) {
+        const d = await window.K888Thumb.datei(window.K888Thumb.fuerRennen(STAND.thumbVorlage, r), r, STAND.design);
+        await bildSenden(`/api/ytthumb/${encodeURIComponent(rk)}?h=${h}&s=${r.startMs}`, d.blob);
+        for (const p of STAND.posts) if (p.rennKey === rk) p.ytThumbH = h;
+      }
+      if (!(r.yt && r.yt.id)) return false;
+      await igApi('POST', `/api/youtube/${encodeURIComponent(rk)}/planen`, {});
+      YTLISTE = null;
+      return true;
+    },
+    // Vorlage für alle geändert: alle kommenden Thumbnails neu zeichnen (der Worker bringt sie auf YouTube)
+    ytAlleNeu() { abgleichen(); }
   };
 
   // Umgebung für die Clip-Fabrik (insta-clips.js)
