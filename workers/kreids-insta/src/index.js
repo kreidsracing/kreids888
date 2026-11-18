@@ -129,7 +129,7 @@ function cfgPruefen(e) {
     naechstes: yt.naechstes !== false
   };
   const tk = e.tiktok || {};
-  c.tiktok = { typen: Array.isArray(tk.typen) ? ['ank', 'story', 'erg', 'woche'].filter(t => tk.typen.includes(t)) : CFG_STANDARD.tiktok.typen.slice() };
+  c.tiktok = { typen: Array.isArray(tk.typen) ? ['ank', 'story', 'erg', 'woche', 'tab', 'monat', 'meilen', 'live'].filter(t => tk.typen.includes(t)) : CFG_STANDARD.tiktok.typen.slice() };
   const wo = e.woche || {};
   c.woche = { aktiv: wo.aktiv !== false, zeit: istUhrzeit(wo.zeit) ? wo.zeit : '17:00', pose: /^[A-Za-z0-9_.-]{1,80}\.(png|webp)$/.test(String(wo.pose || '')) || wo.pose === '' ? wo.pose : CFG_STANDARD.woche.pose };
   const tb = e.tabelle || {}, mo = e.monat || {}, me = e.meilen || {}, li = e.live || {};
@@ -555,6 +555,7 @@ async function zyklus(env) {
     for (const p of plan) {
       if (!cfg.tiktok.typen.includes(p.typ) || p.postMs > jetzt) continue;
       const z = st2['post:' + p.id] || {};
+      if (p.typ === 'live' && !z.gepostet) continue;   // Jetzt live: erst, wenn du wirklich live bist
       if (z.uebersprungen || !z.version) continue;
       const frisch = jetzt - p.postMs < 6 * 3600000 || (z.gepostet && jetzt - (z.gepostet.zeit || 0) < 6 * 3600000);
       if (!frisch || !((cfg.modus === 'auto' && jetzt - p.postMs < VERPASST_NACH) || z.freigegeben || z.gepostet)) continue;

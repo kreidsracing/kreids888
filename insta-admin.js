@@ -399,7 +399,7 @@
     return `<div class="ki-panel"><h3>♪ TikTok · Entwürfe</h3>
       ${status}
       <div class="ki-knoepfe">${t.eingerichtet ? (t.verbunden ? '<button class="btn btn-ghost ki-k" data-aktion="trennen" data-wert="tiktok"><span>Trennen</span></button>' : '<button class="btn btn-red ki-k" data-aktion="verbinden" data-wert="tiktok"><span>Mit TikTok verbinden</span></button>') : ''}</div>
-      <div class="ki-fg"><label>Zusätzlich als Entwurf an TikTok</label><div class="ki-reihe">${art('story', 'Raceday-Story')}${art('woche', 'Wochenplan')}${art('erg', 'Ergebnis')}${art('ank', 'Ankündigung')}</div></div>
+      <div class="ki-fg"><label>Zusätzlich als Entwurf an TikTok</label><div class="ki-reihe">${art('story', 'Raceday-Story')}${art('woche', 'Wochenplan')}${art('erg', 'Ergebnis')}${art('ank', 'Ankündigung')}${art('tab', 'Tabellenstand')}${art('monat', 'Monatsbilanz')}${art('meilen', 'Meilenstein')}${art('live', 'Jetzt live')}</div></div>
       <div class="ki-dim">Geht zur gleichen Zeit wie bei Instagram raus. Du bekommst eine Nachricht in der TikTok-App: Musik dazu und selbst posten – innerhalb von 24 Stunden.</div>
       <div class="ki-knoepfe"><button class="btn btn-red ki-k" data-aktion="kanal-speichern"><span>💾 Speichern</span></button></div>
     </div>`;
