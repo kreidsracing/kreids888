@@ -369,149 +369,235 @@
   }
 
 
-  // ─── Gemeinsame Teile der neuen Posts (Tabellenstand, Monatsbilanz, Meilenstein) ───
-  // Titel-Band (wie „RENNERGEBNIS“) und Fußzeile (links Text, rechts Webseite)
-  function titelBand(titel, y, f1, f2, R, g = 62, h = 84) {
-    const tB = breite(titel, 'black', g, 2);
-    return band(-40, y, tB + R + 72, h, f1) + streifen(tB + R + 56, y, h, f1, f2) +
-      `<text x="${R}" y="${y + h * 0.76}" ${SCHRIFT.black} font-size="${g}" letter-spacing="2" fill="${textAuf(f1)}">${esc(titel)}</text>`;
+  // ─── Neue Posts: Tabellenstand, Monatsbilanz, Meilenstein (Feed) · Jetzt live (Story) ───
+  // Drei Looks, die der Worker der Reihe nach zuteilt (post.vorlage): Klassik (rot), Neon, Hell.
+  // Alle Texte und Zahlen lassen sich pro Post überschreiben (post.edit → Felder unten in FELDER).
+  const LOOKS = [['kreids', 'Klassik'], ['kneon', 'Neon'], ['khell', 'Hell']];
+  const PODEST_HELL = { 1: '#c79a00', 2: '#7d8794', 3: '#b0682c' };
+  function dunkelAuf(farbe) {   // Akzent als Schrift auf hellem Grund
+    let c = rgb(farbe);
+    for (let i = 0; i < 8 && leucht(c) > 0.32; i++) c = c.map(v => v * 0.8);
+    return hex(c);
   }
-  function fussZeile(links, B, H, R, f1) {
-    return `<text x="${R}" y="1288" ${SCHRIFT.semi} font-size="28" letter-spacing="3" fill="#d6dde5">${esc(links)}</text>` +
-      `<text x="${B - R}" y="1288" text-anchor="end" ${SCHRIFT.semi} font-size="26" letter-spacing="3" fill="#c9d1da">${WEBSEITE}</text>` +
-      `<rect x="0" y="${H - 12}" width="${B}" height="12" fill="${f1}"/>`;
+  function lookVon(post, design) {
+    const v = LOOKS.some(l => l[0] === post.vorlage) ? post.vorlage : 'kreids', f1 = design.farbe1 || '#e11324', f2 = design.farbe2 || '#ffffff';
+    if (v === 'khell') return { v, f1, f2, text: '#0b0c10', neben: '#4a515c', akzent: dunkelAuf(f1), podest: PODEST_HELL, panel: '#ffffff' };
+    return { v, f1, f2, text: '#ffffff', neben: v === 'kneon' ? '#c9d1da' : '#d6dde5', akzent: hellAuf(f1), podest: PODEST, panel: v === 'kneon' ? '#0a0c12' : '#14161d' };
+  }
+  // Grund: Klassik = dunkel + Streifen (oder KI-Bild), Neon = Raster + Leuchten, Hell = Papier mit dunkler Kopfleiste fürs Logo
+  function lookGrund(L, B, H, bg, kopfH, untenY = 250) {
+    const glow = `<filter id="neon" x="-30%" y="-60%" width="160%" height="220%"><feGaussianBlur stdDeviation="7" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>` +
+      `<filter id="glut2" x="-30%" y="-60%" width="160%" height="220%"><feGaussianBlur stdDeviation="10"/></filter>`;
+    if (L.v === 'kneon') {
+      let s = `<defs>${glow}<filter id="schatten" x="-20%" y="-30%" width="140%" height="180%"><feDropShadow dx="0" dy="3" stdDeviation="6" flood-color="#000" flood-opacity=".8"/></filter>
+<radialGradient id="ng1" cx="${B * 0.92}" cy="40" r="${B * 0.8}" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="${L.f1}" stop-opacity=".38"/><stop offset="1" stop-color="${L.f1}" stop-opacity="0"/></radialGradient>
+<radialGradient id="ng2" cx="0" cy="${H}" r="${B * 0.9}" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="${L.f1}" stop-opacity=".22"/><stop offset="1" stop-color="${L.f1}" stop-opacity="0"/></radialGradient></defs>`;
+      s += `<rect width="${B}" height="${H}" fill="#05060a"/>`;
+      if (bg) s += `<image href="${daten(bg)}" x="0" y="0" width="${B}" height="${H}" preserveAspectRatio="xMidYMid slice" opacity=".22"/>`;
+      for (let x = 0; x <= B; x += 60) s += `<rect x="${x}" y="0" width="1" height="${H}" fill="${L.f1}" opacity=".07"/>`;
+      for (let y = 0; y <= H; y += 60) s += `<rect x="0" y="${y}" width="${B}" height="1" fill="${L.f1}" opacity=".07"/>`;
+      return s + `<rect width="${B}" height="${H}" fill="url(#ng1)"/><rect width="${B}" height="${H}" fill="url(#ng2)"/>`;
+    }
+    if (L.v === 'khell') {
+      let s = `<defs>${glow}<filter id="schatten" x="-20%" y="-30%" width="140%" height="180%"><feDropShadow dx="0" dy="3" stdDeviation="5" flood-color="#000" flood-opacity=".16"/></filter></defs>`;
+      s += `<rect width="${B}" height="${H}" fill="#f2f0ea"/>`;
+      for (let i = -6; i < 16; i++) s += `<polygon points="${i * 140},${H} ${i * 140 + H * 0.5},0 ${i * 140 + H * 0.5 + 46},0 ${i * 140 + 46},${H}" fill="${L.f1}" opacity="${i % 3 === 0 ? 0.07 : 0.025}"/>`;
+      s += `<rect width="${B}" height="${kopfH}" fill="#0b0c10"/>`;
+      if (bg) s += `<image href="${daten(bg)}" x="0" y="0" width="${B}" height="${kopfH}" preserveAspectRatio="xMidYMid slice" opacity=".35"/>`;
+      return s + `<rect x="0" y="${kopfH}" width="${B}" height="8" fill="${L.f1}"/>`;
+    }
+    return `<defs>${glow}</defs><rect width="${B}" height="${H}" fill="#0a0b0e"/>` + hintergrund(B, H, bg, L.f1) + defs(B, H, kopfH, untenY);
+  }
+  function lookBand(L, titel, y, R, g = 62, h = 84) {
+    const tB = breite(titel, 'black', g, 2);
+    if (L.v === 'kneon') {
+      const s = h * 0.21, x = -40, b = tB + R + 72;
+      return `<polygon points="${x},${y + h} ${x + s},${y} ${x + b + s},${y} ${x + b},${y + h}" fill="${L.f1}" fill-opacity=".14" stroke="${L.f1}" stroke-width="4" filter="url(#neon)"/>` +
+        leuchtText(L, `x="${R}" y="${y + h * 0.76}" ${SCHRIFT.black} font-size="${g}" letter-spacing="2"`, esc(titel), '#ffffff');
+    }
+    if (L.v === 'khell') return band(-40, y, tB + R + 72, h, '#0b0c10') + streifen(tB + R + 56, y, h, L.f1, '#0b0c10') +
+      `<text x="${R}" y="${y + h * 0.76}" ${SCHRIFT.black} font-size="${g}" letter-spacing="2" fill="#ffffff">${esc(titel)}</text>`;
+    return band(-40, y, tB + R + 72, h, L.f1) + streifen(tB + R + 56, y, h, L.f1, L.f2) +
+      `<text x="${R}" y="${y + h * 0.76}" ${SCHRIFT.black} font-size="${g}" letter-spacing="2" fill="${textAuf(L.f1)}">${esc(titel)}</text>`;
+  }
+  function lookPanel(L, x, y, w, h, streifenFarbe) {
+    if (L.v === 'kneon') return `<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="#0a0c12" fill-opacity=".82" stroke="${streifenFarbe || L.f1}" stroke-opacity=".55" stroke-width="2"/>`;
+    if (L.v === 'khell') return `<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="#ffffff" filter="url(#schatten)"/>` + (streifenFarbe ? `<rect x="${x}" y="${y}" width="8" height="${h}" fill="${streifenFarbe}"/>` : '');
+    return `<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="#14161d" fill-opacity=".9"/>` + (streifenFarbe ? `<rect x="${x}" y="${y}" width="8" height="${h}" fill="${streifenFarbe}"/>` : '');
+  }
+  function lookFuss(L, links, B, H, R) {
+    const f = L.v === 'khell' ? '#4a515c' : '#d6dde5';
+    return `<text x="${R}" y="1288" ${SCHRIFT.semi} font-size="28" letter-spacing="3" fill="${f}">${esc(links)}</text>` +
+      `<text x="${B - R}" y="1288" text-anchor="end" ${SCHRIFT.semi} font-size="26" letter-spacing="3" fill="${f}">${WEBSEITE}</text>` +
+      `<rect x="0" y="${H - 12}" width="${B}" height="12" fill="${L.f1}"/>`;
   }
   const zahlDe = n => String(n).replace(/\B(?=(\d{3})+(?!\d))/g, '.');
-  // Pfeil als Form (▲/▼ gibt es in der Schrift nicht)
   const pfeil = (x, y, g, hoch, farbe) => hoch ? `<polygon points="${x},${y} ${x + g},${y} ${x + g / 2},${y - g * 0.9}" fill="${farbe}"/>` : `<polygon points="${x},${y - g * 0.9} ${x + g},${y - g * 0.9} ${x + g / 2},${y}" fill="${farbe}"/>`;
+  // Text mit Leuchten (Neon) – sonst normal
+  const leuchtText = (L, attr, inhalt, farbe) => L.v === 'kneon'   // Neon: farbiges Leuchten hinter scharfer Schrift
+    ? `<text ${attr} fill="${L.f1}" filter="url(#glut2)">${inhalt}</text><text ${attr} fill="${L.f1}" opacity=".55" filter="url(#glut2)">${inhalt}</text><text ${attr} fill="${farbe}">${inhalt}</text>` : `<text ${attr} fill="${farbe}">${inhalt}</text>`;
+
+  // Bearbeitbare Felder pro Art: [Schlüssel, Beschriftung, Standardwert]. Das Dashboard baut daraus das Formular.
+  const MONATSNAMEN = ['JANUAR', 'FEBRUAR', 'MÄRZ', 'APRIL', 'MAI', 'JUNI', 'JULI', 'AUGUST', 'SEPTEMBER', 'OKTOBER', 'NOVEMBER', 'DEZEMBER'];
+  function felder(post) {
+    const t = post.typ;
+    if (t === 'tab') return [['titelText', 'Überschrift', 'TABELLENSTAND'], ['serieText', 'Serie', gross([post.serie, post.klasse].filter(Boolean).join(' · '))],
+      ['unterText', 'Zeile darunter', post.nachRunde ? `NACH RUNDE ${post.nachRunde}${post.rundenGesamt ? ' VON ' + post.rundenGesamt : ''}` : ''], ['standText', 'Unten links', post.stand ? 'STAND ' + post.stand : '']];
+    if (t === 'monat') {
+      const [j, m] = String(post.monat || '').split('-').map(Number), b = post.bestes || {};
+      return [['titelText', 'Überschrift', 'MONATSBILANZ'], ['monatText', 'Monat', MONATSNAMEN[(m || 1) - 1] || ''], ['jahrText', 'Jahr', j ? String(j) : ''],
+        ['bestesText', 'Bestes Rennen', b.platz ? gross(`P${b.platz}${b.track ? ' · ' + b.track : ''}`) : ''], ['bestesSerie', 'Serie dazu', gross(b.serie || '')], ['fussText', 'Unten links', '']];
+    }
+    if (t === 'meilen') return [['titelText', 'Überschrift', 'MEILENSTEIN'], ['wort', 'Wort unter der Zahl', gross(post.wort || '')], ['zusatz', 'Zeile darunter', gross(post.zusatz || '')],
+      ['woText', 'Wo', gross([post.track, post.serie].filter(Boolean).join(' · '))], ['datumText', 'Unten links', post.datumText || datumDe(post.datum)]];
+    if (t === 'live') return [['wort1', 'Groß oben', 'JETZT'], ['wort2', 'Groß unten', 'LIVE'], ['track', 'Strecke', post.track || post.titel || ''], ['serieText', 'Serie', serienZeile(post)]];
+    if (t === 'ank' || t === 'story') return [['serie', 'Serie', post.serie || ''], ['track', 'Strecke (groß)', post.track || ''], ['layout', 'Layout', post.layout || '']];
+    if (t === 'erg') return [['serie', 'Serie', post.serie || ''], ['track', 'Strecke (groß)', post.track || '']];
+    return [];
+  }
+  // Zahlen im Bild (Monatsbilanz-Kästen, Meilenstein-Zahl, Ergebnis): [Schlüssel, Beschriftung, Standardwert]
+  function zahlen(post) {
+    const w = post.werte || {}, e = post.ergebnis || {};
+    if (post.typ === 'monat') return [['rennen', 'Rennen', w.rennen], ['siege', 'Siege', w.siege], ['podien', 'Podien', w.podien], ['top5', 'Top 5', w.top5], ['punkte', 'Punkte', w.punkte], ['schnitt', 'Ø Platz', w.schnitt ? String(w.schnitt).replace('.', ',') : '']];
+    if (post.typ === 'meilen') return [['zahl', 'Zahl', post.zahl]];
+    if (post.typ === 'erg') return [['start', 'Startplatz', e.start || ''], ['ziel', 'Zielplatz', e.ziel || ''], ['punkte', 'Punkte', e.punkte || 0]];
+    return [];
+  }
+  const datumDe = d => { const [j, m, t] = String(d || '').slice(0, 10).split('-'); return t ? `${t}.${m}.${j}` : ''; };
+  // Änderungen aus dem Dashboard übernehmen (Felder überschreiben, leer = Standard)
+  function mitAenderung(post) {
+    const e = post.edit || {}, f = e.felder || {}, p = { ...post };
+    for (const [k] of felder(post)) if (f[k] != null && String(f[k]).trim() !== '') p[k] = String(f[k]);
+    const z = zahlen(post);
+    if (post.typ === 'monat') { p.werte = { ...(post.werte || {}) }; for (const [k] of z) if (f[k] != null && String(f[k]).trim() !== '') p.werte[k] = String(f[k]); }
+    if (post.typ === 'meilen' && f.zahl != null && String(f.zahl).trim() !== '') p.zahl = String(f.zahl);
+    if (post.typ === 'erg') { p.ergebnis = { ...(post.ergebnis || {}) }; for (const [k, , ] of z) if (f[k] != null && String(f[k]).trim() !== '') p.ergebnis[k === 'ziel' ? 'ziel' : k] = Number(f[k]) || f[k]; }
+    if (post.typ === 'tab' && Array.isArray(e.tabelle) && e.tabelle.length) p.tabelle = e.tabelle;
+    return p;
+  }
 
   // ─── Tabellenstand (Feed 1080×1350) ─────────────────────────
-  // post.tabelle = [{ pos, name, pts, delta, ich }] (schon gekürzt: Spitze + eigene Umgebung, Lücke = { luecke: true })
+  // post.tabelle = [{ pos, name, pts, delta, ich }] (Spitze + eigene Umgebung, Lücke = { luecke: true })
   function tabelleSvg(post, design, bg) {
-    const B = 1080, H = 1350, R = 72, f1 = design.farbe1, f2 = design.farbe2, akzent = hellAuf(f1);
+    const B = 1080, H = 1350, R = 72, L = lookVon(post, design), F = Object.fromEntries(felder(post).map(([k, , w]) => [k, post[k] != null ? post[k] : w]));
     const zeilen = post.tabelle || [], n = Math.max(1, zeilen.length);
     const oben = 556, unten = 1222, zh = Math.min(76, Math.floor((unten - oben) / n)), luft = 6;
-    let s = `<svg xmlns="http://www.w3.org/2000/svg" width="${B}" height="${H}" viewBox="0 0 ${B} ${H}">`;
-    s += `<rect width="${B}" height="${H}" fill="#0a0b0e"/>` + hintergrund(B, H, bg, f1) + defs(B, H, 280, 250);
-    s += titelBand('TABELLENSTAND', 300, f1, f2, R);
-    const sz = gross([post.serie, post.klasse].filter(Boolean).join(' · '));
+    let s = `<svg xmlns="http://www.w3.org/2000/svg" width="${B}" height="${H}" viewBox="0 0 ${B} ${H}">` + lookGrund(L, B, H, bg, 270);
+    s += lookBand(L, gross(F.titelText), 300, R);
+    const sz = gross(F.serieText);
     s += `<g filter="url(#schatten)">`;
-    s += `<text x="${R + 2}" y="452" ${SCHRIFT.xbold} font-size="${passend(sz, 'xbold', B - 2 * R, 52, 28)}" fill="#ffffff">${esc(sz)}</text>`;
-    const nach = post.nachRunde ? `NACH RUNDE ${post.nachRunde}${post.rundenGesamt ? ' VON ' + post.rundenGesamt : ''}` : '';
-    if (nach) s += `<text x="${R + 2}" y="506" ${SCHRIFT.semi} font-size="32" letter-spacing="4" fill="${akzent}">${esc(nach)}</text>`;
+    s += `<text x="${R + 2}" y="452" ${SCHRIFT.xbold} font-size="${passend(sz, 'xbold', B - 2 * R, 52, 28)}" fill="${L.text}">${esc(sz)}</text>`;
+    if (F.unterText) s += `<text x="${R + 2}" y="506" ${SCHRIFT.semi} font-size="32" letter-spacing="4" fill="${L.akzent}">${esc(gross(F.unterText))}</text>`;
     s += '</g>';
     zeilen.forEach((z, i) => {
       const y = oben + i * zh, h = zh - luft, mitte = y + h / 2;
-      if (z.luecke) { [-26, 0, 26].forEach(d => { s += `<circle cx="${B / 2 + d}" cy="${mitte}" r="6" fill="#8b929c"/>`; }); return; }
-      const ich = !!z.ich, tf = ich ? textAuf(f1) : '#ffffff';
-      s += ich ? `<rect x="${R - 14}" y="${y - 4}" width="${B - 2 * R + 28}" height="${h + 8}" fill="${f1}"/>`
-        : `<rect x="${R}" y="${y}" width="${B - 2 * R}" height="${h}" fill="#14161d" fill-opacity=".9"/><rect x="${R}" y="${y}" width="8" height="${h}" fill="${PODEST[z.pos] || '#3a3f4a'}"/>`;
+      if (z.luecke) { [-26, 0, 26].forEach(d => { s += `<circle cx="${B / 2 + d}" cy="${mitte}" r="6" fill="${L.neben}"/>`; }); return; }
+      const ich = !!z.ich, tf = ich ? textAuf(L.f1) : L.text, pc = L.podest[z.pos];
+      if (ich) s += `<rect x="${R - 14}" y="${y - 4}" width="${B - 2 * R + 28}" height="${h + 8}" fill="${L.f1}"${L.v === 'kneon' ? ' filter="url(#neon)"' : ''}/>`;
+      else s += lookPanel(L, R, y, B - 2 * R, h, pc || (L.v === 'khell' ? '#d9d5cc' : '#3a3f4a'));
       const g = Math.min(46, h * 0.62), base = mitte + g * 0.36;
-      s += `<text x="${R + 76}" y="${base}" text-anchor="middle" ${SCHRIFT.black} font-size="${g}" fill="${ich ? tf : PODEST[z.pos] || '#ffffff'}">${z.pos}</text>`;
+      s += `<text x="${R + 76}" y="${base}" text-anchor="middle" ${SCHRIFT.black} font-size="${g}" fill="${ich ? tf : pc || L.text}">${esc(z.pos)}</text>`;
       const name = gross(z.name || '');
       s += `<text x="${R + 140}" y="${base}" ${ich ? SCHRIFT.black : SCHRIFT.xbold} font-size="${passend(name, ich ? 'black' : 'xbold', 560, g * 0.92, 22)}" fill="${tf}">${esc(name)}</text>`;
-      if (z.delta) {
-        const hoch = z.delta > 0, fa = ich ? tf : hoch ? '#2fbf6a' : '#e5484d', dg = g * 0.5, dx = B - R - 250;
-        s += pfeil(dx, base - 4, dg * 0.8, hoch, fa) + `<text x="${dx + dg * 0.8 + 8}" y="${base}" ${SCHRIFT.xbold} font-size="${dg * 1.15}" fill="${fa}">${Math.abs(z.delta)}</text>`;
+      const d = Number(z.delta) || 0;
+      if (d) {
+        const hoch = d > 0, fa = ich ? tf : hoch ? '#2fbf6a' : '#e5484d', dg = g * 0.5, dx = B - R - 250;
+        s += pfeil(dx, base - 4, dg * 0.8, hoch, fa) + `<text x="${dx + dg * 0.8 + 8}" y="${base}" ${SCHRIFT.xbold} font-size="${dg * 1.15}" fill="${fa}">${Math.abs(d)}</text>`;
       }
       s += `<text x="${B - R - 26}" y="${base}" text-anchor="end" ${SCHRIFT.black} font-size="${g}" fill="${tf}">${esc(zahlDe(z.pts))}</text>`;
     });
-    s += `<g filter="url(#schatten)">` + fussZeile(post.stand ? 'STAND ' + post.stand : '', B, H, R, f1) + '</g>';
+    s += `<g filter="url(#schatten)">` + lookFuss(L, gross(F.standText || ''), B, H, R) + '</g>';
     return s + '</svg>';
   }
 
   // ─── Monatsbilanz (Feed 1080×1350) ──────────────────────────
-  // post.monat = '2026-11', post.werte = { rennen, siege, podien, top5, punkte, schnitt }, post.bestes = { platz, track, serie }
-  const MONATSNAMEN = ['JANUAR', 'FEBRUAR', 'MÄRZ', 'APRIL', 'MAI', 'JUNI', 'JULI', 'AUGUST', 'SEPTEMBER', 'OKTOBER', 'NOVEMBER', 'DEZEMBER'];
   function monatSvg(post, design, bg) {
-    const B = 1080, H = 1350, R = 72, f1 = design.farbe1, f2 = design.farbe2, akzent = hellAuf(f1);
-    const [j, m] = String(post.monat || '').split('-').map(Number), name = MONATSNAMEN[(m || 1) - 1] || '', w = post.werte || {};
-    let s = `<svg xmlns="http://www.w3.org/2000/svg" width="${B}" height="${H}" viewBox="0 0 ${B} ${H}">`;
-    s += `<rect width="${B}" height="${H}" fill="#0a0b0e"/>` + hintergrund(B, H, bg, f1) + defs(B, H, 280, 250);
-    s += titelBand('MONATSBILANZ', 300, f1, f2, R);
-    const mg = passend(name, 'black', B - 2 * R - 230, 150, 80);
-    s += `<g filter="url(#schatten)"><text x="${R - 6}" y="${400 + mg * 0.74 + 20}" ${SCHRIFT.black} font-size="${mg}" fill="#ffffff">${esc(name)}<tspan dx="18" ${SCHRIFT.semi} font-size="${Math.round(mg * 0.42)}" fill="${akzent}">${j || ''}</tspan></text></g>`;
-    const felder = [['RENNEN', w.rennen], ['SIEGE', w.siege], ['PODIEN', w.podien], ['TOP 5', w.top5], ['PUNKTE', zahlDe(w.punkte || 0)], ['Ø PLATZ', w.schnitt ? String(w.schnitt).replace('.', ',') : '–']];
+    const B = 1080, H = 1350, R = 72, L = lookVon(post, design), F = Object.fromEntries(felder(post).map(([k, , w]) => [k, post[k] != null ? post[k] : w])), w = post.werte || {};
+    let s = `<svg xmlns="http://www.w3.org/2000/svg" width="${B}" height="${H}" viewBox="0 0 ${B} ${H}">` + lookGrund(L, B, H, bg, 270);
+    s += lookBand(L, gross(F.titelText), 300, R);
+    const name = gross(F.monatText), mg = passend(name, 'black', B - 2 * R - 230, 150, 80);
+    s += `<g filter="url(#schatten)">` + leuchtText(L, `x="${R - 6}" y="${400 + mg * 0.74 + 20}" ${SCHRIFT.black} font-size="${mg}"`,
+      `${esc(name)}<tspan dx="18" ${SCHRIFT.semi} font-size="${Math.round(mg * 0.42)}" fill="${L.akzent}">${esc(F.jahrText)}</tspan>`, L.text) + '</g>';
+    const felderW = [['RENNEN', w.rennen], ['SIEGE', w.siege], ['PODIEN', w.podien], ['TOP 5', w.top5], ['PUNKTE', /^\d+$/.test(String(w.punkte)) ? zahlDe(w.punkte) : w.punkte], ['Ø PLATZ', w.schnitt ? String(w.schnitt).replace('.', ',') : '–']];
     const bx = R, by = 600, bw = (B - 2 * R - 2 * 18) / 3, bh = 196;
-    felder.forEach(([l, v], i) => {
-      const x = bx + (i % 3) * (bw + 18), y = by + Math.floor(i / 3) * (bh + 18), hi = (l === 'SIEGE' || l === 'PODIEN') && Number(v) > 0;
-      s += `<rect x="${x}" y="${y}" width="${bw}" height="${bh}" fill="#14161d" fill-opacity=".9"/><rect x="${x}" y="${y}" width="${bw}" height="6" fill="${hi ? (l === 'SIEGE' ? PODEST[1] : f1) : '#3a3f4a'}"/>`;
-      s += `<text x="${x + 26}" y="${y + 58}" ${SCHRIFT.semi} font-size="26" letter-spacing="4" fill="${akzent}">${esc(l)}</text>`;
-      const t = String(v == null ? 0 : v);
-      s += `<text x="${x + 22}" y="${y + 166}" ${SCHRIFT.black} font-size="${passend(t, 'black', bw - 44, 104, 50)}" fill="${l === 'SIEGE' && Number(v) > 0 ? PODEST[1] : '#ffffff'}">${esc(t)}</text>`;
+    felderW.forEach(([l, v], i) => {
+      const x = bx + (i % 3) * (bw + 18), y = by + Math.floor(i / 3) * (bh + 18), gut = (l === 'SIEGE' || l === 'PODIEN') && Number(v) > 0;
+      s += lookPanel(L, x, y, bw, bh, null) + `<rect x="${x}" y="${y}" width="${bw}" height="6" fill="${gut ? (l === 'SIEGE' ? L.podest[1] : L.f1) : (L.v === 'khell' ? '#d9d5cc' : '#3a3f4a')}"/>`;
+      s += `<text x="${x + 26}" y="${y + 58}" ${SCHRIFT.semi} font-size="26" letter-spacing="4" fill="${L.akzent}">${esc(l)}</text>`;
+      const t = String(v == null || v === '' ? 0 : v);
+      s += leuchtText(L, `x="${x + 22}" y="${y + 166}" ${SCHRIFT.black} font-size="${passend(t, 'black', bw - 44, 104, 50)}"`, esc(t), l === 'SIEGE' && Number(v) > 0 ? L.podest[1] : L.text);
     });
-    const b = post.bestes;
-    if (b) {
-      const y = 1060, wert = gross(`${b.platz ? 'P' + b.platz : ''}${b.track ? ' · ' + b.track : ''}`);
-      s += `<g filter="url(#schatten)"><rect x="${R}" y="${y - 46}" width="6" height="${b.serie ? 128 : 84}" fill="${f1}"/>`;
-      s += `<text x="${R + 24}" y="${y - 10}" ${SCHRIFT.semi} font-size="26" letter-spacing="4" fill="${akzent}">BESTES RENNEN</text>`;
-      s += `<text x="${R + 22}" y="${y + 42}" ${SCHRIFT.black} font-size="${passend(wert, 'black', B - 2 * R - 40, 56, 30)}" fill="${PODEST[b.platz] || '#ffffff'}">${esc(wert)}</text>`;
-      if (b.serie) s += `<text x="${R + 24}" y="${y + 80}" ${SCHRIFT.semi} font-size="28" letter-spacing="2" fill="#d6dde5">${esc(gross(b.serie))}</text>`;
+    if (F.bestesText) {
+      const y = 1060, pl = (String(F.bestesText).match(/^P(\d+)/) || [])[1];
+      s += `<g filter="url(#schatten)"><rect x="${R}" y="${y - 46}" width="6" height="${F.bestesSerie ? 128 : 84}" fill="${L.f1}"/>`;
+      s += `<text x="${R + 24}" y="${y - 10}" ${SCHRIFT.semi} font-size="26" letter-spacing="4" fill="${L.akzent}">BESTES RENNEN</text>`;
+      s += `<text x="${R + 22}" y="${y + 42}" ${SCHRIFT.black} font-size="${passend(gross(F.bestesText), 'black', B - 2 * R - 40, 56, 30)}" fill="${L.podest[pl] || L.text}">${esc(gross(F.bestesText))}</text>`;
+      if (F.bestesSerie) s += `<text x="${R + 24}" y="${y + 80}" ${SCHRIFT.semi} font-size="28" letter-spacing="2" fill="${L.neben}">${esc(gross(F.bestesSerie))}</text>`;
       s += '</g>';
     }
-    s += `<g filter="url(#schatten)">` + fussZeile(post.fussText || '', B, H, R, f1) + '</g>';
+    s += `<g filter="url(#schatten)">` + lookFuss(L, gross(F.fussText || ''), B, H, R) + '</g>';
     return s + '</svg>';
   }
 
   // ─── Meilenstein (Feed 1080×1350) ───────────────────────────
-  // post.zahl = 50, post.wort = 'RENNEN' | 'SIEG' | 'PODIUM' …, post.zusatz = Zeile darunter, post.track/serie/datum = wo es passiert ist
   function meilensteinSvg(post, design, bg) {
-    const B = 1080, H = 1350, R = 72, f1 = design.farbe1, f2 = design.farbe2, akzent = hellAuf(f1);
+    const B = 1080, H = 1350, R = 72, L = lookVon(post, design), F = Object.fromEntries(felder(post).map(([k, , w]) => [k, post[k] != null ? post[k] : w]));
     const cx = B / 2, cy = 780;
-    let s = `<svg xmlns="http://www.w3.org/2000/svg" width="${B}" height="${H}" viewBox="0 0 ${B} ${H}">`;
-    s += `<defs><radialGradient id="glut" cx="${cx}" cy="${cy}" r="520" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="${f1}" stop-opacity=".55"/><stop offset="1" stop-color="${f1}" stop-opacity="0"/></radialGradient></defs>`;
-    s += `<rect width="${B}" height="${H}" fill="#0a0b0e"/>` + hintergrund(B, H, bg, f1) + defs(B, H, 280, 250);
-    // Strahlen hinter der Zahl
-    for (let i = 0; i < 24; i++) {
+    let s = `<svg xmlns="http://www.w3.org/2000/svg" width="${B}" height="${H}" viewBox="0 0 ${B} ${H}">` + lookGrund(L, B, H, bg, 270);
+    s += `<defs><radialGradient id="glut" cx="${cx}" cy="${cy}" r="520" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="${L.f1}" stop-opacity="${L.v === 'khell' ? 0.18 : 0.55}"/><stop offset="1" stop-color="${L.f1}" stop-opacity="0"/></radialGradient></defs>`;
+    for (let i = 0; i < 24; i++) {   // Strahlen hinter der Zahl
       const a = i / 24 * Math.PI * 2, d = 0.06, r1 = 140, r2 = 900;
       const p = [[cx + Math.cos(a - d) * r1, cy + Math.sin(a - d) * r1], [cx + Math.cos(a - d * 2.2) * r2, cy + Math.sin(a - d * 2.2) * r2], [cx + Math.cos(a + d * 2.2) * r2, cy + Math.sin(a + d * 2.2) * r2], [cx + Math.cos(a + d) * r1, cy + Math.sin(a + d) * r1]];
-      s += `<polygon points="${p.map(q => q.map(v => v.toFixed(1)).join(',')).join(' ')}" fill="${f1}" opacity="${i % 2 ? 0.08 : 0.16}"/>`;
+      if (L.v === 'kneon') s += `<line x1="${(cx + Math.cos(a) * 200).toFixed(1)}" y1="${(cy + Math.sin(a) * 200).toFixed(1)}" x2="${(cx + Math.cos(a) * 760).toFixed(1)}" y2="${(cy + Math.sin(a) * 760).toFixed(1)}" stroke="${L.f1}" stroke-width="${i % 2 ? 2 : 4}" opacity="${i % 2 ? 0.25 : 0.5}" filter="url(#neon)"/>`;
+      else s += `<polygon points="${p.map(q => q.map(v => v.toFixed(1)).join(',')).join(' ')}" fill="${L.f1}" opacity="${L.v === 'khell' ? (i % 2 ? 0.05 : 0.1) : (i % 2 ? 0.08 : 0.16)}"/>`;
     }
     s += `<rect width="${B}" height="${H}" fill="url(#glut)"/>`;
-    s += titelBand('MEILENSTEIN', 300, f1, f2, R);
+    s += lookBand(L, gross(F.titelText), 300, R);
     const zahl = String(post.zahl || '') + '.', zg = passend(zahl, 'black', B - 2 * R, 400, 200);
     s += `<g filter="url(#schatten)">`;
-    s += `<text x="${cx}" y="${cy + zg * 0.3}" text-anchor="middle" ${SCHRIFT.black} font-size="${zg}" fill="#ffffff" stroke="${f1}" stroke-width="10" paint-order="stroke">${esc(zahl)}</text>`;
-    const wort = gross(post.wort || ''), wg = passend(wort, 'black', B - 2 * R, 120, 60);
-    s += `<text x="${cx}" y="${cy + zg * 0.3 + wg * 0.95 + 10}" text-anchor="middle" ${SCHRIFT.black} font-size="${wg}" letter-spacing="2" fill="#ffffff">${esc(wort)}</text>`;
-    if (post.zusatz) s += `<text x="${cx}" y="${cy + zg * 0.3 + wg * 0.95 + 70}" text-anchor="middle" ${SCHRIFT.semi} font-size="34" letter-spacing="5" fill="${akzent}">${esc(gross(post.zusatz))}</text>`;
-    const wo = gross([post.track, post.serie].filter(Boolean).join(' · '));
-    if (wo) s += `<text x="${cx}" y="1190" text-anchor="middle" ${SCHRIFT.xbold} font-size="${passend(wo, 'xbold', B - 2 * R, 40, 24)}" fill="#e1e6ec">${esc(wo)}</text>`;
+    if (L.v === 'kneon') s += `<text x="${cx}" y="${cy + zg * 0.3}" text-anchor="middle" ${SCHRIFT.black} font-size="${zg}" fill="none" stroke="${L.f1}" stroke-width="12" filter="url(#neon)">${esc(zahl)}</text><text x="${cx}" y="${cy + zg * 0.3}" text-anchor="middle" ${SCHRIFT.black} font-size="${zg}" fill="#ffffff">${esc(zahl)}</text>`;
+    else s += `<text x="${cx}" y="${cy + zg * 0.3}" text-anchor="middle" ${SCHRIFT.black} font-size="${zg}" fill="${L.v === 'khell' ? '#0b0c10' : '#ffffff'}" stroke="${L.f1}" stroke-width="10" paint-order="stroke">${esc(zahl)}</text>`;
+    const wort = gross(F.wort), wg = passend(wort, 'black', B - 2 * R, 120, 60);
+    s += leuchtText(L, `x="${cx}" y="${cy + zg * 0.3 + wg * 0.95 + 10}" text-anchor="middle" ${SCHRIFT.black} font-size="${wg}" letter-spacing="2"`, esc(wort), L.text);
+    if (F.zusatz) s += `<text x="${cx}" y="${cy + zg * 0.3 + wg * 0.95 + 70}" text-anchor="middle" ${SCHRIFT.semi} font-size="34" letter-spacing="5" fill="${L.akzent}">${esc(gross(F.zusatz))}</text>`;
+    if (F.woText) s += `<text x="${cx}" y="1190" text-anchor="middle" ${SCHRIFT.xbold} font-size="${passend(gross(F.woText), 'xbold', B - 2 * R, 40, 24)}" fill="${L.v === 'khell' ? '#2a2f37' : '#e1e6ec'}">${esc(gross(F.woText))}</text>`;
     s += '</g>';
-    s += `<g filter="url(#schatten)">` + fussZeile(post.datumText || '', B, H, R, f1) + '</g>';
+    s += `<g filter="url(#schatten)">` + lookFuss(L, gross(F.datumText || ''), B, H, R) + '</g>';
     return s + '</svg>';
   }
 
   // ─── Jetzt live (Story 1080×1920) ───────────────────────────
   // Instagram legt oben (~250 px) und unten (~380 px) eigene Leisten drüber → alles zwischen y = 200 und y = 1540.
   function liveSvg(post, design, bg) {
-    const B = 1080, H = 1920, R = 64, f1 = design.farbe1, f2 = design.farbe2, akzent = hellAuf(f1);
-    const track = umbruch(grossText(post), 'xbold', B - 2 * R - 10, 96, 52), lz = liveZeile(design);
-    let s = `<svg xmlns="http://www.w3.org/2000/svg" width="${B}" height="${H}" viewBox="0 0 ${B} ${H}">`;
-    s += `<rect width="${B}" height="${H}" fill="#0a0b0e"/>` + hintergrund(B, H, bg, f1) + defs(B, H, 480, 640);
+    const B = 1080, H = 1920, R = 64, L = lookVon(post, design), F = Object.fromEntries(felder(post).map(([k, , w]) => [k, post[k] != null ? post[k] : w]));
+    const track = umbruch(gross(F.track || 'LIVE'), 'xbold', B - 2 * R - 10, 96, 52), lz = liveZeile(design);
+    let s = `<svg xmlns="http://www.w3.org/2000/svg" width="${B}" height="${H}" viewBox="0 0 ${B} ${H}">` + lookGrund(L, B, H, bg, L.v === 'khell' ? 640 : 480, 640);
+    const pill = L.v === 'khell' ? '#0b0c10' : L.f1, auf = L.v === 'khell' ? '#ffffff' : textAuf(L.f1);
     // „● LIVE“-Schild
     const py = 760, ph = 92, pt = 'LIVE', pg = 64, pw = breite(pt, 'black', pg, 4) + 150;
-    s += `<g filter="url(#schatten)"><rect x="${R}" y="${py}" width="${pw}" height="${ph}" rx="${ph / 2}" fill="${f1}"/>`;
-    s += `<circle cx="${R + 54}" cy="${py + ph / 2}" r="18" fill="${textAuf(f1)}"/><circle cx="${R + 54}" cy="${py + ph / 2}" r="30" fill="none" stroke="${textAuf(f1)}" stroke-width="4" opacity=".45"/>`;
-    s += `<text x="${R + 100}" y="${py + ph * 0.74}" ${SCHRIFT.black} font-size="${pg}" letter-spacing="4" fill="${textAuf(f1)}">${pt}</text></g>`;
-    // JETZT / LIVE groß
+    s += `<g filter="url(#${L.v === 'kneon' ? 'neon' : 'schatten'})"><rect x="${R}" y="${py}" width="${pw}" height="${ph}" rx="${ph / 2}" fill="${pill}"/></g>`;
+    s += `<circle cx="${R + 54}" cy="${py + ph / 2}" r="18" fill="${L.v === 'khell' ? L.f1 : auf}"/><circle cx="${R + 54}" cy="${py + ph / 2}" r="30" fill="none" stroke="${L.v === 'khell' ? L.f1 : auf}" stroke-width="4" opacity=".45"/>`;
+    s += `<text x="${R + 100}" y="${py + ph * 0.74}" ${SCHRIFT.black} font-size="${pg}" letter-spacing="4" fill="${auf}">${pt}</text>`;
+    // Groß: JETZT / LIVE
+    const g1 = passend(gross(F.wort1), 'black', B - 2 * R, 250, 120), g2 = passend(gross(F.wort2), 'black', B - 2 * R, 250, 120);
     s += `<g filter="url(#schatten)">`;
-    s += `<text x="${R - 10}" y="1060" ${SCHRIFT.black} font-size="250" fill="#ffffff">JETZT</text>`;
-    s += `<text x="${R - 10}" y="1270" ${SCHRIFT.black} font-size="250" fill="${akzent}">LIVE</text>`;
+    s += `<text x="${R - 10}" y="1060" ${SCHRIFT.black} font-size="${g1}" fill="${L.text}">${esc(gross(F.wort1))}</text>`;
+    s += L.v === 'kneon' ? `<text x="${R - 10}" y="1270" ${SCHRIFT.black} font-size="${g2}" fill="none" stroke="${L.f1}" stroke-width="8" filter="url(#neon)">${esc(gross(F.wort2))}</text><text x="${R - 10}" y="1270" ${SCHRIFT.black} font-size="${g2}" fill="#ffffff" fill-opacity=".92">${esc(gross(F.wort2))}</text>`
+      : `<text x="${R - 10}" y="1270" ${SCHRIFT.black} font-size="${g2}" fill="${L.v === 'khell' ? L.f1 : L.akzent}">${esc(gross(F.wort2))}</text>`;
     let y = 1290 + track.g * 0.8;
-    s += track.zeilen.map((z, i) => `<text x="${R - 4}" y="${y + i * track.g * 0.92}" ${SCHRIFT.xbold} font-size="${track.g}" fill="#ffffff">${esc(z)}</text>`).join('');
+    s += track.zeilen.map((z, i) => `<text x="${R - 4}" y="${y + i * track.g * 0.92}" ${SCHRIFT.xbold} font-size="${track.g}" fill="${L.text}">${esc(z)}</text>`).join('');
     y += (track.zeilen.length - 1) * track.g * 0.92 + 52;
-    const sz = serienZeile(post);
-    s += `<text x="${R}" y="${y}" ${SCHRIFT.semi} font-size="${passend(sz, 'semi', B - 2 * R, 34, 22, 3)}" letter-spacing="3" fill="${akzent}">${esc(sz)}</text>`;
+    const sz = gross(F.serieText);
+    s += `<text x="${R}" y="${y}" ${SCHRIFT.semi} font-size="${passend(sz, 'semi', B - 2 * R, 34, 22, 3)}" letter-spacing="3" fill="${L.akzent}">${esc(sz)}</text>`;
     if (lz) {
       y += 76;
-      s += `<rect x="${R}" y="${y - 42}" width="6" height="54" fill="${f1}"/>` +
-        `<text x="${R + 22}" y="${y}" ${SCHRIFT.semi} font-size="30" letter-spacing="3" fill="#e1e6ec">LIVE AUF</text>` +
-        `<text x="${R + 22 + breite('LIVE AUF', 'semi', 30, 3) + 14}" y="${y}" ${SCHRIFT.xbold} font-size="${passend(lz, 'xbold', B - 2 * R - 200, 50, 26)}" fill="#ffffff">${esc(lz)}</text>`;
+      s += `<rect x="${R}" y="${y - 42}" width="6" height="54" fill="${L.f1}"/>` +
+        `<text x="${R + 22}" y="${y}" ${SCHRIFT.semi} font-size="30" letter-spacing="3" fill="${L.neben}">LIVE AUF</text>` +
+        `<text x="${R + 22 + breite('LIVE AUF', 'semi', 30, 3) + 14}" y="${y}" ${SCHRIFT.xbold} font-size="${passend(lz, 'xbold', B - 2 * R - 200, 50, 26)}" fill="${L.text}">${esc(lz)}</text>`;
     }
-    s += `<text x="${R}" y="${Math.min(1530, y + 64)}" ${SCHRIFT.semi} font-size="28" letter-spacing="4" fill="#c9d1da">LINK IN BIO · ${WEBSEITE}</text>`;
+    s += `<text x="${R}" y="${Math.min(1530, y + 64)}" ${SCHRIFT.semi} font-size="28" letter-spacing="4" fill="${L.neben}">LINK IN BIO · ${WEBSEITE}</text>`;
     s += '</g>';
-    s += `<rect x="0" y="${H - 14}" width="${B}" height="14" fill="${f1}"/>`;
+    s += `<rect x="0" y="${H - 14}" width="${B}" height="14" fill="${L.f1}"/>`;
     return s + '</svg>';
   }
 
@@ -653,7 +739,7 @@
     const [css, bg, logo, team] = await Promise.all([schriften(), bildDaten(p.hg), bildDaten(design.logoBild), teamBild(design.team, design.teamSchwarz !== false)]);
     KOPF = { logo: await masse(logo), team };
     const pose = p.typ === 'woche' && p.pose ? await bildDaten(SITE + 'overlays/personen/' + p.pose).then(masse) : null;
-    let svg = svgFuer({ ...p, klassen: p.klassen || [] }, design, bg, logo, pose);
+    let svg = svgFuer(mitAenderung({ ...p, klassen: p.klassen || [] }), design, bg, logo, pose);
     svg = svg.replace(/^(<svg[^>]*>)/, `$1<style>${css}</style>`);
     if (p.typ !== 'woche') svg = svg.replace(/<\/svg>$/, ebenen(p, design, 1080) + '</svg>');
     else BOXEN = [];
@@ -662,5 +748,5 @@
     blob.boxen = boxen;
     return blob;
   }
-  window.K888Bilder = { post, bildDaten, schriften, berlin, SITE, TEAM, teamUrl, layoutAus, ersatzSpruch, boxen: () => BOXEN };
+  window.K888Bilder = { post, bildDaten, schriften, berlin, SITE, TEAM, teamUrl, layoutAus, ersatzSpruch, boxen: () => BOXEN, LOOKS, felder, zahlen, mitAenderung };
 })();

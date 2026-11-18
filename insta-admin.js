@@ -118,6 +118,8 @@
     if (p.typ === 'tab') {
       tab = window.K888Tabelle ? await window.K888Tabelle.fuer(p, igApi) : null;
       if (!tab) throw new Error('Tabelle der Serie gerade nicht da – später nochmal öffnen.');
+      TABELLEN[p.id] = tab;
+      if (p.edit && p.edit.tabelle) tab = { ...tab, werte: werteAus(p.edit.tabelle, tab.werte.fp) };
     }
     const blob = vk ? await window.K888Vorlagen.bildFuer(vk, p, STAND.design, VORLAGEN_UMG) : await window.K888Bilder.post(tab ? { ...p, ...tab.bild } : p, STAND.design);
     const r = await fetch(INSTA + `/api/post/${encodeURIComponent(p.id)}/fertig?h=${encodeURIComponent(p.soll)}&video=${alsVideo ? 1 : 0}${tab ? '&w=' + encodeURIComponent(JSON.stringify(tab.werte)) : ''}`, {
@@ -573,8 +575,270 @@
     designGeaendert();
   }
 
+  // ═══ 🗓 Post-Planer: was geht wann raus (diese Woche + 3 Wochen), als Liste oder Kalender ═══
+  // Klick auf einen Post öffnet den Editor: Live-Vorschau, Design, Texte, Zahlen, Text unter dem Post, Hintergrund, Posten.
+  let ANSICHT = (() => { try { return localStorage.getItem('k888_planer') || 'liste'; } catch (e) { return 'liste'; } })();
+  let OFFEN_ID = '';                         // Post im Editor
+  const ED = {};                             // Formular pro Post (noch nicht gespeichert): { felder, tabelle, text, geaendert }
+  const TABELLEN = {};                       // Live-Tabelle pro Post (Tabellenstand): Ergebnis von K888Tabelle.fuer
+  const ART_FARBE = { ank: '#18e8ff', story: '#ff2d6f', erg: '#ffd400', woche: '#a855ff', tab: '#5cff1f', monat: '#ff7a00', meilen: '#ffb800', live: '#ff1f3d', clip: '#ff4fd8' };
+  const STORY_ART = ['story', 'woche', 'live'];
+  const bTag = ms => new Date(ms).toLocaleDateString('sv-SE', { timeZone: 'Europe/Berlin' });
+  const tagPlus = (d, n) => { const x = new Date(d + 'T12:00:00Z'); x.setUTCDate(x.getUTCDate() + n); return x.toISOString().slice(0, 10); };
+  const montagVon = d => tagPlus(d, -((new Date(d + 'T12:00:00Z').getUTCDay() + 6) % 7));
+  const WTAGE = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'], MON = ['Jan', 'Feb', 'Mär', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez'];
+  const wtag = d => WTAGE[new Date(d + 'T12:00:00Z').getUTCDay()];
+  const tagMon = d => `${+d.slice(8, 10)}.${d.slice(5, 7)}.`;
+  const spanne = (a, b) => a.slice(5, 7) === b.slice(5, 7) ? `${+a.slice(8, 10)}.–${+b.slice(8, 10)}. ${MON[+b.slice(5, 7) - 1]}` : `${+a.slice(8, 10)}. ${MON[+a.slice(5, 7) - 1]} – ${+b.slice(8, 10)}. ${MON[+b.slice(5, 7) - 1]}`;
+  const uhrzeit = ms => new Date(ms).toLocaleTimeString('de-DE', { timeZone: 'Europe/Berlin', hour: '2-digit', minute: '2-digit' });
+  const istFertig = p => p.status === 'gepostet' || p.status === 'uebersprungen';
+  const clipName = c => ((window.K888Clips && window.K888Clips.VORLAGEN || []).find(v => v.id === c.vorlage) || {}).name || 'Clip';
+
+  function planer(cfg) {
+    const heute = bTag(Date.now()), mo0 = montagVon(heute), modus = cfg.modus;
+    const alle = [
+      ...STAND.posts.map(p => ({ p, ms: p.postMs, tag: bTag(p.postMs) })),
+      ...(STAND.clips || []).filter(c => c.postMs && (c.insta || c.tiktok)).map(c => ({ c, ms: c.postMs, tag: bTag(c.postMs) }))
+    ].sort((a, b) => a.ms - b.ms);
+    const offen = e => e.p ? !istFertig(e.p) : !((!e.c.insta || e.c.gepostet) && (!e.c.tiktok || e.c.tt));
+    const liegen = alle.filter(e => e.tag < mo0 && offen(e));
+    const wochen = [0, 1, 2, 3].map(w => { const von = tagPlus(mo0, 7 * w), bis = tagPlus(von, 6); return { w, von, bis, liste: alle.filter(e => e.tag >= von && e.tag <= bis) }; });
+    const w0 = wochen[0].liste, warten0 = w0.filter(e => e.p && e.p.status === 'wartet').length;
+    return `<div class="kp">
+      <div class="kp-kopf">
+        <div class="kp-umschalt" role="group" aria-label="Ansicht">
+          <button type="button" class="${ANSICHT === 'liste' ? 'an' : ''}" data-aktion="kp-ansicht" data-wert="liste">☰ Liste</button>
+          <button type="button" class="${ANSICHT === 'kalender' ? 'an' : ''}" data-aktion="kp-ansicht" data-wert="kalender">▦ Kalender</button>
+        </div>
+        <div class="kp-summe">Diese Woche <b>${w0.length}</b> ${w0.length === 1 ? 'Post' : 'Posts'}${warten0 ? ` · <b class="gelb">${warten0} ${warten0 === 1 ? 'wartet' : 'warten'} auf dich</b>` : ' · <b class="gruen">alles klar</b>'}</div>
+        <button class="btn btn-ghost ki-k" data-aktion="laden"><span>🔄 Neu laden</span></button>
+      </div>
+      ${liegen.length ? `<section class="kp-woche liegen"><div class="kp-wkopf"><div><h3>⚠ Liegengeblieben</h3><span>aus den Wochen davor</span></div></div>${ANSICHT === 'kalender' ? kpListe(liegen, modus, heute) : kpListe(liegen, modus, heute)}</section>` : ''}
+      ${wochen.map(w => kpWoche(w, modus, heute)).join('')}
+    </div>`;
+  }
+  function kpWoche({ w, von, bis, liste }, modus, heute) {
+    const name = ['Diese Woche', 'Nächste Woche', 'In 2 Wochen', 'In 3 Wochen'][w];
+    const posts = liste.filter(e => e.p), wartend = posts.filter(e => e.p.status === 'wartet');
+    const anzahl = liste.length;
+    const offenHier = liste.some(e => e.p && e.p.id === OFFEN_ID);
+    return `<section class="kp-woche${w === 0 ? ' jetzt' : ''}">
+      <div class="kp-wkopf">
+        <div><h3>${name}</h3><span>${spanne(von, bis)}</span></div>
+        <div class="kp-wzahl">${anzahl ? `<b>${anzahl}</b> ${anzahl === 1 ? 'Post' : 'Posts'}` : 'nichts geplant'}${wartend.length ? ` · <b class="gelb">${wartend.length} ${wartend.length === 1 ? 'wartet' : 'warten'}</b>` : ''}</div>
+        ${modus === 'freigabe' && wartend.length > 1 ? `<button class="btn ki-k kp-alle" data-aktion="kp-woche-frei" data-ids="${esc(wartend.map(e => e.p.id).join(','))}"><span>✓ Alle ${wartend.length} freigeben</span></button>` : ''}
+      </div>
+      ${!anzahl ? '' : ANSICHT === 'kalender' ? kpKalender(von, liste, heute) + (offenHier ? kpEditor(STAND.posts.find(p => p.id === OFFEN_ID), modus) : '') : kpListe(liste, modus, heute)}
+    </section>`;
+  }
+  function kpListe(liste, modus, heute) {
+    const tage = [...new Set(liste.map(e => e.tag))];
+    return tage.map(t => `<div class="kp-tag${t === heute ? ' heute' : ''}">
+      <div class="kp-tagname"><b>${wtag(t)}</b><span>${tagMon(t)}</span>${t === heute ? '<em>heute</em>' : ''}</div>
+      <div class="kp-tagposts">${liste.filter(e => e.tag === t).map(e => e.p ? kpZeile(e.p, modus) + (e.p.id === OFFEN_ID ? kpEditor(e.p, modus) : '') : kpClipZeile(e.c)).join('')}</div>
+    </div>`).join('');
+  }
+  const kpMini = (bild, hoch, leer) => bild ? `<span class="kp-mini${hoch ? ' hoch' : ''}"><img src="${esc(bild)}" alt="" loading="lazy"></span>` : `<span class="kp-mini${hoch ? ' hoch' : ''} leer">${leer || ''}</span>`;
+  function kpStatus(p) {
+    if (p.status === 'gepostet') return ['Gepostet', 'gruen'];
+    return STATUS[p.status] ? [p.status === 'wartet' ? 'Wartet' : STATUS[p.status][0], STATUS[p.status][1]] : ['?', 'grau'];
+  }
+  function kpZeile(p, modus) {
+    const [st, fa] = kpStatus(p), id = esc(p.id), offen = p.id === OFFEN_ID;
+    const frei = istFertig(p) || modus !== 'freigabe' ? '' : p.freigegeben
+      ? `<button class="btn btn-ghost ki-k" data-aktion="freigeben" data-an="0" data-id="${id}" title="Freigabe zurücknehmen"><span>↩</span></button>`
+      : `<button class="btn ki-k kp-frei" data-aktion="freigeben" data-an="1" data-id="${id}"><span>✓ Freigeben</span></button>`;
+    const wann = p.typ === 'live' ? `ab ${uhrzeit(p.liveMs)}` : uhrzeit(p.postMs);
+    return `<div class="kp-zeile${offen ? ' offen' : ''}${istFertig(p) ? ' fertig' : ''}" style="--f:${ART_FARBE[p.typ] || '#888'}" data-aktion="kp-auf" data-id="${id}">
+      <div class="kp-zeit">${esc(wann)}</div>
+      ${kpMini(p.bild, STORY_ART.includes(p.typ), p.bild ? '' : '🖌')}
+      <div class="kp-was"><b>${esc(TYP[p.typ] || p.typ)}</b><span>${titel(p)}${p.typ === 'tab' && p.tab && p.tab.platz ? ` · P${esc(p.tab.platz)}` : ''}${p.typ === 'meilen' ? ` · ${esc(p.zahl)}. ${esc(p.wort)}` : ''}${p.edit ? ' · ✎' : ''}</span></div>
+      <span class="ki-chip ${fa}">${esc(st)}</span>
+      <div class="kp-knoepfe">${frei}<button class="btn btn-ghost ki-k" data-aktion="kp-auf" data-id="${id}"><span>${offen ? '▴ Zu' : '✎ Bearbeiten'}</span></button></div>
+    </div>`;
+  }
+  function kpClipZeile(c) {
+    const st = c.gepostet ? ['Gepostet', 'gruen'] : c.fehler ? ['Fehler', 'rot'] : ['Geplant', 'blau'];
+    const wohin = [c.insta ? 'Insta' : '', c.tiktok ? 'TikTok' : ''].filter(Boolean).join(' + ');
+    return `<div class="kp-zeile clip${c.gepostet ? ' fertig' : ''}" style="--f:${ART_FARBE.clip}">
+      <div class="kp-zeit">${esc(uhrzeit(c.postMs))}</div>
+      ${kpMini(c.bild, true, '🎬')}
+      <div class="kp-was"><b>🎬 Clip · ${esc(clipName(c))}</b><span>${esc(c.titel || '')}${wohin ? ' · ' + esc(wohin) : ''}</span></div>
+      <span class="ki-chip ${st[1]}">${st[0]}</span>
+      <div class="kp-knoepfe"><button class="btn btn-ghost ki-k" data-aktion="reiter" data-wert="clips"><span>→ Clips</span></button></div>
+    </div>`;
+  }
+  function kpKalender(von, liste, heute) {
+    return `<div class="kp-kal-rahmen"><div class="kp-kal">${[0, 1, 2, 3, 4, 5, 6].map(i => {
+      const t = tagPlus(von, i), hier = liste.filter(e => e.tag === t);
+      return `<div class="kp-kt${t === heute ? ' heute' : ''}${t < heute ? ' vorbei' : ''}"><div class="kp-ktkopf"><b>${wtag(t)}</b> ${tagMon(t)}</div>
+        ${hier.map(e => {
+          if (e.c) return `<button type="button" class="kp-karte" style="--f:${ART_FARBE.clip}" data-aktion="reiter" data-wert="clips" title="Clip · ${esc(clipName(e.c))}"><span class="kp-kzeit">${esc(uhrzeit(e.ms))}</span><span class="kp-ktext">🎬 ${esc(clipName(e.c))}</span><i class="kp-dot ${e.c.gepostet ? 'gruen' : 'blau'}"></i></button>`;
+          const p = e.p, [st, fa] = kpStatus(p);
+          return `<button type="button" class="kp-karte${p.id === OFFEN_ID ? ' offen' : ''}${istFertig(p) ? ' fertig' : ''}" style="--f:${ART_FARBE[p.typ] || '#888'}" data-aktion="kp-auf" data-id="${esc(p.id)}" title="${esc((TYP[p.typ] || '') + ' · ' + st)}">
+            ${p.bild ? `<img src="${esc(p.bild)}" alt="" loading="lazy" class="${STORY_ART.includes(p.typ) ? 'hoch' : ''}">` : ''}
+            <span class="kp-kzeit">${esc(p.typ === 'live' ? 'live' : uhrzeit(p.postMs))}</span><span class="kp-ktext">${esc((TYP[p.typ] || p.typ).split(' · ')[0])}</span><i class="kp-dot ${fa}"></i></button>`;
+        }).join('') || '<div class="kp-frei-tag"></div>'}</div>`;
+    }).join('')}</div></div>`;
+  }
+
+  // ─── Editor ───
+  function kpForm(p) {   // aktueller Formular-Stand (gespeichert + ungespeichert)
+    if (!ED[p.id]) {
+      const e = p.edit || {};
+      ED[p.id] = { felder: { ...(e.felder || {}) }, tabelle: e.tabelle ? e.tabelle.map(r => ({ ...r })) : null, text: e.text || '', geaendert: false };
+    }
+    return ED[p.id];
+  }
+  // Post mit allem, was das Bild braucht (Tabelle, Änderungen) – für Vorschau und Hochladen
+  function kpBildPost(p) {
+    const f = ED[p.id], t = TABELLEN[p.id];
+    let q = { ...p };
+    if (p.typ === 'tab' && t) q = { ...q, ...t.bild };
+    if (f) q.edit = { felder: f.felder, tabelle: f.tabelle, text: f.text };
+    return q;
+  }
+  function kpEditor(p, modus) {
+    if (!p) return '';
+    const K = window.K888Bilder, f = kpForm(p), id = esc(p.id), story = STORY_ART.includes(p.typ), [st, fa] = kpStatus(p);
+    const basis = kpBildPost(p), felder = K ? K.felder(basis) : [], zahlen = K ? K.zahlen(basis) : [];
+    let schritt = 0; const nr = () => ++schritt;   // Schritte fortlaufend nummerieren
+    const feld = ([k, label, std], art) => `<label class="kp-feld"><span>${esc(label)}</span><input type="text" maxlength="80" data-kp="${art}" data-k="${esc(k)}" value="${esc(f.felder[k] != null ? f.felder[k] : '')}" placeholder="${esc(std == null ? '' : std)}"></label>`;
+    // 1 · Design
+    const neu = NEUE_ARTEN.includes(p.typ);
+    const looks = neu ? (K ? K.LOOKS : []) : [['kreids', 'Kreids-Design'], ...(STAND.vorlagen || []).filter(v => v.format === (story ? 'story' : 'feed')).map(v => [v.id, v.name])];
+    const design = istFertig(p) ? '' : `<div class="kp-schritt">${nr()} · Design ${p.vorlageFest ? '<em>von dir gewählt</em>' : '<em>wechselt von selbst</em>'}</div>
+      <div class="kp-looks">${looks.map(([v, n]) => `<button type="button" class="kp-look${p.vorlage === v ? ' an' : ''}" data-aktion="kp-look" data-id="${id}" data-wert="${esc(v)}">${esc(n)}</button>`).join('')}
+        <button type="button" class="btn btn-ghost ki-k" data-aktion="vwuerfeln" data-id="${id}" title="Ein anderes Design"><span>🎲</span></button>
+        ${p.vorlageFest ? `<button type="button" class="ki-link" data-aktion="vauto" data-id="${id}">↺ wieder automatisch</button>` : ''}</div>
+      ${!neu && (STAND.videos || []).length && p.typ !== 'woche' ? `<div class="ki-vwahl">🎬 Video für dieses Rennen: <select data-rvideo="${esc(p.rennKey)}" data-start="${esc(p.startMs)}"><option value="">– keins –</option>${STAND.videos.map(x => `<option value="${esc(x.id)}" ${((p.thumb && p.thumb.video) || '') === x.id ? 'selected' : ''}>${esc(x.name)}</option>`).join('')}</select></div>` : ''}`;
+    // 2 · Texte im Bild
+    const texte = felder.length ? `<div class="kp-schritt">${nr()} · Texte im Bild <em>leer = automatisch</em></div><div class="kp-felder">${felder.map(x => feld(x, 'feld')).join('')}</div>` : '';
+    // 3 · Zahlen / Tabelle
+    let zahl = '';
+    if (p.typ === 'tab') {
+      const t = TABELLEN[p.id], zeilen = f.tabelle || (t ? t.bild.tabelle : []);
+      zahl = `<div class="kp-schritt">${nr()} · Tabelle im Bild ${f.tabelle ? '<em>von dir geändert</em>' : '<em>live von SPR</em>'}</div>
+        ${!t ? '<div class="kp-hinweis">⏳ Live-Tabelle wird geladen …</div>' : ''}
+        <div class="kp-tabelle">${zeilen.map((r, i) => r.luecke ? `<div class="kp-tz luecke"><span>· · ·</span><button type="button" class="btn btn-ghost ki-k" data-aktion="kp-tz-weg" data-id="${id}" data-i="${i}" title="Zeile weg"><span>✕</span></button></div>`
+          : `<div class="kp-tz${r.ich ? ' ich' : ''}"><input type="text" data-kp="tz" data-i="${i}" data-k="pos" value="${esc(r.pos)}" class="kp-tpos"><input type="text" data-kp="tz" data-i="${i}" data-k="name" value="${esc(r.name)}" class="kp-tname"><input type="text" data-kp="tz" data-i="${i}" data-k="pts" value="${esc(r.pts)}" class="kp-tpts"><input type="text" data-kp="tz" data-i="${i}" data-k="delta" value="${esc(r.delta || '')}" placeholder="±" class="kp-tdelta" title="Plätze gutgemacht (+) / verloren (−)"><button type="button" class="btn btn-ghost ki-k" data-aktion="kp-tz-weg" data-id="${id}" data-i="${i}" title="Zeile weg"><span>✕</span></button></div>`).join('')}</div>
+        <div class="kp-knoepfe"><button type="button" class="btn btn-ghost ki-k" data-aktion="kp-tz-neu" data-id="${id}"><span>＋ Zeile</span></button>${f.tabelle ? `<button type="button" class="btn btn-ghost ki-k" data-aktion="kp-tz-live" data-id="${id}"><span>↺ Live-Tabelle übernehmen</span></button>` : ''}</div>
+        ${t && t.alle ? `<details class="kp-live" open><summary>📊 Live-Tabelle von SPR · ${esc(t.bild.klasse || 'Gesamt')} · nach Runde ${esc(t.bild.nachRunde)} von ${esc(t.bild.rundenGesamt || '?')}</summary>
+          <table><thead><tr><th>Pos.</th><th>Fahrer</th><th class="r">Punkte</th><th class="r">±</th></tr></thead><tbody>${t.alle.map(r => `<tr class="${r.ich ? 'ich' : ''}"><td>${esc(r.pos)}</td><td>${esc(r.name)}</td><td class="r">${esc(r.pts)}</td><td class="r ${r.delta > 0 ? 'hoch' : r.delta < 0 ? 'runter' : ''}">${r.delta > 0 ? '▲' + r.delta : r.delta < 0 ? '▼' + -r.delta : ''}</td></tr>`).join('')}</tbody></table></details>` : ''}`;
+    } else if (zahlen.length) zahl = `<div class="kp-schritt">${nr()} · Zahlen im Bild <em>leer = automatisch</em></div><div class="kp-felder">${zahlen.map(x => feld(x, 'feld')).join('')}</div>`;
+    // 4 · Text unter dem Post
+    const text = story ? '' : `<div class="kp-schritt">${nr()} · Text unter dem Post ${f.text ? '<em>eigener Text</em>' : '<em>aus der Vorlage</em>'}</div>
+      <textarea rows="6" data-kp="text" placeholder="${esc(p.textStandard || p.text || '')}">${esc(f.text)}</textarea>
+      <div class="kp-tipp">Leer lassen = Text aus „⏰ Zeiten & Text“. Platzhalter wie {serie} {strecke} {platz} gehen auch hier.</div>`;
+    // 5 · Hintergrund (nur bei Rennen)
+    const mitHg = !['woche', 'monat'].includes(p.typ) && !istFertig(p);
+    const kn = (aktion, txt, extra = '', t2 = '') => `<button class="btn btn-ghost ki-k" data-aktion="${aktion}" data-id="${id}" ${extra}${t2 ? ` title="${esc(t2)}"` : ''}><span>${txt}</span></button>`;
+    const hg = mitHg ? `<div class="kp-schritt">${nr()} · Hintergrund <em>gilt für alle Posts dieses Rennens</em></div>
+      <div class="kp-knoepfe">${auswahl(STIMMUNG, STAND.cfg.stimmung || 'zufall', `data-stimmung="${id}" title="Stimmung für das nächste KI-Bild"`)}${auswahl(KAMERA, STAND.cfg.kamera || 'zufall', `data-kamera="${id}" title="Blickwinkel für das nächste KI-Bild"`)}
+        ${p.hg ? kn('neu', '🎲 Neues KI-Bild') : kn('bild', '🎨 KI-Hintergrund')}${kn('gemini', '✨ Gemini')}${kn('chatgpt', '🤖 ChatGPT')}
+        <label class="btn btn-ghost ki-k ki-datei" title="Eigenes Hintergrundbild (z. B. iRacing-Screenshot)"><span>📤 Eigenes Bild</span><input type="file" accept="image/*" data-eigenesbild="${id}"></label></div>
+      ${p.bildQuelle ? `<div class="kp-tipp">Jetzt: ${esc(p.bildQuelle)}</div>` : ''}${p.kiFehler ? `<div class="kp-hinweis">KI-Bild ging nicht (${esc(p.kiFehler)}).</div>` : ''}
+      ${WARTET && WARTET.id === p.id ? `<div class="kp-hinweis gelb">Wartet auf das Bild aus ${(KI[WARTET.quelle] || KI.gemini).name}: Rechtsklick aufs Bild → „Bild kopieren“ → hier Strg+V. <button type="button" class="ki-link" data-aktion="ki-ab">Abbrechen</button></div>` : ''}` : '';
+    // 6 · Posten
+    const tk = STAND.tiktok || {}, yt = STAND.youtube || {}, mitThumb = p.typ === 'story' || p.typ === 'erg' || p.typ === 'ank';
+    const k = [];
+    if (!istFertig(p) && modus === 'freigabe') k.push(p.freigegeben ? kn('freigeben', '↩ Freigabe zurück', 'data-an="0"') : `<button class="btn ki-k kp-frei" data-aktion="freigeben" data-an="1" data-id="${id}"><span>✓ Freigeben</span></button>`);
+    if (p.status !== 'gepostet') k.push(p.status === 'uebersprungen' ? kn('ueberspringen', '↺ Wieder aktivieren', 'data-an="0"') : kn('ueberspringen', '⏭ Überspringen', 'data-an="1"'));
+    if (!istFertig(p)) k.push(kn('jetzt', '🚀 Jetzt posten'));
+    if (p.bild) k.push(`<a class="btn btn-ghost ki-k" href="${esc(p.bild)}?laden=1" download><span>📥 Bild laden</span></a>`);
+    if (p.video) k.push(`<a class="btn btn-ghost ki-k" href="${esc(p.video)}" download target="_blank" rel="noopener"><span>📥 Video laden</span></a>`);
+    if (p.bild && p.status !== 'gepostet') k.push(kn('manuell', '✓ Hab ich selbst gepostet', 'data-an="1"', 'Nur, wenn du es schon selbst in der Insta-App gepostet hast'));
+    if (p.eigenesErgebnis) k.push(`<button class="btn btn-ghost ki-k" data-aktion="erg-weg" data-rk="${esc(p.rennKey)}"><span>✕ Ergebnis löschen</span></button>`);
+    if (tk.verbunden && p.bild && !(p.tiktok && p.tiktok.zeit)) k.push(kn('tiktok', '♪ An TikTok'));
+    if (mitThumb && p.yt && yt.verbunden && p.startMs > Date.now()) k.push(`<button class="btn btn-ghost ki-k" data-aktion="yt-planen" data-rk="${esc(p.rennKey)}"><span>▶ ${p.yt.id ? 'YouTube aktualisieren' : 'Auf YouTube planen'}</span></button>`);
+    const h = [];
+    if (p.fehler) h.push(`<div class="kp-hinweis rot">⚠ ${esc(p.fehler)}</div>`);
+    if (p.status === 'verpasst') h.push('<div class="kp-hinweis rot">Zeit verpasst – „🚀 Jetzt posten“ schickt ihn sofort.</div>');
+    if (p.typ === 'live' && !istFertig(p)) h.push(`<div class="kp-hinweis">Geht von selbst raus, sobald du auf YouTube live bist (45 Min. vor bis 3 Std. nach „Live ab“)${modus === 'freigabe' ? ' – vorher freigeben' : ''}.</div>`);
+    if (p.typ === 'story') h.push('<div class="kp-hinweis">Link-Sticker geht nur von Hand: „📥 Bild laden“ → in der Insta-App posten → „✓ Hab ich selbst gepostet“.</div>');
+    if (mitThumb && p.yt && yt.verbunden && p.yt.id) h.push(`<div class="kp-tipp">▶ YouTube: geplant · <a class="ki-link" href="https://www.youtube.com/watch?v=${esc(p.yt.id)}" target="_blank" rel="noopener">ansehen</a></div>`);
+    if (p.yt && p.yt.fehler) h.push(`<div class="kp-hinweis rot">▶ YouTube: ${esc(p.yt.fehler)}</div>`);
+    if (p.tiktok && p.tiktok.zeit) h.push(`<div class="kp-tipp">♪ TikTok: Entwurf gesendet ${esc(zeit(p.tiktok.zeit))}</div>`);
+    const bild = p.video ? `<video src="${esc(p.video)}" poster="${esc(p.bild)}" muted loop playsinline controls preload="none"></video>` : `<img class="kp-vorschau" data-vorschau="${id}" src="${esc(p.bild || '')}" alt="">`;
+    return `<div class="kp-editor" style="--f:${ART_FARBE[p.typ] || '#ff2d6f'}">
+      <div class="kp-links">
+        <div class="kp-buehne${story ? ' hoch' : ''}">${bild}<span class="kp-laeuft" hidden>🖌 zeichnet …</span></div>
+        <div class="kp-tipp kp-mitte">${p.video ? '🎬 Video-Post' : 'Live-Vorschau · ändert sich beim Tippen'}</div>
+        ${mitThumb ? thumbFeld(p) : ''}
+      </div>
+      <div class="kp-rechts">
+        <div class="kp-etitel"><b>${esc(TYP[p.typ] || p.typ)}</b><span class="ki-chip ${fa}">${esc(st)}</span><span class="kp-dim">geht raus: <b>${p.typ === 'live' ? 'sobald du live bist' : esc(zeit(p.postMs))}</b></span>
+          <button type="button" class="kp-zu" data-aktion="kp-auf" data-id="${id}" title="Schließen">✕</button></div>
+        <div class="kp-etitel2">${titel(p)}</div>
+        ${design}${texte}${zahl}${text}${hg}
+        <div class="kp-schritt">${nr()} · Posten</div>
+        ${h.join('')}
+        <div class="kp-knoepfe">${k.join('')}</div>
+        ${istFertig(p) ? '' : `<div class="kp-speichern"><button type="button" class="btn ki-k kp-los" data-aktion="kp-speichern" data-id="${id}" ${f.geaendert ? '' : 'disabled'}><span>💾 Änderungen speichern</span></button>
+          ${p.edit || f.geaendert ? `<button type="button" class="btn btn-ghost ki-k" data-aktion="kp-reset" data-id="${id}"><span>↺ Alles automatisch</span></button>` : ''}<span class="kp-dim kp-ungespeichert"${f.geaendert ? '' : ' hidden'}>● nicht gespeichert</span></div>`}
+      </div>
+    </div>`;
+  }
+  // Live-Vorschau im Editor (nach kurzer Pause beim Tippen)
+  let VORSCHAU_T = 0, VORSCHAU_URL = '';
+  async function kpVorschau(sofort) {
+    clearTimeout(VORSCHAU_T);
+    if (!sofort) { VORSCHAU_T = setTimeout(() => kpVorschau(true), 350); return; }
+    const p = STAND && STAND.posts.find(x => x.id === OFFEN_ID);
+    const img = p && BOX && BOX.querySelector(`[data-vorschau="${CSS.escape(p.id)}"]`);
+    if (!p || !img || !window.K888Bilder || p.video) return;
+    const dran = BOX.querySelector('.kp-laeuft'); if (dran) dran.hidden = false;
+    try {
+      if (p.typ === 'tab' && !TABELLEN[p.id]) await kpTabelleLaden(p);
+      const vk = p.vorlage && !['kreids', 'kneon', 'khell'].includes(p.vorlage) && window.K888Vorlagen ? (STAND.vorlagen || []).find(x => x.id === p.vorlage) : null;
+      const q = kpBildPost(p), mitEdit = window.K888Bilder.mitAenderung(q);
+      const blob = vk ? await window.K888Vorlagen.bildFuer(JSON.parse(JSON.stringify(vk)), mitEdit, STAND.design, VORLAGEN_UMG) : await window.K888Bilder.post(q, STAND.design);
+      if (p.id !== OFFEN_ID) return;
+      if (VORSCHAU_URL) URL.revokeObjectURL(VORSCHAU_URL);
+      VORSCHAU_URL = URL.createObjectURL(blob);
+      const el = BOX.querySelector(`[data-vorschau="${CSS.escape(p.id)}"]`); if (el) el.src = VORSCHAU_URL;
+    } catch (e) { /* Vorschau ging nicht – Bild bleibt */ }
+    finally { const d = BOX && BOX.querySelector('.kp-laeuft'); if (d) d.hidden = true; }
+  }
+  async function kpTabelleLaden(p) {
+    if (!window.K888Tabelle) return null;
+    const t = await window.K888Tabelle.fuer(p, igApi);
+    if (t) { TABELLEN[p.id] = t; if (OFFEN_ID === p.id && !(ED[p.id] && ED[p.id].tabelle)) zeichnen(); }
+    return t;
+  }
+  // Eingaben im Editor: nur den Formular-Stand ändern und die Vorschau neu zeichnen (kein Neuaufbau → Fokus bleibt)
+  function kpEingabe(t) {
+    const f = OFFEN_ID && ED[OFFEN_ID]; if (!f) return;
+    const art = t.dataset.kp;
+    if (art === 'feld') { const v = t.value; if (v.trim()) f.felder[t.dataset.k] = v; else delete f.felder[t.dataset.k]; }
+    else if (art === 'text') f.text = t.value;
+    else if (art === 'tz') {
+      if (!f.tabelle) { const tb = TABELLEN[OFFEN_ID]; f.tabelle = tb ? tb.bild.tabelle.map(r => ({ ...r })) : []; }
+      const r = f.tabelle[+t.dataset.i]; if (r) r[t.dataset.k] = t.dataset.k === 'delta' ? (parseInt(t.value, 10) || 0) : t.value;
+    } else return;
+    f.geaendert = true;
+    const sp = BOX.querySelector('[data-aktion="kp-speichern"]'); if (sp) sp.disabled = false;
+    const un = BOX.querySelector('.kp-ungespeichert'); if (un) un.hidden = false;
+    kpVorschau();
+  }
+  // Platz/Punkte für den Text unter dem Tabellen-Post aus der (geänderten) Tabelle
+  function werteAus(zeilen, fp) {
+    const ich = (zeilen || []).find(r => r && r.ich), erste = (zeilen || []).find(r => r && !r.luecke);
+    const zahl = v => { const n = parseInt(String(v).replace(/\./g, ''), 10); return isFinite(n) ? n : null; };
+    return { platz: ich ? zahl(ich.pos) : null, punkte: ich ? zahl(ich.pts) : null, abstand: ich && erste ? Math.max(0, (zahl(erste.pts) || 0) - (zahl(ich.pts) || 0)) : null, fp };
+  }
+
   function zeichnen() {
     if (!BOX) return;
+    // Fokus im Editor merken (Neuaufbau durch Abgleich im Hintergrund)
+    const ae = document.activeElement, fokus = ae && BOX.contains(ae) && ae.dataset && ae.dataset.kp ? { kp: ae.dataset.kp, k: ae.dataset.k || '', i: ae.dataset.i || '', a: ae.selectionStart, e: ae.selectionEnd } : null;
+    zeichnenInnen();
+    if (fokus) {
+      const el = [...BOX.querySelectorAll(`[data-kp="${fokus.kp}"]`)].find(x => (x.dataset.k || '') === fokus.k && (x.dataset.i || '') === fokus.i);
+      if (el) { el.focus(); try { el.setSelectionRange(fokus.a, fokus.e); } catch (e) { /* egal */ } }
+    }
+  }
+  function zeichnenInnen() {
     if (!STAND) {
       BOX.innerHTML = `<h2>📸 Instagram</h2>` + (FEHLER
         ? `<p class="msg err">⚠ ${esc(FEHLER)}</p><p class="hint">${/einloggen/.test(FEHLER) ? '<button class="btn btn-red ki-k" data-aktion="neulogin"><span>🔑 Neu einloggen</span></button> ' : ''}<button class="btn btn-ghost ki-k" data-aktion="laden"><span>Nochmal laden</span></button></p>`
@@ -612,9 +876,8 @@
       </div>
       ${REITER === 'posts' ? `
         ${offen.length ? `<div class="ki-panel"><h3>🏁 Ergebnis eintragen</h3><div class="ki-dim" style="margin-bottom:10px">Deine eigenen Rennen der letzten 5 Tage. SPR-Ergebnisse kommen von selbst.</div>${offen.map(ergebnisForm).join('')}</div>` : ''}
-        <div class="ki-leiste"><button class="btn btn-ghost ki-k" data-aktion="laden"><span>🔄 Neu laden</span></button></div>
+        ${planer(cfg)}
         ${hilfe()}
-        ${liste.length ? liste.map(p => postKarte(p, cfg.modus, p.typ === 'story' || p.typ === 'erg' || (p.typ === 'ank' && !mitStory.has(p.rennKey)))).join('') : '<p class="hint">Keine Rennen oder Streams in den nächsten 3 Wochen im Streamkalender.</p>'}
         ${(STAND.erledigt || []).length ? `<details class="ki-panel ki-erledigt"${ERL_OFFEN ? ' open' : ''}><summary><h3>✅ Gepostet · letzte 36 Std. (${STAND.erledigt.length})</h3></summary>${STAND.erledigt.map(erledigtZeile).join('')}</details>` : ''}` : ''}
       ${REITER === 'thumb' ? '<div class="ki-thumbbox"></div>' : ''}
       ${REITER === 'zeiten' ? `
@@ -631,6 +894,11 @@
     if (REITER === 'zuteilung' && window.K888Vorlagen) window.K888Vorlagen.zuteilung(BOX.querySelector('.ki-zuteilungbox'), VORLAGEN_UMG);
     if (REITER === 'design') designVorschau();
     if (REITER === 'thumb' && window.K888Thumb) window.K888Thumb.editor(BOX.querySelector('.ki-thumbbox'), THUMB_UMG, THUMB_RK);
+    if (REITER === 'posts' && OFFEN_ID) {
+      const op = STAND.posts.find(x => x.id === OFFEN_ID);
+      if (!op) OFFEN_ID = '';
+      else { if (op.typ === 'tab' && !TABELLEN[op.id]) kpTabelleLaden(op).catch(e => meldung('Live-Tabelle: ' + e.message, 1)); kpVorschau(true); }
+    }
     if (REITER === 'posts' && window.K888Thumb) BOX.querySelectorAll('canvas[data-thumb]').forEach(c => {
       const r = rennenListe().find(x => x.rennKey === c.dataset.thumb);
       if (r) window.K888Thumb.vorschau(c, STAND.thumbVorlage, r, STAND.design);
@@ -899,6 +1167,34 @@
       await igApi('POST', `/api/youtube/${encodeURIComponent(b.dataset.rk)}/planen`, {});
       meldung('Livestream ist auf YouTube geplant ✓'); await laden(true);
     });
+    if (a === 'kp-ansicht') { ANSICHT = b.dataset.wert === 'kalender' ? 'kalender' : 'liste'; try { localStorage.setItem('k888_planer', ANSICHT); } catch (e) { /* egal */ } return zeichnen(); }
+    if (a === 'kp-auf') { OFFEN_ID = OFFEN_ID === id ? '' : id; zeichnen(); if (OFFEN_ID) { const el = BOX.querySelector('.kp-editor'); if (el) el.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); } return; }
+    if (a === 'kp-look') return ausfuehren(b, async () => { await igApi('POST', `/api/post/${encodeURIComponent(id)}/vorlage`, { id: b.dataset.wert }); await laden(); });
+    if (a === 'kp-speichern') return ausfuehren(b, async () => {
+      const f = ED[id]; if (!f) return;
+      await igApi('POST', `/api/post/${encodeURIComponent(id)}/bearbeiten`, { felder: f.felder, tabelle: f.tabelle, text: f.text });
+      delete ED[id]; meldung('Gespeichert – das Bild wird neu gezeichnet.'); await laden();
+    });
+    if (a === 'kp-reset') return ausfuehren(b, async () => {
+      if (!confirm('Alle Änderungen an diesem Post zurücksetzen (Texte, Zahlen, Text unter dem Post)?')) return;
+      await igApi('POST', `/api/post/${encodeURIComponent(id)}/bearbeiten`, { zuruecksetzen: true });
+      delete ED[id]; await laden();
+    });
+    if (a === 'kp-woche-frei') return ausfuehren(b, async () => {
+      const ids = String(b.dataset.ids || '').split(',').filter(Boolean);
+      for (const x of ids) { await bildSicher(x); await igApi('POST', `/api/post/${encodeURIComponent(x)}/freigeben`, { an: true }); }
+      meldung(`${ids.length} Posts freigegeben ✓`); await laden();
+    });
+    if (a === 'kp-tz-weg' || a === 'kp-tz-neu' || a === 'kp-tz-live') {
+      const f = ED[id]; if (!f) return;
+      const t = TABELLEN[id];
+      if (a === 'kp-tz-live') f.tabelle = null;
+      else {
+        if (!f.tabelle) f.tabelle = t ? t.bild.tabelle.map(r => ({ ...r })) : [];
+        if (a === 'kp-tz-weg') f.tabelle.splice(+b.dataset.i, 1); else f.tabelle.push({ pos: '', name: '', pts: '', delta: 0 });
+      }
+      f.geaendert = true; zeichnen(); return;
+    }
     if (a === 'vwuerfeln' || a === 'vauto') return ausfuehren(b, async () => {
       await igApi('POST', `/api/post/${encodeURIComponent(id)}/vorlage`, a === 'vwuerfeln' ? { wuerfeln: true } : { id: '' });
       await laden();
@@ -1096,7 +1392,116 @@
 #instaApp .ki-ziel span{position:absolute;left:-2px;top:-20px;background:#ffd400;color:#000;font:700 11px var(--body);padding:1px 5px;white-space:nowrap}
 #instaApp .ki-ziel:hover,#instaApp .ki-ziel.zieht{border-color:#ffd400;background:rgba(255,212,0,.1)}
 #ki-toast{position:fixed;right:18px;bottom:18px;z-index:99;max-width:420px;background:#14161d;border:1px solid var(--line);border-left:3px solid #3fbf5f;color:#f2f4f8;font:14px/1.45 'Barlow',sans-serif;padding:10px 14px;box-shadow:0 10px 30px rgba(0,0,0,.5);opacity:0;transform:translateY(8px);transition:.2s;pointer-events:none}
-#ki-toast.an{opacity:1;transform:none}#ki-toast.rot{border-left-color:#e11324}`;
+#ki-toast.an{opacity:1;transform:none}#ki-toast.rot{border-left-color:#e11324}
+/* ─── 🗓 Post-Planer (Look wie die Clip-Fabrik) ─── */
+#instaApp .kp{display:flex;flex-direction:column;gap:16px}
+#instaApp .kp-kopf{display:flex;flex-wrap:wrap;align-items:center;gap:14px;justify-content:space-between}
+#instaApp .kp-umschalt{display:flex;border:1px solid var(--line)}
+#instaApp .kp-umschalt button{background:transparent;border:0;color:var(--steel);font:800 13px var(--disp,inherit);letter-spacing:.08em;text-transform:uppercase;padding:10px 16px;cursor:pointer}
+#instaApp .kp-umschalt button.an{background:#ff2d6f;color:#fff;box-shadow:0 0 18px rgba(255,45,111,.45)}
+#instaApp .kp-summe{flex:1;font-size:15px;color:#cfd3dc}
+#instaApp .kp-summe b{color:#fff}#instaApp .kp-summe b.gelb{color:#f5c518}#instaApp .kp-summe b.gruen{color:#5cff1f}
+#instaApp .kp-woche{background:#0d0e13;border:1px solid var(--line);padding:14px 16px 16px;display:flex;flex-direction:column;gap:10px}
+#instaApp .kp-woche.jetzt{border-color:rgba(255,45,111,.55);box-shadow:0 0 34px rgba(255,45,111,.12)}
+#instaApp .kp-woche.liegen{border-color:rgba(255,107,117,.6)}
+#instaApp .kp-wkopf{display:flex;flex-wrap:wrap;align-items:center;gap:12px}
+#instaApp .kp-wkopf>div:first-child{display:flex;align-items:baseline;gap:12px;flex:1;min-width:220px}
+#instaApp .kp-wkopf h3{margin:0;font:800 20px var(--disp,inherit);letter-spacing:.06em;text-transform:uppercase;color:#fff}
+#instaApp .kp-woche.jetzt .kp-wkopf h3{text-shadow:0 0 16px rgba(255,45,111,.8)}
+#instaApp .kp-wkopf>div:first-child span{color:var(--steel);font-weight:700;letter-spacing:.04em;text-transform:uppercase;font-size:13px}
+#instaApp .kp-wzahl{color:var(--steel);font-size:14px}#instaApp .kp-wzahl b{color:#fff}#instaApp .kp-wzahl b.gelb{color:#f5c518}
+#instaApp .btn.kp-alle,#instaApp .btn.kp-frei{background:linear-gradient(90deg,#ff2d6f,#ff7a00);border-color:transparent;color:#fff;box-shadow:0 0 16px rgba(255,45,111,.35)}
+#instaApp .kp-tag{display:grid;grid-template-columns:78px 1fr;gap:12px;padding-top:10px;border-top:1px solid var(--line)}
+#instaApp .kp-tagname{display:flex;flex-direction:column;align-items:flex-start;gap:1px;padding-top:6px}
+#instaApp .kp-tagname b{font:800 20px var(--disp,inherit);text-transform:uppercase;color:#fff;line-height:1}
+#instaApp .kp-tagname span{color:var(--steel);font-size:13px}
+#instaApp .kp-tagname em{font-style:normal;font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:#5cff1f;text-shadow:0 0 10px rgba(92,255,31,.6)}
+#instaApp .kp-tag.heute .kp-tagname b{color:#5cff1f;text-shadow:0 0 12px rgba(92,255,31,.6)}
+#instaApp .kp-tagposts{display:flex;flex-direction:column;gap:8px;min-width:0}
+#instaApp .kp-zeile{display:grid;grid-template-columns:58px 44px minmax(0,1fr) auto auto;align-items:center;gap:12px;padding:8px 10px;background:#0b0c10;border:1px solid var(--line);border-left:4px solid var(--f);cursor:pointer;transition:.12s}
+#instaApp .kp-zeile:hover{border-color:var(--f);box-shadow:0 0 16px color-mix(in srgb,var(--f) 30%,transparent)}
+#instaApp .kp-zeile.offen{border-color:var(--f);background:color-mix(in srgb,var(--f) 9%,#0b0c10);box-shadow:0 0 22px color-mix(in srgb,var(--f) 35%,transparent)}
+#instaApp .kp-zeile.fertig{opacity:.55}
+#instaApp .kp-zeit{font:800 17px var(--disp,inherit);color:#fff;letter-spacing:.02em}
+#instaApp .kp-mini{width:44px;aspect-ratio:4/5;background:#000;border:1px solid var(--line);overflow:hidden;display:grid;place-items:center;font-size:16px}
+#instaApp .kp-mini.hoch{aspect-ratio:9/16;width:34px;justify-self:center}
+#instaApp .kp-mini img{width:100%;height:100%;object-fit:cover;display:block}
+#instaApp .kp-mini.leer{border-style:dashed}
+#instaApp .kp-was{display:flex;flex-direction:column;min-width:0}
+#instaApp .kp-was b{font:800 15px var(--disp,inherit);letter-spacing:.04em;text-transform:uppercase;color:#fff;text-shadow:0 0 10px color-mix(in srgb,var(--f) 60%,transparent)}
+#instaApp .kp-was span{color:var(--steel);font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#instaApp .kp-knoepfe{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+#instaApp .kp-kal-rahmen{overflow-x:auto;padding-bottom:4px}
+#instaApp .kp-kal{display:grid;grid-template-columns:repeat(7,minmax(110px,1fr));gap:6px;min-width:780px}
+#instaApp .kp-kt{background:#0b0c10;border:1px solid var(--line);min-height:120px;padding:6px;display:flex;flex-direction:column;gap:6px}
+#instaApp .kp-kt.heute{border-color:#5cff1f;box-shadow:0 0 16px rgba(92,255,31,.25) inset}
+#instaApp .kp-kt.vorbei{opacity:.55}
+#instaApp .kp-ktkopf{font-size:13px;color:var(--steel);text-transform:uppercase;letter-spacing:.04em}
+#instaApp .kp-ktkopf b{color:#fff;font:800 15px var(--disp,inherit)}
+#instaApp .kp-kt.heute .kp-ktkopf b{color:#5cff1f}
+#instaApp .kp-karte{position:relative;display:flex;flex-direction:column;align-items:flex-start;gap:2px;width:100%;padding:6px 7px;background:color-mix(in srgb,var(--f) 10%,#101218);border:1px solid color-mix(in srgb,var(--f) 55%,transparent);border-left:3px solid var(--f);color:#fff;cursor:pointer;text-align:left;font:inherit;transition:.12s}
+#instaApp .kp-karte:hover,#instaApp .kp-karte.offen{box-shadow:0 0 16px color-mix(in srgb,var(--f) 45%,transparent);border-color:var(--f)}
+#instaApp .kp-karte.fertig{opacity:.55}
+#instaApp .kp-karte img{width:100%;aspect-ratio:4/5;object-fit:cover;display:block;margin-bottom:3px}
+#instaApp .kp-karte img.hoch{aspect-ratio:9/16;width:62%}
+#instaApp .kp-kzeit{font:800 13px var(--disp,inherit)}
+#instaApp .kp-ktext{font-size:12px;line-height:1.25;color:#e6e8ee}
+#instaApp .kp-dot{position:absolute;top:6px;right:6px;width:9px;height:9px;border-radius:50%;background:#7cb8f5}
+#instaApp .kp-dot.gelb{background:#f5c518;box-shadow:0 0 8px #f5c518}#instaApp .kp-dot.gruen{background:#3fbf5f}#instaApp .kp-dot.rot{background:#ff3b4b;box-shadow:0 0 8px #ff3b4b}#instaApp .kp-dot.grau{background:#5b6672}
+#instaApp .kp-frei-tag{flex:1}
+#instaApp .kp-editor{display:flex;flex-wrap:wrap;gap:20px;padding:16px;background:#0b0c10;border:1px solid var(--f);box-shadow:0 0 30px color-mix(in srgb,var(--f) 22%,transparent);margin:2px 0 6px}
+#instaApp .kp-links{flex:0 0 300px;max-width:100%;display:flex;flex-direction:column;gap:8px}
+#instaApp .kp-buehne{position:relative;width:100%;aspect-ratio:4/5;background:#000;border:1px solid var(--line);box-shadow:0 0 40px color-mix(in srgb,var(--f) 25%,transparent)}
+#instaApp .kp-buehne.hoch{aspect-ratio:9/16;width:250px;align-self:center}
+#instaApp .kp-buehne img,#instaApp .kp-buehne video{width:100%;height:100%;object-fit:contain;display:block}
+#instaApp .kp-laeuft{position:absolute;left:8px;bottom:8px;background:rgba(0,0,0,.75);color:#cfffbf;font-size:12px;padding:3px 8px;border:1px solid rgba(92,255,31,.5)}
+#instaApp .kp-mitte{text-align:center}
+#instaApp .kp-rechts{flex:1 1 380px;min-width:0;display:flex;flex-direction:column;gap:10px}
+#instaApp .kp-etitel{display:flex;flex-wrap:wrap;align-items:center;gap:10px}
+#instaApp .kp-etitel b{font:800 18px var(--disp,inherit);letter-spacing:.04em;text-transform:uppercase;color:#fff;text-shadow:0 0 14px color-mix(in srgb,var(--f) 70%,transparent)}
+#instaApp .kp-etitel2{font:800 16px var(--disp,inherit);text-transform:uppercase;letter-spacing:.02em;color:#e6e8ee}
+#instaApp .kp-zu{margin-left:auto;background:transparent;border:1px solid var(--line);color:#fff;width:34px;height:34px;cursor:pointer;font-size:16px}
+#instaApp .kp-dim{color:var(--steel);font-size:13px}#instaApp .kp-dim b{color:#fff}
+#instaApp .kp-schritt{font:800 13px var(--disp,inherit);text-transform:uppercase;letter-spacing:.1em;color:#fff;border-bottom:1px solid var(--line);padding-bottom:4px;margin-top:6px}
+#instaApp .kp-schritt em{font-style:normal;font-weight:600;letter-spacing:.02em;text-transform:none;color:var(--steel);margin-left:8px;font-family:var(--body,inherit)}
+#instaApp .kp-looks{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+#instaApp .kp-look{padding:10px 16px;background:#14161d;border:2px solid #23262f;color:#fff;font:700 14px var(--body,inherit);cursor:pointer;transition:.12s}
+#instaApp .kp-look:hover{border-color:var(--f)}
+#instaApp .kp-look.an{border-color:var(--f);box-shadow:0 0 18px color-mix(in srgb,var(--f) 55%,transparent),inset 0 0 14px color-mix(in srgb,var(--f) 25%,transparent);background:color-mix(in srgb,var(--f) 12%,#14161d)}
+#instaApp .kp-felder{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:10px 14px}
+#instaApp .kp-feld{display:flex;flex-direction:column;gap:4px;font-size:13px;color:var(--steel);min-width:0}
+#instaApp .kp-feld input,#instaApp .kp-tz input{height:40px;background:#0d0e13;border:1px solid var(--line);color:#fff;font:15px var(--body,inherit);padding:0 10px;min-width:0}
+#instaApp .kp-feld input:focus,#instaApp .kp-tz input:focus,#instaApp .kp-rechts textarea:focus{outline:none;border-color:var(--f);box-shadow:0 0 12px color-mix(in srgb,var(--f) 40%,transparent)}
+#instaApp .kp-rechts textarea{width:100%;background:#0d0e13;border:1px solid var(--line);color:#fff;font:14px/1.5 var(--body,inherit);padding:10px 11px;resize:vertical}
+#instaApp .kp-tabelle{display:flex;flex-direction:column;gap:5px}
+#instaApp .kp-tz{display:grid;grid-template-columns:56px minmax(0,1fr) 84px 56px 40px;gap:6px;align-items:center}
+#instaApp .kp-tz.ich input{border-color:var(--f);box-shadow:0 0 10px color-mix(in srgb,var(--f) 35%,transparent)}
+#instaApp .kp-tz.luecke{grid-template-columns:1fr 40px;color:var(--steel);text-align:center}
+#instaApp .kp-tz .btn{padding:6px 0;text-align:center}
+#instaApp .kp-live{background:#0d0e13;border:1px solid var(--line);padding:8px 12px}
+#instaApp .kp-live summary{cursor:pointer;font-weight:700;color:#fff}
+#instaApp .kp-live table{width:100%;border-collapse:collapse;margin-top:8px;font-size:14px}
+#instaApp .kp-live th{color:var(--steel);text-align:left;font-weight:600;border-bottom:1px solid var(--line);padding:4px 6px}
+#instaApp .kp-live td{padding:4px 6px;border-bottom:1px solid rgba(255,255,255,.04);color:#e6e8ee}
+#instaApp .kp-live .r{text-align:right}
+#instaApp .kp-live tr.ich td{color:#fff;font-weight:800;background:color-mix(in srgb,var(--f) 18%,transparent)}
+#instaApp .kp-live td.hoch{color:#3fbf5f}#instaApp .kp-live td.runter{color:#ff6b75}
+#instaApp .kp-tipp{color:var(--steel);font-size:12.5px;line-height:1.4}
+#instaApp .kp-hinweis{font-size:13px;color:var(--steel);background:#0d0e13;border:1px solid var(--line);padding:6px 10px}
+#instaApp .kp-hinweis.rot{color:#ff6b75;border-color:rgba(225,19,36,.45)}#instaApp .kp-hinweis.gelb{color:#f5c518;border-color:rgba(245,197,24,.45)}
+#instaApp .kp-speichern{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-top:8px;padding-top:12px;border-top:1px solid var(--line)}
+#instaApp .btn.kp-los{background:linear-gradient(90deg,#ff2d6f,#ff7a00);border-color:transparent;color:#fff;font-size:15px;padding:12px 20px;box-shadow:0 0 24px rgba(255,45,111,.45)}
+#instaApp .btn.kp-los:disabled{background:#1a1c24;box-shadow:none;color:var(--steel)}
+#instaApp .kp-ungespeichert{color:#f5c518}
+#instaApp .kp-editor .ki-stream{max-width:100%}
+@media (max-width:700px){
+  #instaApp .kp-tag{grid-template-columns:1fr}
+  #instaApp .kp-tagname{flex-direction:row;align-items:baseline;gap:8px}
+  #instaApp .kp-zeile{grid-template-columns:50px 40px minmax(0,1fr);row-gap:6px}
+  #instaApp .kp-zeile .ki-chip{grid-column:3}
+  #instaApp .kp-zeile .kp-knoepfe{grid-column:1/-1}
+  #instaApp .kp-links{flex-basis:100%}
+}`;
   document.head.appendChild(css);
 
   // Zeichnen (insta-bilder.js) und Thumbnail-Editor (insta-thumb.js) nachladen
@@ -1117,7 +1522,7 @@
         box.addEventListener('click', klick);
         box.addEventListener('change', aenderung);
         box.addEventListener('toggle', ev => { if (ev.target.classList && ev.target.classList.contains('ki-erledigt')) ERL_OFFEN = ev.target.open; }, true);
-        box.addEventListener('input', ev => { if (ev.target.closest('.ki-design')) designGeaendert(); });
+        box.addEventListener('input', ev => { if (ev.target.closest('.ki-design')) designGeaendert(); if (ev.target.dataset && ev.target.dataset.kp) kpEingabe(ev.target); });
         box.addEventListener('pointerdown', dRunter);
         window.addEventListener('pointermove', dBewegen);
         window.addEventListener('pointerup', dHoch);

@@ -12,7 +12,7 @@
 // Routen: GET /bild/:id/:v.jpg · GET /hintergrund/:rennen · GET /logo.png · GET /cvideo/:id/:v.mp4 · GET /cbild/:id.jpg · /api/* (Bearer-Token)
 // ═══════════════════════════════════════════════════════════
 import { DurableObject } from 'cloudflare:workers';
-import { ADMIN, ERG_TAGE, LIVE_VOR, ladeDaten, bauePlan, eigeneRennen, rennKey, inhaltSchluessel, kurzHash, bildtext, platzText } from './plan.js';
+import { ADMIN, ERG_TAGE, LIVE_VOR, LOOKS, EDIT_FELDER, NEUE_ARTEN, ladeDaten, bauePlan, eigeneRennen, rennKey, inhaltSchluessel, kurzHash, bildtext, platzText } from './plan.js';
 import { kiBild, sprueche, STIMMUNGEN, KAMERAS, autos } from './ki.js';
 import { konto, posten, pruefen, tokenVerlaengern, verlaengerbar } from './insta.js';
 import { istUhrzeit, berlin, berlinZuMs, tageZurueck } from './zeit.js';
@@ -307,7 +307,7 @@ async function veroeffentlichen(env, s, post, design, cfg) {
       token, uid: k.user_id,
       bildUrl: `${env.ORIGIN}/bild/${post.id}/${zust.version}.jpg`,
       videoUrl: zust.istVideo ? `${env.ORIGIN}/pvideo/${post.id}/${zust.video.v}.mp4` : '',
-      typ: STORY_ARTEN.includes(post.typ) ? 'story' : 'ank', text: STORY_ARTEN.includes(post.typ) ? '' : bildtext(post, cfg, design, zust.werte),
+      typ: STORY_ARTEN.includes(post.typ) ? 'story' : 'ank', text: STORY_ARTEN.includes(post.typ) ? '' : bildtext(post, cfg, design, zust.werte, zust.edit),
       tags: [], kiHinweis: cfg.kiHinweis && !!zust.ki
     });
     zust.gepostet = { zeit: Date.now(), mediaId };
@@ -431,7 +431,7 @@ async function ttSenden(env, s, post, cfg, design) {
   if (z.istVideo && !(z.video && z.video.hash === z.hash)) throw new Error('Video fehlt noch – den Instagram-Reiter einmal öffnen.');
   const zugang = await ttZugang(env, s);
   const titel = post.typ === 'woche' ? 'Stream Week' : post.typ === 'monat' ? 'Monatsbilanz' : [post.track || post.titel, post.serie].filter(Boolean).join(' · ');
-  const text = STORY_ARTEN.includes(post.typ) ? '#simracing #iracing #kreids888' : bildtext(post, cfg, design, z.werte);
+  const text = STORY_ARTEN.includes(post.typ) ? '#simracing #iracing #kreids888' : bildtext(post, cfg, design, z.werte, z.edit);
   try {
     const id = z.istVideo ? await ttVideoEntwurf(zugang, `${env.ORIGIN}/pvideo/${post.id}/${z.video.v}.mp4`)
       : await ttEntwurf(zugang, `${env.ORIGIN}/bild/${post.id}/${z.version}.jpg`, titel, text);
@@ -689,11 +689,11 @@ async function vorlagenZuteilen(s, plan, st, vorlagen, cfg) {
   const ids = new Set(vorlagen.map(v => v.id));
   const zaehler = {};
   for (const p of plan) {
-    if (!ARTFORMAT[p.typ]) continue;
+    if (!ARTFORMAT[p.typ] && !NEUE_ARTEN.includes(p.typ)) continue;
     const key = 'post:' + p.id, z = st[key] || {};
     if (z.gepostet) continue;
-    const pool = vorlagenPool(p.typ, p.serie, vorlagen, cfg);
-    if (z.vorlage && (z.vorlageFest ? (z.vorlage === 'kreids' || ids.has(z.vorlage)) : pool.includes(z.vorlage))) continue;
+    const pool = NEUE_ARTEN.includes(p.typ) ? LOOKS : vorlagenPool(p.typ, p.serie, vorlagen, cfg);
+    if (z.vorlage && (z.vorlageFest ? (z.vorlage === 'kreids' || ids.has(z.vorlage) || (LOOKS.includes(z.vorlage) && pool === LOOKS)) : pool.includes(z.vorlage))) continue;
     const c = cfg.vorlagen[p.typ] || {};
     let id;
     if (c.modus === 'fest') id = pool.includes(c.fest) ? c.fest : pool[0];
@@ -731,9 +731,9 @@ async function stand(env, s) {
     const bgv = bgvs['bgv:' + rk] || 0;
     const m = bgms['bgm:' + rk] || {};
     const spruch = (thrs['thr:' + rk] || {}).spruch || '';
-    const vid = z.vorlage && (z.vorlage === 'kreids' || vVersion[z.vorlage] !== undefined) ? z.vorlage : 'kreids';
+    const vid = NEUE_ARTEN.includes(p.typ) ? (LOOKS.includes(z.vorlage) ? z.vorlage : 'kreids') : z.vorlage && (z.vorlage === 'kreids' || vVersion[z.vorlage] !== undefined) ? z.vorlage : 'kreids';
     const rennVideo = (thrs['thr:' + rk] || {}).video || '';
-    const soll = kurzHash(inhaltSchluessel({ ...p, spruch }, design, cfg, bgv) + '|' + vid + ':' + (vVersion[vid] || 0) + '|' + rennVideo);
+    const soll = kurzHash(inhaltSchluessel({ ...p, spruch }, design, cfg, bgv) + '|' + vid + ':' + (vVersion[vid] || 0) + '|' + rennVideo + (z.edit ? '|' + JSON.stringify([z.edit.felder || null, z.edit.tabelle || null]) : ''));
     return {
       id: p.id, typ: p.typ, art: p.art, spr: p.spr, titel: p.titel, serie: p.serie, nr: p.nr, track: p.track, layout: p.layout, datum: p.datum,
       postMs: p.postMs, startMs: p.startMs, qualiMs: p.qualiMs || p.startMs, rennMs: p.rennMs || p.startMs, liveMs: p.liveMs, tage: p.tage || 0,
@@ -755,7 +755,9 @@ async function stand(env, s) {
       ytThumbH: (ytbh['ytbh:' + rk] || {}).h || '',
       tiktok: z.tiktok ? { zeit: z.tiktok.zeit || 0, fehler: z.tiktok.zeit ? '' : (z.tiktok.fehler || '') } : null,
       autos: autos(p, design.fahrzeuge || ''),
-      text: STORY_ARTEN.includes(p.typ) ? '' : bildtext(p, cfg, design, z.werte)
+      text: STORY_ARTEN.includes(p.typ) ? '' : bildtext(p, cfg, design, z.werte, z.edit),
+      textStandard: STORY_ARTEN.includes(p.typ) ? '' : bildtext(p, cfg, design, z.werte, z.edit ? { ...z.edit, text: '' } : null),
+      edit: z.edit || null
     };
   });
   // Gepostet in den letzten 36 Stunden
@@ -1109,6 +1111,26 @@ async function api(req, env, url) {
     } catch (e) { return fehler('SPR-Daten gerade nicht da.', 502); }
   }
 
+  // Post bearbeiten: { felder: { titelText, … }, tabelle: [ … ], text } – leer = Standard, { zuruecksetzen: true } = alles zurück
+  const ed = pfad.match(/^\/api\/post\/([A-Za-z0-9_-]{1,200})\/bearbeiten$/);
+  if (ed && req.method === 'POST') {
+    const body = await json(), z = (await s.lies('post:' + ed[1])) || {};
+    if (z.gepostet) return fehler('Dieser Post ist schon auf Instagram.');
+    if (body.zuruecksetzen) delete z.edit;
+    else {
+      const sauber = v => String(v == null ? '' : v).replace(/[<>]/g, '').slice(0, 80);
+      const felder = {};
+      for (const k of EDIT_FELDER) if (body.felder && body.felder[k] != null && String(body.felder[k]).trim() !== '') felder[k] = sauber(body.felder[k]);
+      const tabelle = Array.isArray(body.tabelle) ? body.tabelle.slice(0, 15).map(r => r && r.luecke ? { luecke: true }
+        : { pos: sauber(r && r.pos).slice(0, 4), name: sauber(r && r.name).slice(0, 40), pts: sauber(r && r.pts).slice(0, 8), delta: Math.max(-99, Math.min(99, parseInt(r && r.delta, 10) || 0)), ich: !!(r && r.ich) }) : null;
+      const text = typeof body.text === 'string' ? body.text.slice(0, 2200) : '';
+      z.edit = { felder, tabelle: tabelle && tabelle.length ? tabelle : null, text, zeit: Date.now() };
+      if (!Object.keys(felder).length && !z.edit.tabelle && !text.trim()) delete z.edit;
+    }
+    await s.schreib('post:' + ed[1], z);
+    return antwort({ ok: true, edit: z.edit || null });
+  }
+
   const m = pfad.match(/^\/api\/post\/([A-Za-z0-9_-]{1,200})\/(fertig|bild|freigeben|ueberspringen|jetzt|manuell|eigenesbild|pruefen|tiktok|vorlage)$/);
   if (m && req.method === 'POST') {
     const [, id, aktion] = m;
@@ -1133,11 +1155,11 @@ async function api(req, env, url) {
         const [cfg, liste, daten] = await Promise.all([ladeCfg(s), s.liste('vorlage:'), datenLaden(s)]);
         const p = bauePlan(daten, cfg, Date.now()).find(x => x.id === id);
         if (!p) return fehler('Diesen Post gibt es nicht (mehr).', 404);
-        const pool = vorlagenPool(p.typ, p.serie, Object.values(liste), cfg).filter(x => x !== z.vorlage);
+        const pool = (NEUE_ARTEN.includes(p.typ) ? LOOKS : vorlagenPool(p.typ, p.serie, Object.values(liste), cfg)).filter(x => x !== z.vorlage);
         if (!pool.length) return fehler('Keine andere Vorlage für diese Art da – im Reiter „🧩 Vorlagen“ welche anlegen.');
         z.vorlage = pool[Math.floor(Math.random() * pool.length)]; z.vorlageFest = true;
       } else if (body.id) {
-        if (body.id !== 'kreids' && !(await s.lies('vorlage:' + String(body.id).replace(/[^a-z0-9]/g, '')))) return fehler('Vorlage nicht gefunden.', 404);
+        if (body.id !== 'kreids' && !LOOKS.includes(body.id) && !(await s.lies('vorlage:' + String(body.id).replace(/[^a-z0-9]/g, '')))) return fehler('Vorlage nicht gefunden.', 404);
         z.vorlage = body.id; z.vorlageFest = true;
       } else { delete z.vorlage; delete z.vorlageFest; }
       await s.schreib('post:' + id, z);

@@ -33,11 +33,11 @@ export const rennKey = id => String(id).replace(/_(ank|story|erg|tab|meilen|live
 // Jetzt live: frühestens 45 Min. vor „Live ab“, spätestens 3 Std. danach
 export const LIVE_VOR = 45 * 60000, LIVE_BIS = 3 * 3600000;
 
-// Planung: alle Posts der nächsten 3 Wochen (+ frische Ergebnisse der letzten 5 Tage)
+// Planung: alle Posts der nächsten 4 Wochen (+ frische Ergebnisse der letzten 5 Tage)
 export const ERG_TAGE = 5;
 export function bauePlan(daten, cfg, jetzt) {
   const posts = [];
-  const bis = jetzt + 21 * 86400000;
+  const bis = jetzt + 28 * 86400000;
   for (const e of daten.eintraege) {
     if (!e || e.racing === false || !e.date || !e.time) continue;
     const art = e.type || 'Rennen';
@@ -243,9 +243,26 @@ function deltaText(erg) {
 }
 
 const MONATE = ['Januar', 'Februar', 'März', 'April', 'Mai', 'Juni', 'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember'];
+// Looks der neuen Posts (zeichnet insta-bilder.js), wechseln der Reihe nach
+export const LOOKS = ['kreids', 'kneon', 'khell'];
+// Von Hand geänderte Felder (Dashboard „Bearbeiten“) – erlaubte Schlüssel
+export const EDIT_FELDER = ['titelText', 'serieText', 'unterText', 'standText', 'monatText', 'jahrText', 'bestesText', 'bestesSerie', 'fussText', 'wort', 'zusatz', 'woText', 'datumText',
+  'wort1', 'wort2', 'track', 'serie', 'layout', 'rennen', 'siege', 'podien', 'top5', 'punkte', 'schnitt', 'zahl', 'start', 'ziel'];
+// Änderungen auch für den Text unter dem Post übernehmen (Serie, Strecke, Zahlen)
+function mitEdit(post, edit) {
+  const f = (edit && edit.felder) || {}, da = k => f[k] != null && String(f[k]).trim() !== '';
+  const p = { ...post };
+  if (da('serie')) p.serie = f.serie;
+  if (da('track')) p.track = f.track;
+  if (post.typ === 'erg') { p.ergebnis = { ...(post.ergebnis || {}) }; for (const k of ['start', 'ziel', 'punkte']) if (da(k)) p.ergebnis[k] = Number(f[k]) || f[k]; }
+  if (post.typ === 'monat') { p.werte = { ...(post.werte || {}) }; for (const k of ['rennen', 'siege', 'podien', 'top5', 'punkte', 'schnitt']) if (da(k)) p.werte[k] = f[k]; }
+  if (post.typ === 'meilen') { if (da('zahl')) p.zahl = f.zahl; if (da('wort')) p.wort = f.wort; if (da('zusatz')) p.zusatz = f.zusatz; }
+  return p;
+}
 // Bildunterschrift. Zeilen, deren Platzhalter leer bleibt, fallen weg.
 // tw = Werte des Tabellenstands (rechnet das Dashboard beim Zeichnen: { platz, punkte, abstand })
-export function bildtext(post, cfg, design, tw) {
+export function bildtext(post, cfg, design, tw, edit) {
+  post = mitEdit(post, edit);
   const s = berlin(post.startMs), tage = post.tage | 0;
   const strecke = [post.track, post.layout].filter(Boolean).join(' – ') || post.titel;
   const erg = post.ergebnis || null;
@@ -279,7 +296,8 @@ export function bildtext(post, cfg, design, tw) {
       punkte: String(v.punkte || 0), schnitt: v.schnitt ? String(v.schnitt).replace('.', ',') : '', bestes: b && b.platz ? `P${b.platz} · ${b.track || b.serie}` : '' });
   }
   if (post.typ === 'meilen') w.meilenstein = `${post.zahl}. ${post.wort}${post.zusatz ? ' ' + post.zusatz : ''}`;
-  const vorlage = { erg: cfg.textErgebnis, tab: cfg.textTabelle, monat: cfg.textMonat, meilen: cfg.textMeilen }[post.typ] || cfg.text;
+  const eigen = edit && typeof edit.text === 'string' && edit.text.trim() ? edit.text : '';   // eigener Text für diesen Post
+  const vorlage = eigen || { erg: cfg.textErgebnis, tab: cfg.textTabelle, monat: cfg.textMonat, meilen: cfg.textMeilen }[post.typ] || cfg.text;
   return String(vorlage || '').split('\n').map(z => {
     let leer = false;
     const r = z.replace(/\{(\w+)\}/g, (m, k) => { if (!(k in w)) return m; if (!w[k]) leer = true; return w[k]; });

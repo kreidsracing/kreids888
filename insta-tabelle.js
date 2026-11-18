@@ -226,7 +226,8 @@
     let h = 0x811c9dc5; for (let i = 0; i < fp.length; i++) { h ^= fp.charCodeAt(i); h = Math.imul(h, 0x01000193); }
     return {
       bild: { tabelle: kuerzen(zeilen, ichIdx), nachRunde: letztes.nr, rundenGesamt: liga.numR || 0, klasse, stand: t ? `${t}.${m}.${j}` : '' },
-      werte: { platz: ichZ ? ichZ.pos : null, punkte: ichZ ? ichZ.pts : null, abstand: ichZ && zeilen[0] ? zeilen[0].pts - ichZ.pts : null, fp: (h >>> 0).toString(36) }
+      werte: { platz: ichZ ? ichZ.pos : null, punkte: ichZ ? ichZ.pts : null, abstand: ichZ && zeilen[0] ? zeilen[0].pts - ichZ.pts : null, fp: (h >>> 0).toString(36) },
+      alle: zeilen   // komplette Tabelle (für die Anzeige im Dashboard)
     };
   }
 
