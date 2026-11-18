@@ -590,7 +590,7 @@ async function clipsListe(env, s) {
     video: c.video ? `${env.ORIGIN}/cvideo/${c.id}/${c.video.v}.mp4` : '', bild: c.bild ? `${env.ORIGIN}/cbild/${c.id}.jpg?v=${c.bild}` : '',
     gepostet: c.gepostet ? { zeit: c.gepostet.zeit || 0, link: c.gepostet.link || '', test: !!c.gepostet.test } : null,
     tt: c.tt ? { zeit: c.tt.zeit || 0 } : null, fehler: c.fehler || '', ttFehler: c.ttFehler || '', versuche: c.versuche || 0,
-    youtube: !!c.youtube, yt: c.yt ? { zeit: c.yt.zeit || 0, link: 'https://youtube.com/shorts/' + c.yt.id, privat: !!c.yt.privat } : null, ytFehler: c.ytFehler || ''
+    youtube: !!c.youtube, yt: c.yt ? { zeit: c.yt.zeit || 0, link: 'https://youtube.com/shorts/' + c.yt.id, privat: !!c.yt.privat } : null, ytFehler: c.ytFehler || '', weg: !!c.weg
   }));
 }
 
@@ -707,6 +707,33 @@ async function zyklus(env) {
   await tokenPflege(env, s);
   // 4. Aufräumen: Einträge älter als 14 Tage, alte KI-Tageszähler, Reste der alten Version (th:, thb:, nz:, nb:)
   const weg = [];
+  // 4a. Gesendetes 1 Tag nach dem Senden löschen (dann haben Instagram, TikTok, YouTube und Discord es längst abgeholt)
+  try {
+    const frueher = ms => ms && ms < jetzt - 86400000;
+    for (const [k, z0] of Object.entries(st)) {   // Post-Bilder und -Videos
+      if (!z0 || z0.weg || !z0.gepostet || !frueher(z0.gepostet.zeit)) continue;
+      const z = await s.lies(k); if (!z || z.weg || !z.gepostet) continue;
+      const id = k.slice(5);
+      weg.push('img:' + id);
+      if (z.video) for (let i = 0; i < (z.video.teile || 0); i++) weg.push(`pvteil:${id}:${z.video.v}:${i}`);
+      z.weg = jetzt; await s.schreib(k, z);
+    }
+    for (const c of Object.values(await s.liste('clip:'))) {   // Clip-Videos: wenn Instagram, TikTok und YouTube durch sind
+      if (!c || c.weg || !c.video || !clipDraussen(c)) continue;
+      if (!frueher(Math.max((c.gepostet && c.gepostet.zeit) || 0, (c.tt && c.tt.zeit) || 0, (c.yt && c.yt.zeit) || 0))) continue;
+      weg.push(...clipTeile(c), 'cbild:' + c.id);
+      await s.schreib('clip:' + c.id, { ...c, video: null, bild: 0, weg: jetzt });
+    }
+    const renn = new Map();   // Rennen → späteste Sendezeit (-1 = da kommt noch was)
+    for (const p of plan) {
+      const rk = rennKey(p.id), z = st['post:' + p.id] || {};
+      const offen = !z.gepostet && !z.uebersprungen && (p.postMs + VERPASST_NACH > jetzt || (z.freigegeben && (z.versuche || 0) < 3) || (p.typ === 'live' && jetzt < (p.liveBisMs || 0)));
+      const t = offen ? -1 : z.gepostet ? (z.gepostet.zeit || p.postMs) : p.postMs, alt = renn.has(rk) ? renn.get(rk) : 0;
+      renn.set(rk, alt < 0 || t < 0 ? -1 : Math.max(alt, t));
+    }
+    for (const [rk, t] of renn) if (t > 0 && frueher(t)) weg.push('bgr:' + rk, 'bgv:' + rk);   // KI-Hintergrund, wenn alles zum Rennen draußen ist
+    for (const [k, t] of Object.entries(await s.liste('ytbh:'))) if (t && frueher(t.startMs)) weg.push(k, 'ytb:' + k.slice(5));   // YouTube-Thumbnail nach dem Rennen
+  } catch (e) { /* nächster Lauf */ }
   const alt = ms => !ms || ms < jetzt - 14 * 86400000;
   for (const [k, z] of Object.entries(st)) if (z && z.postMs && alt(z.postMs)) {
     weg.push(k, 'img:' + k.slice(5));
@@ -723,7 +750,7 @@ async function zyklus(env) {
   for (const pre of ['th:', 'thb:', 'nz:', 'nb:']) weg.push(...Object.keys(await s.liste(pre)));
   const tagHeute = new Date().toISOString().slice(0, 10);
   for (const k of Object.keys(await s.liste('ki:'))) if (k !== 'ki:' + tagHeute) weg.push(k);
-  if (weg.length) await s.loesch(weg.slice(0, 120));
+  for (let i = 0; i < weg.length; i += 120) await s.loesch(weg.slice(i, i + 120));   // höchstens 128 Schlüssel pro Löschen
   await s.schreib('lauf', { zeit: jetzt, ok: true, posts: plan.length });
 }
 
@@ -840,10 +867,10 @@ async function stand(env, s) {
       ligaId: p.ligaId || '', werte: p.werte || null, bestes: p.bestes || null, monat: p.monat || '', zahl: p.zahl || 0, wort: p.wort || '', zusatz: p.zusatz || '',
       liveBisMs: p.liveBisMs || 0, tab: z.werte || null,
       vorlage: vid, vorlageFest: !!z.vorlageFest, istVideo: !!z.istVideo,
-      video: z.istVideo && z.video && z.video.hash === z.hash ? `${env.ORIGIN}/pvideo/${p.id}/${z.video.v}.mp4` : '', videoHash: z.video ? z.video.hash : '',
+      video: z.istVideo && z.video && z.video.hash === z.hash && !z.weg ? `${env.ORIGIN}/pvideo/${p.id}/${z.video.v}.mp4` : '', videoHash: z.video ? z.video.hash : '',
       status: status(z, cfg, p, jetzt), freigegeben: !!z.freigegeben, fehler: z.fehler || '', kiFehler: bgv ? '' : (m.kiFehler || ''),
-      gepostet: z.gepostet || null,
-      bild: z.version ? `${env.ORIGIN}/bild/${p.id}/${z.version}.jpg` : '',
+      gepostet: z.gepostet || null, weg: !!z.weg,
+      bild: z.version && !z.weg ? `${env.ORIGIN}/bild/${p.id}/${z.version}.jpg` : '',
       soll, veraltet: !!z.version && z.hash !== soll,
       hg: bgv ? `${env.ORIGIN}/hintergrund/${rk}?v=${bgv}` : p.kalenderBild ? `${env.ORIGIN}/hintergrund/${rk}?k=${kurzHash(p.kalenderBild)}` : '',
       bildQuelle: bgv ? (QUELLE[m.quelle] || '') + (m.modell ? ' (' + m.modell + ')' : '') : p.kalenderBild ? 'Bild aus dem Streamkalender' : '',
@@ -872,8 +899,8 @@ async function stand(env, s) {
       wann, imPlan: imPlan.has(id), fehler: z.fehler || '',
       gepostet: z.gepostet ? { zeit: z.gepostet.zeit || 0, manuell: !!z.gepostet.manuell, mediaId: z.gepostet.mediaId || '' } : null,
       tiktok: z.tiktok ? { zeit: z.tiktok.zeit || 0, fehler: z.tiktok.zeit ? '' : (z.tiktok.fehler || '') } : null,
-      bild: z.version ? `${env.ORIGIN}/bild/${id}/${z.version}.jpg` : '',
-      video: z.istVideo && z.video ? `${env.ORIGIN}/pvideo/${id}/${z.video.v}.mp4` : ''
+      bild: z.version && !z.weg ? `${env.ORIGIN}/bild/${id}/${z.version}.jpg` : '', weg: !!z.weg,
+      video: z.istVideo && z.video && !z.weg ? `${env.ORIGIN}/pvideo/${id}/${z.video.v}.mp4` : ''
     };
   }).filter(Boolean).sort((a, b) => b.wann - a.wann);
   const [clips, clipcfg] = await Promise.all([clipsListe(env, s), ladeClipCfg(s)]);

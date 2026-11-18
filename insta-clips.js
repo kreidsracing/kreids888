@@ -2204,10 +2204,10 @@
     if (x.insta) chips.push(x.gepostet ? `<span class="ki-chip gruen">Instagram ✓${x.gepostet.test ? ' (Test-Reel)' : ''}</span>` : '<span class="ki-chip blau">Instagram</span>');
     if (x.tiktok) chips.push(x.tt ? '<span class="ki-chip gruen">TikTok-Entwurf ✓</span>' : '<span class="ki-chip blau">TikTok</span>');
     if (x.youtube) chips.push(x.yt ? (x.yt.privat ? '<span class="ki-chip rot">YouTube: nur privat</span>' : '<span class="ki-chip gruen">YouTube ✓</span>') : '<span class="ki-chip blau">YouTube</span>');
-    if (!x.video) chips.push('<span class="ki-chip rot">Video fehlt – löschen und neu einplanen</span>');
+    if (!x.video && !x.weg) chips.push('<span class="ki-chip rot">Video fehlt – löschen und neu einplanen</span>');
     if (x.fehler) chips.push('<span class="ki-chip rot">Fehler</span>');
     return `<div class="kc-post" data-id="${esc(x.id)}">
-      <a class="kc-mini" href="${esc(x.video)}" target="_blank" rel="noopener" title="Video ansehen">${x.bild ? `<img src="${esc(x.bild)}" alt="">` : '🎬'}</a>
+      <a class="kc-mini" href="${esc(x.video || (x.yt && x.yt.link) || (x.gepostet && x.gepostet.link) || '#')}" target="_blank" rel="noopener" title="Video ansehen">${x.bild ? `<img src="${esc(x.bild)}" alt="">` : '🎬'}</a>
       <div class="kc-info">
         <div class="kc-titel" style="--f:${v.farbe}">${v.emoji} ${esc(x.titel || v.name)}</div>
         <div class="kc-dim">${raus ? 'Gepostet' : 'Geht raus'}: <b>${esc(zeit(raus ? ((x.gepostet && x.gepostet.zeit) || (x.tt && x.tt.zeit) || x.postMs) : x.postMs))}</b>${x.dauer ? ' · ' + sek(x.dauer) : ''}</div>

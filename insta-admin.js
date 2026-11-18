@@ -230,6 +230,7 @@
       ? `<div class="ki-bild ${p.typ} ki-vid"><video src="${esc(p.video)}" poster="${esc(p.bild)}" muted loop playsinline controls preload="none"></video><span class="ki-vidchip">🎬 Video</span></div>`
       : p.bild
       ? `<a href="${esc(p.bild)}" target="_blank" rel="noopener" class="ki-bild ${p.typ}" title="Vorschau groß öffnen"><img src="${esc(p.bild)}" alt="Vorschau" loading="lazy"></a>`
+      : p.weg ? `<div class="ki-bild ${p.typ} leer">✓ Gesendet – Bild gelöscht</div>`
       : `<div class="ki-bild ${p.typ} leer">${GLEICHT ? '🖌 wird gezeichnet …' : 'Noch kein Bild'}</div>`;
     const id = esc(p.id), k = [];
     const kn = (aktion, text, extra = '', titel = '') => `<button class="btn btn-ghost ki-k" data-aktion="${aktion}" data-id="${id}" ${extra}${titel ? ` title="${esc(titel)}"` : ''}><span>${text}</span></button>`;
@@ -683,7 +684,7 @@
     const wann = p.typ === 'live' ? `ab ${uhrzeit(p.liveMs)}` : uhrzeit(p.postMs);
     return `<div class="kp-zeile${offen ? ' offen' : ''}${istFertig(p) ? ' fertig' : ''}" style="--f:${ART_FARBE[p.typ] || '#888'}" data-aktion="kp-auf" data-id="${id}">
       <div class="kp-zeit">${esc(wann)}</div>
-      ${kpMini(p.bild, istStoryArt(p.typ, p), p.bild ? '' : '🖌')}
+      ${kpMini(p.bild, istStoryArt(p.typ, p), p.bild ? '' : p.weg ? '✓' : '🖌')}
       <div class="kp-was"><b>${esc(TYP[p.typ] || p.typ)}</b><span>${titel(p)}${p.typ === 'tab' && p.tab && p.tab.platz ? ` · P${esc(p.tab.platz)}` : ''}${p.typ === 'meilen' ? ` · ${esc(p.zahl)}. ${esc(p.wort)}` : ''}${p.edit ? ' · ✎' : ''} · ${kpZiele(p)}</span></div>
       <span class="ki-chip ${fa}">${esc(st)}</span>
       <div class="kp-knoepfe">${frei}<button class="btn btn-ghost ki-k" data-aktion="kp-auf" data-id="${id}"><span>${offen ? '▴ Zu' : '✎ Bearbeiten'}</span></button></div>
