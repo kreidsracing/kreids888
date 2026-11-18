@@ -9,7 +9,7 @@
 // ═══════════════════════════════════════════════════════════
 (function () {
   'use strict';
-  const B = 1080, H = 1920, FPS = 30, OUTRO = 1.8, SK = 0.2;
+  const B = 1080, H = 1920, FPS = 30, OUTRO = 2.2, LOOP = 0.4, SK = 0.2;
   const BASIS = ((document.currentScript && document.currentScript.src) || 'https://kreids888.com/insta-clips.js').replace(/[?#].*$/, '').replace(/[^/]*$/, '');
   // Schriften kommen im Dashboard über /site/ (gleiche Adresse), auf kreids888.com direkt
   const site = () => (window.K888Bilder && window.K888Bilder.SITE) || (/(^|\.)kreids888\.com$/.test(location.hostname) ? location.origin + '/' : location.origin + '/site/');
@@ -88,7 +88,21 @@
     { id: 'regen', name: 'Regen-Chaos', emoji: '🌧️', farbe: '#00c2ff', tag: 'REGEN', zl: true, wieder: 'NOCHMAL. LANGSAM.', regen: true,
       hooks: ['REGEN-CHAOS', 'WER BLEIBT DRAUF?', 'AQUAPLANING!', 'NASS. NÄSSER. SPA.'], unten: ['WER BLEIBT DRAUF?', 'SLICKS ODER REGENREIFEN?', 'WER FLIEGT ZUERST RAUS?'],
       text: 'Regen-Chaos 🌧️ Wer bleibt hier drauf? 👇\n\n#simracing #iracing #rain #simracer #kreids888',
-      hilfe: 'Für Regenrennen: mit Regen und Blitz im Bild, Donner und Regen im Ton.' }
+      hilfe: 'Für Regenrennen: mit Regen und Blitz im Bild, Donner und Regen im Ton.' },
+    // Vorlagen mit mehreren Clips bzw. Zeitraffer (eigener Zeitplan und eigenes Bild, nur Neon-Look)
+    { id: 'top3', name: 'Top 3 der Woche', emoji: '🏆', farbe: '#ffd400', tag: 'TOP 3', zl: false, wieder: '', mehr: 'top3', plaetze: ['PLATZ 3', 'PLATZ 2', 'PLATZ 1'],
+      hooks: ['TOP 3 DER WOCHE', 'MEINE TOP 3', 'DIE BESTEN MOMENTE'], unten: ['WAS IST DEIN PLATZ 1?', 'EINVERSTANDEN? KOMMENTIER!', 'WAS FEHLT IN DER LISTE?'],
+      text: 'Meine Top 3 der Woche 🏆 Was ist dein Platz 1? 👇\n\n#simracing #iracing #top3 #simracer #kreids888',
+      hilfe: 'Drei Clips nacheinander, Platz 3 bis Platz 1. Zieh am besten drei Clips auf einmal rein, dann sind die Plätze gleich gefüllt.' },
+    { id: 'vergleich', name: 'Vorher / Nachher', emoji: '🔀', farbe: '#18e8ff', tag: 'VERGLEICH', zl: false, wieder: '', mehr: 'vergleich', plaetze: ['VORHER', 'NACHHER'],
+      hooks: ['VORHER / NACHHER', 'SIEHST DU DEN UNTERSCHIED?', 'GLEICHE STELLE. ANDERES ENDE.'], unten: ['WAS HAT SICH GEÄNDERT?', 'WELCHE IST SCHNELLER?', 'OBEN ODER UNTEN?'],
+      text: 'Vorher / Nachher 🔀 Siehst du den Unterschied? 👇\n\n#simracing #iracing #beforeafter #simracer #kreids888',
+      hilfe: 'Zwei Clips gleichzeitig untereinander, z. B. Quali und Rennen oder Fehler und sauber. Geht auch zweimal mit demselben Clip.' },
+    { id: 'strecke', name: 'Strecke in 30 Sek.', emoji: '🛣️', farbe: '#5cff1f', tag: 'ONBOARD', zl: false, wieder: '', mehr: 'strecke',
+      felder: [['strecke', 'Strecke', 'Silverstone']], pflicht: 'strecke', feldTipp: 'Steht groß oben im Video.',
+      hooks: ['EINE RUNDE IN 30 SEK.', 'DIE STRECKE IN 30 SEK.', 'SO FÄHRT MAN DAS'], unten: ['WIE IST DEINE BESTZEIT HIER?', 'WO VERLIERST DU HIER ZEIT?', 'KENNST DU DIE STRECKE?'],
+      text: c => `${c.strecke ? c.strecke + ' in 30 Sekunden' : 'Eine Runde in 30 Sekunden'} 🛣️ Wie ist deine Bestzeit hier? 👇\n\n#simracing #iracing #onboard #simracer #kreids888`,
+      hilfe: 'Eine Runde im Zeitraffer. Kurvennamen und Tipps blendest du an der richtigen Stelle ein (Schritt 3).' }
   ];
   const LOOKS = [['neon', '✨ Neon'], ['tv', '📺 TV-Sendung']];
   const WIEDER = ['NOCHMAL GENAU HINSCHAUEN', 'NOCHMAL IN ZEITLUPE', 'GANZ GENAU HINSEHEN', 'NOCHMAL. LANGSAM.', 'WIE?!', 'AUTSCH. NOCHMAL.', 'SO GEHT DAS', 'FOTOFINISH'];
@@ -115,10 +129,14 @@
   function passt(g, t, maxW, px, setz, min) { let s = px; setz(g, s); while (s > (min || 18) && g.measureText(t).width > maxW) { s -= 2; setz(g, s); } return s; }
   function rr(g, x, y, w, h, r) { g.beginPath(); g.moveTo(x + r, y); g.arcTo(x + w, y, x + w, y + h, r); g.arcTo(x + w, y + h, x, y + h, r); g.arcTo(x, y + h, x, y, r); g.arcTo(x, y, x + w, y, r); g.closePath(); }
   function zweiZeilen(t) {
-    const w = String(t || '').split(/\s+/).filter(Boolean);
+    const w = String(t || '').split(/\s+/).filter(Boolean), trenn = x => /^[/|·]$/.test(x);
     if (w.length < 2 || t.length <= 13) return [t];
     let best = [t], diff = 1e9;
-    for (let i = 1; i < w.length; i++) { const a = w.slice(0, i).join(' '), b = w.slice(i).join(' '), d = Math.abs(a.length - b.length); if (d < diff) { diff = d; best = [a, b]; } }
+    for (let i = 1; i < w.length; i++) {   // ein Trenner wie „/“ am Zeilenumbruch fällt weg
+      const a = w.slice(0, trenn(w[i - 1]) ? i - 1 : i).join(' '), b = w.slice(trenn(w[i]) ? i + 1 : i).join(' ');
+      if (!a || !b) continue;
+      const d = Math.abs(a.length - b.length); if (d < diff) { diff = d; best = [a, b]; }
+    }
     return best;
   }
   const BILDER = new Map();
@@ -203,7 +221,37 @@
   // ─── Zeitplan eines Clips: Hauptteil · Zeitlupe vom Ende (halbe Geschwindigkeit) · Abspann ───
   // Bei „Was passiert jetzt?“ hält der Clip bei F an (FD Sekunden, Countdown 3-2-1) und läuft dann weiter
   const HALT = 2.4;
+  // Quellen eines Clips: [Haupt-Clip, …weitere] (Top 3 und Vorher/Nachher nehmen mehrere)
+  const quellenVon = c => [c, ...(c.extra || [])];
+  function abschnitt(s) { const dauer = s.dauer || 10, a = kl(s.start || 0, 0, Math.max(0, dauer - 1)), b = kl(s.ende || dauer, a + 1, dauer); return { a, b }; }
+  const STRECKE_ZIEL = 28;   // eine Runde im Zeitraffer auf etwa so viele Sekunden
+  // Zeitplan für Top 3 · Vorher/Nachher · Strecke. spur(t) → welche Plätze (s) zu welcher Clip-Zeit (t) zu sehen sind
+  function zeitplanMehr(c, v) {
+    const q = quellenVon(c), p = { mehr: v.mehr, R: 0, Z: 0, FD: 0 };
+    if (v.mehr === 'top3') {
+      const teile = []; let S = 0;
+      q.slice(0, 3).forEach((src, i) => { const { a, b } = abschnitt(src); teile.push({ q: i, a, b, S, d: b - a }); S += b - a; });
+      const bei = t => teile.find(x => t >= x.S && t < x.S + x.d);
+      Object.assign(p, { teile, slots: teile.map(x => x.q), D: S, a: teile[0].a, b: teile[0].b,
+        spur: t => { const k = bei(t); return k ? [{ s: k.q, t: k.a + (t - k.S) }] : []; },
+        quelle: t => { const k = bei(t); return k ? k.a + (t - k.S) : null; } });
+    } else if (v.mehr === 'vergleich') {
+      const x0 = abschnitt(q[0]), x1 = q[1] ? abschnitt(q[1]) : x0, D = Math.min(x0.b - x0.a, x1.b - x1.a);
+      Object.assign(p, { x0, x1, slots: [0, q[1] ? 1 : 0], D, a: x0.a, b: x0.a + D,
+        spur: t => (t < D ? [{ s: 0, t: x0.a + t }, { s: 1, t: x1.a + t }] : []),
+        quelle: t => (t < D ? x0.a + t : null) });
+    } else {
+      const x = abschnitt(q[0]), L = x.b - x.a, tempo = kl(L / STRECKE_ZIEL, 1, 4), D = L / tempo;
+      const marken = (c.marken || []).filter(m => m.t >= x.a && m.t <= x.b).sort((m, n) => m.t - n.t).map((m, i) => ({ ...m, n: i + 1, ot: (m.t - x.a) / tempo }));
+      Object.assign(p, { x, tempo, marken, slots: [0], D, a: x.a, b: x.b,
+        spur: t => (t < D ? [{ s: 0, t: x.a + t * tempo }] : []),
+        quelle: t => (t < D ? x.a + t * tempo : null) });
+    }
+    p.h = p.D; p.F = p.b; p.T = p.D + OUTRO;
+    return p;
+  }
   function zeitplan(c) {
+    if (vorlage(c).mehr) return zeitplanMehr(c, vorlage(c));
     const dauer = c.dauer || 10, a = kl(c.start || 0, 0, Math.max(0, dauer - 1)), b = kl(c.ende || dauer, a + 1, dauer), v = vorlage(c);
     const FD = v.pause ? HALT : 0, F = v.pause ? kl(c.halt != null ? c.halt : b - 2.5, a + 0.5, b - 0.3) : b, h = F - a;
     const D0 = b - a, D = D0 + FD, Z = c.zeitlupe ? Math.min(3, D0 * 0.4) : 0, R = Z * 2, T = D + R + OUTRO;
@@ -315,7 +363,29 @@
   // Neonröhre geht an: kurzes Flackern am Anfang
   const flackern = t => (t < 0.1 ? 0 : t < 0.18 ? 1 : t < 0.24 ? 0.2 : t < 0.36 ? 1 : t < 0.4 ? 0.35 : 1);
 
+  // Spruch oben: knallt rein mit Glitch, pulsiert danach leicht (o: { y1, y2, px1, px2 } für andere Plätze/Größen)
+  function spruchZeichnen(g, t, text, f, o) {
+    o = o || {};
+    const zeilen = zweiZeilen(GROSS(text)), px = zeilen.length > 1 ? (o.px2 || 150) : (o.px1 || 175);
+    zeilen.forEach((z, i) => {
+      const t0 = 0.12 + i * 0.16, q = fp(t, t0, t0 + 0.32); if (q <= 0) return;
+      const ch = chrom(z, px, f, 990), s = 1 + 0.9 * (1 - eob(q)) + 0.012 * Math.max(0, Math.sin((t - t0) * Math.PI * 2)), cy = (zeilen.length > 1 ? (o.y2 || 428) : (o.y1 || 476)) + i * (px * 0.98);
+      g.save(); g.translate(B / 2, cy); g.scale(s, s); g.globalAlpha = Math.min(1, q * 2.5);
+      if (t - t0 < 0.42) {   // Glitch: versetzte Streifen und Farbgeister
+        const r = zufallR(Math.floor(t * 30) + i * 7), n = 7, sh = ch.h / n;
+        for (let k = 0; k < n; k++) g.drawImage(ch.c, 0, k * sh, ch.w, sh, -ch.mitte + (r() - 0.5) * 70 * (1 - q), -ch.base + k * sh, ch.w, sh);
+        g.globalCompositeOperation = 'lighter'; g.globalAlpha = 0.35 * (1 - q);
+        g.drawImage(ch.c, -ch.mitte - 18, -ch.base); g.drawImage(ch.c, -ch.mitte + 18, -ch.base);
+      } else {
+        g.drawImage(ch.c, -ch.mitte, -ch.base);
+        const gq = ((t - 1 - i * 0.12) % 3.2) / 0.75;
+        if (t > 1 + i * 0.12 && gq <= 1) glanz(g, ch, -ch.mitte, -ch.base, gq);
+      }
+      g.restore();
+    });
+  }
   function zeichne(g, t, c, p, m, vid) {
+    if (p.mehr) return zeichneMehr(g, t, c, p, m, vid);
     if (c.look === 'tv') return zeichneTV(g, t, c, p, m, vid);
     const v = vorlage(c), f = c.farbe || v.farbe, zoom = c.modus === 'zoom';
     const outro = t >= p.T - OUTRO, rz = !outro && t >= p.D && t < p.D + p.R, imClip = !outro;
@@ -361,24 +431,7 @@
       const pr = kl(t / (p.T - OUTRO), 0, 1), py = 1270;
       g.fillStyle = 'rgba(255,255,255,.12)'; g.fillRect(fx, py, fw, 8);
       g.save(); g.fillStyle = f; g.shadowColor = f; g.shadowBlur = 16; g.fillRect(fx, py, fw * pr, 8); g.restore();
-      // Spruch oben: knallt rein mit Glitch, pulsiert danach leicht
-      const zeilen = zweiZeilen(GROSS(c.hook || v.hooks[0])), px = zeilen.length > 1 ? 150 : 175;
-      zeilen.forEach((z, i) => {
-        const t0 = 0.12 + i * 0.16, q = fp(t, t0, t0 + 0.32); if (q <= 0) return;
-        const ch = chrom(z, px, f, 990), s = 1 + 0.9 * (1 - eob(q)) + 0.012 * Math.max(0, Math.sin((t - t0) * Math.PI * 2)), cy = (zeilen.length > 1 ? 428 : 476) + i * (px * 0.98);
-        g.save(); g.translate(B / 2, cy); g.scale(s, s); g.globalAlpha = Math.min(1, q * 2.5);
-        if (t - t0 < 0.42) {   // Glitch: versetzte Streifen und Farbgeister
-          const r = zufallR(Math.floor(t * 30) + i * 7), n = 7, sh = ch.h / n;
-          for (let k = 0; k < n; k++) g.drawImage(ch.c, 0, k * sh, ch.w, sh, -ch.mitte + (r() - 0.5) * 70 * (1 - q), -ch.base + k * sh, ch.w, sh);
-          g.globalCompositeOperation = 'lighter'; g.globalAlpha = 0.35 * (1 - q);
-          g.drawImage(ch.c, -ch.mitte - 18, -ch.base); g.drawImage(ch.c, -ch.mitte + 18, -ch.base);
-        } else {
-          g.drawImage(ch.c, -ch.mitte, -ch.base);
-          const gq = ((t - 1 - i * 0.12) % 3.2) / 0.75;
-          if (t > 1 + i * 0.12 && gq <= 1) glanz(g, ch, -ch.mitte, -ch.base, gq);
-        }
-        g.restore();
-      });
+      spruchZeichnen(g, t, c.hook || v.hooks[0], f);
       // Zeitlupe: Band mit Ansage, Crash-Stempel
       if (rz) {
         const q = fp(t, p.D, p.D + 0.25), aus = fp(t, p.D + 1.6, p.D + 1.9);
@@ -407,6 +460,134 @@
     // Blitze: Anfang, Zeitlupe, Abspann
     const blitze = [[0.12, 0.5], [p.D, p.R ? 0.6 : 0], [p.T - OUTRO, 0.75]];
     for (const [z, a] of blitze) { const d = t - z; if (a && d >= 0 && d < 0.3) { g.fillStyle = `rgba(255,255,255,${a * (1 - d / 0.3)})`; g.fillRect(0, 0, B, H); } }
+  }
+  // ═══ Top 3 · Vorher/Nachher · Strecke in 30 Sek. (Neon) ═══
+  // bilder[s] = Bild des Platzes s (aus spur(t)); was gerade nicht läuft, ist leer
+  function clipRahmen(g, bild, x, y, w, h, f, t, zoom) {
+    g.save(); rr(g, x, y, w, h, 14); g.clip(); g.fillStyle = '#000'; g.fillRect(x, y, w, h);
+    if (bild) quellBild(g, bild, x, y, w, h, zoom || 1, 0);
+    g.restore();
+    const fl = flackern(t);
+    g.save(); g.globalAlpha = fl; rr(g, x, y, w, h, 14); g.strokeStyle = hexA(f, 0.55); g.lineWidth = 3; g.shadowColor = f; g.shadowBlur = 22; g.stroke(); g.restore();
+    g.save(); g.globalAlpha = fl; ecken(g, x - 10, y - 10, w + 20, h + 20, f, 74); g.restore();
+  }
+  function frageBand(g, t, text, f, y, ab) {   // Neon-Band, fährt von links rein
+    const ub = fp(t, ab, ab + 0.35); if (ub <= 0) return;
+    const bd = band(text, f, 46);
+    g.save(); g.translate(-(1 - eo(ub)) * B, 0); g.drawImage(bd.c, B / 2 - bd.bandW / 2 - 40, y - 60); g.restore();
+  }
+  function zeichneMehr(g, t, c, p, m, bilder) {
+    const v = vorlage(c), f = c.farbe || v.farbe, outro = t >= p.T - OUTRO, b = bilder || [];
+    const hg = b.find(Boolean) || null;
+    g.save();
+    if (!outro && hg) weichesBild(g, hg, f); else g.drawImage(grund(f), 0, 0);
+    if (outro) outroZeichnen(g, t - (p.T - OUTRO), m, f);
+    else if (p.mehr === 'top3') top3Zeichnen(g, t, c, p, m, v, f, b);
+    else if (p.mehr === 'vergleich') vergleichZeichnen(g, t, c, p, m, v, f, b);
+    else streckeZeichnen(g, t, c, p, m, v, f, b);
+    g.restore();
+    const blitze = [[0.12, 0.5], [p.T - OUTRO, 0.75], ...(p.teile ? p.teile.slice(1).map(k => [k.S, 0.7]) : [])];
+    for (const [z, a] of blitze) { const d = t - z; if (d >= 0 && d < 0.3) { g.fillStyle = `rgba(255,255,255,${a * (1 - d / 0.3)})`; g.fillRect(0, 0, B, H); } }
+  }
+  function top3Zeichnen(g, t, c, p, m, v, f, b) {
+    const n = p.teile.length, k = Math.max(0, p.teile.findIndex(x => t >= x.S && t < x.S + x.d)), teil = p.teile[k], platz = n - k;
+    const fx = 40, fy = 690, fw = 1000, fh = 562, dt = t - teil.S, src = quellenVon(c)[teil.q] || {};
+    const [sx, sy] = schuetteln(dt - 0.05);
+    g.save(); g.translate(sx, sy);
+    clipRahmen(g, b[teil.q], fx, fy, fw, fh, f, t, 1 + 0.12 * (1 - eo(fp(dt, 0, 0.5))));
+    pille(g, (v.plaetze || [])[3 - platz] || 'PLATZ ' + platz, fx + 6, fy - 66, f, 30, true);
+    g.save(); OR(g, 34); g.textAlign = 'right'; g.shadowColor = f; g.shadowBlur = 14; g.fillStyle = '#fff'; g.fillText(`${k + 1}/${n}`, fx + fw - 6, fy - 28); g.restore();
+    // Große Platz-Zahl beim Wechsel
+    if (dt < 1.15) {
+      const q = eob(fp(dt, 0, 0.35)), aus = fp(dt, 0.75, 1.15), ch = chrom('#' + platz, 340, f, 600);
+      g.save(); g.globalAlpha = Math.min(1, fp(dt, 0, 0.12) * 3) * (1 - aus); g.translate(B / 2, fy + fh / 2 + 120); const sk = (0.35 + 0.65 * q) * (1 + 0.3 * aus); g.scale(sk, sk);
+      g.drawImage(ch.c, -ch.mitte, -ch.base); if (dt > 0.35 && dt < 1.0) glanz(g, ch, -ch.mitte, -ch.base, (dt - 0.35) / 0.65, 0.8); g.restore();
+    }
+    g.restore();
+    spruchZeichnen(g, t, c.hook || v.hooks[0], f);
+    // Fortschritt in drei Abschnitten
+    const py = 1270, luecke = 14, breit = fw - luecke * (n - 1);
+    let x = fx;
+    for (const x0 of p.teile) {
+      const w = breit * x0.d / p.D, q = kl((t - x0.S) / x0.d, 0, 1);
+      g.fillStyle = 'rgba(255,255,255,.12)'; g.fillRect(x, py, w, 8);
+      if (q > 0) { g.save(); g.fillStyle = f; g.shadowColor = f; g.shadowBlur = 16; g.fillRect(x, py, w * q, 8); g.restore(); }
+      x += w + luecke;
+    }
+    // Titel des Platzes als Band, darunter die Frage
+    const titel = GROSS(String(src.titel || '').trim()) || ((v.plaetze || [])[3 - platz] || 'PLATZ ' + platz);
+    frageBand(g, dt, titel, f, 1310, 0.25);
+    const fq = fp(t, 1.0, 1.4);
+    if (fq > 0) { const fr = frageVon(c, v); g.save(); g.globalAlpha = fq; SA(g, 42, 800); neonText(g, fr, B / 2, 1446, passt(g, fr, 940, 42, (gg, px) => SA(gg, px, 800)), f, (gg, px) => SA(gg, px, 800), 'center', 14); g.restore(); }
+    marke(g, t, m, f, 1530);
+  }
+  function vergleichZeichnen(g, t, c, p, m, v, f, b) {
+    const q = quellenVon(c), fx = 60, fw = 960, fh = 540, ya = 300, yb = 950;
+    spruchZeichnen(g, t, c.hook || v.hooks[0], f, { y1: 222, y2: 150, px1: 118, px2: 98 });
+    clipRahmen(g, b[0], fx, ya, fw, fh, f, t);
+    clipRahmen(g, b[1], fx, yb, fw, fh, f, t);
+    const la = GROSS(String(q[0].titel || '').trim()) || v.plaetze[0], lb = GROSS(String((q[1] || {}).titel || '').trim()) || v.plaetze[1];
+    pille(g, la, fx + 16, ya + 16, f, 30, true);
+    pille(g, lb, fx + 16, yb + 16, '#ffffff', 30, true);
+    // VS in der Mitte
+    const vy = (ya + fh + yb) / 2, pu = 1 + 0.05 * Math.max(0, Math.sin(t * Math.PI * 2));
+    g.save(); g.translate(B / 2, vy); g.scale(pu, pu);
+    g.beginPath(); g.arc(0, 0, 50, 0, Math.PI * 2); g.fillStyle = '#05070a'; g.fill();
+    g.lineWidth = 6; g.strokeStyle = f; g.shadowColor = f; g.shadowBlur = 24; g.stroke();
+    RU(g, 46); g.textAlign = 'center'; g.fillStyle = '#fff'; g.shadowBlur = 12; g.fillText('VS', 0, 17); g.restore();
+    // Fortschritt und Frage unten
+    const pr = kl(t / p.D, 0, 1), py = yb + fh + 16;
+    g.fillStyle = 'rgba(255,255,255,.12)'; g.fillRect(fx, py, fw, 8);
+    g.save(); g.fillStyle = f; g.shadowColor = f; g.shadowBlur = 16; g.fillRect(fx, py, fw * pr, 8); g.restore();
+    frageBand(g, t, frageVon(c, v), f, 1548, 0.9);
+  }
+  function rundenzeit(s) { const m = Math.floor(s / 60), r = s - m * 60; return `${m}:${r.toFixed(1).padStart(4, '0')}`; }
+  function streckeZeichnen(g, t, c, p, m, v, f, b) {
+    const fx = 40, fy = 690, fw = 1000, fh = 562, src = p.x.a + Math.min(t, p.D) * p.tempo;
+    clipRahmen(g, b[0], fx, fy, fw, fh, f, t);
+    // Oben: kleiner Spruch, darunter groß die Strecke
+    const q0 = fp(t, 0.1, 0.4);
+    if (q0 > 0) { g.save(); g.globalAlpha = q0; const h = GROSS(c.hook || v.hooks[0]); SA(g, 56, 800); neonText(g, h, B / 2, 300, passt(g, h, 960, 56, (gg, px) => SA(gg, px, 800)), f, (gg, px) => SA(gg, px, 800), 'center', 16); g.restore(); }
+    spruchZeichnen(g, t, String(c.strecke || '').trim() || 'STRECKE', f, { y1: 490, y2: 430, px1: 170, px2: 140 });
+    pille(g, tagText(v), fx + 6, fy - 66, f, 30, true);
+    if (p.tempo >= 1.05) {   // nur zeigen, wenn wirklich schneller
+      const tp = '×' + p.tempo.toFixed(1).replace('.', ',') + ' SPEED';
+      g.save(); RU(g, 30); const tw = g.measureText(tp).width + 42; g.restore();
+      pille(g, tp, fx + fw - tw - 6, fy - 66, '#ffffff', 30, false);
+    }
+    // Rundenzeit unten rechts im Bild
+    g.save(); OR(g, 54); g.textAlign = 'right'; g.shadowColor = '#000'; g.shadowBlur = 14; g.fillStyle = '#fff'; g.fillText(rundenzeit(src - p.x.a), fx + fw - 22, fy + fh - 26);
+    SA(g, 26, 700); g.fillStyle = hexA(f, 0.95); g.fillText('RUNDENZEIT', fx + fw - 22, fy + fh - 86); g.restore();
+    // Kurven-Karte unten links im Bild
+    const mk = p.marken.filter(x => t >= x.ot && t < x.ot + 1.8).pop();
+    if (mk) {
+      const d = t - mk.ot, q = eob(fp(d, 0, 0.25)), aus = fp(d, 1.5, 1.8), teile = String(mk.text || '').split(/\s+[–-]\s+|\s*\|\s*/), name = GROSS(teile[0] || 'KURVE ' + mk.n), tipp2 = GROSS(teile.slice(1).join(' · '));
+      g.save(); g.globalAlpha = 1 - aus; g.translate(fx + 26, fy + fh - 40); g.scale(q, q);
+      SA(g, 50, 900); const w1 = Math.min(660, Math.max(g.measureText(name).width, tipp2 ? (SA(g, 34, 700), g.measureText(tipp2).width) : 0) + 150);
+      const hh = tipp2 ? 128 : 88;
+      rr(g, 0, -hh, w1, hh, 12); g.fillStyle = 'rgba(5,7,10,.82)'; g.fill(); g.lineWidth = 3; g.strokeStyle = f; g.shadowColor = f; g.shadowBlur = 18; g.stroke(); g.shadowBlur = 0;
+      rr(g, 12, -hh + 12, 96, hh - 24, 10); g.fillStyle = f; g.fill();
+      RU(g, 40); g.textAlign = 'center'; g.fillStyle = '#06080a'; g.fillText('T' + mk.n, 60, -hh / 2 + 15);
+      g.textAlign = 'left'; SA(g, passt(g, name, w1 - 140, 50, SA), 900); g.fillStyle = '#fff'; g.fillText(name, 124, tipp2 ? -hh + 60 : -hh / 2 + 18);
+      if (tipp2) { SA(g, passt(g, tipp2, w1 - 140, 34, (gg, px) => SA(gg, px, 700)), 700); g.fillStyle = hexA(f, 1); g.fillText(tipp2, 124, -hh + 104); }
+      g.restore();
+    }
+    // Rundenfortschritt mit Kurven-Punkten
+    const py = 1270, pr = kl((src - p.x.a) / (p.x.b - p.x.a), 0, 1);
+    g.fillStyle = 'rgba(255,255,255,.12)'; g.fillRect(fx, py, fw, 8);
+    g.save(); g.fillStyle = f; g.shadowColor = f; g.shadowBlur = 16; g.fillRect(fx, py, fw * pr, 8); g.restore();
+    for (const x0 of p.marken) { const xx = fx + fw * x0.ot / p.D; g.fillStyle = t >= x0.ot ? f : 'rgba(255,255,255,.55)'; g.beginPath(); g.arc(xx, py + 4, 8, 0, Math.PI * 2); g.fill(); }
+    frageBand(g, t, frageVon(c, v), f, 1310, 0.9);
+    marke(g, t, m, f, 1490);
+  }
+  // Letzte 0,4 s: ins erste Bild überblenden, damit das Video nahtlos von vorn weiterläuft
+  function loopUebergang(g, t, p, erstes) {
+    if (!erstes) return;
+    const q = fp(t, p.T - LOOP, p.T - 1 / FPS); if (q <= 0) return;
+    const e = q * q * (3 - 2 * q), sk = 1 + 0.16 * (1 - e);
+    g.save(); g.globalAlpha = e; g.translate(B / 2, H / 2); g.scale(sk, sk); g.drawImage(erstes, -B / 2, -H / 2, B, H); g.restore();
+    const bl = Math.max(0, 1 - Math.abs(q - 0.45) / 0.25) * 0.4;
+    if (bl > 0) { g.fillStyle = `rgba(255,255,255,${bl})`; g.fillRect(0, 0, B, H); }
   }
   function logoRing(g, x, y, r, farbe, logo, t) {
     g.save(); g.beginPath(); g.arc(x, y, r, 0, Math.PI * 2); g.fillStyle = '#05070a'; g.fill(); g.restore();
@@ -607,7 +788,25 @@
     const ctx = new OfflineAudioContext(2, Math.ceil(TON_RATE * p.T), TON_RATE), aus = ctx.createDynamicsCompressor();
     aus.threshold.value = -10; aus.ratio.value = 4; aus.connect(ctx.destination);
     const rn = (t, d) => { const s = ctx.createBufferSource(); s.buffer = rauschen(ctx); s.loop = true; s.start(t); s.stop(t + d); return s; };
-    if (quelle) {
+    if (p.mehr) {   // quelle = Tonspuren je Platz
+      const spuren = quelle || [];
+      const pegel = (buf, a, d) => {   // Lautstärke des Abschnitts → Faktor, damit alle Clips gleich laut sind
+        const i0 = Math.max(0, Math.floor(a * buf.sampleRate)), i1 = Math.min(buf.length, Math.floor((a + d) * buf.sampleRate));
+        let su = 0, n = 0; for (let ch = 0; ch < buf.numberOfChannels; ch++) { const x = buf.getChannelData(ch); for (let i = i0; i < i1; i += 7) { su += x[i] * x[i]; n++; } }
+        const rms = Math.sqrt(su / (n || 1)); return rms > 1e-4 ? kl(0.126 / rms, 0.4, 2.5) : 1;
+      };
+      const teil = (buf, start, offset, dauer, vol, rate) => {
+        if (!buf || dauer <= 0.05) return;
+        if (p.mehr !== 'strecke') vol *= pegel(buf, offset, dauer);
+        const sn = ctx.createBufferSource(); sn.buffer = buf; if (rate) sn.playbackRate.value = rate;
+        const gn = ctx.createGain(), ende = start + dauer / (rate || 1); sn.connect(gn); gn.connect(aus);
+        gn.gain.setValueAtTime(0.0001, start); gn.gain.linearRampToValueAtTime(vol, start + 0.05); gn.gain.setValueAtTime(vol, Math.max(start + 0.05, ende - 0.08)); gn.gain.linearRampToValueAtTime(0.0001, ende);
+        sn.start(start, offset, dauer);
+      };
+      if (p.mehr === 'top3') for (const k of p.teile) teil(spuren[k.q], k.S, k.a, k.d, 0.9);
+      else if (p.mehr === 'vergleich') { teil(spuren[0], 0, p.x0.a, p.D, 0.55); teil(spuren[1], 0, p.x1.a, p.D, 0.55); }
+      else teil(spuren[0], 0, p.x.a, p.x.b - p.x.a, 0.7, p.tempo);
+    } else if (quelle) {
       const h = ctx.createBufferSource(); h.buffer = quelle; const hg = ctx.createGain(); h.connect(hg); hg.connect(aus);
       if (p.FD) {   // bis zum Anhalten, dann Stille, dann weiter ab dem Haltepunkt
         hg.gain.setValueAtTime(0.9, 0); hg.gain.setValueAtTime(0.9, Math.max(0, p.h - 0.04)); hg.gain.linearRampToValueAtTime(0.0001, p.h);
@@ -669,6 +868,9 @@
       if (p.R) { zisch(p.D - 0.25, 0.3, 0.3, true); wumms(p.D, 0.8, true); }
       anstieg(p.T - OUTRO - 0.7, 0.7, 0.3); wumms(p.T - OUTRO, 0.9, true); [1318, 1661, 1976].forEach((fq, i) => ton(p.T - OUTRO + 0.25 + i * 0.07, fq, 1.2, 0.08));
     }
+    if (p.teile) for (const k of p.teile.slice(1)) { zisch(k.S - 0.3, 0.3, 0.3, true); wumms(k.S, 0.85); glitch(k.S, 0.3, 0.16); }
+    if (p.marken) for (const mk of p.marken) { ton(mk.ot, 1318, 0.22, 0.07); ton(mk.ot + 0.06, 1976, 0.25, 0.05); }
+    zisch(p.T - LOOP, LOOP, 0.22);   // Übergang in die Schleife
     const buf = await ctx.startRendering();
     // Lautheit angleichen (Ziel ≈ −15 dBFS, Spitzen unter −1 dB)
     let su = 0, sp = 0; for (let ch = 0; ch < 2; ch++) { const d = buf.getChannelData(ch); for (let i = 0; i < d.length; i++) { su += d[i] * d[i]; sp = Math.max(sp, Math.abs(d[i])); } }
@@ -883,8 +1085,11 @@
   async function bauen(c, m, fortschritt) {
     if (!window.VideoEncoder) throw new Error('Dieser Browser kann keine Videos bauen. Bitte Chrome oder Edge nehmen.');
     await Promise.all([muxerLaden(), schriften()]);
-    const p = zeitplan(c), quelle = await quellTon(c), ton = await tonMischen(c, p, quelle), les = await leser(c);
+    const p = zeitplan(c), q = quellenVon(c);
+    const quelle = p.mehr ? await Promise.all(p.slots.map(i => quellTon(q[i]))) : await quellTon(c), ton = await tonMischen(c, p, quelle);
+    const lesers = [];
     try {
+    for (const i of (p.mehr ? p.slots : [0])) lesers.push(await leser(q[i]));
     let vcfg = null;
     for (const codec of ['avc1.640028', 'avc1.640032', 'avc1.4d0028', 'avc1.42e028']) {
       const k = { codec, width: B, height: H, bitrate: 9000000, framerate: FPS, latencyMode: 'quality', avc: { format: 'avc' } };
@@ -900,10 +1105,16 @@
     enc.configure(vcfg);
     const cv = leinwand(B, H), g = cv.getContext('2d'), puffer = new Uint8Array(B * H * 3 / 2), cs = { primaries: 'bt709', transfer: 'bt709', matrix: 'bt709', fullRange: false };
     const n = Math.round(p.T * FPS);
+    let erstes = null;
     for (let i = 0; i < n; i++) {
       if (fehler) throw fehler;
-      const t = i / FPS, q = p.quelle(t), bild = q != null ? await les.bei(q) : null;
+      const t = i / FPS;
+      let bild = null;
+      if (p.mehr) { bild = []; for (const sp of p.spur(t)) bild[sp.s] = await lesers[sp.s].bei(sp.t); }
+      else { const qt = p.quelle(t); bild = qt != null ? await lesers[0].bei(qt) : null; }
       g.clearRect(0, 0, B, H); zeichne(g, t, c, p, m, bild);
+      if (i === 0) { erstes = leinwand(B, H); erstes.getContext('2d').drawImage(cv, 0, 0); }
+      else loopUebergang(g, t, p, erstes);
       zuI420(g.getImageData(0, 0, B, H).data, B, H, puffer);
       const fr = new VideoFrame(puffer, { format: 'I420', codedWidth: B, codedHeight: H, timestamp: Math.round(i * 1e6 / FPS), duration: Math.round(1e6 / FPS), colorSpace: cs });
       enc.encode(fr, { keyFrame: i % FPS === 0 }); fr.close();
@@ -926,18 +1137,20 @@
     }
     muxer.finalize();
     const blob = new Blob([muxer.target.buffer], { type: 'video/mp4' });
-    blob.mitTon = !!acfg; blob.dauer = p.T; blob.leser = les.art;
+    blob.mitTon = !!acfg; blob.dauer = p.T; blob.leser = lesers.map(l => l.art).join(',');
     return blob;
-    } finally { les.zu(); }
+    } finally { for (const l of lesers) l.zu(); }
   }
   // Vorschaubild (für die Liste): Spruch steht, Clip läuft
   async function vorschaubild(c, m) {
     await schriften();
-    const p = zeitplan(c), vid = await videoElement(c.url), t = Math.min(1.4, p.D * 0.5);
-    await suchen(vid, p.quelle(t));
-    const cv = leinwand(B, H), g = cv.getContext('2d'); zeichne(g, t, c, p, m, vid);
+    const p = zeitplan(c), t = Math.min(1.4, p.D * 0.5), q = quellenVon(c), vids = [];
+    let bild;
+    if (p.mehr) { bild = []; for (const sp of p.spur(t)) { const v = await videoElement(q[p.slots[sp.s]].url); await suchen(v, sp.t); bild[sp.s] = v; vids.push(v); } }
+    else { bild = await videoElement(c.url); await suchen(bild, p.quelle(t)); vids.push(bild); }
+    const cv = leinwand(B, H), g = cv.getContext('2d'); zeichne(g, t, c, p, m, bild);
     const k = leinwand(540, 960); k.getContext('2d').drawImage(cv, 0, 0, 540, 960);
-    vid.removeAttribute('src'); vid.load();
+    for (const v of vids) { v.removeAttribute('src'); v.load(); }
     return new Promise(ok => k.toBlob(ok, 'image/jpeg', 0.85));
   }
 
@@ -969,9 +1182,30 @@
       v.src = url;
     });
   }
+  const QFELDER = ['datei', 'url', 'name', 'dauer', 'start', 'ende', 'titel', '_ton'];
+  const quelleAusClip = x => ({ datei: x.datei, url: x.url, name: x.name, dauer: x.dauer, start: Math.max(0, x.dauer - 8), ende: x.dauer, titel: '' });
+  function clipAusQuelle(x) {   // Platz frei machen: Clip kommt zurück in die Warteschlange
+    const vl = VORLAGEN[0];
+    return { id: Math.random().toString(36).slice(2), datei: x.datei, url: x.url, name: x.name, dauer: x.dauer, start: Math.max(0, x.dauer - 15), ende: x.dauer,
+      vorlage: vl.id, hook: vl.hooks[0], unten: vl.unten[0], wieder: vl.wieder, zeitlupe: vl.zl, modus: 'ganz', versatz: 0, farbe: vl.farbe, text: vorlageText(vl, {}), textEigen: false, look: LETZTER_LOOK,
+      insta: true, tiktok: !!(stand().tiktok && stand().tiktok.verbunden), postMs: 0 };
+  }
+  const platzZahl = v => (v.mehr === 'top3' ? 3 : v.mehr === 'vergleich' ? 2 : 1);
+  function extraZurueck(c, ab) {   // weitere Clips ab Platz „ab“ zurück in die Warteschlange (nicht, wenn es derselbe Clip ist)
+    const weg = (c.extra || []).splice(Math.max(0, ab - 1));
+    for (const x of weg) if (x.url !== c.url && !quellenVon(c).some(y => y.url === x.url)) CLIPS.push(clipAusQuelle(x));
+  }
   function vorlageSetzen(c, id) {
-    const v = VORLAGEN.find(x => x.id === id) || VORLAGEN[0];
+    const v = VORLAGEN.find(x => x.id === id) || VORLAGEN[0], alt = vorlage(c);
     c.vorlage = v.id; c.hook = v.hooks[0]; c.unten = v.unten[0]; c.wieder = v.wieder; c.zeitlupe = v.zl; c.farbe = v.farbe; c.text = vorlageText(v, c); c.textEigen = false;
+    extraZurueck(c, platzZahl(v));
+    if (alt.mehr !== v.mehr) for (const x of quellenVon(c)) x.titel = '';   // Titel passen nicht zur anderen Vorlage
+    if (v.mehr) {
+      c.look = 'neon'; c.modus = 'ganz'; c.extra = c.extra || [];
+      while (quellenVon(c).length < platzZahl(v) && CLIPS.length > 1) c.extra.push(quelleAusClip(CLIPS.splice(1, 1)[0]));
+      if (v.mehr === 'strecke') { c.start = 0; c.ende = c.dauer; }
+      else if (alt.mehr !== v.mehr) { c.start = Math.max(0, c.dauer - 8); c.ende = c.dauer; }
+    } else if (alt.mehr) { c.look = LETZTER_LOOK; c.start = Math.max(0, c.dauer - 15); c.ende = c.dauer; }
   }
   const postText = c => String(c.text || '').replace(/[ \t]{2,}/g, ' ').replace(/[ \t]+\n/g, '\n').trim();
   const sek = s => (Math.round(s * 10) / 10).toLocaleString('de-DE', { minimumFractionDigits: 1 }) + ' s';
@@ -1026,24 +1260,17 @@
         ${c.zeitlupe ? `<label class="kc-feld">Text in der Zeitlupe<div class="kc-zeile"><input type="text" maxlength="40" value="${esc(c.wieder || '')}" placeholder="${esc(v.wieder)}" data-c="wieder"><button type="button" class="btn ki-k" data-c="wuerfeln-wieder" title="Anderer Text">🎲</button></div></label>` : ''}
         ${v.felder ? `<div class="kc-felder">${v.felder.map(([k, label, ph]) => `<label class="kc-feld">${esc(label)}<input type="text" maxlength="40" placeholder="${esc(ph)}" value="${esc(c[k] || '')}" data-c="feld" data-feld="${k}"></label>`).join('')}</div>
           ${tipp(esc(v.feldTipp || ''))}` : ''}
-        <div class="kc-umschalt kc-looks">${LOOKS.map(([k, n]) => `<button type="button" class="${(c.look || 'neon') === k ? 'an' : ''}" data-c="look" data-wert="${k}">${n}</button>`).join('')}</div>
+        ${v.mehr ? '' : `<div class="kc-umschalt kc-looks">${LOOKS.map(([k, n]) => `<button type="button" class="${(c.look || 'neon') === k ? 'an' : ''}" data-c="look" data-wert="${k}">${n}</button>`).join('')}</div>`}
         <div class="kc-farben">${FARBEN.map(f => `<button type="button" class="kc-farbe${f === c.farbe ? ' an' : ''}" style="--f:${f}" data-c="farbe" data-wert="${f}" aria-label="Neonfarbe ${f}"></button>`).join('')}<span class="kc-dim">Neonfarbe</span></div>
-        <div class="kc-felder">
+        ${v.mehr ? '' : `<div class="kc-felder">
           ${c.look === 'tv' ? '' : `<div class="kc-umschalt"><button type="button" class="${c.modus !== 'zoom' ? 'an' : ''}" data-c="modus" data-wert="ganz">▭ Ganzes Bild</button><button type="button" class="${c.modus === 'zoom' ? 'an' : ''}" data-c="modus" data-wert="zoom">▯ Zoom</button></div>`}
           <label class="kc-check"><input type="checkbox" data-c="zeitlupe" ${c.zeitlupe ? 'checked' : ''}> <span><b>Zeitlupe</b> vom Ende</span></label>
-        </div>
-        ${c.modus === 'zoom' && c.look !== 'tv' ? `<label class="kc-feld">Bildausschnitt<input type="range" min="-1" max="1" step="0.05" value="${c.versatz}" data-c="versatz"></label>` : ''}
-        ${tipp(c.look === 'tv'
+        </div>`}
+        ${c.modus === 'zoom' && c.look !== 'tv' && !v.mehr ? `<label class="kc-feld">Bildausschnitt<input type="range" min="-1" max="1" step="0.05" value="${c.versatz}" data-c="versatz"></label>` : ''}
+        ${v.mehr ? tipp(TIPP_MEHR[v.mehr]) : tipp(c.look === 'tv'
           ? 'TV-Sendung: wie eine Live-Übertragung mit Schlagzeile, LIVE/REPLAY, Bauchbinde und Laufschrift. Zeitlupe: die letzten Sekunden nochmal halb so schnell, mit Replay-Übergang.'
           : 'Neon: Chrom-Schrift im Neon-Rahmen. Ganzes Bild: Clip im Rahmen. Zoom: Clip füllt das ganze Handy (Seiten werden abgeschnitten). Zeitlupe: die letzten Sekunden nochmal halb so schnell.')}
-        <div class="kc-schritt">3 · Schnitt</div>
-        <div class="kc-schnitt">
-          <label class="kc-feld">Anfang <b data-c="start-wert">${sek(p.a)}</b><input type="range" min="0" max="${c.dauer}" step="0.1" value="${p.a}" data-c="start"></label>
-          <label class="kc-feld">Ende <b data-c="ende-wert">${sek(p.b)}</b><input type="range" min="0" max="${c.dauer}" step="0.1" value="${p.b}" data-c="ende"></label>
-        </div>
-        ${v.pause ? `<label class="kc-feld">Anhalten bei <b data-c="halt-wert">${sek(p.F)}</b><input type="range" min="${p.a}" max="${p.b}" step="0.1" value="${p.F}" data-c="halt"></label>
-          ${tipp('Kurz bevor es knallt. Dann kommt 3-2-1 und der Clip läuft weiter.')}` : ''}
-        ${tipp(`Clip ist ${sek(c.dauer)} lang. Genommen werden ${sek(p.b - p.a)}${p.FD ? ' + Pause' : ''}${p.R ? ' + Zeitlupe' : ''}. Am besten 8 bis 20 Sekunden, die Action ans Ende.`)}
+        ${v.mehr ? schnittMehr(c, v, p) : schnittEinfach(c, v, p)}
         <div class="kc-schritt">4 · Text & Termin</div>
         <label class="kc-feld">Text unter dem Post<textarea rows="4" maxlength="2200" data-c="text">${esc(c.text)}</textarea>${tipp('Mit Frage am Ende – Kommentare bringen Reichweite. Höchstens 5 Hashtags.')}</label>
         <div class="kc-felder">
@@ -1061,6 +1288,59 @@
         </div>
       </div>
     </div>`;
+  }
+  const TIPP_MEHR = {
+    top3: 'Nur Neon-Look. Jeder Platz bekommt eine große Nummer und seinen Titel im Band.',
+    vergleich: 'Nur Neon-Look. Das Video ist so lang wie der kürzere Clip.',
+    strecke: 'Nur Neon-Look. Lange Runden laufen schneller (bis 4×), damit sie in etwa 30 Sekunden passen.'
+  };
+  function schnittMehr(c, v, p) {
+    if (v.mehr === 'strecke') {
+      const st = VOR.stelle != null ? kl(VOR.stelle, p.a, p.b) : p.a, mk = (c.marken || []).slice().sort((x, y) => x.t - y.t);
+      return `<div class="kc-schritt">3 · Runde & Kurven</div>
+        <div class="kc-schnitt">
+          <label class="kc-feld">Runde beginnt <b data-c="start-wert">${sek(p.a)}</b><input type="range" min="0" max="${c.dauer}" step="0.1" value="${p.a}" data-c="start"></label>
+          <label class="kc-feld">Runde endet <b data-c="ende-wert">${sek(p.b)}</b><input type="range" min="0" max="${c.dauer}" step="0.1" value="${p.b}" data-c="ende"></label>
+        </div>
+        ${tipp(p.tempo >= 1.05 ? `Runde ${sek(p.b - p.a)} → im Video ${sek(p.D)} (${p.tempo.toFixed(1).replace('.', ',')}× schneller).` : `Runde ${sek(p.b - p.a)} – passt ohne Zeitraffer.`)}
+        <label class="kc-feld">Stelle für die nächste Kurve <b data-c="stelle-wert">${sek(st - p.a)}</b><input type="range" min="${p.a}" max="${p.b}" step="0.1" value="${st}" data-c="stelle"></label>
+        <div class="kc-knoepfe"><button type="button" class="btn ki-k" data-c="marke-neu">＋ Kurve an dieser Stelle</button></div>
+        ${tipp('Stelle schieben, die Vorschau zeigt das Bild. Dann „＋ Kurve“ und Text, z. B. „Copse – voll durch“ (vor dem Strich groß, dahinter klein).')}
+        ${mk.length ? `<div class="kc-marken">${mk.map((x, i) => `<div class="kc-marke"><b>T${i + 1}</b><span class="kc-dim">${sek(Math.max(0, x.t - p.a))}</span><input type="text" maxlength="40" value="${esc(x.text || '')}" placeholder="Kurvenname – Tipp" data-c="marke-text" data-k="${esc(x.id)}"><button type="button" class="btn ki-k" data-c="marke-weg" data-k="${esc(x.id)}" title="Kurve löschen">✕</button></div>`).join('')}</div>` : ''}`;
+    }
+    const q = quellenVon(c), warte = CLIPS.slice(1);
+    let erstLeer = true;
+    return `<div class="kc-schritt">3 · Clips</div>
+      ${v.plaetze.map((name, i) => {
+        const src = q[i];
+        if (!src) {
+          const knoepfe = erstLeer ? `<div class="kc-knoepfe">
+              ${warte.length ? `<select class="kc-wahl" data-c="slot-wahl"><option value="">Aus der Warteschlange …</option>${warte.map((x, k) => `<option value="${k + 1}">${esc(x.name)}</option>`).join('')}</select>` : ''}
+              <label class="btn ki-k kc-datei">📂 Clip wählen<input type="file" accept="video/*" data-c="slot-datei"></label>
+              ${v.mehr === 'vergleich' ? '<button type="button" class="btn ki-k" data-c="slot-gleich">Gleicher Clip, andere Stelle</button>' : ''}</div>` : '';
+          erstLeer = false;
+          return `<div class="kc-slot leer" style="--f:${c.farbe || v.farbe}"><div class="kc-slot-kopf"><b>${esc(name)}</b><span class="kc-dim">fehlt noch</span></div>${knoepfe}</div>`;
+        }
+        const { a, b } = abschnitt(src);
+        return `<div class="kc-slot" style="--f:${c.farbe || v.farbe}"><div class="kc-slot-kopf"><b>${esc(name)}</b><span class="kc-dim">${esc(src.name || '')}</span>
+            <span class="kc-slot-knoepfe">${i < q.length - 1 ? `<button type="button" class="btn ki-k" data-c="slot-tauschen" data-i="${i}" title="Mit dem Platz darunter tauschen">⇅</button>` : ''}${i > 0 ? `<button type="button" class="btn ki-k" data-c="slot-raus" data-i="${i}" title="Zurück in die Warteschlange">✕</button>` : ''}</span></div>
+          <label class="kc-feld">${v.mehr === 'top3' ? 'Titel (steht im Band)' : 'Text am Bild'}<input type="text" maxlength="30" value="${esc(src.titel || '')}" placeholder="${v.mehr === 'top3' ? 'z. B. Bester Überholer' : esc(name)}" data-c="slot-titel" data-i="${i}"></label>
+          <div class="kc-schnitt">
+            <label class="kc-feld">Anfang <b data-c="slot-a-wert" data-i="${i}">${sek(a)}</b><input type="range" min="0" max="${src.dauer}" step="0.1" value="${a}" data-c="slot-a" data-i="${i}"></label>
+            <label class="kc-feld">Ende <b data-c="slot-b-wert" data-i="${i}">${sek(b)}</b><input type="range" min="0" max="${src.dauer}" step="0.1" value="${b}" data-c="slot-b" data-i="${i}"></label>
+          </div></div>`;
+      }).join('')}
+      ${tipp(v.mehr === 'top3' ? `Zusammen ${sek(p.D)}. Am besten 5 bis 10 Sekunden je Platz, die Action ans Ende.` : `Beide laufen ${sek(p.D)} gleichzeitig. Mit „Anfang“ legst du sie genau übereinander.`)}`;
+  }
+  function schnittEinfach(c, v, p) {
+    return `<div class="kc-schritt">3 · Schnitt</div>
+        <div class="kc-schnitt">
+          <label class="kc-feld">Anfang <b data-c="start-wert">${sek(p.a)}</b><input type="range" min="0" max="${c.dauer}" step="0.1" value="${p.a}" data-c="start"></label>
+          <label class="kc-feld">Ende <b data-c="ende-wert">${sek(p.b)}</b><input type="range" min="0" max="${c.dauer}" step="0.1" value="${p.b}" data-c="ende"></label>
+        </div>
+        ${v.pause ? `<label class="kc-feld">Anhalten bei <b data-c="halt-wert">${sek(p.F)}</b><input type="range" min="${p.a}" max="${p.b}" step="0.1" value="${p.F}" data-c="halt"></label>
+          ${tipp('Kurz bevor es knallt. Dann kommt 3-2-1 und der Clip läuft weiter.')}` : ''}
+        ${tipp(`Clip ist ${sek(c.dauer)} lang. Genommen werden ${sek(p.b - p.a)}${p.FD ? ' + Pause' : ''}${p.R ? ' + Zeitlupe' : ''}. Am besten 8 bis 20 Sekunden, die Action ans Ende.`)}`;
   }
   function zeile(x, raus) {
     const v = VORLAGEN.find(y => y.id === x.vorlage) || VORLAGEN[0];
@@ -1090,6 +1370,7 @@
   async function vorschauStarten() {
     const cv = BOX && BOX.querySelector('canvas[data-c="vorschau"]'), c = CLIPS[0];
     if (!cv || !c) return;
+    if (vorlage(c).mehr) return vorschauMehr(cv, c);
     if (!MAT) await material();
     await schriften();
     if (!VOR.vid || VOR.url !== c.url) {
@@ -1099,11 +1380,12 @@
     }
     VOR.vid.muted = !VOR.ton;
     VOR.canvas = cv; const g = cv.getContext('2d'), mein = ++VOR.lauf, vid = VOR.vid;
-    let phase = '', outroStart = 0, haltStart = 0, gehalten = false;
+    let phase = '', outroStart = 0, haltStart = 0, gehalten = false, erstes = null;
     const schritt = () => {
       if (VOR.lauf !== mein) return;
       const cl = CLIPS[0];
-      if (!cv.isConnected || !cl || cl.url !== VOR.url) { vid.pause(); return; }   // Reiter gewechselt oder Clip weg → Video anhalten
+      if (!cv.isConnected || !cl || cl.url !== VOR.url || vorlage(cl).mehr) { vid.pause(); return; }   // Reiter gewechselt oder Clip weg → Video anhalten
+      if (phase === '' || phase === 'neu') erstes = null;
       const p = zeitplan(cl);
       let t;
       if (phase === '' || phase === 'neu') { vid.playbackRate = 1; vid.currentTime = p.a; vid.play().catch(() => {}); phase = 'haupt'; gehalten = false; }
@@ -1113,7 +1395,75 @@
       if (phase === 'lupe') { t = p.D + (vid.currentTime - (p.b - p.Z)) * 2; if (vid.currentTime >= p.b - 0.03 || vid.ended) { phase = 'outro'; vid.pause(); outroStart = performance.now(); } }
       if (phase === 'outro') { t = p.T - OUTRO + (performance.now() - outroStart) / 1000; if (t >= p.T) { phase = 'neu'; t = p.T - 0.01; } }
       g.setTransform(cv.width / B, 0, 0, cv.height / H, 0, 0); g.clearRect(0, 0, B, H);
-      zeichne(g, kl(t || 0, 0, p.T - 0.001), cl, p, MAT, vid);
+      const tt = kl(t || 0, 0, p.T - 0.001);
+      zeichne(g, tt, cl, p, MAT, vid);
+      if (!erstes && tt < 0.25 && !vid.seeking && vid.readyState >= 2) { erstes = leinwand(cv.width, cv.height); erstes.getContext('2d').drawImage(cv, 0, 0); }
+      else loopUebergang(g, tt, p, erstes);
+      requestAnimationFrame(schritt);
+    };
+    requestAnimationFrame(schritt);
+  }
+  // Vorschau für Top 3 · Vorher/Nachher · Strecke: Zeit läuft mit der Uhr, je Platz ein Video-Element, das mitgezogen wird
+  const VIDS = new Map();   // Schlüssel url#platz → Video
+  function vidFuer(url, s) {
+    const k = url + '#' + s;
+    let v = VIDS.get(k);
+    if (!v) { v = document.createElement('video'); v.playsInline = true; v.preload = 'auto'; v.muted = true; v.src = url; VIDS.set(k, v); }
+    return v;
+  }
+  function vidsWeg(urls) { for (const [k, v] of VIDS) if (!urls || urls.some(u => k.startsWith(u + '#'))) { v.pause(); v.removeAttribute('src'); v.load(); VIDS.delete(k); } }
+  // Springen ohne schwarzes Bild: vorher das aktuelle Bild merken, Dauer des Sprungs messen (für den nächsten Sprung)
+  function springen(v, ziel) {
+    if (v.readyState >= 2 && v.videoWidth) {
+      const k = v._stand || (v._stand = leinwand(640, Math.round(640 * v.videoHeight / v.videoWidth)));
+      k.videoWidth = v.videoWidth; k.videoHeight = v.videoHeight; k.getContext('2d').drawImage(v, 0, 0, k.width, k.height); k._ok = true;
+    }
+    if (!v._mess) { v._mess = true; v.addEventListener('seeked', () => { if (v._ab) v._lat = Math.min(2, (performance.now() - v._ab) / 1000); v._ab = 0; }); }
+    v._ab = performance.now(); v.currentTime = ziel;
+  }
+  const vidBild = v => (v.readyState >= 2 && !v.seeking ? v : v._stand && v._stand._ok ? v._stand : null);
+  async function vorschauMehr(cv, c) {
+    if (!MAT) await material();
+    await schriften();
+    if (VOR.vid) VOR.vid.pause();
+    VOR.canvas = cv; const g = cv.getContext('2d'), mein = ++VOR.lauf;
+    let start = performance.now(), erstes = null, tAlt = 0, wartet = 0;
+    const schritt = () => {
+      if (VOR.lauf !== mein) return;
+      const cl = CLIPS[0];
+      if (!cv.isConnected || cl !== c || !vorlage(cl).mehr) { for (const v of VIDS.values()) v.pause(); return; }
+      const p = zeitplan(cl), q = quellenVon(cl), jetzt = performance.now(), rate = p.tempo || 1;
+      let t = (jetzt - start) / 1000, scrub = null;
+      if (VOR.scrub && jetzt < VOR.scrub.bis && p.mehr === 'strecke') { scrub = VOR.scrub; t = kl((scrub.t - p.x.a) / p.tempo, 0, p.D - 0.01); }
+      if (t >= p.T) { t = 0; erstes = null; }
+      // Die Uhr folgt dem ersten Video: springt oder lädt es noch, wartet die Vorschau (höchstens 2 s), statt hinterherzuspringen
+      const sp0 = !scrub && p.spur(t)[0], q0 = sp0 && q[p.slots[sp0.s]], v0 = q0 && VIDS.get(q0.url + '#' + sp0.s);
+      if (v0 && !v0.paused && !v0.seeking && v0.readyState >= 2 && Math.abs(v0.currentTime - sp0.t) < 3) { t = Math.max(0, t + (v0.currentTime - sp0.t) / rate); wartet = 0; }
+      else if (v0 && t < p.D && (v0.seeking || v0.readyState < 2 || v0.paused)) {
+        const ab = p.teile ? (p.teile.find(k => t >= k.S && t < k.S + k.d) || p.teile[0]).S : 0;   // nicht vor den Anfang dieses Clips zurück
+        if (!wartet) wartet = jetzt; if (jetzt - wartet < 2000) t = Math.max(ab, Math.min(t, tAlt));
+      }
+      start = jetzt - t * 1000; tAlt = t;
+      const bilder = [], aktiv = new Set();
+      for (const sp of p.spur(t)) {
+        const src = q[p.slots[sp.s]]; if (!src) continue;
+        const v = vidFuer(src.url, sp.s); aktiv.add(v);
+        if (v.playbackRate !== rate) v.playbackRate = rate;
+        const drift = v.currentTime - sp.t;
+        if (scrub) { if (!v.paused) v.pause(); if (Math.abs(drift) > 0.04 && !v.seeking) springen(v, sp.t); }
+        else if (v.paused) { if (Math.abs(drift) > 0.15 && !v.seeking) springen(v, sp.t); v.play().catch(() => {}); }
+        else if (Math.abs(drift) > (v === v0 ? 3 : 0.5) && !v.seeking && jetzt - (v._sync || 0) > 1500) { v._sync = jetzt; springen(v, sp.t + (v === v0 ? 0 : (v._lat || 0.2) * rate)); }   // zweites Video: um die Sprungdauer vorweg
+        v.muted = !VOR.ton || (p.mehr === 'vergleich' && sp.s !== 0);
+        bilder[sp.s] = vidBild(v);
+      }
+      // Top 3: den nächsten Clip schon vor dem Wechsel an seinen Anfang legen
+      if (p.teile && !scrub) { const n = p.teile.find(k => k.S > t && k.S - t < 1.5); if (n && q[n.q]) { const v = vidFuer(q[n.q].url, n.q); aktiv.add(v); if (!v.paused) v.pause(); if (Math.abs(v.currentTime - n.a) > 0.1 && !v.seeking) springen(v, n.a); } }
+      for (const v of VIDS.values()) if (!aktiv.has(v) && !v.paused) v.pause();
+      g.setTransform(cv.width / B, 0, 0, cv.height / H, 0, 0); g.clearRect(0, 0, B, H);
+      const tt = kl(t, 0, p.T - 0.001);
+      zeichne(g, tt, cl, p, MAT, bilder);
+      if (!erstes && tt < 0.25 && bilder.some(Boolean)) { erstes = leinwand(cv.width, cv.height); erstes.getContext('2d').drawImage(cv, 0, 0); }
+      else loopUebergang(g, tt, p, erstes);
       requestAnimationFrame(schritt);
     };
     requestAnimationFrame(schritt);
@@ -1137,6 +1487,8 @@
   async function senden(pfad, blob) { return UMG.senden(pfad, blob); }
   function clipWeg(c) {
     if (VOR.vid && VOR.url === c.url) { VOR.vid.pause(); VOR.vid.removeAttribute('src'); VOR.vid.load(); VOR.vid = null; VOR.url = ''; }
+    vidsWeg(quellenVon(c).map(x => x.url));
+    for (const x of c.extra || []) if (x.url !== c.url) URL.revokeObjectURL(x.url);
     URL.revokeObjectURL(c.url);
     const i = CLIPS.indexOf(c); if (i >= 0) CLIPS.splice(i, 1);
   }
@@ -1151,6 +1503,7 @@
     const c = CLIPS[0]; if (!c || ARBEIT) return;
     if (!nurLaden && !c.insta && !c.tiktok) return UMG.meldung('Bitte Instagram oder TikTok anhaken.', 1);
     const vp = vorlage(c), pf = vp.pflicht && vp.felder.find(x => x[0] === vp.pflicht);
+    if (vp.mehr && quellenVon(c).length < platzZahl(vp)) return UMG.meldung(`Für „${vp.name}“ fehlt noch ein Clip (Schritt 3).`, 1);
     if (pf && !String(c[pf[0]] || '').trim()) return UMG.meldung(`Bitte „${pf[1]}“ eintragen.`, 1);
     let id = '';
     try {
@@ -1190,7 +1543,18 @@
     if (a === 'ton') { VOR.ton = !VOR.ton; if (VOR.vid) VOR.vid.muted = !VOR.ton; b.textContent = VOR.ton ? '🔊' : '🔇'; return; }
     if (a === 'einplanen') return einplanen(false);
     if (a === 'laden') return einplanen(true);
-    if (a === 'weglegen' && c) { clipWeg(c); zeichnen(); return; }
+    if (a === 'weglegen' && c) { extraZurueck(c, 1); clipWeg(c); zeichnen(); return; }
+    if (a === 'slot-tauschen' && c) { const q = quellenVon(c), i = +b.dataset.i; if (q[i] && q[i + 1]) for (const k of QFELDER) [q[i][k], q[i + 1][k]] = [q[i + 1][k], q[i][k]]; zeichnen(); return; }
+    if (a === 'slot-raus' && c) { const i = +b.dataset.i, x = (c.extra || []).splice(i - 1, 1)[0]; if (x && x.url !== c.url && !quellenVon(c).some(y => y.url === x.url)) CLIPS.push(clipAusQuelle(x)); zeichnen(); return; }
+    if (a === 'slot-gleich' && c) { (c.extra = c.extra || []).push({ datei: c.datei, url: c.url, name: c.name, dauer: c.dauer, start: c.start, ende: c.ende, titel: '' }); zeichnen(); return; }
+    if (a === 'marke-neu' && c) {
+      const p = zeitplan(c), t = VOR.stelle != null ? kl(VOR.stelle, p.a, p.b) : p.a;
+      (c.marken = c.marken || []).push({ id: Math.random().toString(36).slice(2, 8), t, text: '' });
+      zeichnen();
+      const felder = BOX.querySelectorAll('[data-c="marke-text"]'), mk = c.marken[c.marken.length - 1], f = [...felder].find(x => x.dataset.k === mk.id); if (f) f.focus();
+      return;
+    }
+    if (a === 'marke-weg' && c) { c.marken = (c.marken || []).filter(x => x.id !== b.dataset.k); zeichnen(); return; }
     if (a === 'cfg-speichern') {
       try { await UMG.igApi('POST', '/api/clips/einstellungen', { zeit: BOX.querySelector('[data-c="cfg-zeit"]').value, test: BOX.querySelector('[data-c="cfg-test"]').checked }); UMG.meldung('Gespeichert.'); await UMG.laden(); } catch (e) { UMG.meldung(e.message, 1); }
       return;
@@ -1219,6 +1583,19 @@
       if (!c.textEigen && typeof vorlage(c).text === 'function') { c.text = vorlageText(vorlage(c), c); const ta = BOX.querySelector('[data-c="text"]'); if (ta) ta.value = c.text; }
     }
     else if (a === 'text') { c.text = t.value; c.textEigen = true; }
+    else if (a === 'slot-titel') { const src = quellenVon(c)[+t.dataset.i]; if (src) src.titel = t.value; }
+    else if (a === 'slot-a' || a === 'slot-b') {
+      const i = +t.dataset.i, src = quellenVon(c)[i]; if (!src) return;
+      const v = +t.value;
+      if (a === 'slot-a') src.start = Math.min(v, (src.ende || src.dauer) - 1); else src.ende = Math.max(v, (src.start || 0) + 1);
+      const x = abschnitt(src), aw = BOX.querySelector(`[data-c="slot-a-wert"][data-i="${i}"]`), bw = BOX.querySelector(`[data-c="slot-b-wert"][data-i="${i}"]`);
+      if (aw) aw.textContent = sek(x.a); if (bw) bw.textContent = sek(x.b);
+    }
+    else if (a === 'stelle') {
+      VOR.stelle = +t.value; VOR.scrub = { t: VOR.stelle, bis: performance.now() + 2500 };
+      const p = zeitplan(c), w = BOX.querySelector('[data-c="stelle-wert"]'); if (w) w.textContent = sek(Math.max(0, VOR.stelle - p.a));
+    }
+    else if (a === 'marke-text') { const mk = (c.marken || []).find(x => x.id === t.dataset.k); if (mk) mk.text = t.value; }
     else if (a === 'versatz') c.versatz = +t.value;
     else if (a === 'halt') {
       c.halt = +t.value; const p = zeitplan(c), hw = BOX.querySelector('[data-c="halt-wert"]'); if (hw) hw.textContent = sek(p.F);
@@ -1237,6 +1614,12 @@
     const a = t.dataset.c;
     if (a === 'datei' && t.files && t.files.length) { dateienRein([...t.files]); t.value = ''; return; }
     if (!c) return;
+    if (a === 'slot-wahl') { const k = +t.value; if (k >= 1 && CLIPS[k]) { (c.extra = c.extra || []).push(quelleAusClip(CLIPS.splice(k, 1)[0])); zeichnen(); } return; }
+    if (a === 'slot-datei' && t.files && t.files[0]) {
+      neuerClip(t.files[0]).then(x => { if (!x) return UMG.meldung('Dieses Video kann der Browser nicht öffnen. Bitte als MP4 speichern.', 1); (c.extra = c.extra || []).push(quelleAusClip(x)); zeichnen(); });
+      return;
+    }
+    if (a === 'slot-a' || a === 'slot-b') { zeichnen(); return; }
     if (a === 'zeitlupe') { c.zeitlupe = t.checked; zeichnen(); }
     else if (a === 'insta' || a === 'tiktok') c[a] = t.checked;
     else if (a === 'postms') c.postMs = t.value ? new Date(t.value).getTime() : 0;
@@ -1311,6 +1694,20 @@
 .kc-app .kc-check input{margin-top:3px;accent-color:#ff2d6f;width:18px;height:18px}
 .kc-app .kc-check.aus{opacity:.5;cursor:default}
 .kc-app .kc-schnitt{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.kc-app .kc-slot{display:flex;flex-direction:column;gap:8px;padding:10px 12px;background:#0b0c10;border:1px solid var(--line,#23262f);border-left:3px solid var(--f,#ffd400)}
+.kc-app .kc-slot.leer{border-left-color:#5b6672}
+.kc-app .kc-slot-kopf{display:flex;align-items:center;gap:10px;flex-wrap:wrap;color:#fff}
+.kc-app .kc-slot-kopf b{font-family:var(--disp,inherit);font-weight:800;letter-spacing:.06em;text-transform:uppercase}
+.kc-app .kc-slot-knoepfe{margin-left:auto;display:flex;gap:6px}
+.kc-app .kc-slot-knoepfe .btn{padding:4px 10px}
+.kc-app .kc-wahl{height:38px;background:#0b0c10;border:1px solid var(--line,#23262f);color:#fff;padding:0 8px;max-width:260px}
+.kc-app .kc-datei{position:relative;overflow:hidden}
+.kc-app .kc-datei input{position:absolute;inset:0;opacity:0;cursor:pointer}
+.kc-app .kc-marken{display:flex;flex-direction:column;gap:6px}
+.kc-app .kc-marke{display:flex;align-items:center;gap:8px}
+.kc-app .kc-marke b{color:#5cff1f;min-width:34px}
+.kc-app .kc-marke .kc-dim{min-width:54px}
+.kc-app .kc-marke input{flex:1;min-width:0;height:38px;background:#0b0c10;border:1px solid var(--line,#23262f);color:#fff;padding:0 10px}
 .kc-app textarea{width:100%;background:#0b0c10;border:1px solid var(--line,#23262f);color:#fff;font:14px/1.5 var(--body,inherit);padding:10px 11px;resize:vertical}
 .kc-app .kc-ziele{display:flex;flex-direction:column;gap:8px;padding-bottom:6px}
 .kc-app .kc-knoepfe{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
