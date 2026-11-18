@@ -1953,7 +1953,7 @@
         const dauer = v.duration || 0, vl = VORLAGEN[0];
         ok(dauer >= 2 ? mitText({ id: Math.random().toString(36).slice(2), datei, url, name: datei.name, dauer, start: Math.max(0, dauer - 15), ende: dauer,
           vorlage: vl.id, ...spruecheNeu(vl), zeitlupe: vl.zl, modus: 'ganz', versatz: 0, farbe: vl.farbe, text: '', textEigen: false, look: LETZTER_LOOK,
-          insta: true, tiktok: !!(stand().tiktok && stand().tiktok.verbunden), postMs: 0 }) : null);
+          insta: true, tiktok: !!(stand().tiktok && stand().tiktok.verbunden), youtube: !!(stand().youtube && stand().youtube.verbunden), postMs: 0 }) : null);
       };
       v.onerror = () => ok(null);
       v.src = url;
@@ -1984,7 +1984,7 @@
     const vl = VORLAGEN[0];
     return mitText({ id: Math.random().toString(36).slice(2), datei: x.datei, url: x.url, name: x.name, dauer: x.dauer, start: Math.max(0, x.dauer - 15), ende: x.dauer,
       vorlage: vl.id, ...spruecheNeu(vl), zeitlupe: vl.zl, modus: 'ganz', versatz: 0, farbe: vl.farbe, text: '', textEigen: false, look: LETZTER_LOOK,
-      insta: true, tiktok: !!(stand().tiktok && stand().tiktok.verbunden), postMs: 0 });
+      insta: true, tiktok: !!(stand().tiktok && stand().tiktok.verbunden), youtube: !!(stand().youtube && stand().youtube.verbunden), postMs: 0 });
   }
   const platzZahl = v => (v.plaetze ? v.plaetze.length : 1);
   function extraZurueck(c, ab) {   // weitere Clips ab Platz „ab“ zurück in die Warteschlange (nicht, wenn es derselbe Clip ist)
@@ -2050,7 +2050,7 @@
 
   function html() {
     const st = stand(), c = CLIPS[0], liste = (st.clips || []), cfg = st.clipcfg || { zeit: '18:30', test: true };
-    const draussen = x => (!x.insta || !!x.gepostet) && (!x.tiktok || !!x.tt);
+    const draussen = x => (!x.insta || !!x.gepostet) && (!x.tiktok || !!x.tt) && (!x.youtube || !!x.yt);
     const offen = liste.filter(x => !draussen(x)), raus = liste.filter(draussen).reverse();
     const tk = st.tiktok || {};
     return `<div class="kc-app">
@@ -2074,11 +2074,12 @@
         </div>
         ${cfg.testFehler ? `<div class="kc-hinweis">Test-Reels gingen beim letzten Mal nicht, deshalb wurde normal gepostet. Instagram sagt: ${esc(cfg.testFehler)}</div>` : ''}
         <div class="kc-knoepfe"><button type="button" class="btn ki-k" data-c="cfg-speichern">💾 Speichern</button></div>
-        ${tipp('Instagram-Konto steht ganz oben („● Verbunden mit …“). Logo: Reiter „🎨 Aussehen“. TikTok verbinden: Reiter „📡 YouTube & TikTok“.')}
+        ${tipp('Instagram-Konto steht ganz oben („● Verbunden mit …“). Logo: Reiter „🎨 Aussehen“. TikTok verbinden: Reiter „📡 YouTube · TikTok · Discord“.')}
       </details>
     </div>`;
   }
   function editor(c, tk) {
+    const yt = stand().youtube || {};
     const v = vorlage(c), p = zeitplan(c);
     return `<div class="kc-editor">
       <div class="kc-links">
@@ -2116,10 +2117,11 @@
           <div class="kc-ziele">
             <label class="kc-check"><input type="checkbox" data-c="insta" ${c.insta ? 'checked' : ''}> <span><b>Instagram</b> (Reel)</span></label>
             <label class="kc-check${tk.verbunden ? '' : ' aus'}"><input type="checkbox" data-c="tiktok" ${c.tiktok && tk.verbunden ? 'checked' : ''} ${tk.verbunden ? '' : 'disabled'}> <span><b>TikTok</b> (Entwurf)</span></label>
+            <label class="kc-check${yt.verbunden ? '' : ' aus'}"><input type="checkbox" data-c="youtube" ${c.youtube && yt.verbunden ? 'checked' : ''} ${yt.verbunden ? '' : 'disabled'}> <span><b>YouTube</b> (Short)</span></label>
           </div>
         </div>
         ${termineHtml(c)}
-        ${tipp(tk.verbunden ? 'TikTok: Das Video landet als Entwurf in deiner TikTok-App. Dort nur noch einen Trend-Sound drauf und posten.' : 'TikTok ist nicht verbunden (Reiter „📡 YouTube & TikTok“). Für TikTok: „📥 Video laden“ und selbst hochladen.')}
+        ${tipp(tk.verbunden ? 'TikTok: Das Video landet als Entwurf in deiner TikTok-App. Dort nur noch einen Trend-Sound drauf und posten.' : 'TikTok ist nicht verbunden (Reiter „📡 YouTube · TikTok · Discord“). Für TikTok: „📥 Video laden“ und selbst hochladen.')}
         <div class="kc-knoepfe gross">
           <button type="button" class="btn ki-k kc-los" data-c="einplanen" ${ARBEIT ? 'disabled' : ''}>🚀 Video bauen & einplanen</button>
           <button type="button" class="btn ki-k" data-c="laden" ${ARBEIT ? 'disabled' : ''}>📥 Nur Video laden</button>
@@ -2201,6 +2203,7 @@
     const chips = [];
     if (x.insta) chips.push(x.gepostet ? `<span class="ki-chip gruen">Instagram ✓${x.gepostet.test ? ' (Test-Reel)' : ''}</span>` : '<span class="ki-chip blau">Instagram</span>');
     if (x.tiktok) chips.push(x.tt ? '<span class="ki-chip gruen">TikTok-Entwurf ✓</span>' : '<span class="ki-chip blau">TikTok</span>');
+    if (x.youtube) chips.push(x.yt ? (x.yt.privat ? '<span class="ki-chip rot">YouTube: nur privat</span>' : '<span class="ki-chip gruen">YouTube ✓</span>') : '<span class="ki-chip blau">YouTube</span>');
     if (!x.video) chips.push('<span class="ki-chip rot">Video fehlt – löschen und neu einplanen</span>');
     if (x.fehler) chips.push('<span class="ki-chip rot">Fehler</span>');
     return `<div class="kc-post" data-id="${esc(x.id)}">
@@ -2209,9 +2212,10 @@
         <div class="kc-titel" style="--f:${v.farbe}">${v.emoji} ${esc(x.titel || v.name)}</div>
         <div class="kc-dim">${raus ? 'Gepostet' : 'Geht raus'}: <b>${esc(zeit(raus ? ((x.gepostet && x.gepostet.zeit) || (x.tt && x.tt.zeit) || x.postMs) : x.postMs))}</b>${x.dauer ? ' · ' + sek(x.dauer) : ''}</div>
         <div class="kc-chips">${chips.join('')}</div>
-        ${x.fehler ? `<div class="kc-hinweis rot">⚠ ${esc(x.fehler)}</div>` : ''}${x.ttFehler && !x.tt ? `<div class="kc-hinweis rot">TikTok: ${esc(x.ttFehler)}</div>` : ''}
+        ${x.fehler ? `<div class="kc-hinweis rot">⚠ ${esc(x.fehler)}</div>` : ''}${x.ttFehler && !x.tt ? `<div class="kc-hinweis rot">TikTok: ${esc(x.ttFehler)}</div>` : ''}${x.ytFehler && !x.yt ? `<div class="kc-hinweis rot">YouTube: ${esc(x.ytFehler)}</div>` : ''}
         <div class="kc-knoepfe">
           ${x.gepostet && x.gepostet.link ? `<a class="btn ki-k" href="${esc(x.gepostet.link)}" target="_blank" rel="noopener">↗ Auf Instagram</a>` : ''}
+          ${x.yt && x.yt.link ? `<a class="btn ki-k" href="${esc(x.yt.link)}" target="_blank" rel="noopener">↗ Auf YouTube</a>` : ''}
           ${!raus ? `<button type="button" class="btn ki-k" data-c="jetzt">🚀 Jetzt posten</button>
             <input type="datetime-local" value="${esc(lokal(x.postMs))}" data-c="zeitwert"><button type="button" class="btn ki-k" data-c="zeit">🕒 Zeit</button>` : ''}
           ${x.video ? `<a class="btn ki-k" href="${esc(x.video)}" download>📥 Video</a>` : ''}
@@ -2356,7 +2360,7 @@
   function arbeit(t) { ARBEIT = t; const el = BOX && BOX.querySelector('.kc-arbeit'); if (el) el.lastChild.textContent = t; else zeichnen(); }
   async function einplanen(nurLaden) {
     const c = CLIPS[0]; if (!c || ARBEIT) return;
-    if (!nurLaden && !c.insta && !c.tiktok) return UMG.meldung('Bitte Instagram oder TikTok anhaken.', 1);
+    if (!nurLaden && !c.insta && !c.tiktok && !c.youtube) return UMG.meldung('Bitte Instagram, TikTok oder YouTube anhaken.', 1);
     const vp = vorlage(c), pf = vp.pflicht && vp.felder.find(x => x[0] === vp.pflicht);
     if (vp.mehr && quellenVon(c).length < platzZahl(vp)) return UMG.meldung(`Für „${vp.name}“ fehlt noch ein Clip (Schritt 3).`, 1);
     if (pf && !String(c[pf[0]] || '').trim()) return UMG.meldung(`Bitte „${pf[1]}“ eintragen.`, 1);
@@ -2371,7 +2375,7 @@
         ARBEIT = ''; zeichnen(); return UMG.meldung('Video ist fertig und wird geladen.');
       }
       arbeit('⬆ Hochladen …');
-      const r = await UMG.igApi('POST', '/api/clip/neu', { vorlage: c.vorlage, titel: GROSS(c.hook), text: postText(c), postMs: c.postMs || undefined, insta: c.insta, tiktok: c.tiktok, thumbMs: 1300, dauer: blob.dauer });
+      const r = await UMG.igApi('POST', '/api/clip/neu', { vorlage: c.vorlage, titel: GROSS(c.hook), text: postText(c), postMs: c.postMs || undefined, insta: c.insta, tiktok: c.tiktok, youtube: !!c.youtube, thumbMs: 1300, dauer: blob.dauer });
       id = r.id;
       await hochladen(id, blob);
       try { const vb = await vorschaubild(c, MAT); if (vb) await senden(`/api/clip/${id}/bild`, vb); } catch (e) { /* Vorschaubild ist nur schön */ }
@@ -2448,7 +2452,7 @@
         if (!confirm('Diesen Clip jetzt sofort posten?')) return;
         b.disabled = true; b.textContent = '⏳ …';
         const r = await UMG.igApi('POST', `/api/clip/${id}/jetzt`, {});
-        UMG.meldung([r.gepostet ? 'Instagram ✓' : '', r.tiktok ? 'TikTok-Entwurf ✓' : '', r.ttFehler ? 'TikTok ging nicht: ' + r.ttFehler : ''].filter(Boolean).join(' · ') || 'Gesendet.', !!r.ttFehler && !r.gepostet);
+        UMG.meldung([r.gepostet ? 'Instagram ✓' : '', r.tiktok ? 'TikTok-Entwurf ✓' : '', r.youtube ? 'YouTube ✓' : '', r.ttFehler ? 'TikTok ging nicht: ' + r.ttFehler : '', r.ytFehler ? 'YouTube ging nicht: ' + r.ytFehler : ''].filter(Boolean).join(' · ') || 'Gesendet.', (!!r.ttFehler || !!r.ytFehler) && !r.gepostet);
         await UMG.laden();
       }
       if (a === 'zeit') { const v = z.querySelector('[data-c="zeitwert"]').value; await UMG.igApi('POST', `/api/clip/${id}/aendern`, { postMs: new Date(v).getTime() }); UMG.meldung('Zeit gespeichert.'); await UMG.laden(); }
@@ -2518,7 +2522,7 @@
     if (a === 'marke-farbe') { const mk = (c.marken || []).find(x => x.id === t.dataset.k); if (mk) mk.farbe = t.value; return; }
     if (a === 'sektor-letzt') { c.sektorLetzt = t.value; return; }
     if (a === 'zeitlupe') { c.zeitlupe = t.checked; zeichnen(); }
-    else if (a === 'insta' || a === 'tiktok') c[a] = t.checked;
+    else if (a === 'insta' || a === 'tiktok' || a === 'youtube') c[a] = t.checked;
     else if (a === 'postms') { c.postMs = t.value ? new Date(t.value).getTime() : 0; BOX.querySelectorAll('[data-c="termin"]').forEach(x => x.classList.toggle('an', +x.dataset.ms === c.postMs)); }
     else if (a === 'start' || a === 'ende' || a === 'halt' || a === 'linie') zeichnen();
   }

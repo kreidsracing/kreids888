@@ -154,3 +154,31 @@ export async function ytPlanen(zugang, r, cfg, alteId, beschr) {
 export async function ytThumbnail(zugang, id, bytes, typ) {
   await yt(zugang, `/thumbnails/set?videoId=${encodeURIComponent(id)}&uploadType=media`, { method: 'POST', upload: true, body: bytes, typ });
 }
+
+// Clip als YouTube-Short hochladen (hochkant und unter 3 Min. → wird von selbst ein Short).
+// Seit 2. Nov. 2026 auch bei nicht geprüften Apps öffentlich. Eigenes Upload-Kontingent (100 pro Tag, gratis).
+const ytSauber = t => String(t || '').replace(/[<>]/g, '').trim();
+export async function ytShortHochladen(zugang, { titel, beschreibung, tags, body, groesse }) {
+  const meta = {
+    snippet: { title: ytSauber(titel).slice(0, 100) || 'Simracing', description: ytSauber(beschreibung).slice(0, 4900), categoryId: '20', tags: (tags || []).slice(0, 15), defaultLanguage: 'de', defaultAudioLanguage: 'de' },
+    status: { privacyStatus: 'public', selfDeclaredMadeForKids: false, containsSyntheticMedia: false, embeddable: true }
+  };
+  const r = await fetch('https://www.googleapis.com/upload/youtube/v3/videos?uploadType=resumable&part=snippet,status', {
+    method: 'POST',
+    headers: { Authorization: 'Bearer ' + zugang, 'Content-Type': 'application/json; charset=UTF-8', 'X-Upload-Content-Type': 'video/mp4', 'X-Upload-Content-Length': String(groesse) },
+    body: JSON.stringify(meta)
+  });
+  if (!r.ok) {
+    const d = await r.json().catch(() => ({})), e = d.error || {}, grund = (e.errors && e.errors[0] && e.errors[0].reason) || '';
+    throw new Error('YouTube: ' + (e.message || r.status) + (grund ? ' (' + grund + ')' : ''));
+  }
+  const ort = r.headers.get('Location');
+  if (!ort) throw new Error('YouTube: kein Upload-Link bekommen');
+  const r2 = await fetch(ort, { method: 'PUT', headers: { 'Content-Type': 'video/mp4', 'Content-Length': String(groesse) }, body });
+  const d = await r2.json().catch(() => ({}));
+  if (!r2.ok || !d.id) {
+    const e = d.error || {};
+    throw new Error('YouTube-Upload: ' + (e.message || r2.status));
+  }
+  return { id: d.id, sichtbar: (d.status && d.status.privacyStatus) || '' };
+}

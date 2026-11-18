@@ -672,7 +672,8 @@
   function clipZiele(c) {
     const insta = c.insta ? (c.gepostet ? '<b class="kp-ok">✓ Insta</b>' : c.fehler ? '<b class="kp-weh">⚠ Insta</b>' : 'Insta') : '';
     const tiktok = c.tiktok ? (c.tt ? '<b class="kp-ok">✓ TikTok</b>' : c.ttFehler ? '<b class="kp-weh">⚠ TikTok</b>' : 'TikTok') : '';
-    return [insta, tiktok].filter(Boolean).join(' + ');
+    const youtube = c.youtube ? (c.yt ? '<b class="kp-ok">✓ YouTube</b>' : c.ytFehler ? '<b class="kp-weh">⚠ YouTube</b>' : 'YouTube') : '';
+    return [insta, tiktok, youtube].filter(Boolean).join(' + ');
   }
   function kpZeile(p, modus) {
     const [st, fa] = kpStatus(p), id = esc(p.id), offen = p.id === OFFEN_ID;
