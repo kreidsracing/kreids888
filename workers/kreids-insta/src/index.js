@@ -1,6 +1,7 @@
 // ═══════════════════════════════════════════════════════════
 // kreids-insta · Instagram-Poster für Kreids888 (privates Konto)
 // • Ankündigung (Feed) X Tage vorher, Raceday-Story am Renntag, Rennergebnis (Feed)
+// • Tabellenstand, Monatsbilanz, Meilensteine (Feed) und „Jetzt live“ (Story, sobald kreids888-live „live“ meldet)
 // • Daten aus dem Kreids-Dashboard (kreids888-admin): Streamkalender + SPR-Ergebnisse
 // • Die Bilder zeichnet das Dashboard im Browser (insta-bilder.js) und schickt sie hierher:
 //   Im Gratis-Tarif hat ein Worker nur 10 ms Rechenzeit – zu wenig zum Zeichnen.
@@ -11,7 +12,7 @@
 // Routen: GET /bild/:id/:v.jpg · GET /hintergrund/:rennen · GET /logo.png · GET /cvideo/:id/:v.mp4 · GET /cbild/:id.jpg · /api/* (Bearer-Token)
 // ═══════════════════════════════════════════════════════════
 import { DurableObject } from 'cloudflare:workers';
-import { ADMIN, ERG_TAGE, ladeDaten, bauePlan, eigeneRennen, rennKey, inhaltSchluessel, kurzHash, bildtext, platzText } from './plan.js';
+import { ADMIN, ERG_TAGE, LIVE_VOR, ladeDaten, bauePlan, eigeneRennen, rennKey, inhaltSchluessel, kurzHash, bildtext, platzText } from './plan.js';
 import { kiBild, sprueche, STIMMUNGEN, KAMERAS, autos } from './ki.js';
 import { konto, posten, pruefen, tokenVerlaengern, verlaengerbar } from './insta.js';
 import { istUhrzeit, berlin, berlinZuMs, tageZurueck } from './zeit.js';
@@ -35,6 +36,10 @@ const CFG_STANDARD = {
   story: { aktiv: true, zeit: '12:00' },
   ergebnis: { aktiv: true, zeit: '18:00' },
   woche: { aktiv: true, zeit: '17:00', pose: 'pose_02_zeigt_auf_dich.png' },   // Wochenplan-Story sonntags
+  tabelle: { aktiv: true, zeit: '18:00' },   // Tabellenstand 2 Tage nach dem Rennen
+  monat: { aktiv: true, zeit: '18:00' },     // Monatsbilanz am 1. des Monats
+  meilen: { aktiv: true, zeit: '20:00' },    // Meilenstein am Tag nach dem Rennen
+  live: { aktiv: true },                     // „Jetzt live“-Story, sobald der Stream läuft
   // Vorlagen-Wechsel pro Art: reihe | zufall | fest (+ fest = Vorlagen-ID), kreids = fertiges Kreids-Design mit im Wechsel
   vorlagen: { ank: { modus: 'reihe', kreids: true, fest: '' }, story: { modus: 'reihe', kreids: true, fest: '' }, erg: { modus: 'reihe', kreids: true, fest: '' }, woche: { modus: 'reihe', kreids: true, fest: '' } },
   // YouTube: geplanter Livestream pro Rennen (X Tage vorher), Thumbnail kommt automatisch aus dem Editor
@@ -51,7 +56,10 @@ const CFG_STANDARD = {
   stimmung: 'zufall',
   kamera: 'zufall',
   text: '{countdown}: {serie} in {strecke}!\n{wochentag}, {datum} · Live ab {live} Uhr\nLive auf {livezeile}\n\nAlle Infos: Link in Bio\n#simracing #iracing #kreids888',
-  textErgebnis: '{platz} in {strecke}! 🏁\n{serie} · {datum}\nStart {startplatz} → Ziel {ziel} · {delta}\n{punkte} Punkte\n\n#simracing #iracing #kreids888'
+  textErgebnis: '{platz} in {strecke}! 🏁\n{serie} · {datum}\nStart {startplatz} → Ziel {ziel} · {delta}\n{punkte} Punkte\n\n#simracing #iracing #kreids888',
+  textTabelle: '📊 Tabellenstand {serie} nach {runde}\n{platz} mit {punkte} Punkten · {abstand}\n\nWer holt sich den Titel? 👇\n#simracing #iracing #kreids888',
+  textMonat: '📅 Mein {monat} in Zahlen\n🏁 Rennen: {rennen} · 🥇 Siege: {siege} · 🏆 Podien: {podien}\n⭐ Bestes Rennen: {bestes}\n\nWie lief dein Monat? 👇\n#simracing #iracing #kreids888',
+  textMeilen: '🏆 {meilenstein}!\nDanke an alle, die dabei sind 🙏\n{serie} · {strecke} · {datum}\n\n#simracing #iracing #kreids888'
 };
 const DESIGN_STANDARD = {
   farbe1: '#e11324', farbe2: '#ffffff', liveText: 'YouTube · @Kreids888', fahrzeuge: '',
@@ -124,6 +132,11 @@ function cfgPruefen(e) {
   c.tiktok = { typen: Array.isArray(tk.typen) ? ['ank', 'story', 'erg', 'woche'].filter(t => tk.typen.includes(t)) : CFG_STANDARD.tiktok.typen.slice() };
   const wo = e.woche || {};
   c.woche = { aktiv: wo.aktiv !== false, zeit: istUhrzeit(wo.zeit) ? wo.zeit : '17:00', pose: /^[A-Za-z0-9_.-]{1,80}\.(png|webp)$/.test(String(wo.pose || '')) || wo.pose === '' ? wo.pose : CFG_STANDARD.woche.pose };
+  const tb = e.tabelle || {}, mo = e.monat || {}, me = e.meilen || {}, li = e.live || {};
+  c.tabelle = { aktiv: tb.aktiv !== false, zeit: istUhrzeit(tb.zeit) ? tb.zeit : '18:00' };
+  c.monat = { aktiv: mo.aktiv !== false, zeit: istUhrzeit(mo.zeit) ? mo.zeit : '18:00' };
+  c.meilen = { aktiv: me.aktiv !== false, zeit: istUhrzeit(me.zeit) ? me.zeit : '20:00' };
+  c.live = { aktiv: li.aktiv !== false };
   const vl = e.vorlagen || {};
   c.vorlagen = {};
   for (const t of ['ank', 'story', 'erg', 'woche']) {
@@ -137,6 +150,7 @@ function cfgPruefen(e) {
   c.kamera = e.kamera in KAMERAS ? e.kamera : 'zufall';
   c.text = typeof e.text === 'string' && e.text.trim() ? e.text.slice(0, 2000) : CFG_STANDARD.text;
   c.textErgebnis = typeof e.textErgebnis === 'string' && e.textErgebnis.trim() ? e.textErgebnis.slice(0, 2000) : CFG_STANDARD.textErgebnis;
+  for (const k of ['textTabelle', 'textMonat', 'textMeilen']) c[k] = typeof e[k] === 'string' && e[k].trim() ? e[k].slice(0, 2000) : CFG_STANDARD[k];
   return c;
 }
 async function ladeCfg(s) {
@@ -147,6 +161,10 @@ async function ladeCfg(s) {
     story: { ...CFG_STANDARD.story, ...(c.story || {}) },
     ergebnis: { ...CFG_STANDARD.ergebnis, ...(c.ergebnis || {}) },
     woche: { ...CFG_STANDARD.woche, ...(c.woche || {}) },
+    tabelle: { ...CFG_STANDARD.tabelle, ...(c.tabelle || {}) },
+    monat: { ...CFG_STANDARD.monat, ...(c.monat || {}) },
+    meilen: { ...CFG_STANDARD.meilen, ...(c.meilen || {}) },
+    live: { ...CFG_STANDARD.live, ...(c.live || {}) },
     youtube: { ...CFG_STANDARD.youtube, ...(c.youtube || {}) },
     tiktok: { ...CFG_STANDARD.tiktok, ...(c.tiktok || {}) },
     vorlagen: { ...CFG_STANDARD.vorlagen, ...(c.vorlagen || {}) }
@@ -261,6 +279,16 @@ async function tokenPflege(env, s) {
   }
 }
 
+const STORY_ARTEN = ['story', 'woche', 'live'];
+// Läuft der Stream gerade? (kreids888-live, derselbe Dienst wie „ON AIR“ auf kreids888.com)
+const LIVE_API = 'https://kreids888-live.kreids.workers.dev/';
+async function liveJetzt() {
+  try {
+    const r = await fetch(LIVE_API, { headers: { Accept: 'application/json' }, signal: AbortSignal.timeout(8000) });
+    const d = r.ok ? await r.json() : null;
+    return !!d && d.state === 'live';
+  } catch (e) { return false; }
+}
 async function veroeffentlichen(env, s, post, design, cfg) {
   const zust = (await s.lies('post:' + post.id)) || {};
   // Sperre gegen doppeltes Posten (Zeitplan und „Jetzt posten“ gleichzeitig)
@@ -279,7 +307,7 @@ async function veroeffentlichen(env, s, post, design, cfg) {
       token, uid: k.user_id,
       bildUrl: `${env.ORIGIN}/bild/${post.id}/${zust.version}.jpg`,
       videoUrl: zust.istVideo ? `${env.ORIGIN}/pvideo/${post.id}/${zust.video.v}.mp4` : '',
-      typ: post.typ === 'story' || post.typ === 'woche' ? 'story' : 'ank', text: post.typ === 'woche' ? '' : bildtext(post, cfg, design),
+      typ: STORY_ARTEN.includes(post.typ) ? 'story' : 'ank', text: STORY_ARTEN.includes(post.typ) ? '' : bildtext(post, cfg, design, zust.werte),
       tags: [], kiHinweis: cfg.kiHinweis && !!zust.ki
     });
     zust.gepostet = { zeit: Date.now(), mediaId };
@@ -402,8 +430,8 @@ async function ttSenden(env, s, post, cfg, design) {
   if (!z.version) throw new Error('Bild fehlt noch – den Instagram-Reiter einmal öffnen.');
   if (z.istVideo && !(z.video && z.video.hash === z.hash)) throw new Error('Video fehlt noch – den Instagram-Reiter einmal öffnen.');
   const zugang = await ttZugang(env, s);
-  const titel = post.typ === 'woche' ? 'Stream Week' : [post.track || post.titel, post.serie].filter(Boolean).join(' · ');
-  const text = post.typ === 'woche' || post.typ === 'story' ? '#simracing #iracing #kreids888' : bildtext(post, cfg, design);
+  const titel = post.typ === 'woche' ? 'Stream Week' : post.typ === 'monat' ? 'Monatsbilanz' : [post.track || post.titel, post.serie].filter(Boolean).join(' · ');
+  const text = STORY_ARTEN.includes(post.typ) ? '#simracing #iracing #kreids888' : bildtext(post, cfg, design, z.werte);
   try {
     const id = z.istVideo ? await ttVideoEntwurf(zugang, `${env.ORIGIN}/pvideo/${post.id}/${z.video.v}.mp4`)
       : await ttEntwurf(zugang, `${env.ORIGIN}/bild/${post.id}/${z.version}.jpg`, titel, text);
@@ -509,9 +537,16 @@ async function zyklus(env) {
   const plan = bauePlan(daten, cfg, jetzt);
   const st = await s.liste('post:');
   // 1. Fällige Posts senden (nur mit fertigem Bild aus dem Dashboard)
+  let live = null;   // kreids888-live höchstens einmal pro Lauf fragen
   for (const p of plan) {
     const z = st['post:' + p.id] || {};
     if (z.gepostet || z.uebersprungen || (z.versuche || 0) >= 3) continue;
+    if (p.typ === 'live') {   // „Jetzt live“: sobald der Stream läuft (ab 45 Min. vor „Live ab“ bis 3 Std. danach)
+      if (jetzt < p.postMs - LIVE_VOR || jetzt > p.liveBisMs || !(cfg.modus === 'auto' || z.freigegeben)) continue;
+      if (live === null) live = await liveJetzt();
+      if (live) await veroeffentlichen(env, s, p, design, cfg);
+      continue;
+    }
     if (p.postMs <= jetzt && ((cfg.modus === 'auto' && jetzt - p.postMs < VERPASST_NACH) || z.freigegeben)) await veroeffentlichen(env, s, p, design, cfg);
   }
   // 1b. TikTok-Entwürfe (gleiche Zeit wie Instagram, eigene Versuche; nur frische Posts, alte nur per Knopf)
@@ -545,7 +580,7 @@ async function zyklus(env) {
   for (const p of plan) {
     if (p.postMs - jetzt > 48 * 3600000 || ki <= 0) break;
     const rk = rennKey(p.id);
-    if (p.typ === 'woche' || gesehen.has(rk) || p.kalenderBild || (st['post:' + p.id] || {}).gepostet) continue;
+    if (p.typ === 'woche' || p.typ === 'monat' || gesehen.has(rk) || p.kalenderBild || (st['post:' + p.id] || {}).gepostet) continue;
     gesehen.add(rk);
     if (await s.lies('bgv:' + rk)) continue;
     const m = await s.lies('bgm:' + rk);
@@ -561,7 +596,7 @@ async function zyklus(env) {
     for (const p of plan) {
       if (n <= 0) break;
       const rk = rennKey(p.id);
-      if (p.typ === 'woche' || p.typ === 'erg' || fertig.has(rk) || p.startMs < jetzt || p.startMs - jetzt > 7 * 86400000) continue;
+      if ((p.typ !== 'story' && p.typ !== 'ank') || fertig.has(rk) || p.startMs < jetzt || p.startMs - jetzt > 7 * 86400000) continue;
       fertig.add(rk);
       const alt = thrs['thr:' + rk] || {};
       if (alt.spruch) continue;
@@ -631,11 +666,11 @@ function status(z, cfg, p, jetzt) {
   if (z.uebersprungen) return 'uebersprungen';
   if (z.fehler && z.fehler !== BILD_FEHLT) return 'fehler';
   if (cfg.modus === 'freigabe' && !z.freigegeben) return 'wartet';
-  if (!z.freigegeben && p && jetzt - p.postMs > VERPASST_NACH) return 'verpasst';
+  if (!z.freigegeben && p && (p.typ === 'live' ? jetzt > p.liveBisMs : jetzt - p.postMs > VERPASST_NACH)) return 'verpasst';
   return 'geplant';
 }
-const TYP_AUS_ID = id => /^woche_/.test(id) ? 'woche' : (String(id).match(/_(ank|story|erg)$/) || [])[1] || '';
-const DATUM_AUS_ID = id => (String(id).match(/(\d{4}-\d{2}-\d{2})_(ank|story|erg)$/) || [])[1] || '';
+const TYP_AUS_ID = id => /^woche_/.test(id) ? 'woche' : (String(id).match(/_(ank|story|erg|tab|meilen|live|monat)$/) || [])[1] || '';
+const DATUM_AUS_ID = id => (String(id).match(/(\d{4}-\d{2}-\d{2})_(ank|story|erg|tab|meilen|live)$/) || [])[1] || '';
 const QUELLE = { eigen: 'Eigenes Bild', gemini: 'Gemini-App', chatgpt: 'ChatGPT-App', ki: 'Cloudflare-KI' };
 
 // ─── Vorlagen: welche Vorlage bekommt ein Post? ───
@@ -704,6 +739,8 @@ async function stand(env, s) {
       postMs: p.postMs, startMs: p.startMs, qualiMs: p.qualiMs || p.startMs, rennMs: p.rennMs || p.startMs, liveMs: p.liveMs, tage: p.tage || 0,
       klassen: p.klassen, reverseGrid: p.reverseGrid, spruch, liste: p.liste || null, bisDatum: p.bisDatum || '', pose: p.pose || '',
       ergebnis: p.ergebnis || null, platz: p.ergebnis ? platzText(p.ergebnis) : '', eigenesErgebnis: !!p.eigenesErgebnis,
+      ligaId: p.ligaId || '', werte: p.werte || null, bestes: p.bestes || null, monat: p.monat || '', zahl: p.zahl || 0, wort: p.wort || '', zusatz: p.zusatz || '',
+      liveBisMs: p.liveBisMs || 0, tab: z.werte || null,
       vorlage: vid, vorlageFest: !!z.vorlageFest, istVideo: !!z.istVideo,
       video: z.istVideo && z.video && z.video.hash === z.hash ? `${env.ORIGIN}/pvideo/${p.id}/${z.video.v}.mp4` : '', videoHash: z.video ? z.video.hash : '',
       status: status(z, cfg, p, jetzt), freigegeben: !!z.freigegeben, fehler: z.fehler || '', kiFehler: bgv ? '' : (m.kiFehler || ''),
@@ -718,7 +755,7 @@ async function stand(env, s) {
       ytThumbH: (ytbh['ytbh:' + rk] || {}).h || '',
       tiktok: z.tiktok ? { zeit: z.tiktok.zeit || 0, fehler: z.tiktok.zeit ? '' : (z.tiktok.fehler || '') } : null,
       autos: autos(p, design.fahrzeuge || ''),
-      text: p.typ === 'story' || p.typ === 'woche' ? '' : bildtext(p, cfg, design)
+      text: STORY_ARTEN.includes(p.typ) ? '' : bildtext(p, cfg, design, z.werte)
     };
   });
   // Gepostet in den letzten 36 Stunden
@@ -1062,6 +1099,16 @@ async function api(req, env, url) {
     return antwort({ ok: true });
   }
 
+  // SPR-Serie (Fahrer, Rennen, Kalender) für den Tabellenstand – unverändert durchgereicht, gerechnet wird im Dashboard
+  const sl = pfad.match(/^\/api\/spr\/liga\/([A-Za-z0-9_-]{1,60})$/);
+  if (sl && req.method === 'GET') {
+    try {
+      const r = await fetch('https://api.snailpaceracing.org/api/liga/' + sl[1], { headers: { Accept: 'application/json' }, signal: AbortSignal.timeout(10000) });
+      if (!r.ok) return fehler(`SPR-Daten gerade nicht da (${r.status}).`, 502);
+      return new Response(r.body, { headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store', ...CORS } });
+    } catch (e) { return fehler('SPR-Daten gerade nicht da.', 502); }
+  }
+
   const m = pfad.match(/^\/api\/post\/([A-Za-z0-9_-]{1,200})\/(fertig|bild|freigeben|ueberspringen|jetzt|manuell|eigenesbild|pruefen|tiktok|vorlage)$/);
   if (m && req.method === 'POST') {
     const [, id, aktion] = m;
@@ -1119,6 +1166,12 @@ async function api(req, env, url) {
       z.istVideo = url.searchParams.get('video') === '1';
       z.postMs = p.postMs;
       z.info = { typ: p.typ, titel: p.titel || '', serie: p.serie || '', nr: p.nr || 0, track: p.track || '', layout: p.layout || '', datum: p.datum || '', bisDatum: p.bisDatum || '' };
+      // Tabellenstand: Platz/Punkte für den Text (rechnet das Dashboard), fp = Fingerabdruck der Tabelle
+      if (p.typ === 'tab') {
+        let w = {}; try { w = JSON.parse(url.searchParams.get('w') || '{}') || {}; } catch (e) { w = {}; }
+        const zahl = (v, min, max) => (Number.isFinite(Number(v)) && v !== null && v !== '' ? Math.max(min, Math.min(max, Math.round(Number(v)))) : null);
+        z.werte = { platz: zahl(w.platz, 1, 999), punkte: zahl(w.punkte, -9999, 99999), abstand: zahl(w.abstand, 0, 99999), fp: String(w.fp || '').replace(/[^a-z0-9]/gi, '').slice(0, 20) };
+      }
       z.erstellt = Date.now();
       z.ki = !!bgv && !!bgm && bgm.quelle === 'ki';
       if (z.fehler === BILD_FEHLT) z.fehler = '';

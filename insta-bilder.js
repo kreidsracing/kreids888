@@ -1,6 +1,6 @@
 // ═══════════════════════════════════════════════════════════
 // Kreids888 · Instagram-Bilder im Browser zeichnen (für den Instagram-Reiter im Dashboard)
-// Ankündigung + Ergebnis 1080×1350 (Feed 4:5), Raceday 1080×1920 (Story 9:16).
+// Ankündigung, Ergebnis, Tabellenstand, Monatsbilanz, Meilenstein 1080×1350 (Feed 4:5), Raceday + Jetzt live 1080×1920 (Story 9:16).
 // Aufbau als SVG (Saira Condensed eingebettet) → Canvas → JPEG. Der Worker kreids-insta
 // speichert das fertige Bild und postet es. (Im Gratis-Tarif darf der Worker nicht selbst zeichnen.)
 // Aussehen geändert? → ZEICHEN_VERSION in workers/kreids-insta/src/plan.js hochzählen.
@@ -146,7 +146,7 @@
     return { svg: svg + '</g></g>', box: { x: x0, y: y0, w: x1 + sch - x0, h: y1 - y0 } };
   }
   function ebenen(p, design, B) {
-    const k = KOPF || {}, L = layoutAus(design)[p.typ === 'story' ? 'story' : 'feed'];
+    const k = KOPF || {}, L = layoutAus(design)[p.typ === 'story' || p.typ === 'live' ? 'story' : 'feed'];
     let svg = `<defs><filter id="schattenE" x="-20%" y="-30%" width="140%" height="180%"><feDropShadow dx="0" dy="4" stdDeviation="8" flood-color="#000" flood-opacity=".7"/></filter></defs>`;
     BOXEN = [];
     const bildEbene = (name, bild) => {
@@ -157,7 +157,7 @@
     };
     if (design.logoAn !== false) bildEbene('logo', k.logo);
     if (design.teamAn !== false) bildEbene('team', k.team);
-    if (design.spruchAn !== false) {
+    if (design.spruchAn !== false && !['tab', 'monat', 'meilen'].includes(p.typ)) {   // Spruch gehört zu einem Rennen
       const sp = spruchSvg((p.spruch || '').trim() || ersatzSpruch(p), L.spruch, design.farbe1 || '#e11324', B);
       svg += sp.svg.replace('url(#schatten)', 'url(#schattenE)');
       BOXEN.push({ el: 'spruch', ...sp.box });
@@ -368,6 +368,153 @@
     return s + '</svg>';
   }
 
+
+  // ─── Gemeinsame Teile der neuen Posts (Tabellenstand, Monatsbilanz, Meilenstein) ───
+  // Titel-Band (wie „RENNERGEBNIS“) und Fußzeile (links Text, rechts Webseite)
+  function titelBand(titel, y, f1, f2, R, g = 62, h = 84) {
+    const tB = breite(titel, 'black', g, 2);
+    return band(-40, y, tB + R + 72, h, f1) + streifen(tB + R + 56, y, h, f1, f2) +
+      `<text x="${R}" y="${y + h * 0.76}" ${SCHRIFT.black} font-size="${g}" letter-spacing="2" fill="${textAuf(f1)}">${esc(titel)}</text>`;
+  }
+  function fussZeile(links, B, H, R, f1) {
+    return `<text x="${R}" y="1288" ${SCHRIFT.semi} font-size="28" letter-spacing="3" fill="#d6dde5">${esc(links)}</text>` +
+      `<text x="${B - R}" y="1288" text-anchor="end" ${SCHRIFT.semi} font-size="26" letter-spacing="3" fill="#c9d1da">${WEBSEITE}</text>` +
+      `<rect x="0" y="${H - 12}" width="${B}" height="12" fill="${f1}"/>`;
+  }
+  const zahlDe = n => String(n).replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+  // Pfeil als Form (▲/▼ gibt es in der Schrift nicht)
+  const pfeil = (x, y, g, hoch, farbe) => hoch ? `<polygon points="${x},${y} ${x + g},${y} ${x + g / 2},${y - g * 0.9}" fill="${farbe}"/>` : `<polygon points="${x},${y - g * 0.9} ${x + g},${y - g * 0.9} ${x + g / 2},${y}" fill="${farbe}"/>`;
+
+  // ─── Tabellenstand (Feed 1080×1350) ─────────────────────────
+  // post.tabelle = [{ pos, name, pts, delta, ich }] (schon gekürzt: Spitze + eigene Umgebung, Lücke = { luecke: true })
+  function tabelleSvg(post, design, bg) {
+    const B = 1080, H = 1350, R = 72, f1 = design.farbe1, f2 = design.farbe2, akzent = hellAuf(f1);
+    const zeilen = post.tabelle || [], n = Math.max(1, zeilen.length);
+    const oben = 556, unten = 1222, zh = Math.min(76, Math.floor((unten - oben) / n)), luft = 6;
+    let s = `<svg xmlns="http://www.w3.org/2000/svg" width="${B}" height="${H}" viewBox="0 0 ${B} ${H}">`;
+    s += `<rect width="${B}" height="${H}" fill="#0a0b0e"/>` + hintergrund(B, H, bg, f1) + defs(B, H, 280, 250);
+    s += titelBand('TABELLENSTAND', 300, f1, f2, R);
+    const sz = gross([post.serie, post.klasse].filter(Boolean).join(' · '));
+    s += `<g filter="url(#schatten)">`;
+    s += `<text x="${R + 2}" y="452" ${SCHRIFT.xbold} font-size="${passend(sz, 'xbold', B - 2 * R, 52, 28)}" fill="#ffffff">${esc(sz)}</text>`;
+    const nach = post.nachRunde ? `NACH RUNDE ${post.nachRunde}${post.rundenGesamt ? ' VON ' + post.rundenGesamt : ''}` : '';
+    if (nach) s += `<text x="${R + 2}" y="506" ${SCHRIFT.semi} font-size="32" letter-spacing="4" fill="${akzent}">${esc(nach)}</text>`;
+    s += '</g>';
+    zeilen.forEach((z, i) => {
+      const y = oben + i * zh, h = zh - luft, mitte = y + h / 2;
+      if (z.luecke) { [-26, 0, 26].forEach(d => { s += `<circle cx="${B / 2 + d}" cy="${mitte}" r="6" fill="#8b929c"/>`; }); return; }
+      const ich = !!z.ich, tf = ich ? textAuf(f1) : '#ffffff';
+      s += ich ? `<rect x="${R - 14}" y="${y - 4}" width="${B - 2 * R + 28}" height="${h + 8}" fill="${f1}"/>`
+        : `<rect x="${R}" y="${y}" width="${B - 2 * R}" height="${h}" fill="#14161d" fill-opacity=".9"/><rect x="${R}" y="${y}" width="8" height="${h}" fill="${PODEST[z.pos] || '#3a3f4a'}"/>`;
+      const g = Math.min(46, h * 0.62), base = mitte + g * 0.36;
+      s += `<text x="${R + 76}" y="${base}" text-anchor="middle" ${SCHRIFT.black} font-size="${g}" fill="${ich ? tf : PODEST[z.pos] || '#ffffff'}">${z.pos}</text>`;
+      const name = gross(z.name || '');
+      s += `<text x="${R + 140}" y="${base}" ${ich ? SCHRIFT.black : SCHRIFT.xbold} font-size="${passend(name, ich ? 'black' : 'xbold', 560, g * 0.92, 22)}" fill="${tf}">${esc(name)}</text>`;
+      if (z.delta) {
+        const hoch = z.delta > 0, fa = ich ? tf : hoch ? '#2fbf6a' : '#e5484d', dg = g * 0.5, dx = B - R - 250;
+        s += pfeil(dx, base - 4, dg * 0.8, hoch, fa) + `<text x="${dx + dg * 0.8 + 8}" y="${base}" ${SCHRIFT.xbold} font-size="${dg * 1.15}" fill="${fa}">${Math.abs(z.delta)}</text>`;
+      }
+      s += `<text x="${B - R - 26}" y="${base}" text-anchor="end" ${SCHRIFT.black} font-size="${g}" fill="${tf}">${esc(zahlDe(z.pts))}</text>`;
+    });
+    s += `<g filter="url(#schatten)">` + fussZeile(post.stand ? 'STAND ' + post.stand : '', B, H, R, f1) + '</g>';
+    return s + '</svg>';
+  }
+
+  // ─── Monatsbilanz (Feed 1080×1350) ──────────────────────────
+  // post.monat = '2026-11', post.werte = { rennen, siege, podien, top5, punkte, schnitt }, post.bestes = { platz, track, serie }
+  const MONATSNAMEN = ['JANUAR', 'FEBRUAR', 'MÄRZ', 'APRIL', 'MAI', 'JUNI', 'JULI', 'AUGUST', 'SEPTEMBER', 'OKTOBER', 'NOVEMBER', 'DEZEMBER'];
+  function monatSvg(post, design, bg) {
+    const B = 1080, H = 1350, R = 72, f1 = design.farbe1, f2 = design.farbe2, akzent = hellAuf(f1);
+    const [j, m] = String(post.monat || '').split('-').map(Number), name = MONATSNAMEN[(m || 1) - 1] || '', w = post.werte || {};
+    let s = `<svg xmlns="http://www.w3.org/2000/svg" width="${B}" height="${H}" viewBox="0 0 ${B} ${H}">`;
+    s += `<rect width="${B}" height="${H}" fill="#0a0b0e"/>` + hintergrund(B, H, bg, f1) + defs(B, H, 280, 250);
+    s += titelBand('MONATSBILANZ', 300, f1, f2, R);
+    const mg = passend(name, 'black', B - 2 * R - 230, 150, 80);
+    s += `<g filter="url(#schatten)"><text x="${R - 6}" y="${400 + mg * 0.74 + 20}" ${SCHRIFT.black} font-size="${mg}" fill="#ffffff">${esc(name)}<tspan dx="18" ${SCHRIFT.semi} font-size="${Math.round(mg * 0.42)}" fill="${akzent}">${j || ''}</tspan></text></g>`;
+    const felder = [['RENNEN', w.rennen], ['SIEGE', w.siege], ['PODIEN', w.podien], ['TOP 5', w.top5], ['PUNKTE', zahlDe(w.punkte || 0)], ['Ø PLATZ', w.schnitt ? String(w.schnitt).replace('.', ',') : '–']];
+    const bx = R, by = 600, bw = (B - 2 * R - 2 * 18) / 3, bh = 196;
+    felder.forEach(([l, v], i) => {
+      const x = bx + (i % 3) * (bw + 18), y = by + Math.floor(i / 3) * (bh + 18), hi = (l === 'SIEGE' || l === 'PODIEN') && Number(v) > 0;
+      s += `<rect x="${x}" y="${y}" width="${bw}" height="${bh}" fill="#14161d" fill-opacity=".9"/><rect x="${x}" y="${y}" width="${bw}" height="6" fill="${hi ? (l === 'SIEGE' ? PODEST[1] : f1) : '#3a3f4a'}"/>`;
+      s += `<text x="${x + 26}" y="${y + 58}" ${SCHRIFT.semi} font-size="26" letter-spacing="4" fill="${akzent}">${esc(l)}</text>`;
+      const t = String(v == null ? 0 : v);
+      s += `<text x="${x + 22}" y="${y + 166}" ${SCHRIFT.black} font-size="${passend(t, 'black', bw - 44, 104, 50)}" fill="${l === 'SIEGE' && Number(v) > 0 ? PODEST[1] : '#ffffff'}">${esc(t)}</text>`;
+    });
+    const b = post.bestes;
+    if (b) {
+      const y = 1060, wert = gross(`${b.platz ? 'P' + b.platz : ''}${b.track ? ' · ' + b.track : ''}`);
+      s += `<g filter="url(#schatten)"><rect x="${R}" y="${y - 46}" width="6" height="${b.serie ? 128 : 84}" fill="${f1}"/>`;
+      s += `<text x="${R + 24}" y="${y - 10}" ${SCHRIFT.semi} font-size="26" letter-spacing="4" fill="${akzent}">BESTES RENNEN</text>`;
+      s += `<text x="${R + 22}" y="${y + 42}" ${SCHRIFT.black} font-size="${passend(wert, 'black', B - 2 * R - 40, 56, 30)}" fill="${PODEST[b.platz] || '#ffffff'}">${esc(wert)}</text>`;
+      if (b.serie) s += `<text x="${R + 24}" y="${y + 80}" ${SCHRIFT.semi} font-size="28" letter-spacing="2" fill="#d6dde5">${esc(gross(b.serie))}</text>`;
+      s += '</g>';
+    }
+    s += `<g filter="url(#schatten)">` + fussZeile(post.fussText || '', B, H, R, f1) + '</g>';
+    return s + '</svg>';
+  }
+
+  // ─── Meilenstein (Feed 1080×1350) ───────────────────────────
+  // post.zahl = 50, post.wort = 'RENNEN' | 'SIEG' | 'PODIUM' …, post.zusatz = Zeile darunter, post.track/serie/datum = wo es passiert ist
+  function meilensteinSvg(post, design, bg) {
+    const B = 1080, H = 1350, R = 72, f1 = design.farbe1, f2 = design.farbe2, akzent = hellAuf(f1);
+    const cx = B / 2, cy = 780;
+    let s = `<svg xmlns="http://www.w3.org/2000/svg" width="${B}" height="${H}" viewBox="0 0 ${B} ${H}">`;
+    s += `<defs><radialGradient id="glut" cx="${cx}" cy="${cy}" r="520" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="${f1}" stop-opacity=".55"/><stop offset="1" stop-color="${f1}" stop-opacity="0"/></radialGradient></defs>`;
+    s += `<rect width="${B}" height="${H}" fill="#0a0b0e"/>` + hintergrund(B, H, bg, f1) + defs(B, H, 280, 250);
+    // Strahlen hinter der Zahl
+    for (let i = 0; i < 24; i++) {
+      const a = i / 24 * Math.PI * 2, d = 0.06, r1 = 140, r2 = 900;
+      const p = [[cx + Math.cos(a - d) * r1, cy + Math.sin(a - d) * r1], [cx + Math.cos(a - d * 2.2) * r2, cy + Math.sin(a - d * 2.2) * r2], [cx + Math.cos(a + d * 2.2) * r2, cy + Math.sin(a + d * 2.2) * r2], [cx + Math.cos(a + d) * r1, cy + Math.sin(a + d) * r1]];
+      s += `<polygon points="${p.map(q => q.map(v => v.toFixed(1)).join(',')).join(' ')}" fill="${f1}" opacity="${i % 2 ? 0.08 : 0.16}"/>`;
+    }
+    s += `<rect width="${B}" height="${H}" fill="url(#glut)"/>`;
+    s += titelBand('MEILENSTEIN', 300, f1, f2, R);
+    const zahl = String(post.zahl || '') + '.', zg = passend(zahl, 'black', B - 2 * R, 400, 200);
+    s += `<g filter="url(#schatten)">`;
+    s += `<text x="${cx}" y="${cy + zg * 0.3}" text-anchor="middle" ${SCHRIFT.black} font-size="${zg}" fill="#ffffff" stroke="${f1}" stroke-width="10" paint-order="stroke">${esc(zahl)}</text>`;
+    const wort = gross(post.wort || ''), wg = passend(wort, 'black', B - 2 * R, 120, 60);
+    s += `<text x="${cx}" y="${cy + zg * 0.3 + wg * 0.95 + 10}" text-anchor="middle" ${SCHRIFT.black} font-size="${wg}" letter-spacing="2" fill="#ffffff">${esc(wort)}</text>`;
+    if (post.zusatz) s += `<text x="${cx}" y="${cy + zg * 0.3 + wg * 0.95 + 70}" text-anchor="middle" ${SCHRIFT.semi} font-size="34" letter-spacing="5" fill="${akzent}">${esc(gross(post.zusatz))}</text>`;
+    const wo = gross([post.track, post.serie].filter(Boolean).join(' · '));
+    if (wo) s += `<text x="${cx}" y="1190" text-anchor="middle" ${SCHRIFT.xbold} font-size="${passend(wo, 'xbold', B - 2 * R, 40, 24)}" fill="#e1e6ec">${esc(wo)}</text>`;
+    s += '</g>';
+    s += `<g filter="url(#schatten)">` + fussZeile(post.datumText || '', B, H, R, f1) + '</g>';
+    return s + '</svg>';
+  }
+
+  // ─── Jetzt live (Story 1080×1920) ───────────────────────────
+  // Instagram legt oben (~250 px) und unten (~380 px) eigene Leisten drüber → alles zwischen y = 200 und y = 1540.
+  function liveSvg(post, design, bg) {
+    const B = 1080, H = 1920, R = 64, f1 = design.farbe1, f2 = design.farbe2, akzent = hellAuf(f1);
+    const track = umbruch(grossText(post), 'xbold', B - 2 * R - 10, 96, 52), lz = liveZeile(design);
+    let s = `<svg xmlns="http://www.w3.org/2000/svg" width="${B}" height="${H}" viewBox="0 0 ${B} ${H}">`;
+    s += `<rect width="${B}" height="${H}" fill="#0a0b0e"/>` + hintergrund(B, H, bg, f1) + defs(B, H, 480, 640);
+    // „● LIVE“-Schild
+    const py = 760, ph = 92, pt = 'LIVE', pg = 64, pw = breite(pt, 'black', pg, 4) + 150;
+    s += `<g filter="url(#schatten)"><rect x="${R}" y="${py}" width="${pw}" height="${ph}" rx="${ph / 2}" fill="${f1}"/>`;
+    s += `<circle cx="${R + 54}" cy="${py + ph / 2}" r="18" fill="${textAuf(f1)}"/><circle cx="${R + 54}" cy="${py + ph / 2}" r="30" fill="none" stroke="${textAuf(f1)}" stroke-width="4" opacity=".45"/>`;
+    s += `<text x="${R + 100}" y="${py + ph * 0.74}" ${SCHRIFT.black} font-size="${pg}" letter-spacing="4" fill="${textAuf(f1)}">${pt}</text></g>`;
+    // JETZT / LIVE groß
+    s += `<g filter="url(#schatten)">`;
+    s += `<text x="${R - 10}" y="1060" ${SCHRIFT.black} font-size="250" fill="#ffffff">JETZT</text>`;
+    s += `<text x="${R - 10}" y="1270" ${SCHRIFT.black} font-size="250" fill="${akzent}">LIVE</text>`;
+    let y = 1290 + track.g * 0.8;
+    s += track.zeilen.map((z, i) => `<text x="${R - 4}" y="${y + i * track.g * 0.92}" ${SCHRIFT.xbold} font-size="${track.g}" fill="#ffffff">${esc(z)}</text>`).join('');
+    y += (track.zeilen.length - 1) * track.g * 0.92 + 52;
+    const sz = serienZeile(post);
+    s += `<text x="${R}" y="${y}" ${SCHRIFT.semi} font-size="${passend(sz, 'semi', B - 2 * R, 34, 22, 3)}" letter-spacing="3" fill="${akzent}">${esc(sz)}</text>`;
+    if (lz) {
+      y += 76;
+      s += `<rect x="${R}" y="${y - 42}" width="6" height="54" fill="${f1}"/>` +
+        `<text x="${R + 22}" y="${y}" ${SCHRIFT.semi} font-size="30" letter-spacing="3" fill="#e1e6ec">LIVE AUF</text>` +
+        `<text x="${R + 22 + breite('LIVE AUF', 'semi', 30, 3) + 14}" y="${y}" ${SCHRIFT.xbold} font-size="${passend(lz, 'xbold', B - 2 * R - 200, 50, 26)}" fill="#ffffff">${esc(lz)}</text>`;
+    }
+    s += `<text x="${R}" y="${Math.min(1530, y + 64)}" ${SCHRIFT.semi} font-size="28" letter-spacing="4" fill="#c9d1da">LINK IN BIO · ${WEBSEITE}</text>`;
+    s += '</g>';
+    s += `<rect x="0" y="${H - 14}" width="${B}" height="14" fill="${f1}"/>`;
+    return s + '</svg>';
+  }
+
   // ─── Wochenplan (Story 1080×1920) – Look wie der Streamkalender auf kreids888.com + Ich-Bild ───
   // Instagram legt oben (~200 px) und unten (~300 px) eigene Leisten drüber → Kopf ab y = 220.
   const MONATE = ['JAN', 'FEB', 'MÄR', 'APR', 'MAI', 'JUN', 'JUL', 'AUG', 'SEP', 'OKT', 'NOV', 'DEZ'];
@@ -473,7 +620,9 @@
     } finally { URL.revokeObjectURL(url); }
   }
   const svgFuer = (post, design, bg, logo, pose) => post.typ === 'woche' ? wocheSvg(post, design, bg, logo, pose) : post.typ === 'story' ? storySvg(post, design, bg, logo)
-    : post.typ === 'erg' ? ergebnisSvg(post, design, bg, logo) : feedSvg(post, design, bg, logo);
+    : post.typ === 'erg' ? ergebnisSvg(post, design, bg, logo) : post.typ === 'tab' ? tabelleSvg(post, design, bg) : post.typ === 'monat' ? monatSvg(post, design, bg)
+    : post.typ === 'meilen' ? meilensteinSvg(post, design, bg) : post.typ === 'live' ? liveSvg(post, design, bg) : feedSvg(post, design, bg, logo);
+  const HOCH = ['story', 'woche', 'live'];   // 1080×1920, sonst 1080×1350
   // Team-Bilder (kreids888.com/team/bilder), auf Wunsch ohne schwarzen Hintergrund
   const TEAM = [['f2f-logo.webp', 'F2F Logo', true], ['f2f-motto.webp', 'F2F Motto', true], ['f2f-cars.webp', 'F2F Autos'], ['f2f-recruiting.webp', 'F2F Recruiting'], ['f2f-logo.png', 'F2F Logo (PNG)'], ['f2f-g61.png', 'F2F G61']];
   const teamUrl = d => SITE + 'team/bilder/' + d;
@@ -509,7 +658,7 @@
     if (p.typ !== 'woche') svg = svg.replace(/<\/svg>$/, ebenen(p, design, 1080) + '</svg>');
     else BOXEN = [];
     const boxen = BOXEN.slice();   // Lage der Ebenen (für die Vorschau zum Verschieben)
-    const blob = await rastern(svg, 1080, p.typ === 'story' || p.typ === 'woche' ? 1920 : 1350, 0.9);
+    const blob = await rastern(svg, 1080, HOCH.includes(p.typ) ? 1920 : 1350, 0.9);
     blob.boxen = boxen;
     return blob;
   }
