@@ -25,6 +25,7 @@
   const zufallR = s => { let v = s >>> 0 || 1; return () => { v = (v * 1664525 + 1013904223) >>> 0; return v / 4294967296; }; };
   const GROSS = s => String(s || '').toLocaleUpperCase('de-DE');
 
+  const nr = x => { const n = parseInt(String(x == null ? '' : x).replace(/\D/g, ''), 10); return n > 0 ? n : 0; };   // „P17“, „17.“ → 17
   // ─── Vorlagen: jede mit eigener Neonfarbe, Sprüchen, Frage unten und Text für den Post ───
   const VORLAGEN = [
     { id: 'schuld', name: 'Wer war schuld?', emoji: '⚖️', farbe: '#ff2d6f', tag: 'VORFALL', zl: true, wieder: 'NOCHMAL GENAU HINSCHAUEN',
@@ -57,7 +58,7 @@
       hooks: ['WER KOMMT DURCH?', 'START-CHAOS', 'KURVE 1. WIE IMMER.', 'ALLE AUF EINMAL'], unten: ['WO WÄRST DU HINGEFAHREN?', 'WER IST SCHULD?', 'INNEN ODER AUSSEN?'],
       text: 'Start-Chaos 🚦 Wer kommt hier heil durch? Wo wärst du hingefahren? 👇\n\n#simracing #iracing #racestart #simracer #kreids888',
       hilfe: 'Für Rennstarts und die erste Kurve – da passiert immer was.' },
-    { id: 'finish', name: 'Knappes Finish', emoji: '🏁', farbe: '#00ffa3', tag: 'ZIEL', zl: true, wieder: 'FOTOFINISH',
+    { id: 'finish', name: 'Knappes Finish', emoji: '📸', farbe: '#00ffa3', tag: 'ZIEL', zl: true, wieder: 'FOTOFINISH',
       hooks: ['KNAPPER GEHT’S NICHT', 'FOTOFINISH', 'WER WAR VORNE?', 'ZEHNTEL ENTSCHEIDEN'], unten: ['WIE KNAPP WAR’S BEI DIR?', 'WER WAR VORNE?', 'SCHON MAL SO KNAPP?'],
       felder: [['abstand', 'Abstand im Ziel', '0,042 s']], zeigen: 'abstand', zeigenLabel: 'ABSTAND IM ZIEL', info: () => 'ABSTAND IM ZIEL',
       feldTipp: 'Der Abstand kommt am Ende groß ins Bild. Leer lassen geht auch.',
@@ -103,6 +104,25 @@
       hooks: ['EINE RUNDE IN 30 SEK.', 'DIE STRECKE IN 30 SEK.', 'SO FÄHRT MAN DAS'], unten: ['WIE IST DEINE BESTZEIT HIER?', 'WO VERLIERST DU HIER ZEIT?', 'KENNST DU DIE STRECKE?'],
       text: c => `${c.strecke ? c.strecke + ' in 30 Sekunden' : 'Eine Runde in 30 Sekunden'} 🛣️ Wie ist deine Bestzeit hier? 👇\n\n#simracing #iracing #onboard #simracer #kreids888`,
       hilfe: 'Eine Runde im Zeitraffer. Kurvennamen und Tipps blendest du an der richtigen Stelle ein (Schritt 3).' },
+    // ── Rennen ──
+    { id: 'rennstart', name: 'Rennstart', emoji: '🟢', farbe: '#27f25a', tag: 'RENNSTART', zl: true, wieder: 'DER START IN ZEITLUPE', gruenStart: true, gruppe: 'rennen', neu: true,
+      felder: [['startplatz', 'Startplatz', '17'], ['nachStart', 'Platz nach dem Start', '14']], feldTipp: 'Freiwillig. Mit beiden Plätzen kommt am Ende groß, wie viele Plätze du am Start geholt hast.',
+      ergebnisVon: c => { const s0 = nr(c.startplatz), n0 = nr(c.nachStart); if (!s0 || !n0) return null; const d = s0 - n0; return { wert: d > 0 ? '+' + d : d < 0 ? '-' + -d : '±0', label: 'PLÄTZE AM START', info: `VON P${s0} AUF P${n0}` }; },
+      hooks: ['GRÜNE FLAGGE!', 'RENNSTART', 'UND LOS GEHT’S!', 'WER KOMMT BESSER WEG?'], unten: ['WIE WAR MEIN START?', 'GUTER START ODER ZU WILD?', 'WIE VIELE PLÄTZE HÄTTEST DU GEHOLT?'],
+      text: c => `Rennstart 🟢${nr(c.startplatz) ? ' von P' + nr(c.startplatz) : ''}${nr(c.nachStart) ? ', nach dem Start P' + nr(c.nachStart) : ''} – wie war mein Start? 👇\n\n#simracing #iracing #racestart #simracer #kreids888`,
+      hilfe: 'Für Rennstarts: grüne Flagge am Anfang, dein Startplatz im Bild und am Ende, wie viele Plätze du am Start geholt hast.' },
+    { id: 'bestzeit', name: 'Bestzeit im Rennen', emoji: '⚡', farbe: '#b84dff', tag: 'SCHNELLSTE RUNDE', zl: false, wieder: '', bestzeit: true, linie: true, gruppe: 'rennen', neu: true,
+      felder: [['rundenzeit', 'Rundenzeit', '1:52.414'], ['runde', 'Runde', '23'], ['auto', 'Auto', 'Porsche 911 GT3 R']], pflicht: 'rundenzeit', feldTipp: 'Die Zeit läuft im Bild mit und wird an der Ziellinie lila.',
+      ergebnisVon: c => { const z = String(c.rundenzeit || '').trim(); return z ? { wert: z, label: 'SCHNELLSTE RUNDE', info: GROSS([nr(c.runde) ? 'Runde ' + nr(c.runde) : '', c.auto].filter(Boolean).join(' · ')) } : null; },
+      hooks: ['SCHNELLSTE RUNDE!', 'BESTZEIT IM RENNEN', 'LILA!', 'DAS WAR DIE SCHNELLSTE'], unten: ['WIE SCHNELL BIST DU HIER?', 'SCHREIB DEINE BESTZEIT!', 'GEHT DA NOCH WAS?'],
+      text: c => `Schnellste Runde im Rennen${c.rundenzeit ? ' ⏱ ' + c.rundenzeit : ''} ⚡ Wie schnell bist du hier? 👇\n\n#simracing #iracing #fastestlap #simracer #kreids888`,
+      hilfe: 'Für die schnellste Runde im Rennen: Die Rundenzeit läuft mit und wird an der Ziellinie lila, dazu „Schnellste Runde“ wie in der F1. Die Ziellinie stellst du in Schritt 3 ein.' },
+    { id: 'ziel', name: 'Zieleinlauf', emoji: '🏁', farbe: '#ffd400', tag: 'ZIEL', zl: false, wieder: '', zielflagge: true, linie: true, gruppe: 'rennen', neu: true,
+      felder: [['platz', 'Platz im Ziel', '4'], ['startplatz', 'Startplatz', '17'], ['serie', 'Rennen / Serie', 'SPR GT3 Cup']], pflicht: 'platz', feldTipp: 'Der Platz kommt groß ins Standbild, mit Startplatz auch die gewonnenen Plätze.',
+      ergebnisVon: c => { const z = nr(c.platz); if (!z) return null; const s0 = nr(c.startplatz), d = s0 ? s0 - z : 0; return { wert: 'P' + z, label: 'IM ZIEL', info: GROSS([s0 ? `von P${s0} gestartet` : '', d > 0 ? `+${d} Plätze` : '', c.serie].filter(Boolean).join(' · ')) }; },
+      hooks: ['ZIEL!', 'KARIERTE FLAGGE', 'GESCHAFFT!', 'ZIELEINLAUF'], unten: ['WIE LIEF DEIN RENNEN?', 'ZUFRIEDEN MIT DEM ERGEBNIS?', 'WAS WAR DEIN BESTES ERGEBNIS?'],
+      text: c => `Zieleinlauf${nr(c.platz) ? ' auf P' + nr(c.platz) : ''}${nr(c.startplatz) ? ' – gestartet von P' + nr(c.startplatz) : ''} 🏁 Wie lief dein Rennen? 👇\n\n#simracing #iracing #finish #simracer #kreids888`,
+      hilfe: 'Für die Zieldurchfahrt: An der Ziellinie steht das Bild, die karierte Flagge weht und dein Ergebnis kommt groß. Die Ziellinie stellst du in Schritt 3 ein.' },
     // ── Multiclass ──
     { id: 'verkehr', name: 'Durch den Verkehr', emoji: '🏎️', farbe: '#2f8bff', tag: 'MULTICLASS', zl: false, wieder: '', mehr: 'verkehr', gruppe: 'multi', neu: true,
       felder: [['klasse', 'Deine Klasse', 'LMP2']], feldTipp: 'Steht als Schild oben rechts. Leer lassen geht auch.',
@@ -147,7 +167,7 @@
       text: 'Was für ein Manöver! 🎙️ Wie hättest du’s kommentiert? 👇\n\n#simracing #iracing #racing #simracer #kreids888',
       hilfe: 'Wie eine echte TV-Übertragung: Serie, Runde, Fahrer-Bauchbinde, eigene Laufschrift und Jubel am Ende.' }
   ];
-  const GRUPPEN = [['klassik', 'Klassiker'], ['mehr', 'Mehrere Clips & Runde'], ['multi', 'Multiclass'], ['action', 'Action'], ['trend', 'Trends']];
+  const GRUPPEN = [['klassik', 'Klassiker'], ['rennen', 'Rennen'], ['mehr', 'Mehrere Clips & Runde'], ['multi', 'Multiclass'], ['action', 'Action'], ['trend', 'Trends']];
   const gruppeVon = v => v.gruppe || (v.mehr ? 'mehr' : 'klassik');
   const LOOKS = [['neon', '✨ Neon'], ['tv', '📺 TV-Sendung']];
   const WIEDER = ['NOCHMAL GENAU HINSCHAUEN', 'NOCHMAL IN ZEITLUPE', 'GANZ GENAU HINSEHEN', 'NOCHMAL. LANGSAM.', 'WIE?!', 'AUTSCH. NOCHMAL.', 'SO GEHT DAS', 'FOTOFINISH'];
@@ -265,7 +285,7 @@
 
   // ─── Zeitplan eines Clips: Hauptteil · Zeitlupe vom Ende (halbe Geschwindigkeit) · Abspann ───
   // Bei „Was passiert jetzt?“ hält der Clip bei F an (FD Sekunden, Countdown 3-2-1) und läuft dann weiter
-  const HALT = 2.4, ANALYSE = 3.4, AMPEL = 3.6, AMPEL_AN = [0.45, 1.0, 1.55, 2.1, 2.65];
+  const HALT = 2.4, ANALYSE = 3.4, AMPEL = 3.6, AMPEL_AN = [0.45, 1.0, 1.55, 2.1, 2.65], ZIEL_HALT = 3.0;
   // Quellen eines Clips: [Haupt-Clip, …weitere] (Top 3 und Vorher/Nachher nehmen mehrere)
   const quellenVon = c => [c, ...(c.extra || [])];
   function abschnitt(s) { const dauer = s.dauer || 10, a = kl(s.start || 0, 0, Math.max(0, dauer - 1)), b = kl(s.ende || dauer, a + 1, dauer); return { a, b }; }
@@ -339,10 +359,11 @@
     if (vorlage(c).mehr) return zeitplanMehr(c, vorlage(c));
     const dauer = c.dauer || 10, a = kl(c.start || 0, 0, Math.max(0, dauer - 1)), b = kl(c.ende || dauer, a + 1, dauer), v = vorlage(c);
     // Anhalten: „Was passiert jetzt?“ (Countdown) und Replay-Analyse an einer Stelle, Lights Out ganz am Anfang (Startampel)
-    const FD = v.pause ? HALT : v.analyse ? ANALYSE : v.ampel ? AMPEL : 0;
-    const F = v.ampel ? a : (v.pause || v.analyse) ? kl(c.halt != null ? c.halt : b - 2.5, a + 0.5, b - 0.3) : b, h = F - a;
+    const lin = v.linie ? kl(c.linie != null ? c.linie : b - 2, a + 0.3, b - 0.2) : null;   // Ziellinie
+    const FD = v.pause ? HALT : v.analyse ? ANALYSE : v.ampel ? AMPEL : v.zielflagge ? ZIEL_HALT : 0;
+    const F = v.ampel ? a : (v.pause || v.analyse) ? kl(c.halt != null ? c.halt : b - 2.5, a + 0.5, b - 0.3) : v.zielflagge ? lin : b, h = F - a;
     const D0 = b - a, D = D0 + FD, Z = c.zeitlupe ? Math.min(3, D0 * 0.4) : 0, R = Z * 2, T = D + R + OUTRO;
-    return { a, b, D, Z, R, T, F, FD, h, quelle: t => (t < h ? a + t : t < h + FD ? F : t < D ? a + t - FD : t < D + R ? b - Z + (t - D) / 2 : null) };
+    return { a, b, D, Z, R, T, F, FD, h, lin, L: lin != null ? lin - a : null, quelle: t => (t < h ? a + t : t < h + FD ? F : t < D ? a + t - FD : t < D + R ? b - Z + (t - D) / 2 : null) };
   }
 
   // ─── Ein Bild zeichnen (Vorschau und Video benutzen dieselbe Funktion) ───
@@ -358,15 +379,26 @@
     g.fillStyle = 'rgba(0,0,0,.55)'; g.fillRect(0, 0, B, H);
     g.save(); g.globalAlpha = 0.8; g.drawImage(grund(farbe), 0, 0); g.restore();
   }
-  function bildRechteck(vid, x, y, w, h, zoom, versatz) {   // wo der Clip landet, wenn er ein Rechteck deckend füllt
+  function bildRechteck(vid, x, y, w, h, zoom, versatz, tf) {   // wo der Clip landet, wenn er ein Rechteck deckend füllt (tf: selbst verschoben/vergrößert)
     const vw = (vid && (vid.videoWidth || vid.displayWidth)) || 1920, vh = (vid && (vid.videoHeight || vid.displayHeight)) || 1080, s = Math.max(w / vw, h / vh) * (zoom || 1), dw = vw * s, dh = vh * s;
     // Hochkant-Clip (z. B. fertiger Clip aus dem Kreids Clipper) im Querformat-Rahmen: Mitte bei 38 % der Höhe – dort ist meist das Spielbild, unten die Kamera
     const yy = vh > vw && dh > h * 1.5 ? kl(y + h / 2 - 0.38 * dh, y + h - dh, y) : y + (h - dh) / 2;
-    return { x: x + (w - dw) * (0.5 + (versatz || 0) * 0.5), y: yy, w: dw, h: dh };
+    const r = { x: x + (w - dw) * (0.5 + (versatz || 0) * 0.5), y: yy, w: dw, h: dh };
+    if (!tf || (!tf.x && !tf.y && (!tf.z || tf.z === 1))) return r;
+    const z = kl(tf.z || 1, 0.3, 5), cx = x + w / 2, cy = y + h / 2;   // um die Mitte des Fensters vergrößern, dann verschieben
+    return { x: cx + (r.x - cx) * z + (tf.x || 0) * w, y: cy + (r.y - cy) * z + (tf.y || 0) * h, w: r.w * z, h: r.h * z };
   }
-  function quellBild(g, vid, x, y, w, h, zoom, versatz) {   // Clip deckend in ein Rechteck
-    const r = bildRechteck(vid, x, y, w, h, zoom, versatz); g.drawImage(vid, r.x, r.y, r.w, r.h);
+  function quellBild(g, vid, x, y, w, h, zoom, versatz, tf) {   // Clip deckend in ein Rechteck
+    const r = bildRechteck(vid, x, y, w, h, zoom, versatz, tf); g.drawImage(vid, r.x, r.y, r.w, r.h);
   }
+  // Fenster (Rahmen um den Clip): Breite/Höhe einstellbar. Wird es höher, rückt es etwas nach oben und alles darunter nach unten (dy)
+  const FENSTER_MAX = { neon: 820, tv: 620 };
+  function lage(c, tv) {
+    const fe = c.fenster || {}, fw = kl(Math.round(fe.w || 1000), 360, 1040), fh = kl(Math.round(fe.h || 562), 280, tv ? FENSTER_MAX.tv : FENSTER_MAX.neon);
+    const hoch = tv ? 0 : Math.min(70, Math.max(0, fh - 562) / 2), fy = (tv ? 730 : 690) - hoch, unten = fy + fh;
+    return { fx: Math.round((B - fw) / 2), fy, fw, fh, hoch, dy: unten - ((tv ? 730 : 690) + 562) };
+  }
+  const markeY = (y, dy) => (y + dy <= 1600 ? y + dy : null);   // Logo unten nur, wenn noch Platz ist
   function ecken(g, x, y, w, h, farbe, l) {   // Neon-Ecken (HUD)
     g.save(); g.lineCap = 'square'; g.strokeStyle = farbe; g.lineWidth = 9; g.shadowColor = farbe; g.shadowBlur = 26;
     const e = (ax, ay, dx, dy) => { g.beginPath(); g.moveTo(ax + dx * l, ay); g.lineTo(ax, ay); g.lineTo(ax, ay + dy * l); g.stroke(); };
@@ -424,12 +456,13 @@
   }
   // Großer Wert am Ende (Rundenzeit, Abstand): am Ende der Zeitlupe, ohne Zeitlupe am Ende des Clips
   function ergebnis(v, c, p, t) {
-    if (!v.zeigen) return null;
-    const roh = String(c[v.zeigen] || '').trim(); if (!roh) return null;
-    const wert = v.gross ? GROSS(roh) : roh;
-    const a = (p.R ? p.D + p.R : p.D) - 2.4;
+    let e = null;
+    if (v.ergebnisVon) e = v.ergebnisVon(c);
+    else if (v.zeigen) { const roh = String(c[v.zeigen] || '').trim(); if (roh) e = { wert: v.gross ? GROSS(roh) : roh, label: v.zeigenLabel || '', info: GROSS(v.info ? v.info(c) : '') }; }
+    if (!e) return null;
+    const a = p.L != null ? p.L + (v.zielflagge ? 0.35 : 0) : (p.R ? p.D + p.R : p.D) - 2.4;
     if (t < a) return null;
-    return { q: fp(t, a, a + 0.3), wert, label: v.zeigenLabel || '', info: GROSS(v.info ? v.info(c) : '') };
+    return { q: fp(t, a, a + 0.3), ...e };
   }
   // Stempel (CRASH, FAIL) in der Zeitlupe
   function stempel(g, t, p, v, f, x, y) {
@@ -559,11 +592,12 @@
   }
   // Fläche, in der der Clip gezeichnet wird (Rahmen oder ganzes Bild bei „Zoom“) – für Analyse-Kreis und Tippen in die Vorschau
   function flaeche(c, p, t) {
-    if (c.modus === 'zoom') return { x: -40, y: -40, w: B + 80, h: H + 80, zoom: 1.02 + 0.03 * fp(t, 0, p.D), versatz: c.versatz || 0, kx: 0, ky: 0, kw: B, kh: H };
-    return { x: 40, y: 690, w: 1000, h: 562, zoom: 1, versatz: 0, kx: 40, ky: 690, kw: 1000, kh: 562 };
+    if (c.modus === 'zoom' && c.look !== 'tv') return { x: -40, y: -40, w: B + 80, h: H + 80, zoom: 1.02 + 0.03 * fp(t, 0, p.D), versatz: c.versatz || 0, tf: c.bild, kx: 0, ky: 0, kw: B, kh: H };
+    const L = lage(c, c.look === 'tv');
+    return { x: L.fx, y: L.fy, w: L.fw, h: L.fh, zoom: 1, versatz: 0, tf: c.bild, kx: L.fx, ky: L.fy, kw: L.fw, kh: L.fh };
   }
   const zielVon = c => { const z = c.ziel || {}; return { u: kl(z.u != null ? z.u : 0.5, 0.03, 0.97), v: kl(z.v != null ? z.v : 0.55, 0.03, 0.97) }; };
-  function analyseZiel(c, vid, R) { const z = zielVon(c), r = bildRechteck(vid, R.x, R.y, R.w, R.h, R.zoom, R.versatz); return { x: r.x + z.u * r.w, y: r.y + z.v * r.h, r }; }
+  function analyseZiel(c, vid, R) { const z = zielVon(c), r = bildRechteck(vid, R.x, R.y, R.w, R.h, R.zoom, R.versatz, R.tf); return { x: r.x + z.u * r.w, y: r.y + z.v * r.h, r }; }
   // Replay-Analyse im Standbild: heranzoomen auf die Stelle, Rest abdunkeln
   function analyseBild(g, t, c, p, vid, R) {
     const d = t - p.h, ein = eo(fp(d, 0, 0.4)), aus = eo(fp(d, p.FD - 0.4, p.FD)), k = 1 + 0.4 * ein * (1 - aus), z = analyseZiel(c, vid, R), a = ein * (1 - aus);
@@ -615,12 +649,80 @@
     const q = fp(t, t0, t0 + 0.35); if (q <= 0) return;
     g.save(); rr(g, fx, fy, fw, fh, 14); g.clip(); g.fillStyle = `rgba(3,4,7,${0.62 * q})`; g.fillRect(fx, fy, fw, fh); licht(g, fx + fw / 2, fy + fh / 2, 520, f, 0.25 * q); g.restore();
     const ch = chrom(gross, 210, f, 880), cy = fy + fh / 2 + (unter ? 10 : 50), k = 0.6 + 0.4 * eob(q);
-    g.save(); g.globalAlpha = Math.min(1, q * 2); g.translate(B / 2, cy); g.scale(k, k); g.drawImage(ch.c, -ch.mitte, -ch.base);
+    g.save(); g.globalAlpha *= Math.min(1, q * 2); g.translate(B / 2, cy); g.scale(k, k); g.drawImage(ch.c, -ch.mitte, -ch.base);
     const gq = (t - t0 - 0.45) / 0.7; if (gq >= 0 && gq <= 1) glanz(g, ch, -ch.mitte, -ch.base, gq, 0.85);
     g.restore();
     const q2 = eo(fp(t, t0 + 0.25, t0 + 0.55));
-    if (unter && q2 > 0) { g.save(); g.globalAlpha = q2; SA(g, passt(g, unter, fw - 80, 66, SAx(900)), 900); g.textAlign = 'center'; g.fillStyle = '#fff'; g.shadowColor = f; g.shadowBlur = 18; g.fillText(unter, B / 2, cy + 104 - (1 - q2) * 20); g.restore(); }
-    if (info && q2 > 0) { g.save(); g.globalAlpha = q2; OR(g, passt(g, info, fw - 120, 46, OR)); g.textAlign = 'center'; g.fillStyle = hexA(f, 1); g.shadowColor = '#000'; g.shadowBlur = 10; g.fillText(info, B / 2, cy + 172); g.restore(); }
+    if (unter && q2 > 0) { g.save(); g.globalAlpha *= q2; SA(g, passt(g, unter, fw - 80, 66, SAx(900)), 900); g.textAlign = 'center'; g.fillStyle = '#fff'; g.shadowColor = f; g.shadowBlur = 18; g.fillText(unter, B / 2, cy + 104 - (1 - q2) * 20); g.restore(); }
+    if (info && q2 > 0) { g.save(); g.globalAlpha *= q2; OR(g, passt(g, info, fw - 120, 46, OR)); g.textAlign = 'center'; g.fillStyle = hexA(f, 1); g.shadowColor = '#000'; g.shadowBlur = 10; g.fillText(info, B / 2, cy + 172); g.restore(); }
+  }
+  // Wehende Flagge: grün beim Rennstart, kariert im Ziel (Stoff mit Welle, Licht und Schatten)
+  function flaggeZeichnen(g, x, y, w, h, t, art, a) {
+    if (a <= 0) return;
+    const n = 28, ph = u => t * 9 - u * 6.5;
+    const welle = (u, v) => { const k = ph(u), amp = h * (0.05 + 0.15 * u); return [x + u * w - Math.abs(Math.sin(k)) * w * 0.035 * u, y + v * h + Math.sin(k) * amp + (v - 0.5) * Math.cos(k) * h * 0.08 * u]; };
+    const viereck = (u0, v0, u1, v1) => { const [x1, y1] = welle(u0, v0), [x2, y2] = welle(u1, v0), [x3, y3] = welle(u1, v1), [x4, y4] = welle(u0, v1); g.beginPath(); g.moveTo(x1, y1); g.lineTo(x2, y2); g.lineTo(x3, y3); g.lineTo(x4, y4); g.closePath(); };
+    const umriss = () => { g.beginPath(); for (let i = 0; i <= n; i++) { const [xx, yy] = welle(i / n, 0); if (i) g.lineTo(xx, yy); else g.moveTo(xx, yy); } for (let i = n; i >= 0; i--) { const [xx, yy] = welle(i / n, 1); g.lineTo(xx, yy); } g.closePath(); };
+    g.save(); g.globalAlpha *= a;
+    const st = g.createLinearGradient(x - 14, 0, x, 0); st.addColorStop(0, '#8a929c'); st.addColorStop(0.5, '#f2f5f8'); st.addColorStop(1, '#9aa3ad');   // Stab
+    g.fillStyle = st; g.shadowColor = 'rgba(0,0,0,.7)'; g.shadowBlur = 12; g.fillRect(x - 14, y - 10, 12, h * 2.1); g.shadowBlur = 0;
+    g.fillStyle = '#e8edf2'; g.beginPath(); g.arc(x - 8, y - 12, 9, 0, Math.PI * 2); g.fill();
+    umriss();
+    if (art === 'kariert') {
+      g.fillStyle = '#f6f8fa'; g.shadowColor = 'rgba(255,255,255,.6)'; g.shadowBlur = 30; g.fill(); g.shadowBlur = 0;
+      const nx = 8, ny = 6; g.fillStyle = '#0a0c0f';
+      for (let i = 0; i < nx; i++) for (let j = 0; j < ny; j++) if ((i + j) % 2) { viereck(i / nx, j / ny, (i + 1) / nx, (j + 1) / ny); g.fill(); }
+    } else {
+      const gr = g.createLinearGradient(0, y, 0, y + h); gr.addColorStop(0, '#3dff6e'); gr.addColorStop(0.55, '#12c93f'); gr.addColorStop(1, '#0a9a2e');
+      g.fillStyle = gr; g.shadowColor = '#27f25a'; g.shadowBlur = 40; g.fill(); g.shadowBlur = 0;
+    }
+    const sg = g.createLinearGradient(x, 0, x + w, 0);   // Licht auf den Wellenbergen, Schatten in den Tälern (ein Verlauf, ohne Streifen)
+    for (let i = 0; i <= 24; i++) { const u = i / 24, s0 = Math.cos(ph(u)), k = 0.35 + 0.65 * u; sg.addColorStop(u, s0 > 0 ? `rgba(255,255,255,${0.32 * s0 * k})` : `rgba(0,0,0,${-0.5 * s0 * k})`); }
+    umriss(); g.fillStyle = sg; g.fill();
+    umriss(); g.lineWidth = 2; g.strokeStyle = art === 'kariert' ? 'rgba(255,255,255,.5)' : 'rgba(180,255,200,.55)'; g.stroke();
+    g.restore();
+  }
+  function stoppuhr(g, x, y, r, farbe) {
+    g.save(); g.strokeStyle = farbe; g.fillStyle = farbe; g.lineWidth = r * 0.2; g.lineCap = 'round';
+    g.beginPath(); g.arc(x, y, r, 0, Math.PI * 2); g.stroke();
+    g.fillRect(x - r * 0.24, y - r * 1.55, r * 0.48, r * 0.34);
+    g.beginPath(); g.moveTo(x, y); g.lineTo(x + r * 0.42, y - r * 0.5); g.stroke();
+    g.restore();
+  }
+  // Bestzeit im Rennen: Rundenzeit läuft oben links mit und wird an der Ziellinie lila, dann „Schnellste Runde“ unten im Clip
+  function bestzeitZeichnen(g, t, c, p, m, f, fx, fy, fw, fh) {
+    const lila = '#b84dff', hell = '#ead6ff', lap = zeitLesen(c.rundenzeit), src = p.quelle(t), da = p.L != null && t >= p.L, d = da ? t - p.L : 0;
+    const wert = da || src == null ? (lap != null ? lap : (p.lin || p.b) - p.a) : lap != null ? Math.max(0, lap - (p.lin - src)) : Math.max(0, src - p.a);
+    const w = Math.min(380, fw - 44), h = 132, x = fx + 22, y = fy + 22, fl = da ? 1 - fp(d, 0, 0.7) : 0;
+    g.save(); rr(g, x, y, w, h, 12); g.fillStyle = da ? 'rgba(46,10,80,.92)' : 'rgba(5,7,10,.84)'; g.fill();
+    g.lineWidth = 3; g.strokeStyle = da ? lila : 'rgba(255,255,255,.25)'; g.shadowColor = lila; g.shadowBlur = da ? 18 + 34 * fl : 0; g.stroke(); g.shadowBlur = 0;
+    if (fl > 0) { g.fillStyle = hexA(lila, 0.5 * fl); g.fill(); }
+    SA(g, 28, 700); g.fillStyle = da ? hell : hexA(f, 1); g.fillText(nr(c.runde) ? 'RUNDE ' + nr(c.runde) : 'RUNDENZEIT', x + 24, y + 42);
+    stoppuhr(g, x + w - 32, y + 36, 12, da ? hell : 'rgba(255,255,255,.75)');
+    const zt = zeitText(wert); OR(g, passt(g, zt, w - 48, 62, OR)); g.fillStyle = '#fff'; if (da) { g.shadowColor = lila; g.shadowBlur = 26; } g.fillText(zt, x + 24, y + 110);
+    g.restore();
+    if (!da) return;
+    const q = eo(fp(d, 0.2, 0.6)), kw = Math.min(fw - 44, 720), kh = 140, kx = fx + fw - 22 - kw + (1 - q) * (kw + 80), ky = fy + fh - 22 - kh;
+    g.save(); g.beginPath(); g.rect(fx, fy, fw, fh); g.clip();
+    const gr = g.createLinearGradient(kx, 0, kx + kw, 0); gr.addColorStop(0, '#4d0f8c'); gr.addColorStop(1, lila);
+    rr(g, kx, ky, kw, kh, 14); g.fillStyle = gr; g.shadowColor = lila; g.shadowBlur = 34; g.fill(); g.shadowBlur = 0;
+    g.fillStyle = 'rgba(0,0,0,.28)'; rr(g, kx + 14, ky + 14, 112, kh - 28, 10); g.fill();
+    stoppuhr(g, kx + 70, ky + kh / 2 + 9, 28, '#fff');
+    SA(g, 34, 900); g.fillStyle = hell; g.fillText('SCHNELLSTE RUNDE', kx + 150, ky + 50);
+    const nm = GROSS(m.name || ''); SA(g, 30, 700); const nw = g.measureText(nm).width; if (nw < kw - 520) { g.textAlign = 'right'; g.fillStyle = 'rgba(255,255,255,.8)'; g.fillText(nm, kx + kw - 24, ky + 50); g.textAlign = 'left'; }
+    OR(g, passt(g, zeitText(wert), kw - 180, 60, OR)); g.fillStyle = '#fff'; g.shadowColor = '#000'; g.shadowBlur = 10; g.fillText(zeitText(wert), kx + 150, ky + 116);
+    g.restore();
+  }
+  // Zieleinlauf: an der Ziellinie steht das Bild, karierte Flagge, Ergebnis groß; danach läuft der Clip weiter
+  function zielZeichnen(g, t, c, p, f, fx, fy, fw, fh) {
+    const d = t - p.h; if (d < 0) return;
+    const aus = fp(d, p.FD - 0.05, p.FD + 0.35); if (aus >= 1) return;
+    const v = vorlage(c), e = v.ergebnisVon(c);
+    g.save(); g.globalAlpha *= 1 - aus;
+    if (e) schlussBild(g, t, p.h + 0.3, fx, fy, fw, fh, f, e.wert, e.label, e.info);
+    const qf = eo(fp(d, 0, 0.45)), fwid = Math.min(260, fw * 0.32);
+    flaggeZeichnen(g, fx + 44 - (1 - qf) * (fwid + 160), fy + 30, fwid, fwid * 0.66, t, 'kariert', 1);
+    g.restore();
   }
   // Fortschritt unter dem Clip mit Punkten für jede Markierung
   function fortschrittPunkte(g, t, p, f, fx, fw, py) {
@@ -674,24 +776,24 @@
     if (imClip && vid) {
       if (zoom) {
         if (ana) analyseBild(g, t, c, p, vid, R);
-        else quellBild(g, vid, -40, -40, B + 80, H + 80, rz ? 1.12 : R.zoom, c.versatz);
+        else quellBild(g, vid, -40, -40, B + 80, H + 80, rz ? 1.12 : R.zoom, c.versatz, c.bild);
         const v1 = g.createLinearGradient(0, 0, 0, 840); v1.addColorStop(0, 'rgba(3,4,6,.92)'); v1.addColorStop(0.45, 'rgba(3,4,6,.8)'); v1.addColorStop(1, 'rgba(3,4,6,0)'); g.fillStyle = v1; g.fillRect(0, 0, B, 840);
         const v2 = g.createLinearGradient(0, 1100, 0, H); v2.addColorStop(0, 'rgba(3,4,6,0)'); v2.addColorStop(0.4, 'rgba(3,4,6,.88)'); g.fillStyle = v2; g.fillRect(0, 1100, B, H - 1100);
       } else weichesBild(g, vid, f);
     } else g.drawImage(grund(f), 0, 0);
     if (imClip) {
       // Clip im Neon-Rahmen (oder ganzes Bild bei „Zoom“)
-      const fx = zoom ? 34 : 40, fy = zoom ? 690 : 690, fw = zoom ? B - 68 : 1000, fh = zoom ? 600 : 562;
+      const L0 = lage(c), fx = zoom ? 34 : L0.fx, fy = zoom ? 690 : L0.fy, fw = zoom ? B - 68 : L0.fw, fh = zoom ? 600 : L0.fh, dy = zoom ? 0 : L0.dy;
       const fl = flackern(t);
       if (!zoom && vid) {
         g.save(); rr(g, fx, fy, fw, fh, 14); g.clip();
         g.fillStyle = '#000'; g.fillRect(fx, fy, fw, fh);
-        if (ana) analyseBild(g, t, c, p, vid, R); else quellBild(g, vid, fx, fy, fw, fh, rz ? 1.15 : 1, 0);
+        if (ana) analyseBild(g, t, c, p, vid, R); else quellBild(g, vid, fx, fy, fw, fh, rz ? 1.15 : 1, 0, c.bild);
         if (rz) { g.fillStyle = 'rgba(0,0,0,.12)'; for (let yy = fy; yy < fy + fh; yy += 6) g.fillRect(fx, yy, fw, 2); }
         g.restore();
         g.save(); g.globalAlpha = fl; rr(g, fx, fy, fw, fh, 14); g.strokeStyle = hexA(f, 0.55); g.lineWidth = 3; g.shadowColor = f; g.shadowBlur = 22; g.stroke(); g.restore();
       }
-      if (halt && !v.analyse) { g.fillStyle = v.ampel ? 'rgba(0,0,0,.55)' : 'rgba(0,0,0,.42)'; if (zoom) g.fillRect(0, 0, B, H); else { g.save(); rr(g, fx, fy, fw, fh, 14); g.clip(); g.fillRect(fx, fy, fw, fh); g.restore(); } }
+      if (halt && !v.analyse) { g.fillStyle = v.ampel ? 'rgba(0,0,0,.55)' : v.zielflagge ? 'rgba(0,0,0,.15)' : 'rgba(0,0,0,.42)'; if (zoom) g.fillRect(0, 0, B, H); else { g.save(); rr(g, fx, fy, fw, fh, 14); g.clip(); g.fillRect(fx, fy, fw, fh); g.restore(); } }
       if (v.regen) { g.fillStyle = 'rgba(40,90,170,.14)'; g.fillRect(zoom ? 0 : fx, zoom ? 0 : fy, zoom ? B : fw, zoom ? H : fh); regen(g, t, p); }
       g.save(); g.globalAlpha = fl;
       if (!zoom) ecken(g, fx - 10, fy - 10, fw + 20, fh + 20, f, 74);
@@ -700,6 +802,13 @@
       const mx = B / 2, my = zoom ? 1000 : fy + fh / 2;   // Mitte des Clips
       if (v.ampel) ampelZeichnen(g, t, p, mx, my, Math.min(fw, 1000));
       if (ana) analyseOben(g, t, c, p, vid, R, f);
+      if (v.gruenStart) {   // Rennstart: grüne Flagge weht am Anfang
+        const a0 = fp(t, 0.15, 0.4) * (1 - fp(t, 2.6, 3.0)), fwd = Math.min(220, fw * 0.3), gx = zoom ? 60 : fx + 46, gy = (zoom ? 700 : fy) + 34;
+        flaggeZeichnen(g, gx - (1 - eo(fp(t, 0.15, 0.45))) * 300, gy, fwd, fwd * 0.66, t, 'gruen', a0);
+        if (a0 > 0) { g.save(); g.globalAlpha = a0; SA(g, 34, 900); g.fillStyle = '#fff'; g.shadowColor = '#27f25a'; g.shadowBlur = 18; g.fillText('GRÜNE FLAGGE', gx + fwd + 26, gy + fwd * 0.4); g.restore(); }
+      }
+      if (v.bestzeit) bestzeitZeichnen(g, t, c, p, m, f, zoom ? 34 : fx, zoom ? 700 : fy, zoom ? B - 68 : fw, zoom ? 540 : fh);
+      if (v.zielflagge) zielZeichnen(g, t, c, p, f, zoom ? 34 : fx, zoom ? 700 : fy, zoom ? B - 68 : fw, zoom ? 540 : fh);
       // Schild oben links am Rahmen, Uhr oben rechts (Klassen-Duell: beide Klassen mittig)
       const sy0 = zoom ? 618 : fy - 66;
       if (rz) {
@@ -709,14 +818,15 @@
       else if (halt && v.pause) pille(g, '❚❚ PAUSE', fx + 6, sy0, f, 30, true);
       else if (halt && v.analyse) pille(g, 'STANDBILD · ANALYSE', fx + 6, sy0, f, 30, true);
       else if (halt && v.ampel) pille(g, 'START', fx + 6, sy0, '#ff2a2a', 30, true);
+      else if (halt && v.zielflagge) pille(g, 'ZIEL', fx + 6, sy0, f, 30, true);
       else if (v.klassen) klassenSchilder(g, t, c, sy0 - 6);
-      else pille(g, tagText(v), fx + 6, sy0, f, 30, true);
-      if (vid && !v.klassen) { g.save(); OR(g, 34); g.textAlign = 'right'; g.shadowColor = f; g.shadowBlur = 14; g.fillStyle = '#fff'; g.fillText(uhr(p.quelle(t) || 0), fx + fw - 6, sy0 + 38); g.restore(); }
+      else { const w0 = pille(g, tagText(v), fx + 6, sy0, f, 30, true); if (v.gruenStart && nr(c.startplatz)) pille(g, 'START P' + nr(c.startplatz), fx + 6 + w0 + 14, sy0, '#ffffff', 30, false); }
+      if (vid && !v.klassen && fw >= 640) { g.save(); OR(g, 34); g.textAlign = 'right'; g.shadowColor = f; g.shadowBlur = 14; g.fillStyle = '#fff'; g.fillText(uhr(p.quelle(t) || 0), fx + fw - 6, sy0 + 38); g.restore(); }
       // Fortschritt
-      const pr = kl(t / (p.T - OUTRO), 0, 1), py = 1270;
+      const pr = kl(t / (p.T - OUTRO), 0, 1), py = zoom ? 1270 : fy + fh + 18;
       g.fillStyle = 'rgba(255,255,255,.12)'; g.fillRect(fx, py, fw, 8);
       g.save(); g.fillStyle = f; g.shadowColor = f; g.shadowBlur = 16; g.fillRect(fx, py, fw * pr, 8); g.restore();
-      spruchZeichnen(g, t, c.hook || v.hooks[0], f);
+      spruchZeichnen(g, t, c.hook || v.hooks[0], f, !zoom && L0.hoch ? { y1: 476 - L0.hoch, y2: 428 - L0.hoch } : undefined);
       // Zeitlupe: Band mit Ansage, Crash-Stempel
       if (rz) {
         const q = fp(t, p.D, p.D + 0.25), aus = fp(t, p.D + 1.6, p.D + 1.9);
@@ -726,39 +836,39 @@
       countdown(g, t, v, p, f, B / 2, zoom ? 1000 : fy + fh / 2, false);
       if (v.ampel) lichterAus(g, t, p, f, mx, my);
       // Rundenzeit / Abstand groß am Ende
-      const erg = ergebnis(v, c, p, t);
+      const erg = v.bestzeit || v.zielflagge ? null : ergebnis(v, c, p, t);   // Bestzeit und Ziel zeigen es selbst
       if (erg) {
         const ch = chrom(erg.wert, 150, f, 900), yy = zoom ? 1160 : fy + fh - 40;
         g.save(); g.translate(B / 2, yy); const k = 0.7 + 0.3 * eob(erg.q); g.scale(k, k); g.globalAlpha = Math.min(1, erg.q * 2); g.drawImage(ch.c, -ch.mitte, -ch.base); g.restore();
         if (erg.info) { g.save(); g.globalAlpha = erg.q; SA(g, passt(g, erg.info, 900, 52, SA)); g.textAlign = 'center'; g.fillStyle = '#fff'; g.shadowColor = '#000'; g.shadowBlur = 12; g.fillText(erg.info, B / 2, yy + 70); g.restore(); }
       }
       if (v.klassen) {   // Abstimmung A oder B, darunter die Frage
-        abstimmung(g, t, c, f, 1296);
+        abstimmung(g, t, c, f, 1296 + dy);
         const fq = fp(t, 1.3, 1.7);
-        if (fq > 0) { const fr = frageVon(c, v); g.save(); g.globalAlpha = fq; neonText(g, fr, B / 2, 1470, passt(g, fr, 960, 52, SAx(800)), f, SAx(800), 'center', 16); g.restore(); }
-        marke(g, t, m, f, 1550);
+        if (fq > 0) { const fr = frageVon(c, v); g.save(); g.globalAlpha = fq; neonText(g, fr, B / 2, 1470 + dy, passt(g, fr, 960, 52, SAx(800)), f, SAx(800), 'center', 16); g.restore(); }
+        if (markeY(1550, dy) != null) marke(g, t, m, f, 1550 + dy);
       } else {
         // Frage unten als Neon-Band, Pfeile zu den Kommentaren
         const ub = fp(t, 0.9, 1.25);
         if (ub > 0) {
-          const bd = band(frageVon(c, v), f, 46), y = 1310;
+          const bd = band(frageVon(c, v), f, 46), y = 1310 + dy;
           g.save(); g.translate(-(1 - eo(ub)) * B, 0); g.drawImage(bd.c, B / 2 - bd.bandW / 2 - 40, y - 60); g.restore();
-          if (ub >= 1) chevrons(g, B / 2, y + 92, t, f);
+          if (ub >= 1 && y + 120 < 1640) chevrons(g, B / 2, y + 92, t, f);
         }
-        // Marke unten: Logo im Neon-Ring, Name, Folgen-Schild
-        marke(g, t, m, f, 1490);
+        // Marke unten: Logo im Neon-Ring, Name, Folgen-Schild (wenn das Fenster sehr hoch ist, fällt sie weg)
+        if (markeY(1490, dy) != null) marke(g, t, m, f, 1490 + dy);
       }
     } else outroZeichnen(g, t - (p.T - OUTRO), m, f);
     g.restore();
     // Blitze: Anfang, Zeitlupe, Abspann, Lichter aus, Standbild (Analyse)
-    const blitze = [[0.12, 0.5], [p.D, p.R ? 0.6 : 0], [p.T - OUTRO, 0.75], [p.h + p.FD, v.ampel ? 0.7 : 0], [p.h, v.analyse ? 0.45 : 0]];
+    const blitze = [[0.12, 0.5], [p.D, p.R ? 0.6 : 0], [p.T - OUTRO, 0.75], [p.h + p.FD, v.ampel ? 0.7 : 0], [p.h, v.analyse ? 0.45 : v.zielflagge ? 0.7 : 0], [p.L || 0, v.bestzeit ? 0.35 : 0]];
     for (const [z, a] of blitze) { const d = t - z; if (a && d >= 0 && d < 0.3) { g.fillStyle = `rgba(255,255,255,${a * (1 - d / 0.3)})`; g.fillRect(0, 0, B, H); } }
   }
   // ═══ Top 3 · Vorher/Nachher · Strecke in 30 Sek. (Neon) ═══
   // bilder[s] = Bild des Platzes s (aus spur(t)); was gerade nicht läuft, ist leer
-  function clipRahmen(g, bild, x, y, w, h, f, t, zoom) {
+  function clipRahmen(g, bild, x, y, w, h, f, t, zoom, tf) {
     g.save(); rr(g, x, y, w, h, 14); g.clip(); g.fillStyle = '#000'; g.fillRect(x, y, w, h);
-    if (bild) quellBild(g, bild, x, y, w, h, zoom || 1, 0);
+    if (bild) quellBild(g, bild, x, y, w, h, zoom || 1, 0, tf);
     g.restore();
     const fl = flackern(t);
     g.save(); g.globalAlpha = fl; rr(g, x, y, w, h, 14); g.strokeStyle = hexA(f, 0.55); g.lineWidth = 3; g.shadowColor = f; g.shadowBlur = 22; g.stroke(); g.restore();
@@ -788,10 +898,10 @@
   }
   function top3Zeichnen(g, t, c, p, m, v, f, b) {
     const n = p.teile.length, k = Math.max(0, p.teile.findIndex(x => t >= x.S && t < x.S + x.d)), teil = p.teile[k], platz = n - k;
-    const fx = 40, fy = 690, fw = 1000, fh = 562, dt = t - teil.S, src = quellenVon(c)[teil.q] || {};
+    const L0 = lage(c), fx = L0.fx, fy = L0.fy, fw = L0.fw, fh = L0.fh, dy = L0.dy, dt = t - teil.S, src = quellenVon(c)[teil.q] || {};
     const [sx, sy] = schuetteln(dt - 0.05);
     g.save(); g.translate(sx, sy);
-    clipRahmen(g, b[teil.q], fx, fy, fw, fh, f, t, 1 + 0.12 * (1 - eo(fp(dt, 0, 0.5))));
+    clipRahmen(g, b[teil.q], fx, fy, fw, fh, f, t, 1 + 0.12 * (1 - eo(fp(dt, 0, 0.5))), src.bild);
     pille(g, (v.plaetze || [])[3 - platz] || 'PLATZ ' + platz, fx + 6, fy - 66, f, 30, true);
     g.save(); OR(g, 34); g.textAlign = 'right'; g.shadowColor = f; g.shadowBlur = 14; g.fillStyle = '#fff'; g.fillText(`${k + 1}/${n}`, fx + fw - 6, fy - 28); g.restore();
     // Große Platz-Zahl beim Wechsel
@@ -801,9 +911,9 @@
       g.drawImage(ch.c, -ch.mitte, -ch.base); if (dt > 0.35 && dt < 1.0) glanz(g, ch, -ch.mitte, -ch.base, (dt - 0.35) / 0.65, 0.8); g.restore();
     }
     g.restore();
-    spruchZeichnen(g, t, c.hook || v.hooks[0], f);
+    spruchZeichnen(g, t, c.hook || v.hooks[0], f, L0.hoch ? { y1: 476 - L0.hoch, y2: 428 - L0.hoch } : undefined);
     // Fortschritt in drei Abschnitten
-    const py = 1270, luecke = 14, breit = fw - luecke * (n - 1);
+    const py = fy + fh + 18, luecke = 14, breit = fw - luecke * (n - 1);
     let x = fx;
     for (const x0 of p.teile) {
       const w = breit * x0.d / p.D, q = kl((t - x0.S) / x0.d, 0, 1);
@@ -813,16 +923,16 @@
     }
     // Titel des Platzes als Band, darunter die Frage
     const titel = GROSS(String(src.titel || '').trim()) || ((v.plaetze || [])[3 - platz] || 'PLATZ ' + platz);
-    frageBand(g, dt, titel, f, 1310, 0.25);
+    frageBand(g, dt, titel, f, 1310 + dy, 0.25);
     const fq = fp(t, 1.0, 1.4);
-    if (fq > 0) { const fr = frageVon(c, v); g.save(); g.globalAlpha = fq; SA(g, 42, 800); neonText(g, fr, B / 2, 1446, passt(g, fr, 940, 42, (gg, px) => SA(gg, px, 800)), f, (gg, px) => SA(gg, px, 800), 'center', 14); g.restore(); }
-    marke(g, t, m, f, 1530);
+    if (fq > 0) { const fr = frageVon(c, v); g.save(); g.globalAlpha = fq; SA(g, 42, 800); neonText(g, fr, B / 2, 1446 + dy, passt(g, fr, 940, 42, (gg, px) => SA(gg, px, 800)), f, (gg, px) => SA(gg, px, 800), 'center', 14); g.restore(); }
+    if (markeY(1530, dy) != null) marke(g, t, m, f, 1530 + dy);
   }
   function vergleichZeichnen(g, t, c, p, m, v, f, b) {
     const q = quellenVon(c), fx = 60, fw = 960, fh = 540, ya = 300, yb = 950;
     spruchZeichnen(g, t, c.hook || v.hooks[0], f, { y1: 222, y2: 150, px1: 118, px2: 98 });
-    clipRahmen(g, b[0], fx, ya, fw, fh, f, t);
-    clipRahmen(g, b[1], fx, yb, fw, fh, f, t);
+    clipRahmen(g, b[0], fx, ya, fw, fh, f, t, 1, q[0].bild);
+    clipRahmen(g, b[1], fx, yb, fw, fh, f, t, 1, (q[1] || q[0]).bild);
     const la = GROSS(String(q[0].titel || '').trim()) || v.plaetze[0], lb = GROSS(String((q[1] || {}).titel || '').trim()) || v.plaetze[1];
     pille(g, la, fx + 16, ya + 16, f, 30, true);
     pille(g, lb, fx + 16, yb + 16, '#ffffff', 30, true);
@@ -840,12 +950,12 @@
   }
   function rundenzeit(s) { const m = Math.floor(s / 60), r = s - m * 60; return `${m}:${r.toFixed(1).padStart(4, '0')}`; }
   function streckeZeichnen(g, t, c, p, m, v, f, b) {
-    const fx = 40, fy = 690, fw = 1000, fh = 562, src = p.x.a + Math.min(t, p.D) * p.tempo;
-    clipRahmen(g, b[0], fx, fy, fw, fh, f, t);
+    const L0 = lage(c), fx = L0.fx, fy = L0.fy, fw = L0.fw, fh = L0.fh, dy = L0.dy, src = p.x.a + Math.min(t, p.D) * p.tempo;
+    clipRahmen(g, b[0], fx, fy, fw, fh, f, t, 1, c.bild);
     // Oben: kleiner Spruch, darunter groß die Strecke
     const q0 = fp(t, 0.1, 0.4);
-    if (q0 > 0) { g.save(); g.globalAlpha = q0; const h = GROSS(c.hook || v.hooks[0]); SA(g, 56, 800); neonText(g, h, B / 2, 300, passt(g, h, 960, 56, (gg, px) => SA(gg, px, 800)), f, (gg, px) => SA(gg, px, 800), 'center', 16); g.restore(); }
-    spruchZeichnen(g, t, String(c.strecke || '').trim() || 'STRECKE', f, { y1: 490, y2: 430, px1: 170, px2: 140 });
+    if (q0 > 0) { g.save(); g.globalAlpha = q0; const h = GROSS(c.hook || v.hooks[0]); SA(g, 56, 800); neonText(g, h, B / 2, 300 - L0.hoch, passt(g, h, 960, 56, (gg, px) => SA(gg, px, 800)), f, (gg, px) => SA(gg, px, 800), 'center', 16); g.restore(); }
+    spruchZeichnen(g, t, String(c.strecke || '').trim() || 'STRECKE', f, { y1: 490 - L0.hoch, y2: 430 - L0.hoch, px1: 170, px2: 140 });
     pille(g, tagText(v), fx + 6, fy - 66, f, 30, true);
     if (p.tempo >= 1.05) {   // nur zeigen, wenn wirklich schneller
       const tp = '×' + p.tempo.toFixed(1).replace('.', ',') + ' SPEED';
@@ -870,12 +980,12 @@
       g.restore();
     }
     // Rundenfortschritt mit Kurven-Punkten
-    const py = 1270, pr = kl((src - p.x.a) / (p.x.b - p.x.a), 0, 1);
+    const py = fy + fh + 18, pr = kl((src - p.x.a) / (p.x.b - p.x.a), 0, 1);
     g.fillStyle = 'rgba(255,255,255,.12)'; g.fillRect(fx, py, fw, 8);
     g.save(); g.fillStyle = f; g.shadowColor = f; g.shadowBlur = 16; g.fillRect(fx, py, fw * pr, 8); g.restore();
     for (const x0 of p.marken) { const xx = fx + fw * x0.ot / p.D; g.fillStyle = t >= x0.ot ? f : 'rgba(255,255,255,.55)'; g.beginPath(); g.arc(xx, py + 4, 8, 0, Math.PI * 2); g.fill(); }
-    frageBand(g, t, frageVon(c, v), f, 1310, 0.9);
-    marke(g, t, m, f, 1490);
+    frageBand(g, t, frageVon(c, v), f, 1310 + dy, 0.9);
+    if (markeY(1490, dy) != null) marke(g, t, m, f, 1490 + dy);
   }
   function speedPille(g, p, xr, y) {   // „×2,0 SPEED“ rechtsbündig bis xr (nur wenn wirklich schneller), gibt die neue rechte Kante zurück
     if (!(p.tempo >= 1.05)) return xr;
@@ -884,9 +994,9 @@
   }
   // ═══ Durch den Verkehr (Multiclass): Zähler, blaue Flagge, „+1“ mit Klasse, am Ende Standbild mit der Zahl ═══
   function verkehrZeichnen(g, t, c, p, m, v, f, b) {
-    const fx = 40, fy = 690, fw = 1000, fh = 562, weg = p.marken.filter(x => t >= x.ot), n = weg.length, letzt = weg[n - 1];
-    clipRahmen(g, b[0], fx, fy, fw, fh, f, t);
-    spruchZeichnen(g, t, c.hook || v.hooks[0], f);
+    const L0 = lage(c), fx = L0.fx, fy = L0.fy, fw = L0.fw, fh = L0.fh, dy = L0.dy, weg = p.marken.filter(x => t >= x.ot), n = weg.length, letzt = weg[n - 1];
+    clipRahmen(g, b[0], fx, fy, fw, fh, f, t, 1, c.bild);
+    spruchZeichnen(g, t, c.hook || v.hooks[0], f, L0.hoch ? { y1: 476 - L0.hoch, y2: 428 - L0.hoch } : undefined);
     pille(g, tagText(v), fx + 6, fy - 66, f, 30, true);
     let xr = fx + fw - 6;
     const eigen = GROSS(String(c.klasse || '').trim());
@@ -902,9 +1012,9 @@
     }
     zaehlerKasten(g, fx + fw - 24 - 240, fy + 22, 240, 150, 'ÜBERHOLT', String(n), f, letzt ? fp(t, letzt.ot, letzt.ot + 0.4) : 1);
     if (n && p.lauf < p.D) schlussBild(g, t, p.lauf, fx, fy, fw, fh, f, String(n), n === 1 ? 'AUTO ÜBERHOLT' : 'AUTOS ÜBERHOLT', `IN ${Math.max(1, Math.round(p.x.b - p.x.a))} SEKUNDEN`);
-    fortschrittPunkte(g, t, p, f, fx, fw, 1270);
-    frageBand(g, t, frageVon(c, v), f, 1310, 0.9);
-    marke(g, t, m, f, 1490);
+    fortschrittPunkte(g, t, p, f, fx, fw, fy + fh + 18);
+    frageBand(g, t, frageVon(c, v), f, 1310 + dy, 0.9);
+    if (markeY(1490, dy) != null) marke(g, t, m, f, 1490 + dy);
   }
   // ═══ Aufholjagd: Platz-Anzeige zählt nach vorn, am Ende „+X Plätze“ ═══
   const startPlatz = c => kl(parseInt(String(c.startplatz || '').replace(/\D/g, ''), 10) || 20, 2, 99);
@@ -927,17 +1037,17 @@
     g.restore();
   }
   function aufholjagdZeichnen(g, t, c, p, m, v, f, b) {
-    const fx = 40, fy = 690, fw = 1000, fh = 562, start = startPlatz(c), weg = p.marken.filter(x => t >= x.ot).slice(0, start - 1), n = weg.length, letzt = weg[n - 1], gesamt = Math.min(p.marken.length, start - 1);
-    clipRahmen(g, b[0], fx, fy, fw, fh, f, t);
-    spruchZeichnen(g, t, c.hook || v.hooks[0], f);
+    const L0 = lage(c), fx = L0.fx, fy = L0.fy, fw = L0.fw, fh = L0.fh, dy = L0.dy, start = startPlatz(c), weg = p.marken.filter(x => t >= x.ot).slice(0, start - 1), n = weg.length, letzt = weg[n - 1], gesamt = Math.min(p.marken.length, start - 1);
+    clipRahmen(g, b[0], fx, fy, fw, fh, f, t, 1, c.bild);
+    spruchZeichnen(g, t, c.hook || v.hooks[0], f, L0.hoch ? { y1: 476 - L0.hoch, y2: 428 - L0.hoch } : undefined);
     pille(g, tagText(v), fx + 6, fy - 66, f, 30, true);
     speedPille(g, p, fx + fw - 6, fy - 66);
     if (t < p.lauf) for (const x of weg) plusEins(g, t - x.ot, GROSS(String(x.text || '').trim()), '#5cff1f', fx + fw / 2 - 60, fy + fh / 2 + 40);
     platzKasten(g, fx + fw - 24 - 270, fy + 22, 270, 214, start - n, n, letzt ? t - letzt.ot : 9, f);
     if (gesamt && p.lauf < p.D) schlussBild(g, t, p.lauf, fx, fy, fw, fh, f, '+' + gesamt, gesamt === 1 ? 'PLATZ GUTGEMACHT' : 'PLÄTZE GUTGEMACHT', `VON P${start} AUF P${start - gesamt}`);
-    fortschrittPunkte(g, t, p, f, fx, fw, 1270);
-    frageBand(g, t, frageVon(c, v), f, 1310, 0.9);
-    marke(g, t, m, f, 1490);
+    fortschrittPunkte(g, t, p, f, fx, fw, fy + fh + 18);
+    frageBand(g, t, frageVon(c, v), f, 1310 + dy, 0.9);
+    if (markeY(1490, dy) != null) marke(g, t, m, f, 1490 + dy);
   }
   // ═══ Sektorzeiten: Zeiten-Turm wie in der F1 (Lila / Grün / Gelb), am Ende die Rundenzeit ═══
   function zeitenTurm(g, t, p, src, x, y, f, a) {
@@ -982,9 +1092,9 @@
     }
   }
   function sektorenZeichnen(g, t, c, p, m, v, f, b) {
-    const fx = 40, fy = 690, fw = 1000, fh = 562, S = p.sektoren, src = p.x.a + Math.min(t, p.lauf) * p.tempo, t0 = p.lauf + 0.7;
-    clipRahmen(g, b[0], fx, fy, fw, fh, f, t);
-    spruchZeichnen(g, t, c.hook || v.hooks[0], f);
+    const L0 = lage(c), fx = L0.fx, fy = L0.fy, fw = L0.fw, fh = L0.fh, dy = L0.dy, S = p.sektoren, src = p.x.a + Math.min(t, p.lauf) * p.tempo, t0 = p.lauf + 0.7;
+    clipRahmen(g, b[0], fx, fy, fw, fh, f, t, 1, c.bild);
+    spruchZeichnen(g, t, c.hook || v.hooks[0], f, L0.hoch ? { y1: 476 - L0.hoch, y2: 428 - L0.hoch } : undefined);
     pille(g, tagText(v), fx + 6, fy - 66, f, 30, true);
     let xr = fx + fw - 6; const st = GROSS(String(c.strecke || '').trim());
     if (st) { const w = pillenBreite(g, st, 30); pille(g, st, xr - w, fy - 66, '#ffffff', 30, false); xr -= w + 14; }
@@ -1003,9 +1113,9 @@
         g.restore();
       }
     }
-    sektorBalken(g, t, p, fx, fw, 1270);
-    frageBand(g, t, frageVon(c, v), f, 1310, 0.9);
-    marke(g, t, m, f, 1490);
+    sektorBalken(g, t, p, fx, fw, fy + fh + 18);
+    frageBand(g, t, frageVon(c, v), f, 1310 + dy, 0.9);
+    if (markeY(1490, dy) != null) marke(g, t, m, f, 1490 + dy);
   }
   // ═══ Erwartung vs. Realität: oben der Plan, unten was wirklich passiert ist, am Ende Standbild mit Pointe ═══
   function memeText(g, text, x, y, px, farbe) {
@@ -1029,7 +1139,7 @@
     const q = quellenVon(c), fx = 90, fw = 900, fh = 506, ya = 352, yb = 958, teil2 = t >= p.d0, steh = t >= p.lauf, rot = '#ff2a3d';
     spruchZeichnen(g, t, c.hook || v.hooks[0], f, { y1: 300, y2: 214, px1: 112, px2: 96 });
     // Oben: Erwartung (läuft, danach Standbild)
-    clipRahmen(g, b[0], fx, ya, fw, fh, f, t);
+    clipRahmen(g, b[0], fx, ya, fw, fh, f, t, 1, q[0].bild);
     if (!teil2) funkeln(g, t, fx, ya, fw, fh, f);
     else { g.save(); rr(g, fx, ya, fw, fh, 14); g.clip(); g.fillStyle = 'rgba(0,0,0,.28)'; g.fillRect(fx, ya, fw, fh); g.restore(); }
     memeText(g, GROSS(String(q[0].titel || '').trim()) || v.plaetze[0], B / 2, ya + 80, 68, f);
@@ -1041,7 +1151,7 @@
       const ch = chrom('?', 300, f, 400), pu = 1 + 0.08 * Math.sin(t * 5);
       g.save(); g.translate(B / 2, yb + fh / 2 + 40); g.scale(pu, pu); g.drawImage(ch.c, -ch.mitte, -ch.base + 100); g.restore();
     } else {
-      clipRahmen(g, b[1], fx, yb, fw, fh, rot, t, 1 + 0.1 * zq);
+      clipRahmen(g, b[1], fx, yb, fw, fh, rot, t, 1 + 0.1 * zq, (q[1] || q[0]).bild);
       if (zq > 0) {
         g.save(); rr(g, fx, yb, fw, fh, 14); g.clip();
         g.globalCompositeOperation = 'saturation'; g.globalAlpha = 0.9 * zq; g.fillStyle = '#808080'; g.fillRect(fx, yb, fw, fh);
@@ -1126,7 +1236,7 @@
     logoRing(g, 76, y + 27, 28, f, m.logo, t);
     g.save(); SA(g, passt(g, m.name, eq ? 380 : 440, 44, SAx(900), 26), 900); g.fillStyle = '#fff'; g.fillText(m.name, 120, y + 43); const w = g.measureText(m.name).width; g.restore();
     pille(g, 'TV', 120 + w + 12, y + 5, f, 27, true);
-    const txt = status === 'pause' ? 'PAUSE' : replay ? 'REPLAY' : 'LIVE', farbe = replay ? f : '#ff2a2a';
+    const txt = status === 'pause' ? 'PAUSE' : status === 'ziel' ? 'ZIEL' : replay ? 'REPLAY' : 'LIVE', farbe = replay ? f : '#ff2a2a';
     g.save(); SA(g, 36, 900); const bw = g.measureText(txt).width + 70, bx = B - 44 - bw, by = y + 2;
     g.shadowColor = farbe; g.shadowBlur = 20; g.fillStyle = farbe; g.fillRect(bx, by, bw, 50); g.shadowBlur = 0;
     g.fillStyle = replay ? '#06080a' : '#fff'; g.fillText(txt, bx + 48, by + 38);
@@ -1171,11 +1281,11 @@
     if (t > 1.1 && gq <= 1) { const bx = x0 - 300 + (bw + 600) * gq, gr = g.createLinearGradient(bx, 0, bx + 220, 0); gr.addColorStop(0, 'rgba(255,255,255,0)'); gr.addColorStop(0.5, 'rgba(255,255,255,.16)'); gr.addColorStop(1, 'rgba(255,255,255,0)'); g.shadowBlur = 0; g.fillStyle = gr; g.fillRect(x0, y, bw, h); }
     g.restore();
   }
-  function tvBildschirm(g, t, p, f, vid, rz) {   // Clip als Fernsehbild: geht an wie ein alter Fernseher
-    const fx = 40, fy = 730, fw = 1000, fh = 562, an = eo(fp(t, 0.04, 0.3)), hh = Math.max(4, fh * an);
+  function tvBildschirm(g, t, p, f, vid, rz, L, tf) {   // Clip als Fernsehbild: geht an wie ein alter Fernseher
+    const fx = L.fx, fy = L.fy, fw = L.fw, fh = L.fh, an = eo(fp(t, 0.04, 0.3)), hh = Math.max(4, fh * an);
     g.save(); g.beginPath(); g.rect(fx, fy + (fh - hh) / 2, fw, hh); g.clip();
     g.fillStyle = '#000'; g.fillRect(fx, fy, fw, fh);
-    if (vid) quellBild(g, vid, fx, fy, fw, fh, rz ? 1.12 : 1, 0);
+    if (vid) quellBild(g, vid, fx, fy, fw, fh, rz ? 1.12 : 1, 0, tf);
     if (an < 1) { g.fillStyle = `rgba(255,255,255,${0.85 * (1 - an)})`; g.fillRect(fx, fy, fw, fh); }
     g.fillStyle = 'rgba(0,0,0,.09)'; for (let y = fy; y < fy + fh; y += 4) g.fillRect(fx, y, fw, 1);
     g.save(); SA(g, 30, 900); g.textAlign = 'right'; g.fillStyle = 'rgba(255,255,255,.6)'; g.fillText('K888 TV', fx + fw - 20, fy + 44); g.restore();
@@ -1192,9 +1302,9 @@
     g.save(); g.fillStyle = f; g.shadowColor = f; g.shadowBlur = 16; g.fillRect(x, y, lw, 52); g.restore();
     g.fillStyle = '#06080a'; g.fillText(label, x + 22, y + 38);
   }
-  function tvBauchbinde(g, label, text, f, q) {   // Bauchbinde unter dem Bild: Etikett + weißer Kasten
+  function tvBauchbinde(g, label, text, f, q, dy) {   // Bauchbinde unter dem Bild: Etikett + weißer Kasten
     if (q <= 0) return;
-    const x = 40, y = 1326;
+    const x = 40, y = 1326 + (dy || 0);
     g.save(); g.translate(-(1 - eo(q)) * (B + 60), 0);
     tvEtikett(g, x, y, label, f);
     const px = passt(g, text, B - 170, 60, SAx(900), 30); SA(g, px, 900);
@@ -1204,8 +1314,8 @@
     g.fillStyle = '#0a0d16'; g.fillText(text, x + 36, y + 52 + 47 + px * 0.36);
     g.restore();
   }
-  function tvErgebnis(g, erg, f) {   // Rundenzeit / Abstand als Ergebnis-Einblendung
-    const x = 40, y = 1326, info = erg.info && erg.info !== erg.label && erg.wert.length <= 12 ? erg.info : '';
+  function tvErgebnis(g, erg, f, dy) {   // Rundenzeit / Abstand als Ergebnis-Einblendung
+    const x = 40, y = 1326 + (dy || 0), info = erg.info && erg.info !== erg.label && erg.wert.length <= 12 ? erg.info : '';
     g.save(); g.translate(-(1 - eo(erg.q)) * (B + 60), 0);
     tvEtikett(g, x, y, erg.label, f);
     const px = passt(g, erg.wert, info ? 540 : 880, 82, OR, 40); OR(g, px); const ww = g.measureText(erg.wert).width;
@@ -1217,8 +1327,8 @@
     if (info) { SA(g, ipx, 700); g.fillStyle = '#3a4152'; g.fillText(info, x + 36 + ww + 34, y + 52 + 55 + ipx * 0.36); }
     g.restore();
   }
-  function tvLaufschrift(g, t, m, f, eigen) {   // Laufschrift ganz unten, Sender links, FOLGEN rechts (eigen: eigener Text)
-    const y = 1508, h = 70, links = 236, rechts = 250;
+  function tvLaufschrift(g, t, m, f, eigen, dy) {   // Laufschrift ganz unten, Sender links, FOLGEN rechts (eigen: eigener Text)
+    const y = 1508 + (dy || 0), h = 70, links = 236, rechts = 250;
     g.fillStyle = 'rgba(5,7,12,.95)'; g.fillRect(0, y, B, h);
     g.save(); g.fillStyle = f; g.shadowColor = f; g.shadowBlur = 14; g.fillRect(0, y - 4, B, 4); g.restore();
     const txt = eigen ? `+++ ${GROSS(eigen)} +++ FOLG ${m.handle} ` : `+++ SIMRACING-CLIPS VON ${m.handle} +++ FOLGEN NICHT VERGESSEN +++ SCHREIB DEINE MEINUNG IN DIE KOMMENTARE `;
@@ -1268,23 +1378,26 @@
     const rz = t >= p.D && t < p.D + p.R, [sx, sy] = rz && v.stempel ? schuetteln(t - p.D) : [0, 0];
     g.save(); g.translate(sx, sy);
     if (vid) { unscharf(g, vid); g.save(); g.globalAlpha = 0.88; g.drawImage(studio(f), 0, 0); g.restore(); } else g.drawImage(studio(f), 0, 0);
-    const halt = angehalten(v, p, t);
-    tvKopf(g, t, m, f, halt ? 'pause' : rz ? 'replay' : 'live', !!v.kommentator);
+    const halt = angehalten(v, p, t), L = lage(c, true), mitte = L.fy + L.fh / 2;
+    tvKopf(g, t, m, f, halt ? (v.zielflagge ? 'ziel' : 'pause') : rz ? 'replay' : 'live', !!v.kommentator);
     tvSchlagzeile(g, t, c, v, f);
-    tvBildschirm(g, t, p, f, vid, rz);
-    if (halt) { g.fillStyle = 'rgba(0,0,0,.45)'; g.fillRect(40, 730, 1000, 562); }
-    if (v.regen) { g.fillStyle = 'rgba(40,90,170,.14)'; g.fillRect(40, 730, 1000, 562); regen(g, t, p); }
-    countdown(g, t, v, p, f, B / 2, 1011, true);
-    if (rz) stempel(g, t, p, v, f, B / 2, 1031);
-    const erg = ergebnis(v, c, p, t), fahrer = v.kommentator ? GROSS(String(c.fahrer || '').trim()) : '';
-    if (erg) tvErgebnis(g, erg, f);
+    tvBildschirm(g, t, p, f, vid, rz, L, c.bild);
+    if (halt) { g.fillStyle = v.zielflagge ? 'rgba(0,0,0,.2)' : 'rgba(0,0,0,.45)'; g.fillRect(L.fx, L.fy, L.fw, L.fh); }
+    if (v.regen) { g.fillStyle = 'rgba(40,90,170,.14)'; g.fillRect(L.fx, L.fy, L.fw, L.fh); regen(g, t, p); }
+    if (v.gruenStart) flaggeZeichnen(g, L.fx + 46 - (1 - eo(fp(t, 0.15, 0.45))) * 300, L.fy + 34, Math.min(200, L.fw * 0.3), Math.min(200, L.fw * 0.3) * 0.66, t, 'gruen', fp(t, 0.15, 0.4) * (1 - fp(t, 2.6, 3.0)));
+    if (v.zielflagge && halt) flaggeZeichnen(g, L.fx + 46 - (1 - eo(fp(t - p.h, 0, 0.45))) * 400, L.fy + 34, Math.min(240, L.fw * 0.32), Math.min(240, L.fw * 0.32) * 0.66, t, 'kariert', 1);
+    if (v.bestzeit) bestzeitZeichnen(g, t, c, p, m, f, L.fx, L.fy, L.fw, L.fh);
+    countdown(g, t, v, p, f, B / 2, mitte, true);
+    if (rz) stempel(g, t, p, v, f, B / 2, mitte + 20);
+    const erg = v.bestzeit ? null : ergebnis(v, c, p, t), fahrer = v.kommentator ? GROSS(String(c.fahrer || '').trim()) : '';
+    if (erg) tvErgebnis(g, erg, f, L.dy);
     else if (fahrer) {   // Kommentator: erst der Fahrer in der Bauchbinde, dann die Frage
       const w = Math.min(4.6, Math.max(2.4, p.D * 0.45));
-      if (t < w) tvBauchbinde(g, 'IM BILD', fahrer, f, fp(t, 0.9, 1.25) * (1 - fp(t, w - 0.3, w)));
-      else tvBauchbinde(g, 'FRAGE AN DICH', frageVon(c, v), f, fp(t, w, w + 0.35));
+      if (t < w) tvBauchbinde(g, 'IM BILD', fahrer, f, fp(t, 0.9, 1.25) * (1 - fp(t, w - 0.3, w)), L.dy);
+      else tvBauchbinde(g, 'FRAGE AN DICH', frageVon(c, v), f, fp(t, w, w + 0.35), L.dy);
     }
-    else tvBauchbinde(g, 'FRAGE AN DICH', frageVon(c, v), f, fp(t, 0.9, 1.25));
-    tvLaufschrift(g, t, m, f, v.kommentator ? String(c.laufband || '').trim() : '');
+    else tvBauchbinde(g, 'FRAGE AN DICH', frageVon(c, v), f, fp(t, 0.9, 1.25), L.dy);
+    tvLaufschrift(g, t, m, f, v.kommentator ? String(c.laufband || '').trim() : '', L.dy);
     g.restore();
     if (p.R) tvWischer(g, t, f, m, p.D - 0.25);
   }
@@ -1443,6 +1556,9 @@
       ton(p.h + 0.78, 1568, 0.4, 0.07); ton(p.h + 0.84, 2093, 0.5, 0.05);
       zisch(p.h + p.FD - 0.3, 0.35, 0.18);
     }
+    if (v.gruenStart) { zisch(0.12, 0.35, 0.18); const e = v.ergebnisVon(c); if (e) { const a0 = (p.R ? p.D + p.R : p.D) - 2.4; wumms(a0, 0.7); [1046.5, 1318.5, 1568].forEach((fq, i) => ton(a0 + 0.05 + i * 0.08, fq, 0.6, 0.05)); } }
+    if (v.bestzeit && p.L != null) { wumms(p.L, 0.6); [1568, 2093, 2637].forEach((fq, i) => ton(p.L + 0.05 + i * 0.09, fq, 0.5, 0.06)); zisch(p.L + 0.1, 0.4, 0.14); }
+    if (v.zielflagge && p.L != null) { zisch(p.h - 0.28, 0.3, 0.22); wumms(p.h, 0.9, true); jingle(p.h + 0.3, 0.1); zisch(p.h + p.FD - 0.3, 0.35, 0.16); }
     if (v.klassen) { for (const z of [0.5, 1.15]) { ton(z, 220, 0.25, 0.08); ton(z, 233, 0.25, 0.08); wumms(z, 0.45); glitch(z, 0.12, 0.12); } }   // „VS“-Schlag
     if (v.kommentator) {   // Publikum jubelt zum Höhepunkt
       const t0 = Math.max(0.5, p.D - 1.4), d = Math.min(3.2, p.D + (p.R || 0) - t0);
@@ -1765,7 +1881,26 @@
       v.src = url;
     });
   }
-  const QFELDER = ['datei', 'url', 'name', 'dauer', 'start', 'ende', 'titel', '_ton'];
+  const QFELDER = ['datei', 'url', 'name', 'dauer', 'start', 'ende', 'titel', '_ton', 'bild'];
+  // Bild im Fenster: Video verschieben/vergrößern (je Clip), Fenster-Größe (je Video)
+  const tfVon = x => (x && x.bild) || { x: 0, y: 0, z: 1 };
+  const fensterGeht = v => !v.mehr || v.mehr === 'top3' || !!MARKEN[v.mehr];   // Vorher/Nachher und Erwartung: zwei feste Fenster
+  function bildPanel(c, v) {
+    const tv = c.look === 'tv', zoomModus = c.modus === 'zoom' && !tv && !v.mehr, L = lage(c, tv), z = tfVon(c).z || 1, jeClip = v.mehr && !MARKEN[v.mehr], fenster = fensterGeht(v) && !zoomModus;
+    return `<div class="kc-bildpanel">
+      <div class="kc-bildkopf">🖐 Video in der Vorschau ziehen = verschieben${jeClip ? '<span class="kc-dim"> (der Clip, auf den du tippst; Größe je Clip in Schritt 3)</span>' : ''}</div>
+      ${jeClip ? '' : `<label class="kc-feld">Video-Größe <b data-c="bild-z-wert">${Math.round(z * 100)} %</b><input type="range" min="0.5" max="3" step="0.01" value="${z}" data-c="bild-z"></label>`}
+      ${fenster ? `<label class="kc-feld">Fenster-Breite <b data-c="fenster-w-wert">${L.fw}</b><input type="range" min="360" max="1040" step="10" value="${L.fw}" data-c="fenster-w"></label>
+      <label class="kc-feld">Fenster-Höhe <b data-c="fenster-h-wert">${L.fh}</b><input type="range" min="280" max="${tv ? FENSTER_MAX.tv : FENSTER_MAX.neon}" step="10" value="${L.fh}" data-c="fenster-h"></label>` : ''}
+      <div class="kc-knoepfe">${fenster ? '<button type="button" class="btn ki-k" data-c="fenster-auto">▣ Fenster ans Video anpassen</button>' : ''}<button type="button" class="btn ki-k" data-c="bild-reset">↺ Zurücksetzen</button></div>
+    </div>`;
+  }
+  function videoMasse(src) {   // Seitenverhältnis des Clips (aus der laufenden Vorschau)
+    const kand = [];
+    if (VOR.vid && VOR.url === src.url) kand.push(VOR.vid);
+    for (const [k, v] of VIDS) if (k.startsWith(src.url + '#')) kand.push(v);
+    const v = kand.find(x => x.videoWidth); return v ? { w: v.videoWidth, h: v.videoHeight } : { w: 16, h: 9 };
+  }
   const quelleAusClip = x => ({ datei: x.datei, url: x.url, name: x.name, dauer: x.dauer, start: Math.max(0, x.dauer - 8), ende: x.dauer, titel: '' });
   function clipAusQuelle(x) {   // Platz frei machen: Clip kommt zurück in die Warteschlange
     const vl = VORLAGEN[0];
@@ -1841,6 +1976,7 @@
         <div class="kc-dim kc-mitte">Vorschau läuft in Schleife · ${sek(p.T)} lang${VOR.ton ? '' : ' · 🔇 tippen für Ton'}</div>
         <div class="kc-dim kc-mitte">Effekt-Sounds hörst du im fertigen Video.</div>
         ${v.analyse ? '<div class="kc-hinweis kc-mitte">🎯 Tipp ins Bild auf die Stelle, die eingekreist werden soll.</div>' : ''}
+        ${bildPanel(c, v)}
       </div>
       <div class="kc-rechts">
         <div class="kc-schritt">1 · Vorlage</div>
@@ -1858,7 +1994,6 @@
           ${c.look === 'tv' ? '' : `<div class="kc-umschalt"><button type="button" class="${c.modus !== 'zoom' ? 'an' : ''}" data-c="modus" data-wert="ganz">▭ Ganzes Bild</button><button type="button" class="${c.modus === 'zoom' ? 'an' : ''}" data-c="modus" data-wert="zoom">▯ Zoom</button></div>`}
           <label class="kc-check"><input type="checkbox" data-c="zeitlupe" ${c.zeitlupe ? 'checked' : ''}> <span><b>Zeitlupe</b> vom Ende</span></label>
         </div>`}
-        ${c.modus === 'zoom' && c.look !== 'tv' && !v.mehr ? `<label class="kc-feld">Bildausschnitt<input type="range" min="-1" max="1" step="0.05" value="${c.versatz}" data-c="versatz"></label>` : ''}
         ${v.mehr ? tipp(TIPP_MEHR[v.mehr]) : v.nurNeon ? tipp('Nur Neon-Look. Ganzes Bild: Clip im Rahmen. Zoom: Clip füllt das ganze Handy. Zeitlupe: die letzten Sekunden nochmal halb so schnell.') : tipp(c.look === 'tv'
           ? 'TV-Sendung: wie eine Live-Übertragung mit Schlagzeile, LIVE/REPLAY, Bauchbinde und Laufschrift. Zeitlupe: die letzten Sekunden nochmal halb so schnell, mit Replay-Übergang.'
           : 'Neon: Chrom-Schrift im Neon-Rahmen. Ganzes Bild: Clip im Rahmen. Zoom: Clip füllt das ganze Handy (Seiten werden abgeschnitten). Zeitlupe: die letzten Sekunden nochmal halb so schnell.')}
@@ -1929,7 +2064,8 @@
           <div class="kc-schnitt">
             <label class="kc-feld">Anfang <b data-c="slot-a-wert" data-i="${i}">${sek(a)}</b><input type="range" min="0" max="${src.dauer}" step="0.1" value="${a}" data-c="slot-a" data-i="${i}"></label>
             <label class="kc-feld">Ende <b data-c="slot-b-wert" data-i="${i}">${sek(b)}</b><input type="range" min="0" max="${src.dauer}" step="0.1" value="${b}" data-c="slot-b" data-i="${i}"></label>
-          </div></div>`;
+          </div>
+          <label class="kc-feld">Video-Größe <b data-c="slot-z-wert" data-i="${i}">${Math.round((tfVon(src).z || 1) * 100)} %</b><input type="range" min="0.5" max="3" step="0.01" value="${tfVon(src).z || 1}" data-c="slot-z" data-i="${i}"></label></div>`;
       }).join('')}
       ${tipp(v.mehr === 'top3' ? `Zusammen ${sek(p.D)}. Am besten 5 bis 10 Sekunden je Platz, die Action ans Ende.`
         : v.mehr === 'erwartung' ? `Erst ${sek(p.d0)} Erwartung, dann ${sek(p.lauf - p.d0)} Realität, dann Standbild. Den Crash ans Ende der Realität legen.`
@@ -1944,7 +2080,9 @@
         ${v.pause || v.analyse ? `<label class="kc-feld">Anhalten bei <b data-c="halt-wert">${sek(p.F)}</b><input type="range" min="${p.a}" max="${p.b}" step="0.1" value="${p.F}" data-c="halt"></label>
           ${tipp(v.analyse ? 'Wo der Clip für die Analyse anhält. Dann in der Vorschau auf die Stelle tippen, die eingekreist werden soll.' : 'Kurz bevor es knallt. Dann kommt 3-2-1 und der Clip läuft weiter.')}` : ''}
         ${v.ampel ? tipp('„Anfang“ auf kurz vor dem Start legen: Das erste Bild steht, bis die Lichter ausgehen.') : ''}
-        ${tipp(`Clip ist ${sek(c.dauer)} lang. Genommen werden ${sek(p.b - p.a)}${p.FD ? (v.ampel ? ' + Startampel' : v.analyse ? ' + Analyse' : ' + Pause') : ''}${p.R ? ' + Zeitlupe' : ''}. Am besten 8 bis 20 Sekunden, die Action ans Ende.`)}`;
+        ${v.linie ? `<label class="kc-feld">Ziellinie bei <b data-c="linie-wert">${sek(p.lin)}</b><input type="range" min="${p.a}" max="${p.b}" step="0.1" value="${p.lin}" data-c="linie"></label>
+          ${tipp(v.zielflagge ? 'Der Moment, in dem du über die Ziellinie fährst: Dort steht das Bild mit Flagge und Ergebnis.' : 'Der Moment, in dem du über die Ziellinie fährst: Dort wird die Zeit lila.')}` : ''}
+        ${tipp(`Clip ist ${sek(c.dauer)} lang. Genommen werden ${sek(p.b - p.a)}${p.FD ? (v.ampel ? ' + Startampel' : v.analyse ? ' + Analyse' : v.zielflagge ? ' + Ziel-Standbild' : ' + Pause') : ''}${p.R ? ' + Zeitlupe' : ''}. Am besten 8 bis 20 Sekunden, die Action ans Ende.`)}`;
   }
   function zeile(x, raus) {
     const v = VORLAGEN.find(y => y.id === x.vorlage) || VORLAGEN[0];
@@ -2065,7 +2203,7 @@
       if (p.teile && !scrub) { const n = p.teile.find(k => k.S > t && k.S - t < 1.5); if (n && q[n.q]) { const v = vidFuer(q[n.q].url, n.q); aktiv.add(v); if (!v.paused) v.pause(); if (Math.abs(v.currentTime - n.a) > 0.1 && !v.seeking) springen(v, n.a); } }
       for (const v of VIDS.values()) if (!aktiv.has(v) && !v.paused) v.pause();
       g.setTransform(cv.width / B, 0, 0, cv.height / H, 0, 0); g.clearRect(0, 0, B, H);
-      const tt = kl(t, 0, p.T - 0.001);
+      const tt = kl(t, 0, p.T - 0.001); VOR.t = tt;
       zeichne(g, tt, cl, p, MAT, bilder);
       if (!erstes && tt < 0.25 && bilder.some(Boolean)) { erstes = leinwand(cv.width, cv.height); erstes.getContext('2d').drawImage(cv, 0, 0); }
       else loopUebergang(g, tt, p, erstes);
@@ -2146,7 +2284,15 @@
     if (a === 'modus' && c) { c.modus = b.dataset.wert; zeichnen(); return; }
     if (a === 'look' && c) { c.look = LETZTER_LOOK = b.dataset.wert; zeichnen(); return; }
     if (a === 'ton') { VOR.ton = !VOR.ton; if (VOR.vid) VOR.vid.muted = !VOR.ton; b.textContent = VOR.ton ? '🔊' : '🔇'; return; }
+    if (a === 'fenster-auto' && c) {   // Fenster bekommt die Form vom Video, Video wieder ganz drin
+      const v = vorlage(c), src = v.mehr === 'top3' ? quelleUnter(c, B / 2, 900).src : c, mm = videoMasse(src), maxH = c.look === 'tv' ? FENSTER_MAX.tv : FENSTER_MAX.neon, ar = mm.w / mm.h;
+      let w = 1000, h = Math.round(1000 / ar); if (h > maxH) { h = maxH; w = Math.round(maxH * ar); }
+      c.fenster = { w: kl(w, 360, 1040), h: kl(h, 280, maxH) }; for (const x of quellenVon(c)) x.bild = null;
+      zeichnen(); return;
+    }
+    if (a === 'bild-reset' && c) { c.fenster = null; for (const x of quellenVon(c)) x.bild = null; zeichnen(); return; }
     if (a === 'vorschau' && c && vorlage(c).analyse && VOR.vid) {   // Replay-Analyse: Stelle für den Kreis antippen
+      if (performance.now() - (VOR.gezogen || 0) < 400) return;   // war Ziehen, kein Tippen
       const r = b.getBoundingClientRect(), p = zeitplan(c), R = flaeche(c, p, p.h);
       let x = (ev.clientX - r.left) * B / r.width, y = (ev.clientY - r.top) * H / r.height;
       if (x < R.kx || x > R.kx + R.kw || y < R.ky || y > R.ky + R.kh) return UMG.meldung('Bitte direkt ins Clip-Bild tippen.', 1);
@@ -2154,7 +2300,7 @@
         const d = VOR.t - p.h, k = 1 + 0.4 * eo(fp(d, 0, 0.4)) * (1 - eo(fp(d, p.FD - 0.4, p.FD))), z = analyseZiel(c, VOR.vid, R);
         x = z.x + (x - z.x) / k; y = z.y + (y - z.y) / k;
       }
-      const bi = bildRechteck(VOR.vid, R.x, R.y, R.w, R.h, R.zoom, R.versatz);
+      const bi = bildRechteck(VOR.vid, R.x, R.y, R.w, R.h, R.zoom, R.versatz, R.tf);
       c.ziel = { u: kl((x - bi.x) / bi.w, 0.03, 0.97), v: kl((y - bi.y) / bi.h, 0.03, 0.97) };
       VOR.sprung = Math.max(p.a, p.F - 0.6);
       return;
@@ -2223,7 +2369,10 @@
       const p = zeitplan(c), w = BOX.querySelector('[data-c="stelle-wert"]'); if (w) w.textContent = sek(Math.max(0, VOR.stelle - p.a));
     }
     else if (a === 'marke-text') { const mk = (c.marken || []).find(x => x.id === t.dataset.k); if (mk) mk.text = t.value; schritt3Auffrischen(c); }
-    else if (a === 'versatz') c.versatz = +t.value;
+    else if (a === 'bild-z') { c.bild = { ...tfVon(c), z: +t.value }; const w = BOX.querySelector('[data-c="bild-z-wert"]'); if (w) w.textContent = Math.round(+t.value * 100) + ' %'; }
+    else if (a === 'slot-z') { const src = quellenVon(c)[+t.dataset.i]; if (src) { src.bild = { ...tfVon(src), z: +t.value }; const w = BOX.querySelector(`[data-c="slot-z-wert"][data-i="${t.dataset.i}"]`); if (w) w.textContent = Math.round(+t.value * 100) + ' %'; } }
+    else if (a === 'fenster-w' || a === 'fenster-h') { const L = lage(c, c.look === 'tv'); c.fenster = { w: L.fw, h: L.fh, [a === 'fenster-w' ? 'w' : 'h']: +t.value }; const w = BOX.querySelector(`[data-c="${a}-wert"]`); if (w) w.textContent = t.value; }
+    else if (a === 'linie') { c.linie = +t.value; const p = zeitplan(c), w = BOX.querySelector('[data-c="linie-wert"]'); if (w) w.textContent = sek(p.lin); VOR.sprung = Math.max(p.a, p.lin - 1.5); }
     else if (a === 'halt') {
       c.halt = +t.value; const p = zeitplan(c), hw = BOX.querySelector('[data-c="halt-wert"]'); if (hw) hw.textContent = sek(p.F);
       VOR.sprung = Math.max(p.a, p.F - 1.5);
@@ -2252,7 +2401,45 @@
     if (a === 'zeitlupe') { c.zeitlupe = t.checked; zeichnen(); }
     else if (a === 'insta' || a === 'tiktok') c[a] = t.checked;
     else if (a === 'postms') c.postMs = t.value ? new Date(t.value).getTime() : 0;
-    else if (a === 'start' || a === 'ende' || a === 'halt') zeichnen();
+    else if (a === 'start' || a === 'ende' || a === 'halt' || a === 'linie') zeichnen();
+  }
+  // ─── Video im Fenster mit Maus/Finger verschieben, Mausrad = Größe ───
+  let ZUG = null;
+  function vorschauPunkt(cv, ev) { const r = cv.getBoundingClientRect(); return { x: (ev.clientX - r.left) * B / r.width, y: (ev.clientY - r.top) * H / r.height, s: B / r.width }; }
+  function quelleUnter(c, x, y) {   // welcher Clip liegt unter dem Finger, und wie groß ist sein Fenster
+    const v = vorlage(c), q = quellenVon(c);
+    if (v.mehr === 'vergleich') return y < 895 ? { src: q[0], w: 960, h: 540 } : { src: q[1] || q[0], w: 960, h: 540 };
+    if (v.mehr === 'erwartung') return y < 908 ? { src: q[0], w: 900, h: 506 } : { src: q[1] || q[0], w: 900, h: 506 };
+    if (v.mehr === 'top3') { const p = zeitplan(c), t = VOR.t || 0, k = p.teile.find(x2 => t >= x2.S && t < x2.S + x2.d) || p.teile[0], L = lage(c); return { src: q[k.q] || c, w: L.fw, h: L.fh }; }
+    if (!v.mehr && c.modus === 'zoom' && c.look !== 'tv') return { src: c, w: B + 80, h: H + 80 };
+    const L = lage(c, c.look === 'tv'); return { src: c, w: L.fw, h: L.fh };
+  }
+  function ziehenStart(ev) {
+    const cv = ev.target.closest && ev.target.closest('canvas[data-c="vorschau"]'), c = CLIPS[0]; if (!cv || !c || ev.button > 0) return;
+    const pt = vorschauPunkt(cv, ev), u = quelleUnter(c, pt.x, pt.y);
+    ZUG = { cv, id: ev.pointerId, x0: ev.clientX, y0: ev.clientY, s: pt.s, u, tf0: { ...tfVon(u.src) }, bewegt: false };
+    try { cv.setPointerCapture(ev.pointerId); } catch (e) { /* egal */ }
+  }
+  function ziehenBewegen(ev) {
+    if (!ZUG || ev.pointerId !== ZUG.id) return;
+    const dx = (ev.clientX - ZUG.x0) * ZUG.s, dy = (ev.clientY - ZUG.y0) * ZUG.s;
+    if (!ZUG.bewegt && Math.hypot(dx, dy) < 14) return;
+    ZUG.bewegt = true; ZUG.cv.classList.add('zieht');
+    ZUG.u.src.bild = { ...ZUG.tf0, x: kl(ZUG.tf0.x + dx / ZUG.u.w, -2, 2), y: kl(ZUG.tf0.y + dy / ZUG.u.h, -2, 2) };
+  }
+  function ziehenEnde(ev) {
+    if (!ZUG || ev.pointerId !== ZUG.id) return;
+    if (ZUG.bewegt) VOR.gezogen = performance.now();
+    ZUG.cv.classList.remove('zieht'); ZUG = null;
+  }
+  function radZoom(ev) {
+    const cv = ev.target.closest && ev.target.closest('canvas[data-c="vorschau"]'), c = CLIPS[0]; if (!cv || !c) return;
+    ev.preventDefault();
+    const pt = vorschauPunkt(cv, ev), u = quelleUnter(c, pt.x, pt.y), tf = { ...tfVon(u.src) };
+    tf.z = kl((tf.z || 1) * Math.exp(-ev.deltaY * 0.0012), 0.5, 3); u.src.bild = tf;
+    const z = tfVon(c).z || 1, el = BOX.querySelector('[data-c="bild-z"]'), w = BOX.querySelector('[data-c="bild-z-wert"]');   // Regler nachziehen
+    if (el) el.value = z; if (w) w.textContent = Math.round(z * 100) + ' %';
+    quellenVon(c).forEach((src, i) => { const s2 = BOX.querySelector(`[data-c="slot-z"][data-i="${i}"]`), w2 = BOX.querySelector(`[data-c="slot-z-wert"][data-i="${i}"]`), z2 = tfVon(src).z || 1; if (s2) s2.value = z2; if (w2) w2.textContent = Math.round(z2 * 100) + ' %'; });
   }
   window.K888Clips = {
     VORLAGEN, bauen, zeitplan, zeichne, material, schriften, vorschaubild,
@@ -2263,6 +2450,11 @@
         box.addEventListener('click', klick);
         box.addEventListener('input', eingabe);
         box.addEventListener('change', aenderung);
+        box.addEventListener('pointerdown', ziehenStart);
+        box.addEventListener('pointermove', ziehenBewegen);
+        box.addEventListener('pointerup', ziehenEnde);
+        box.addEventListener('pointercancel', ziehenEnde);
+        box.addEventListener('wheel', radZoom, { passive: false });
         box.addEventListener('toggle', e => { const k = e.target.classList && [...e.target.classList].find(x => x in OFFEN); if (k) OFFEN[k] = e.target.open; }, true);
         box.addEventListener('dragover', e => { e.preventDefault(); const d = box.querySelector('.kc-drop'); if (d) d.classList.add('drueber'); });
         box.addEventListener('dragleave', e => { const d = box.querySelector('.kc-drop'); if (d && !box.contains(e.relatedTarget)) d.classList.remove('drueber'); });
@@ -2305,7 +2497,12 @@
 .kc-app .kc-vgruppe{grid-column:1/-1;font:800 11px var(--disp,inherit);letter-spacing:.14em;text-transform:uppercase;color:var(--steel,#8b929c);margin-top:6px;padding-bottom:2px;border-bottom:1px dashed #23262f}
 .kc-app .kc-vgruppe:first-child{margin-top:0}
 .kc-app .kc-vl em{margin-left:auto;font:800 10px var(--body,inherit);font-style:normal;letter-spacing:.08em;color:#06080a;background:#5cff1f;padding:2px 5px;box-shadow:0 0 10px rgba(92,255,31,.6)}
+.kc-app .kc-vorschau{touch-action:none;cursor:grab}
+.kc-app .kc-vorschau.zieht{cursor:grabbing}
 .kc-app .kc-vorschau.ziel{cursor:crosshair}
+.kc-app .kc-bildpanel{display:flex;flex-direction:column;gap:8px;margin-top:4px;padding:10px 12px;background:#0b0c10;border:1px solid var(--line,#23262f)}
+.kc-app .kc-bildkopf{font-size:13px;color:#fff;font-weight:600;line-height:1.35}
+.kc-app .kc-bildpanel .kc-knoepfe .btn{font-size:13px;padding:7px 10px}
 .kc-app .kc-marke .kc-sfarbe{max-width:120px;flex:none}
 .kc-app .kc-marke .kc-fuell{flex:1;color:#fff;font-weight:700}
 .kc-app .kc-vl:hover{border-color:var(--f)}
