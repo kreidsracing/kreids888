@@ -26,6 +26,11 @@ export class Speicher extends DurableObject {
   async schreib(k, v) { await this.ctx.storage.put(k, v); }
   async loesch(keys) { await this.ctx.storage.delete(keys); }
   async liste(prefix) { return Object.fromEntries(await this.ctx.storage.list({ prefix })); }
+  // Große Werte (Bilder, Video-Stücke): nicht im Speicher des Objekts behalten – sonst wird es bei Videos zu voll
+  async liesGross(k) { const v = await this.ctx.storage.get(k, { noCache: true }); return v === undefined ? null : v; }
+  async schreibGross(k, v) { await this.ctx.storage.put(k, v, { noCache: true }); }
+  // Wie viele Stücke prefix0 … prefix(n-1) sind da? (zählt im Objekt, schickt keine Daten herum)
+  async vorhanden(prefix, n) { let da = 0; for (let i = 0; i < n; i++) if ((await this.ctx.storage.get(prefix + i, { noCache: true })) !== undefined) da++; return da; }
 }
 const speicher = env => env.SPEICHER.get(env.SPEICHER.idFromName('kreids-insta'));
 
@@ -100,7 +105,7 @@ async function strom(req, s, prefix, teile, groesse, typ) {
     const w = writable.getWriter();
     try {
       for (let i = erster; i <= letzter; i++) {
-        const u8 = await s.lies(prefix + i);
+        const u8 = await s.liesGross(prefix + i);
         if (!u8) throw new Error('Stück fehlt');
         await w.write(u8.subarray(i === erster ? start - i * TEIL : 0, i === letzter ? ende - i * TEIL + 1 : u8.length));
       }
@@ -235,7 +240,7 @@ async function hintergrundKI(env, s, post, design, cfg, wunsch, neu) {
     }, { flux: heute < KI_PRO_TAG });
     await s.schreib('ki:' + tag, heute + 1);
     const bgv = ((await s.lies('bgv:' + rk)) || 0) + 1;
-    await s.schreib('bgr:' + rk, k.bild);
+    await s.schreibGross('bgr:' + rk, k.bild);
     await s.schreib('bgv:' + rk, bgv);
     await s.schreib('bgm:' + rk, { quelle: 'ki', modell: k.modell, kiFehler: '', zeit: Date.now(), startMs: post.startMs });
     return { ok: true, bgv };
@@ -399,7 +404,7 @@ async function ytEinRennen(env, s, zugang, r, cfg, erzwingen, beschr) {
     }
     const th = await s.lies('ytbh:' + r.rennKey);
     if (th && th.h && th.h !== z.thumbH) {
-      const bytes = await s.lies('ytb:' + r.rennKey);
+      const bytes = await s.liesGross('ytb:' + r.rennKey);
       if (bytes) { await ytThumbnail(zugang, z.id, bytes, th.typ === 'png' ? 'image/png' : 'image/jpeg'); z.thumbH = th.h; }
     }
     z.fehler = '';
@@ -959,12 +964,12 @@ async function api(req, env, url) {
     if (was === 'videoteil') {
       const v = Number(url.searchParams.get('v')) || 0, u8 = new Uint8Array(await req.arrayBuffer());
       if (!v || !u8.length || u8.length > TEIL || !(Number(nr) >= 0 && Number(nr) < 40)) return fehler('Stück ungültig.');
-      await s.schreib(`cvteil:${id}:${v}:${Number(nr)}`, u8);
+      await s.schreibGross(`cvteil:${id}:${v}:${Number(nr)}`, u8);
       return antwort({ ok: true });
     }
     if (was === 'videofertig') {
       const v = Number(url.searchParams.get('v')) || 0, b = await json(), teile = Number(b.teile) || 0, groesse = Number(b.groesse) || 0;
-      const da = Object.keys(await s.liste(`cvteil:${id}:${v}:`)).length;
+      const da = await s.vorhanden(`cvteil:${id}:${v}:`, teile);
       if (!v || !teile || da !== teile || groesse > VIDEO_MAX) return fehler(`Video unvollständig (${da} von ${teile}).`);
       const alt = c.video;
       c.video = { v, teile, groesse, zeit: Date.now() };
@@ -976,7 +981,7 @@ async function api(req, env, url) {
     if (was === 'bild') {
       const u8 = await bildAusBody(req, 900000);
       if (!u8) return fehler('Vorschaubild ungültig.');
-      await s.schreib('cbild:' + id, u8);
+      await s.schreibGross('cbild:' + id, u8);
       c.bild = Date.now(); await s.schreib('clip:' + id, c);
       return antwort({ ok: true });
     }
@@ -1069,7 +1074,7 @@ async function api(req, env, url) {
     const typ = bildTyp(u8);
     if (u8.length < 200 || u8.length > 1.9e6 || !['image/png', 'image/jpeg', 'image/webp'].includes(typ)) return fehler('Bitte PNG, JPG oder WebP bis 1,9 MB.');
     const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
-    await s.schreib('ablage:' + id, u8);
+    await s.schreibGross('ablage:' + id, u8);
     await s.schreib('ablageinfo:' + id, { name: String(url.searchParams.get('name') || 'Bild').replace(/[<>]/g, '').slice(0, 60), typ, zeit: Date.now() });
     return antwort({ ok: true, id, url: `${env.ORIGIN}/ablage/${id}` });
   }
@@ -1092,11 +1097,11 @@ async function api(req, env, url) {
     if (was === 'teil') {
       const n = Number(nr), u8 = new Uint8Array(await req.arrayBuffer());
       if (!(n >= 0 && n < info.teile) || !u8.length || u8.length > TEIL) return fehler('Stück ungültig.');
-      await s.schreib(`vteil:${vid}:${n}`, u8);
+      await s.schreibGross(`vteil:${vid}:${n}`, u8);
       return antwort({ ok: true });
     }
     if (was === 'fertig') {
-      const da = Object.keys(await s.liste(`vteil:${vid}:`)).length;
+      const da = await s.vorhanden(`vteil:${vid}:`, info.teile);
       if (da !== info.teile) return fehler(`Hochladen unvollständig (${da} von ${info.teile}).`);
       await s.schreib('video:' + vid, { ...info, fertig: true });
       return antwort({ ok: true, url: `${env.ORIGIN}/video/${vid}` });
@@ -1114,13 +1119,13 @@ async function api(req, env, url) {
     if (was === 'videoteil') {
       const u8 = new Uint8Array(await req.arrayBuffer());
       if (!u8.length || u8.length > TEIL || !(Number(nr) >= 0 && Number(nr) < 40)) return fehler('Stück ungültig.');
-      await s.schreib(`pvteil:${id}:${v}:${Number(nr)}`, u8);
+      await s.schreibGross(`pvteil:${id}:${v}:${Number(nr)}`, u8);
       return antwort({ ok: true });
     }
     const b = await json(), teile = Number(b.teile) || 0, groesse = Number(b.groesse) || 0;
     const z = (await s.lies('post:' + id)) || {};
     if (z.gepostet) return fehler('Dieser Post ist schon gepostet.');
-    const da = Object.keys(await s.liste(`pvteil:${id}:${v}:`)).length;
+    const da = await s.vorhanden(`pvteil:${id}:${v}:`, teile);
     if (!teile || da !== teile) return fehler(`Video unvollständig (${da} von ${teile}).`);
     const alt = z.video;
     z.video = { v, teile, groesse, hash: String(b.hash || '').slice(0, 20), zeit: Date.now() };
@@ -1135,7 +1140,7 @@ async function api(req, env, url) {
   if (ytt && req.method === 'POST') {
     const u8 = await bildAusBody(req, 2e6);
     if (!u8) return fehler('Thumbnail ungültig (PNG/JPG unter 2 MB).');
-    await s.schreib('ytb:' + ytt[1], u8);
+    await s.schreibGross('ytb:' + ytt[1], u8);
     await s.schreib('ytbh:' + ytt[1], { h: String(url.searchParams.get('h') || '').slice(0, 20), typ: bildTyp(u8) === 'image/png' ? 'png' : 'jpg', startMs: Number(url.searchParams.get('s')) || Date.now(), zeit: Date.now() });
     return antwort({ ok: true });
   }
@@ -1303,7 +1308,7 @@ async function api(req, env, url) {
       z.erstellt = Date.now();
       z.ki = !!bgv && !!bgm && bgm.quelle === 'ki';
       if (z.fehler === BILD_FEHLT) z.fehler = '';
-      await s.schreib('img:' + id, u8);
+      await s.schreibGross('img:' + id, u8);
       await s.schreib('post:' + id, z);
       return antwort({ ok: true, bild: `${env.ORIGIN}/bild/${id}/${z.version}.jpg` });
     }
@@ -1315,7 +1320,7 @@ async function api(req, env, url) {
       if (!p) return fehler('Diesen Post gibt es im Streamkalender nicht (mehr).', 404);
       const herkunft = url.searchParams.get('herkunft');
       const bgv = ((await s.lies('bgv:' + rk)) || 0) + 1;
-      await s.schreib('bgr:' + rk, u8);
+      await s.schreibGross('bgr:' + rk, u8);
       await s.schreib('bgv:' + rk, bgv);
       await s.schreib('bgm:' + rk, { quelle: ['gemini', 'chatgpt'].includes(herkunft) ? herkunft : 'eigen', modell: '', kiFehler: '', zeit: Date.now(), startMs: p.startMs });
       return antwort({ ok: true, bgv });
@@ -1386,7 +1391,7 @@ export default {
       // Fertiges Post-Bild (für Instagram und die Vorschau)
       const b = url.pathname.match(/^\/bild\/([A-Za-z0-9_-]{1,200})\/\d+\.jpg$/);
       if (b && req.method === 'GET') {
-        const jpg = await speicher(env).lies('img:' + b[1]);
+        const jpg = await speicher(env).liesGross('img:' + b[1]);
         if (!jpg) return new Response('Kein Bild', { status: 404, headers: CORS });
         const h = { 'Content-Type': 'image/jpeg', 'Cache-Control': 'public, max-age=86400', ...CORS };
         if (url.searchParams.has('laden')) h['Content-Disposition'] = `attachment; filename="kreids888-${b[1]}.jpg"`;
@@ -1415,14 +1420,14 @@ export default {
       }
       const cb = url.pathname.match(/^\/cbild\/([a-z0-9]{1,40})\.jpg$/);
       if (cb && req.method === 'GET') {
-        const u8 = await speicher(env).lies('cbild:' + cb[1]);
+        const u8 = await speicher(env).liesGross('cbild:' + cb[1]);
         if (!u8) return new Response('Kein Bild', { status: 404, headers: CORS });
         return new Response(u8, { headers: { 'Content-Type': bildTyp(u8) || 'image/jpeg', 'Cache-Control': 'public, max-age=86400', ...CORS } });
       }
       // Eigenes Bild aus der Ablage (für Vorlagen)
       const ab = url.pathname.match(/^\/ablage\/([a-z0-9]{1,40})$/);
       if (ab && req.method === 'GET') {
-        const u8 = await speicher(env).lies('ablage:' + ab[1]);
+        const u8 = await speicher(env).liesGross('ablage:' + ab[1]);
         if (!u8) return new Response('Kein Bild', { status: 404, headers: CORS });
         return new Response(u8, { headers: { 'Content-Type': bildTyp(u8) || 'application/octet-stream', 'Cache-Control': 'public, max-age=31536000, immutable', ...CORS } });
       }
@@ -1430,7 +1435,7 @@ export default {
       const hg = url.pathname.match(/^\/hintergrund\/([A-Za-z0-9_-]{1,200})$/);
       if (hg && req.method === 'GET') {
         const s = speicher(env);
-        const bg = await s.lies('bgr:' + hg[1]);
+        const bg = await s.liesGross('bgr:' + hg[1]);
         if (bg) return new Response(bg, { headers: { 'Content-Type': bildTyp(bg) || 'image/jpeg', 'Cache-Control': 'public, max-age=86400', ...CORS } });
         const k = await s.lies('kbu:' + hg[1]);
         return (k && await durchreichen(k.url)) || new Response('Kein Hintergrund', { status: 404, headers: CORS });
