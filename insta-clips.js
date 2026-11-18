@@ -102,8 +102,53 @@
       felder: [['strecke', 'Strecke', 'Silverstone']], pflicht: 'strecke', feldTipp: 'Steht groß oben im Video.',
       hooks: ['EINE RUNDE IN 30 SEK.', 'DIE STRECKE IN 30 SEK.', 'SO FÄHRT MAN DAS'], unten: ['WIE IST DEINE BESTZEIT HIER?', 'WO VERLIERST DU HIER ZEIT?', 'KENNST DU DIE STRECKE?'],
       text: c => `${c.strecke ? c.strecke + ' in 30 Sekunden' : 'Eine Runde in 30 Sekunden'} 🛣️ Wie ist deine Bestzeit hier? 👇\n\n#simracing #iracing #onboard #simracer #kreids888`,
-      hilfe: 'Eine Runde im Zeitraffer. Kurvennamen und Tipps blendest du an der richtigen Stelle ein (Schritt 3).' }
+      hilfe: 'Eine Runde im Zeitraffer. Kurvennamen und Tipps blendest du an der richtigen Stelle ein (Schritt 3).' },
+    // ── Multiclass ──
+    { id: 'verkehr', name: 'Durch den Verkehr', emoji: '🏎️', farbe: '#2f8bff', tag: 'MULTICLASS', zl: false, wieder: '', mehr: 'verkehr', gruppe: 'multi', neu: true,
+      felder: [['klasse', 'Deine Klasse', 'LMP2']], feldTipp: 'Steht als Schild oben rechts. Leer lassen geht auch.',
+      hooks: ['DURCH DEN VERKEHR', 'MULTICLASS-CHAOS', 'PLATZ DA!', 'BLAUE FLAGGE!'], unten: ['WIE VIELE HAST DU GEZÄHLT?', 'SAUBER ODER ZU HART?', 'LIEBER PROTO ODER GT?'],
+      text: c => `Durch den Verkehr 🏎️${c.klasse ? ' im ' + c.klasse : ''} – wie viele hast du gezählt? 👇\n\n#simracing #iracing #multiclass #simracer #kreids888`,
+      hilfe: 'Multiclass: Du fährst durch die langsameren Klassen. Jedes überholte Auto markierst du in Schritt 3 – der Zähler läuft mit, die Klasse kommt als Schild ins Bild.' },
+    { id: 'klassen', name: 'Klassen-Duell', emoji: '🆚', farbe: '#ff3df0', tag: 'KLASSEN-DUELL', zl: true, wieder: 'GANZ GENAU HINSEHEN', klassen: true, nurNeon: true, gruppe: 'multi', neu: true,
+      felder: [['klasseA', 'Klasse A', 'LMP2'], ['klasseB', 'Klasse B', 'GT3']], feldTipp: 'Die beiden Klassen stehen oben über dem Clip und unten zum Abstimmen (A oder B).',
+      hooks: ['KLASSEN-DUELL', 'PROTO GEGEN GT', 'WER MUSS PLATZ MACHEN?', 'SCHNELL GEGEN SCHNELLER'], unten: ['WER WAR IM RECHT? A ODER B!', 'WER HÄTTE PLATZ MACHEN MÜSSEN?', 'A ODER B? KOMMENTIER!'],
+      text: c => `${c.klasseA || 'LMP2'} gegen ${c.klasseB || 'GT3'} 🆚 Wer war im Recht – A oder B? 👇\n\n#simracing #iracing #multiclass #simracer #kreids888`,
+      hilfe: 'Zwei Klassen, eine Kurve. Die Leute stimmen ab: A oder B – das bringt Kommentare.' },
+    // ── Action ──
+    { id: 'aufholjagd', name: 'Aufholjagd', emoji: '📈', farbe: '#5cff1f', tag: 'AUFHOLJAGD', zl: false, wieder: '', mehr: 'aufholjagd', gruppe: 'action', neu: true,
+      felder: [['startplatz', 'Startplatz', '18']], pflicht: 'startplatz', feldTipp: 'Von hier zählt die Platz-Anzeige nach vorn.',
+      hooks: ['AUFHOLJAGD', 'VON GANZ HINTEN', 'PLATZ FÜR PLATZ', 'NIEMALS AUFGEBEN'], unten: ['WIE VIELE PLÄTZE SCHAFFST DU?', 'BESTE AUFHOLJAGD?', 'WAS WAR DEIN REKORD?'],
+      text: c => `Aufholjagd 📈${String(c.startplatz || '').replace(/\D/g, '') ? ' von P' + String(c.startplatz).replace(/\D/g, '') : ''} – wie viele Plätze schaffst du? 👇\n\n#simracing #iracing #comeback #simracer #kreids888`,
+      hilfe: 'Von hinten nach vorn: Jeder Überholer ist ein Platz. Die Platz-Anzeige zählt mit, am Ende kommt „+X Plätze“.' },
+    { id: 'ampel', name: 'Lights Out', emoji: '🚥', farbe: '#ff2a2a', tag: 'LIGHTS OUT', zl: true, wieder: 'NOCHMAL IN ZEITLUPE', ampel: true, nurNeon: true, gruppe: 'action', neu: true,
+      hooks: ['WER KOMMT BESSER WEG?', 'START-DUELL', 'REAKTIONSTEST', 'KURVE 1 WARTET'], unten: ['WIE WAR DEIN START?', 'GUTER START ODER FRÜHSTART?', 'WER GEWINNT KURVE 1?'],
+      text: 'Lights out 🚥 Wer kommt hier besser weg? 👇\n\n#simracing #iracing #racestart #simracer #kreids888',
+      hilfe: 'Für Rennstarts: Das Bild steht, fünf rote Lichter gehen an – Lichter aus und los. Mit Motor-Sound. Der Clip sollte kurz vor dem Start anfangen.' },
+    { id: 'analyse', name: 'Replay-Analyse', emoji: '🎯', farbe: '#18e8ff', tag: 'ANALYSE', zl: true, wieder: 'NOCHMAL IN ZEITLUPE', analyse: true, nurNeon: true, gruppe: 'action', neu: true,
+      felder: [['analyseText', 'Text bei der Analyse', 'Hier zu früh eingelenkt']], pflicht: 'analyseText', feldTipp: 'Erscheint im Standbild neben dem Kreis.',
+      hooks: ['GENAU HIER!', 'DER FEHLER', 'SIEHST DU’S?', 'ANALYSE'], unten: ['HÄTTEST DU’S GESEHEN?', 'WAS HÄTTEST DU ANDERS GEMACHT?', 'EINVERSTANDEN?'],
+      text: 'Replay-Analyse 🎯 Genau hier passiert’s. Was hättest du anders gemacht? 👇\n\n#simracing #iracing #analysis #simracer #kreids888',
+      hilfe: 'Wie im TV: Der Clip hält an, die wichtige Stelle wird eingekreist und erklärt, dann läuft er weiter. Stelle und Kreis legst du in Schritt 3 fest.' },
+    { id: 'sektoren', name: 'Sektorzeiten', emoji: '🟣', farbe: '#b44dff', tag: 'HOTLAP', zl: false, wieder: '', mehr: 'sektoren', gruppe: 'action', neu: true,
+      felder: [['strecke', 'Strecke', 'Spa'], ['rundenzeit', 'Rundenzeit', '2:17.384']], feldTipp: 'Rundenzeit leer = wird aus dem Clip gemessen.',
+      hooks: ['LILA. LILA. LILA.', 'JEDE TAUSENDSTEL ZÄHLT', 'DIE PERFEKTE RUNDE?', 'SCHLÄGST DU DAS?'], unten: ['SCHREIB DEINE ZEIT!', 'WO HOLST DU NOCH ZEIT?', 'WER IST SCHNELLER?'],
+      text: c => `Sektor für Sektor${c.strecke ? ' in ' + c.strecke : ''}${c.rundenzeit ? ' ⏱ ' + c.rundenzeit : ''} 🟣 Schlägst du das? 👇\n\n#simracing #iracing #hotlap #simracer #kreids888`,
+      hilfe: 'Hotlap mit Zeiten-Turm wie in der F1: Sektorzeiten in Lila, Grün oder Gelb, am Ende die Rundenzeit. Die Sektoren markierst du in Schritt 3.' },
+    // ── Trends ──
+    { id: 'erwartung', name: 'Erwartung vs. Realität', emoji: '🎭', farbe: '#ffb800', tag: 'MEME', zl: false, wieder: '', mehr: 'erwartung', plaetze: ['ERWARTUNG', 'REALITÄT'], gruppe: 'trend', neu: true,
+      felder: [['pointe', 'Text am Schluss', 'NA TOLL.']], feldTipp: 'Knallt am Ende auf das Standbild. Leer = „NA TOLL.“',
+      hooks: ['ERWARTUNG VS. REALITÄT', 'SO SOLLTE ES LAUFEN …', 'DER PLAN VS. DAS RENNEN'], unten: ['PASSIERT DIR DAS AUCH?', 'KENNST DU DAS?', 'SEI EHRLICH: WIE OFT?'],
+      text: 'Erwartung vs. Realität 🎭 Kennst du das? Sei ehrlich 👇\n\n#simracing #iracing #expectationvsreality #simracer #kreids888',
+      hilfe: 'Meme: Erst der Plan (schöner Clip), dann was wirklich passiert ist (Crash, Fail). Am Ende Standbild mit traurigem Trompeten-Sound.' },
+    { id: 'kommentator', name: 'Kommentator', emoji: '🎙️', farbe: '#ff7a00', tag: 'KOMMENTAR', zl: true, wieder: 'NOCHMAL IN ZEITLUPE', kommentator: true, nurTV: true, gruppe: 'trend', neu: true,
+      felder: [['serie', 'Serie', 'SPR GT3 Cup'], ['runde', 'Runde', '12/30'], ['fahrer', 'Fahrer im Bild', 'Kreids888 · P4'], ['laufband', 'Laufschrift', 'Kreids888 holt drei Plätze in einer Runde']],
+      feldTipp: 'Alles freiwillig: Serie steht oben, Runde rechts daneben, der Fahrer in der Bauchbinde, die Laufschrift ganz unten.',
+      hooks: ['WAS FÜR EIN MANÖVER!', 'UNGLAUBLICH!', 'DAS GIBT’S DOCH NICHT!', 'UND ER IST VORBEI!'], unten: ['WIE HÄTTEST DU’S KOMMENTIERT?', 'WAS SAGST DU DAZU?', 'MANÖVER DES RENNENS?'],
+      text: 'Was für ein Manöver! 🎙️ Wie hättest du’s kommentiert? 👇\n\n#simracing #iracing #racing #simracer #kreids888',
+      hilfe: 'Wie eine echte TV-Übertragung: Serie, Runde, Fahrer-Bauchbinde, eigene Laufschrift und Jubel am Ende.' }
   ];
+  const GRUPPEN = [['klassik', 'Klassiker'], ['mehr', 'Mehrere Clips & Runde'], ['multi', 'Multiclass'], ['action', 'Action'], ['trend', 'Trends']];
+  const gruppeVon = v => v.gruppe || (v.mehr ? 'mehr' : 'klassik');
   const LOOKS = [['neon', '✨ Neon'], ['tv', '📺 TV-Sendung']];
   const WIEDER = ['NOCHMAL GENAU HINSCHAUEN', 'NOCHMAL IN ZEITLUPE', 'GANZ GENAU HINSEHEN', 'NOCHMAL. LANGSAM.', 'WIE?!', 'AUTSCH. NOCHMAL.', 'SO GEHT DAS', 'FOTOFINISH'];
   const frageVon = (c, v) => GROSS(String(c.unten || '').trim() || v.unten[0]);
@@ -220,12 +265,34 @@
 
   // ─── Zeitplan eines Clips: Hauptteil · Zeitlupe vom Ende (halbe Geschwindigkeit) · Abspann ───
   // Bei „Was passiert jetzt?“ hält der Clip bei F an (FD Sekunden, Countdown 3-2-1) und läuft dann weiter
-  const HALT = 2.4;
+  const HALT = 2.4, ANALYSE = 3.4, AMPEL = 3.6, AMPEL_AN = [0.45, 1.0, 1.55, 2.1, 2.65];
   // Quellen eines Clips: [Haupt-Clip, …weitere] (Top 3 und Vorher/Nachher nehmen mehrere)
   const quellenVon = c => [c, ...(c.extra || [])];
   function abschnitt(s) { const dauer = s.dauer || 10, a = kl(s.start || 0, 0, Math.max(0, dauer - 1)), b = kl(s.ende || dauer, a + 1, dauer); return { a, b }; }
   const STRECKE_ZIEL = 28;   // eine Runde im Zeitraffer auf etwa so viele Sekunden
-  // Zeitplan für Top 3 · Vorher/Nachher · Strecke. spur(t) → welche Plätze (s) zu welcher Clip-Zeit (t) zu sehen sind
+  // Vorlagen mit Markierungen im Clip (Kurven, überholte Autos, Plätze, Sektoren): Zeitraffer-Ziel, Standbild am Ende, Texte für Schritt 3
+  const MARKEN = {
+    strecke: { ziel: STRECKE_ZIEL, max: 4, nach: 0, schritt: '3 · Runde & Kurven', von: 'Runde beginnt', bis: 'Runde endet', stelle: 'Stelle für die nächste Kurve', knopf: '＋ Kurve an dieser Stelle', ph: 'Kurvenname – Tipp', kurz: i => 'T' + (i + 1),
+      tipp: 'Stelle schieben, die Vorschau zeigt das Bild. Dann „＋ Kurve“ und Text, z. B. „Copse – voll durch“ (vor dem Strich groß, dahinter klein).' },
+    verkehr: { ziel: 30, max: 3, nach: 2.4, schritt: '3 · Schnitt & Autos', von: 'Anfang', bis: 'Ende', stelle: 'Stelle fürs nächste Auto', knopf: '＋ Auto überholt', ph: 'Klasse, z. B. GT4', kurz: i => '#' + (i + 1),
+      tipp: 'Stelle schieben, bis du am Auto vorbei bist. Dann „＋ Auto überholt“ und die Klasse eintragen (z. B. GT4). Am Ende kommt ein Standbild mit der Zahl.' },
+    aufholjagd: { ziel: 35, max: 4, nach: 2.4, schritt: '3 · Schnitt & Überholer', von: 'Anfang', bis: 'Ende', stelle: 'Stelle für den nächsten Überholer', knopf: '＋ Platz gewonnen', ph: 'Gegner oder Kurve (freiwillig)', kurz: null,
+      tipp: 'Stelle schieben, bis du vorbei bist. Dann „＋ Platz gewonnen“. Jeder Eintrag ist ein Platz nach vorn, am Ende kommt ein Standbild mit „+X Plätze“.' },
+    sektoren: { ziel: 40, max: 3, nach: 2.6, schritt: '3 · Runde & Sektoren', von: 'Runde beginnt', bis: 'Runde endet', stelle: 'Stelle fürs nächste Sektor-Ende', knopf: '＋ Sektor endet hier', ph: 'Zeit, z. B. 32.415 (leer = gemessen)', kurz: i => 'S' + (i + 1), farbe: true,
+      tipp: 'Stelle genau auf die Sektor-Linie schieben, dann „＋ Sektor endet hier“. Der letzte Sektor endet am Rundenende. Lila = Bestzeit, Grün = persönliche Bestzeit, Gelb = langsamer.' }
+  };
+  const ERWARTUNG_NACH = 2.0;   // Standbild der Realität am Ende (Trompete)
+  const SEKTOR_FARBEN = { lila: '#b84dff', gruen: '#27f25a', gelb: '#ffd400' };
+  // „1:23.456“, „83.456“, „32,415“ → Sekunden (sonst null)
+  function zeitLesen(s) {
+    const m = String(s || '').trim().replace(',', '.').match(/^(?:(\d+):)?(\d+(?:\.\d+)?)$/);
+    return m ? (Number(m[1]) || 0) * 60 + Number(m[2]) : null;
+  }
+  function zeitText(s) {   // 32.415 · 1:23.456
+    s = Math.max(0, s || 0); const ms = Math.round(s * 1000), m = Math.floor(ms / 60000), r = (ms - m * 60000) / 1000;
+    return m ? `${m}:${r.toFixed(3).padStart(6, '0')}` : r.toFixed(3);
+  }
+  // Zeitplan für Top 3 · Vorher/Nachher · Strecke usw. spur(t) → welche Plätze (s) zu welcher Clip-Zeit (t) zu sehen sind (steh = Standbild)
   function zeitplanMehr(c, v) {
     const q = quellenVon(c), p = { mehr: v.mehr, R: 0, Z: 0, FD: 0 };
     if (v.mehr === 'top3') {
@@ -240,12 +307,30 @@
       Object.assign(p, { x0, x1, slots: [0, q[1] ? 1 : 0], D, a: x0.a, b: x0.a + D,
         spur: t => (t < D ? [{ s: 0, t: x0.a + t }, { s: 1, t: x1.a + t }] : []),
         quelle: t => (t < D ? x0.a + t : null) });
-    } else {
-      const x = abschnitt(q[0]), L = x.b - x.a, tempo = kl(L / STRECKE_ZIEL, 1, 4), D = L / tempo;
+    } else if (v.mehr === 'erwartung') {   // erst Erwartung, dann Realität (Erwartung bleibt oben als Standbild), am Ende Standbild
+      const x0 = abschnitt(q[0]), x1 = q[1] ? abschnitt(q[1]) : x0, d0 = x0.b - x0.a, d1 = x1.b - x1.a, lauf = d0 + d1, D = lauf + ERWARTUNG_NACH;
+      const s1 = q[1] ? 1 : 0, steh0 = { s: 0, t: Math.max(x0.a, x0.b - 0.05), steh: true };
+      Object.assign(p, { x0, x1, d0, lauf, slots: [0, s1], D, a: x0.a, b: x0.b,
+        teile: [{ q: 0, a: x0.a, b: x0.b, S: 0, d: d0 }, { q: 1, a: x1.a, b: x1.b, S: d0, d: d1 }],
+        spur: t => (t < d0 ? [{ s: 0, t: x0.a + t }] : t < lauf ? [{ s: 1, t: x1.a + t - d0 }, steh0] : t < D ? [{ s: 1, t: Math.max(x1.a, x1.b - 0.05), steh: true }, steh0] : []),
+        quelle: t => (t < d0 ? x0.a + t : null) });
+    } else {   // Strecke · Verkehr · Aufholjagd · Sektoren: ein Clip mit Markierungen, lange Clips im Zeitraffer
+      const cfg = MARKEN[v.mehr] || MARKEN.strecke, x = abschnitt(q[0]), L = x.b - x.a, tempo = kl(L / cfg.ziel, 1, cfg.max), lauf = L / tempo, D = lauf + cfg.nach;
       const marken = (c.marken || []).filter(m => m.t >= x.a && m.t <= x.b).sort((m, n) => m.t - n.t).map((m, i) => ({ ...m, n: i + 1, ot: (m.t - x.a) / tempo }));
-      Object.assign(p, { x, tempo, marken, slots: [0], D, a: x.a, b: x.b,
-        spur: t => (t < D ? [{ s: 0, t: x.a + t * tempo }] : []),
-        quelle: t => (t < D ? x.a + t * tempo : null) });
+      Object.assign(p, { x, tempo, marken, lauf, slots: [0], D, a: x.a, b: x.b,
+        spur: t => (t < lauf ? [{ s: 0, t: x.a + t * tempo }] : t < D ? [{ s: 0, t: Math.max(x.a, x.b - 0.05), steh: true }] : []),
+        quelle: t => (t < lauf ? x.a + t * tempo : null) });
+      if (v.mehr === 'sektoren') {   // Sektor-Enden = Markierungen + Rundenende; Zeit eingetragen oder aus dem Clip gemessen
+        let vor = x.a;
+        p.sektoren = [...marken, null].map((mk, i) => {
+          const ende = mk ? mk.t : x.b, roh = mk ? zeitLesen(mk.text) : null, s = { n: i + 1, start: vor, ende, ot0: (vor - x.a) / tempo, ot: (ende - x.a) / tempo,
+            zeit: roh != null ? roh : ende - vor, farbe: SEKTOR_FARBEN[(mk ? mk.farbe : c.sektorLetzt) || 'lila'] || SEKTOR_FARBEN.lila };
+          vor = ende; return s;
+        });
+        const lr = zeitLesen(c.rundenzeit);
+        if (lr != null) { const rest = lr - p.sektoren.slice(0, -1).reduce((s, x2) => s + x2.zeit, 0); if (rest > 0.5) p.sektoren[p.sektoren.length - 1].zeit = rest; }   // letzter Sektor passt zur Rundenzeit
+        p.runde = lr != null ? lr : p.sektoren.reduce((s, x2) => s + x2.zeit, 0);
+      }
     }
     p.h = p.D; p.F = p.b; p.T = p.D + OUTRO;
     return p;
@@ -253,7 +338,9 @@
   function zeitplan(c) {
     if (vorlage(c).mehr) return zeitplanMehr(c, vorlage(c));
     const dauer = c.dauer || 10, a = kl(c.start || 0, 0, Math.max(0, dauer - 1)), b = kl(c.ende || dauer, a + 1, dauer), v = vorlage(c);
-    const FD = v.pause ? HALT : 0, F = v.pause ? kl(c.halt != null ? c.halt : b - 2.5, a + 0.5, b - 0.3) : b, h = F - a;
+    // Anhalten: „Was passiert jetzt?“ (Countdown) und Replay-Analyse an einer Stelle, Lights Out ganz am Anfang (Startampel)
+    const FD = v.pause ? HALT : v.analyse ? ANALYSE : v.ampel ? AMPEL : 0;
+    const F = v.ampel ? a : (v.pause || v.analyse) ? kl(c.halt != null ? c.halt : b - 2.5, a + 0.5, b - 0.3) : b, h = F - a;
     const D0 = b - a, D = D0 + FD, Z = c.zeitlupe ? Math.min(3, D0 * 0.4) : 0, R = Z * 2, T = D + R + OUTRO;
     return { a, b, D, Z, R, T, F, FD, h, quelle: t => (t < h ? a + t : t < h + FD ? F : t < D ? a + t - FD : t < D + R ? b - Z + (t - D) / 2 : null) };
   }
@@ -271,9 +358,14 @@
     g.fillStyle = 'rgba(0,0,0,.55)'; g.fillRect(0, 0, B, H);
     g.save(); g.globalAlpha = 0.8; g.drawImage(grund(farbe), 0, 0); g.restore();
   }
+  function bildRechteck(vid, x, y, w, h, zoom, versatz) {   // wo der Clip landet, wenn er ein Rechteck deckend füllt
+    const vw = (vid && (vid.videoWidth || vid.displayWidth)) || 1920, vh = (vid && (vid.videoHeight || vid.displayHeight)) || 1080, s = Math.max(w / vw, h / vh) * (zoom || 1), dw = vw * s, dh = vh * s;
+    // Hochkant-Clip (z. B. fertiger Clip aus dem Kreids Clipper) im Querformat-Rahmen: Mitte bei 38 % der Höhe – dort ist meist das Spielbild, unten die Kamera
+    const yy = vh > vw && dh > h * 1.5 ? kl(y + h / 2 - 0.38 * dh, y + h - dh, y) : y + (h - dh) / 2;
+    return { x: x + (w - dw) * (0.5 + (versatz || 0) * 0.5), y: yy, w: dw, h: dh };
+  }
   function quellBild(g, vid, x, y, w, h, zoom, versatz) {   // Clip deckend in ein Rechteck
-    const vw = vid.videoWidth || vid.displayWidth || 1920, vh = vid.videoHeight || vid.displayHeight || 1080, s = Math.max(w / vw, h / vh) * (zoom || 1), dw = vw * s, dh = vh * s;
-    g.drawImage(vid, x + (w - dw) * (0.5 + (versatz || 0) * 0.5), y + (h - dh) / 2, dw, dh);
+    const r = bildRechteck(vid, x, y, w, h, zoom, versatz); g.drawImage(vid, r.x, r.y, r.w, r.h);
   }
   function ecken(g, x, y, w, h, farbe, l) {   // Neon-Ecken (HUD)
     g.save(); g.lineCap = 'square'; g.strokeStyle = farbe; g.lineWidth = 9; g.shadowColor = farbe; g.shadowBlur = 26;
@@ -316,7 +408,7 @@
     else { const ch = chrom(zahl, 260, f, 400); g.shadowBlur = 0; g.drawImage(ch.c, -ch.mitte, -ch.base + 92); }
     g.restore();
   }
-  const angehalten = (v, p, t) => v.pause && t >= p.h && t < p.h + p.FD;
+  const angehalten = (v, p, t) => p.FD > 0 && t >= p.h && t < p.h + p.FD;
   // Regen über das Bild (schräge Striche) + Blitz am Anfang und in der Mitte
   function regen(g, t, p) {
     const r = zufallR(42);
@@ -384,17 +476,205 @@
       g.restore();
     });
   }
+  // ═══ Bausteine für Multiclass · Action · Trends ═══
+  function pillenBreite(g, text, px) { g.save(); RU(g, px); const w = g.measureText(text).width + px * 1.4; g.restore(); return w + px * 1.6 * 0.35; }
+  const KLASSEN_FARBEN = { GTP: '#ff2d6f', HYPERCAR: '#ff2d6f', LMDH: '#ff2d6f', LMH: '#ff2d6f', LMP1: '#ff2d6f', DPI: '#ff2d6f', LMP2: '#2f8bff', P2: '#2f8bff', LMP3: '#b44dff', P3: '#b44dff',
+    GT3: '#ff7a00', GTD: '#ff7a00', GTE: '#ffd400', GTLM: '#ffd400', GT4: '#5cff1f', TCR: '#18e8ff', CUP: '#ff4fd8', MX5: '#00ffa3', GT2: '#ff9f1c' };
+  function klasseFarbe(k) {
+    const n = GROSS(k).replace(/[^A-Z0-9]/g, '');
+    if (!n) return '#ffffff';
+    if (KLASSEN_FARBEN[n]) return KLASSEN_FARBEN[n];
+    for (const key of Object.keys(KLASSEN_FARBEN)) if (n.includes(key)) return KLASSEN_FARBEN[key];
+    let h = 0; for (const ch of n) h = (h * 31 + ch.charCodeAt(0)) >>> 0; return FARBEN[h % FARBEN.length];
+  }
+  const klasseA = c => GROSS(String(c.klasseA || '').trim() || 'LMP2'), klasseB = c => GROSS(String(c.klasseB || '').trim() || 'GT3');
+  // Klassen-Duell: zwei Klassen-Schilder über dem Clip, „VS“ dazwischen
+  function klassenSchilder(g, t, c, y) {
+    const A = klasseA(c), Bk = klasseB(c), px = 34, wa = pillenBreite(g, A, px), wb = pillenBreite(g, Bk, px), vs = 96, x0 = B / 2 - (wa + vs + wb) / 2;
+    const qa = eo(fp(t, 0.25, 0.55)), qb = eo(fp(t, 0.35, 0.65)), qv = eob(fp(t, 0.5, 0.8));
+    if (qa > 0) { g.save(); g.globalAlpha = qa; g.translate(-(1 - qa) * 400, 0); pille(g, A, x0, y, klasseFarbe(A), px, true); g.restore(); }
+    if (qb > 0) { g.save(); g.globalAlpha = qb; g.translate((1 - qb) * 400, 0); pille(g, Bk, x0 + wa + vs, y, klasseFarbe(Bk), px, true); g.restore(); }
+    if (qv > 0) { g.save(); g.translate(x0 + wa + vs / 2 + 8, y + px * 0.8); g.scale(qv, qv); RU(g, 42); g.textAlign = 'center'; g.fillStyle = '#fff'; g.shadowColor = '#fff'; g.shadowBlur = 16; g.fillText('VS', 0, 15); g.restore(); }
+  }
+  // Klassen-Duell: Abstimmung A oder B (statt Band unter dem Clip), leuchtet abwechselnd
+  function abstimmung(g, t, c, f, y) {
+    const q = eo(fp(t, 0.9, 1.3)); if (q <= 0) return;
+    const A = klasseA(c), Bk = klasseB(c), w = 470, h = 116, xa = B / 2 - 20 - w, xb = B / 2 + 20, s = 28;
+    const kasten = (x, buch, name, fk, dx, ph) => {
+      g.save(); g.translate(dx, 0);
+      g.beginPath(); g.moveTo(x + s, y); g.lineTo(x + w, y); g.lineTo(x + w - s, y + h); g.lineTo(x, y + h); g.closePath();
+      g.fillStyle = 'rgba(6,8,10,.9)'; g.fill(); g.lineWidth = 4; g.strokeStyle = fk; g.shadowColor = fk; g.shadowBlur = 12 + 26 * ph; g.stroke(); g.shadowBlur = 0;
+      g.beginPath(); g.moveTo(x + s + 12, y + 12); g.lineTo(x + s + 104, y + 12); g.lineTo(x + 104 + 4, y + h - 12); g.lineTo(x + 16, y + h - 12); g.closePath(); g.fillStyle = fk; g.fill();
+      RU(g, 66); g.textAlign = 'center'; g.fillStyle = '#06080a'; g.fillText(buch, x + s / 2 + 62, y + h / 2 + 24);
+      g.textAlign = 'left'; RU(g, passt(g, name, w - 180, 56, RU)); g.fillStyle = '#fff'; g.shadowColor = fk; g.shadowBlur = 12 * ph; g.fillText(name, x + 146, y + h / 2 + 20);
+      g.restore();
+    };
+    const ph = 0.5 + 0.5 * Math.sin(t * Math.PI * 2);   // A und B leuchten abwechselnd
+    kasten(xa, 'A', A, klasseFarbe(A), -(1 - q) * 640, ph);
+    kasten(xb, 'B', Bk, klasseFarbe(Bk), (1 - q) * 640, 1 - ph);
+    const qv = eob(fp(t, 1.15, 1.45));
+    if (qv > 0) {
+      g.save(); g.translate(B / 2, y + h / 2); g.scale(qv, qv);
+      g.beginPath(); g.arc(0, 0, 44, 0, Math.PI * 2); g.fillStyle = '#05070a'; g.fill(); g.lineWidth = 5; g.strokeStyle = f; g.shadowColor = f; g.shadowBlur = 22; g.stroke();
+      RU(g, 38); g.textAlign = 'center'; g.fillStyle = '#fff'; g.shadowBlur = 10; g.fillText('VS', 0, 14); g.restore();
+    }
+  }
+  // Lights Out: fünf Ampel-Säulen, je zwei rote Lampen; gehen nacheinander an, dann alle aus
+  function ampelZeichnen(g, t, p, cx, cy, breite) {
+    if (t >= p.FD + 0.4) return;
+    const aus = t >= p.FD, weg = eo(fp(t, p.FD + 0.05, p.FD + 0.4)), ein = eob(fp(t, 0.05, 0.35));
+    const n = 5, gap = 22, pw = Math.min(160, (breite - gap * 4) / 5), ph = pw * 1.62, gw = pw * n + gap * (n - 1), x0 = cx - gw / 2, y0 = cy - ph / 2 + 18;
+    const an = aus ? 0 : AMPEL_AN.filter(z => t >= z).length;
+    if (an) licht(g, cx, cy, 760, '#ff1a1a', 0.07 * an);
+    g.save(); g.globalAlpha = 1 - weg; g.translate(0, -weg * 160 - (1 - ein) * 260);
+    g.fillStyle = '#0b0d10'; rr(g, x0 - 34, y0 - 56, gw + 68, 38, 8); g.fill(); g.strokeStyle = 'rgba(255,255,255,.2)'; g.lineWidth = 2; g.stroke();
+    for (let i = 0; i < n; i++) {
+      const x = x0 + i * (pw + gap), lit = i < an, blitz = lit ? fp(t, AMPEL_AN[i], AMPEL_AN[i] + 0.1) : 1;
+      g.fillStyle = '#2a2e35'; g.fillRect(x + pw / 2 - 6, y0 - 20, 12, 22);
+      const gr = g.createLinearGradient(x, 0, x + pw, 0); gr.addColorStop(0, '#121418'); gr.addColorStop(0.5, '#262a31'); gr.addColorStop(1, '#0e1013');
+      g.fillStyle = gr; rr(g, x, y0, pw, ph, 18); g.fill(); g.strokeStyle = 'rgba(255,255,255,.16)'; g.lineWidth = 2; g.stroke();
+      for (let k = 0; k < 2; k++) {
+        const lx = x + pw / 2, ly = y0 + ph * (k ? 0.73 : 0.27), r = pw * 0.36;
+        g.beginPath(); g.arc(lx, ly, r, 0, Math.PI * 2); g.fillStyle = '#050607'; g.fill();
+        if (lit) {
+          g.save(); g.shadowColor = '#ff1a1a'; g.shadowBlur = 70;
+          const rg = g.createRadialGradient(lx - r * 0.28, ly - r * 0.28, r * 0.08, lx, ly, r); rg.addColorStop(0, '#fff1ec'); rg.addColorStop(0.3, '#ff4a35'); rg.addColorStop(1, '#a80000');
+          g.fillStyle = rg; g.beginPath(); g.arc(lx, ly, r * 0.9, 0, Math.PI * 2); g.fill(); g.restore();
+          if (blitz < 1) { g.fillStyle = `rgba(255,255,255,${0.7 * (1 - blitz)})`; g.beginPath(); g.arc(lx, ly, r * 1.05, 0, Math.PI * 2); g.fill(); }
+        } else {
+          const rg = g.createRadialGradient(lx - r * 0.3, ly - r * 0.3, r * 0.05, lx, ly, r); rg.addColorStop(0, '#3b2424'); rg.addColorStop(1, '#130909');
+          g.fillStyle = rg; g.beginPath(); g.arc(lx, ly, r * 0.9, 0, Math.PI * 2); g.fill();
+        }
+      }
+    }
+    g.restore();
+  }
+  function lichterAus(g, t, p, f, cx, cy) {   // „LIGHTS OUT!“ knallt rein, wenn die Lampen ausgehen
+    const d = t - p.FD; if (d < 0 || d > 1.6) return;
+    const q = eob(fp(d, 0, 0.28)), aus = fp(d, 1.2, 1.6), ch = chrom('LIGHTS OUT!', 150, f, 960);
+    g.save(); g.globalAlpha = (1 - aus) * Math.min(1, d * 8); g.translate(cx, cy); const s = (1.7 - 0.7 * q) * (1 + 0.2 * aus); g.scale(s, s);
+    g.drawImage(ch.c, -ch.mitte, -ch.base + 45);
+    if (d > 0.3 && d < 1.05) glanz(g, ch, -ch.mitte, -ch.base + 45, (d - 0.3) / 0.75, 0.85);
+    g.restore();
+  }
+  // Fläche, in der der Clip gezeichnet wird (Rahmen oder ganzes Bild bei „Zoom“) – für Analyse-Kreis und Tippen in die Vorschau
+  function flaeche(c, p, t) {
+    if (c.modus === 'zoom') return { x: -40, y: -40, w: B + 80, h: H + 80, zoom: 1.02 + 0.03 * fp(t, 0, p.D), versatz: c.versatz || 0, kx: 0, ky: 0, kw: B, kh: H };
+    return { x: 40, y: 690, w: 1000, h: 562, zoom: 1, versatz: 0, kx: 40, ky: 690, kw: 1000, kh: 562 };
+  }
+  const zielVon = c => { const z = c.ziel || {}; return { u: kl(z.u != null ? z.u : 0.5, 0.03, 0.97), v: kl(z.v != null ? z.v : 0.55, 0.03, 0.97) }; };
+  function analyseZiel(c, vid, R) { const z = zielVon(c), r = bildRechteck(vid, R.x, R.y, R.w, R.h, R.zoom, R.versatz); return { x: r.x + z.u * r.w, y: r.y + z.v * r.h, r }; }
+  // Replay-Analyse im Standbild: heranzoomen auf die Stelle, Rest abdunkeln
+  function analyseBild(g, t, c, p, vid, R) {
+    const d = t - p.h, ein = eo(fp(d, 0, 0.4)), aus = eo(fp(d, p.FD - 0.4, p.FD)), k = 1 + 0.4 * ein * (1 - aus), z = analyseZiel(c, vid, R), a = ein * (1 - aus);
+    g.save(); g.translate(z.x, z.y); g.scale(k, k); g.translate(-z.x, -z.y); g.drawImage(vid, z.r.x, z.r.y, z.r.w, z.r.h); g.restore();
+    if (a <= 0) return;
+    const sp = g.createRadialGradient(z.x, z.y, 120, z.x, z.y, 300); sp.addColorStop(0, 'rgba(0,0,0,0)'); sp.addColorStop(1, `rgba(0,0,0,${0.66 * a})`);
+    g.fillStyle = sp; g.fillRect(R.kx, R.ky, R.kw, R.kh);
+    g.fillStyle = `rgba(0,0,0,${0.12 * a})`; for (let yy = R.ky; yy < R.ky + R.kh; yy += 6) g.fillRect(R.kx, yy, R.kw, 2);
+  }
+  // Replay-Analyse: Kreis wie mit dem Stift gezogen, Pfeil, Erklärung
+  function analyseOben(g, t, c, p, vid, R, f) {
+    const d = t - p.h, a = 1 - fp(d, p.FD - 0.35, p.FD); if (a <= 0) return;
+    const z = analyseZiel(c, vid, R), rx = 150, ry = 112;
+    g.save(); g.globalAlpha = a; g.lineCap = 'round'; g.lineJoin = 'round';
+    const q = eo(fp(d, 0.3, 0.85));
+    if (q > 0) {
+      const a0 = -2.3, a1 = a0 + Math.PI * 2 * 1.1 * q;
+      g.beginPath();
+      for (let w = a0, i = 0; w <= a1 + 0.001; w += 0.05, i++) { const wob = 1 + 0.035 * Math.sin(w * 3 + 1) + (w - a0) * 0.012, xx = z.x + Math.cos(w) * rx * wob, yy = z.y + Math.sin(w) * ry * wob; if (i) g.lineTo(xx, yy); else g.moveTo(xx, yy); }
+      g.strokeStyle = f; g.lineWidth = 11; g.shadowColor = f; g.shadowBlur = 26; g.stroke();
+      g.shadowBlur = 0; g.strokeStyle = 'rgba(255,255,255,.85)'; g.lineWidth = 3.5; g.stroke();
+    }
+    const text = GROSS(String(c.analyseText || '').trim() || 'HIER PASSIERT’S'), qt = eob(fp(d, 0.75, 1.05));
+    if (qt > 0) {
+      const px = passt(g, text, R.kw - 140, 52, SAx(900), 26); SA(g, px, 900);
+      const bw = Math.min(R.kw - 48, g.measureText(text).width + 76), bh = px + 76, oben = z.y > R.ky + R.kh * 0.5;
+      const y0 = R.kh > 1000 ? 640 : R.ky, y1 = R.kh > 1000 ? 1280 : R.ky + R.kh;   // bei „Zoom“ nicht unter Spruch oder Band
+      const by = kl(oben ? z.y - ry - 40 - bh : z.y + ry + 40, y0 + 24, y1 - 24 - bh), bx = kl(z.x - bw / 2, R.kx + 24, R.kx + R.kw - 24 - bw);
+      const ax = kl(z.x, bx + 50, bx + bw - 50), ay = oben ? by + bh : by, dx = z.x - ax, dy = z.y - ay, L = Math.hypot(dx, dy) || 1, rand = Math.min(rx, ry) + 16;
+      const qp = eo(fp(d, 0.95, 1.25));
+      if (qp > 0 && L > rand + 24) {   // Pfeil vom Kasten zum Kreis
+        const ex = z.x - dx / L * rand, ey = z.y - dy / L * rand, px2 = ax + (ex - ax) * qp, py2 = ay + (ey - ay) * qp, w = Math.atan2(ey - ay, ex - ax);
+        g.save(); g.strokeStyle = '#fff'; g.fillStyle = '#fff'; g.lineWidth = 7; g.shadowColor = f; g.shadowBlur = 16;
+        g.beginPath(); g.moveTo(ax, ay); g.lineTo(px2, py2); g.stroke();
+        if (qp > 0.9) { g.beginPath(); g.moveTo(px2 + Math.cos(w) * 8, py2 + Math.sin(w) * 8); g.lineTo(px2 + Math.cos(w + 2.5) * 30, py2 + Math.sin(w + 2.5) * 30); g.lineTo(px2 + Math.cos(w - 2.5) * 30, py2 + Math.sin(w - 2.5) * 30); g.closePath(); g.fill(); }
+        g.restore();
+      }
+      g.save(); g.translate(bx + bw / 2, by + bh / 2); g.scale(qt, qt); g.translate(-(bx + bw / 2), -(by + bh / 2));
+      rr(g, bx, by, bw, bh, 12); g.fillStyle = 'rgba(5,7,10,.92)'; g.fill(); g.lineWidth = 4; g.strokeStyle = f; g.shadowColor = f; g.shadowBlur = 20; g.stroke(); g.shadowBlur = 0;
+      g.fillStyle = f; g.fillRect(bx, by + 14, 8, bh - 28);
+      SA(g, 26, 900); g.fillStyle = f; g.fillText('ANALYSE', bx + 32, by + 38);
+      SA(g, px, 900); g.fillStyle = '#fff'; g.fillText(text, bx + 32, by + 46 + px * 0.86);
+      g.restore();
+    }
+    g.restore();
+  }
+  // Großes Chrom-Ergebnis über dem Standbild am Ende (Anzahl Autos, +X Plätze, Rundenzeit)
+  function schlussBild(g, t, t0, fx, fy, fw, fh, f, gross, unter, info) {
+    const q = fp(t, t0, t0 + 0.35); if (q <= 0) return;
+    g.save(); rr(g, fx, fy, fw, fh, 14); g.clip(); g.fillStyle = `rgba(3,4,7,${0.62 * q})`; g.fillRect(fx, fy, fw, fh); licht(g, fx + fw / 2, fy + fh / 2, 520, f, 0.25 * q); g.restore();
+    const ch = chrom(gross, 210, f, 880), cy = fy + fh / 2 + (unter ? 10 : 50), k = 0.6 + 0.4 * eob(q);
+    g.save(); g.globalAlpha = Math.min(1, q * 2); g.translate(B / 2, cy); g.scale(k, k); g.drawImage(ch.c, -ch.mitte, -ch.base);
+    const gq = (t - t0 - 0.45) / 0.7; if (gq >= 0 && gq <= 1) glanz(g, ch, -ch.mitte, -ch.base, gq, 0.85);
+    g.restore();
+    const q2 = eo(fp(t, t0 + 0.25, t0 + 0.55));
+    if (unter && q2 > 0) { g.save(); g.globalAlpha = q2; SA(g, passt(g, unter, fw - 80, 66, SAx(900)), 900); g.textAlign = 'center'; g.fillStyle = '#fff'; g.shadowColor = f; g.shadowBlur = 18; g.fillText(unter, B / 2, cy + 104 - (1 - q2) * 20); g.restore(); }
+    if (info && q2 > 0) { g.save(); g.globalAlpha = q2; OR(g, passt(g, info, fw - 120, 46, OR)); g.textAlign = 'center'; g.fillStyle = hexA(f, 1); g.shadowColor = '#000'; g.shadowBlur = 10; g.fillText(info, B / 2, cy + 172); g.restore(); }
+  }
+  // Fortschritt unter dem Clip mit Punkten für jede Markierung
+  function fortschrittPunkte(g, t, p, f, fx, fw, py) {
+    const pr = kl(t / p.lauf, 0, 1);
+    g.fillStyle = 'rgba(255,255,255,.12)'; g.fillRect(fx, py, fw, 8);
+    g.save(); g.fillStyle = f; g.shadowColor = f; g.shadowBlur = 16; g.fillRect(fx, py, fw * pr, 8); g.restore();
+    for (const x0 of p.marken) { const xx = fx + fw * x0.ot / p.lauf; g.fillStyle = t >= x0.ot ? f : 'rgba(255,255,255,.55)'; g.beginPath(); g.arc(xx, py + 4, 8, 0, Math.PI * 2); g.fill(); }
+  }
+  // „+1“ springt ins Bild, daneben das Schild (Klasse, Gegner)
+  function plusEins(g, d, schild, farbe, cx, cy) {
+    if (d < 0 || d > 1.1) return;
+    const q = eob(fp(d, 0, 0.22)), aus = fp(d, 0.75, 1.1), ch = chrom('+1', 190, farbe, 400), sw = schild ? pillenBreite(g, schild, 44) + 24 : 0, ges = ch.w * 0.62 + sw;
+    g.save(); g.globalAlpha = 1 - aus; g.translate(cx, cy - 70 * eo(fp(d, 0, 1.1))); g.scale(q, q);
+    g.drawImage(ch.c, -ges / 2 - ch.w * 0.19, -ch.base + 60);
+    if (schild) pille(g, schild, -ges / 2 + ch.w * 0.62, -10, farbe, 44, true);
+    g.restore();
+  }
+  function blaueFlagge(g, x, y, t, a) {   // wehende blaue Flagge (Überrundung)
+    if (a <= 0) return;
+    const w = 128, h = 84, n = 18, welle = (i, yy) => yy + Math.sin(t * 10 - i * 0.6) * 8 * (i / n);
+    g.save(); g.globalAlpha = a;
+    g.fillStyle = '#dfe4ea'; g.shadowColor = 'rgba(0,0,0,.6)'; g.shadowBlur = 8; g.fillRect(x, y, 7, 138); g.shadowBlur = 0;
+    g.beginPath();
+    for (let i = 0; i <= n; i++) { const xx = x + 7 + w * i / n, yy = welle(i, y + 4); if (i) g.lineTo(xx, yy); else g.moveTo(xx, yy); }
+    for (let i = n; i >= 0; i--) g.lineTo(x + 7 + w * i / n, welle(i, y + 4 + h));
+    g.closePath(); g.fillStyle = '#1f6bff'; g.shadowColor = '#1f6bff'; g.shadowBlur = 30; g.fill(); g.shadowBlur = 0;
+    g.save(); g.clip(); g.strokeStyle = 'rgba(255,214,0,.9)'; g.lineWidth = 16; g.beginPath(); g.moveTo(x + 7, y + 4 + h + 10); g.lineTo(x + 7 + w, y - 6); g.stroke(); g.restore();
+    SA(g, 30, 900); g.fillStyle = '#fff'; g.shadowColor = '#000'; g.shadowBlur = 10; g.fillText('BLAUE FLAGGE', x + 18, y + h + 52);
+    g.restore();
+  }
+  function zaehlerKasten(g, x, y, w, h, label, wert, f, pop, zusatz) {   // Kasten oben rechts im Clip: Zähler / Platz
+    const fl = 1 - pop;
+    g.save(); rr(g, x, y, w, h, 12); g.fillStyle = 'rgba(5,7,10,.84)'; g.fill(); g.lineWidth = 3; g.strokeStyle = f; g.shadowColor = f; g.shadowBlur = 14 + 30 * fl; g.stroke(); g.shadowBlur = 0;
+    if (fl > 0) { g.fillStyle = hexA(f, 0.35 * fl); g.fill(); }
+    SA(g, 28, 700); g.textAlign = 'center'; g.fillStyle = hexA(f, 1); g.fillText(label, x + w / 2, y + 40);
+    g.beginPath(); g.rect(x, y + 46, w, h - (zusatz ? 92 : 50)); g.clip();
+    const k = 1 + 0.35 * (1 - eob(pop)); g.translate(x + w / 2, y + 46 + (h - (zusatz ? 92 : 50)) / 2 + 2); g.scale(k, k);
+    OR(g, passt(g, wert, w - 40, 96, OR)); g.fillStyle = '#fff'; g.shadowColor = f; g.shadowBlur = 20; g.fillText(wert, 0, 34);
+    g.restore();
+    if (zusatz) { g.save(); SA(g, 40, 900); g.textAlign = 'center'; g.fillStyle = zusatz.farbe; g.shadowColor = zusatz.farbe; g.shadowBlur = 14; g.fillText(zusatz.text, x + w / 2, y + h - 22); g.restore(); }
+  }
   function zeichne(g, t, c, p, m, vid) {
     if (p.mehr) return zeichneMehr(g, t, c, p, m, vid);
     if (c.look === 'tv') return zeichneTV(g, t, c, p, m, vid);
     const v = vorlage(c), f = c.farbe || v.farbe, zoom = c.modus === 'zoom';
     const outro = t >= p.T - OUTRO, rz = !outro && t >= p.D && t < p.D + p.R, imClip = !outro;
+    const halt = imClip && angehalten(v, p, t), ana = halt && v.analyse && vid, R = flaeche(c, p, t);
     const [sx, sy] = rz && v.stempel ? schuetteln(t - p.D) : [0, 0];
     g.save(); g.translate(sx, sy);
     // Hintergrund
     if (imClip && vid) {
       if (zoom) {
-        quellBild(g, vid, -40, -40, B + 80, H + 80, rz ? 1.12 : 1.02 + 0.03 * fp(t, 0, p.D), c.versatz);
+        if (ana) analyseBild(g, t, c, p, vid, R);
+        else quellBild(g, vid, -40, -40, B + 80, H + 80, rz ? 1.12 : R.zoom, c.versatz);
         const v1 = g.createLinearGradient(0, 0, 0, 840); v1.addColorStop(0, 'rgba(3,4,6,.92)'); v1.addColorStop(0.45, 'rgba(3,4,6,.8)'); v1.addColorStop(1, 'rgba(3,4,6,0)'); g.fillStyle = v1; g.fillRect(0, 0, B, 840);
         const v2 = g.createLinearGradient(0, 1100, 0, H); v2.addColorStop(0, 'rgba(3,4,6,0)'); v2.addColorStop(0.4, 'rgba(3,4,6,.88)'); g.fillStyle = v2; g.fillRect(0, 1100, B, H - 1100);
       } else weichesBild(g, vid, f);
@@ -406,27 +686,32 @@
       if (!zoom && vid) {
         g.save(); rr(g, fx, fy, fw, fh, 14); g.clip();
         g.fillStyle = '#000'; g.fillRect(fx, fy, fw, fh);
-        quellBild(g, vid, fx, fy, fw, fh, rz ? 1.15 : 1, 0);
+        if (ana) analyseBild(g, t, c, p, vid, R); else quellBild(g, vid, fx, fy, fw, fh, rz ? 1.15 : 1, 0);
         if (rz) { g.fillStyle = 'rgba(0,0,0,.12)'; for (let yy = fy; yy < fy + fh; yy += 6) g.fillRect(fx, yy, fw, 2); }
         g.restore();
         g.save(); g.globalAlpha = fl; rr(g, fx, fy, fw, fh, 14); g.strokeStyle = hexA(f, 0.55); g.lineWidth = 3; g.shadowColor = f; g.shadowBlur = 22; g.stroke(); g.restore();
       }
-      const halt = angehalten(v, p, t);
-      if (halt) { g.fillStyle = 'rgba(0,0,0,.42)'; if (zoom) g.fillRect(0, 0, B, H); else { g.save(); rr(g, fx, fy, fw, fh, 14); g.clip(); g.fillRect(fx, fy, fw, fh); g.restore(); } }
+      if (halt && !v.analyse) { g.fillStyle = v.ampel ? 'rgba(0,0,0,.55)' : 'rgba(0,0,0,.42)'; if (zoom) g.fillRect(0, 0, B, H); else { g.save(); rr(g, fx, fy, fw, fh, 14); g.clip(); g.fillRect(fx, fy, fw, fh); g.restore(); } }
       if (v.regen) { g.fillStyle = 'rgba(40,90,170,.14)'; g.fillRect(zoom ? 0 : fx, zoom ? 0 : fy, zoom ? B : fw, zoom ? H : fh); regen(g, t, p); }
       g.save(); g.globalAlpha = fl;
       if (!zoom) ecken(g, fx - 10, fy - 10, fw + 20, fh + 20, f, 74);
       else ecken(g, 34, 296, B - 68, 1258, f, 90);
       g.restore();
-      // Schild oben links am Rahmen, Uhr oben rechts
+      const mx = B / 2, my = zoom ? 1000 : fy + fh / 2;   // Mitte des Clips
+      if (v.ampel) ampelZeichnen(g, t, p, mx, my, Math.min(fw, 1000));
+      if (ana) analyseOben(g, t, c, p, vid, R, f);
+      // Schild oben links am Rahmen, Uhr oben rechts (Klassen-Duell: beide Klassen mittig)
       const sy0 = zoom ? 618 : fy - 66;
       if (rz) {
         pille(g, 'REPLAY 0.5×', fx + 40, sy0, '#ff2a2a', 30, false);
         if (Math.floor(t * 3) % 2 === 0) { g.save(); g.fillStyle = '#ff2a2a'; g.shadowColor = '#ff2a2a'; g.shadowBlur = 16; g.beginPath(); g.arc(fx + 18, sy0 + 24, 11, 0, Math.PI * 2); g.fill(); g.restore(); }
       }
-      else if (halt) pille(g, '❚❚ PAUSE', fx + 6, sy0, f, 30, true);
+      else if (halt && v.pause) pille(g, '❚❚ PAUSE', fx + 6, sy0, f, 30, true);
+      else if (halt && v.analyse) pille(g, 'STANDBILD · ANALYSE', fx + 6, sy0, f, 30, true);
+      else if (halt && v.ampel) pille(g, 'START', fx + 6, sy0, '#ff2a2a', 30, true);
+      else if (v.klassen) klassenSchilder(g, t, c, sy0 - 6);
       else pille(g, tagText(v), fx + 6, sy0, f, 30, true);
-      if (vid) { g.save(); OR(g, 34); g.textAlign = 'right'; g.shadowColor = f; g.shadowBlur = 14; g.fillStyle = '#fff'; g.fillText(uhr(p.quelle(t) || 0), fx + fw - 6, sy0 + 38); g.restore(); }
+      if (vid && !v.klassen) { g.save(); OR(g, 34); g.textAlign = 'right'; g.shadowColor = f; g.shadowBlur = 14; g.fillStyle = '#fff'; g.fillText(uhr(p.quelle(t) || 0), fx + fw - 6, sy0 + 38); g.restore(); }
       // Fortschritt
       const pr = kl(t / (p.T - OUTRO), 0, 1), py = 1270;
       g.fillStyle = 'rgba(255,255,255,.12)'; g.fillRect(fx, py, fw, 8);
@@ -439,6 +724,7 @@
         stempel(g, t, p, v, f, B / 2, zoom ? 1010 : fy + fh / 2 + 20);
       }
       countdown(g, t, v, p, f, B / 2, zoom ? 1000 : fy + fh / 2, false);
+      if (v.ampel) lichterAus(g, t, p, f, mx, my);
       // Rundenzeit / Abstand groß am Ende
       const erg = ergebnis(v, c, p, t);
       if (erg) {
@@ -446,19 +732,26 @@
         g.save(); g.translate(B / 2, yy); const k = 0.7 + 0.3 * eob(erg.q); g.scale(k, k); g.globalAlpha = Math.min(1, erg.q * 2); g.drawImage(ch.c, -ch.mitte, -ch.base); g.restore();
         if (erg.info) { g.save(); g.globalAlpha = erg.q; SA(g, passt(g, erg.info, 900, 52, SA)); g.textAlign = 'center'; g.fillStyle = '#fff'; g.shadowColor = '#000'; g.shadowBlur = 12; g.fillText(erg.info, B / 2, yy + 70); g.restore(); }
       }
-      // Frage unten als Neon-Band, Pfeile zu den Kommentaren
-      const ub = fp(t, 0.9, 1.25);
-      if (ub > 0) {
-        const bd = band(frageVon(c, v), f, 46), y = 1310;
-        g.save(); g.translate(-(1 - eo(ub)) * B, 0); g.drawImage(bd.c, B / 2 - bd.bandW / 2 - 40, y - 60); g.restore();
-        if (ub >= 1) chevrons(g, B / 2, y + 92, t, f);
+      if (v.klassen) {   // Abstimmung A oder B, darunter die Frage
+        abstimmung(g, t, c, f, 1296);
+        const fq = fp(t, 1.3, 1.7);
+        if (fq > 0) { const fr = frageVon(c, v); g.save(); g.globalAlpha = fq; neonText(g, fr, B / 2, 1470, passt(g, fr, 960, 52, SAx(800)), f, SAx(800), 'center', 16); g.restore(); }
+        marke(g, t, m, f, 1550);
+      } else {
+        // Frage unten als Neon-Band, Pfeile zu den Kommentaren
+        const ub = fp(t, 0.9, 1.25);
+        if (ub > 0) {
+          const bd = band(frageVon(c, v), f, 46), y = 1310;
+          g.save(); g.translate(-(1 - eo(ub)) * B, 0); g.drawImage(bd.c, B / 2 - bd.bandW / 2 - 40, y - 60); g.restore();
+          if (ub >= 1) chevrons(g, B / 2, y + 92, t, f);
+        }
+        // Marke unten: Logo im Neon-Ring, Name, Folgen-Schild
+        marke(g, t, m, f, 1490);
       }
-      // Marke unten: Logo im Neon-Ring, Name, Folgen-Schild
-      marke(g, t, m, f, 1490);
     } else outroZeichnen(g, t - (p.T - OUTRO), m, f);
     g.restore();
-    // Blitze: Anfang, Zeitlupe, Abspann
-    const blitze = [[0.12, 0.5], [p.D, p.R ? 0.6 : 0], [p.T - OUTRO, 0.75]];
+    // Blitze: Anfang, Zeitlupe, Abspann, Lichter aus, Standbild (Analyse)
+    const blitze = [[0.12, 0.5], [p.D, p.R ? 0.6 : 0], [p.T - OUTRO, 0.75], [p.h + p.FD, v.ampel ? 0.7 : 0], [p.h, v.analyse ? 0.45 : 0]];
     for (const [z, a] of blitze) { const d = t - z; if (a && d >= 0 && d < 0.3) { g.fillStyle = `rgba(255,255,255,${a * (1 - d / 0.3)})`; g.fillRect(0, 0, B, H); } }
   }
   // ═══ Top 3 · Vorher/Nachher · Strecke in 30 Sek. (Neon) ═══
@@ -478,15 +771,19 @@
   }
   function zeichneMehr(g, t, c, p, m, bilder) {
     const v = vorlage(c), f = c.farbe || v.farbe, outro = t >= p.T - OUTRO, b = bilder || [];
-    const hg = b.find(Boolean) || null;
+    const hg = (p.mehr === 'erwartung' && b[1]) || b.find(Boolean) || null;
     g.save();
     if (!outro && hg) weichesBild(g, hg, f); else g.drawImage(grund(f), 0, 0);
     if (outro) outroZeichnen(g, t - (p.T - OUTRO), m, f);
     else if (p.mehr === 'top3') top3Zeichnen(g, t, c, p, m, v, f, b);
     else if (p.mehr === 'vergleich') vergleichZeichnen(g, t, c, p, m, v, f, b);
+    else if (p.mehr === 'erwartung') erwartungZeichnen(g, t, c, p, m, v, f, b);
+    else if (p.mehr === 'verkehr') verkehrZeichnen(g, t, c, p, m, v, f, b);
+    else if (p.mehr === 'aufholjagd') aufholjagdZeichnen(g, t, c, p, m, v, f, b);
+    else if (p.mehr === 'sektoren') sektorenZeichnen(g, t, c, p, m, v, f, b);
     else streckeZeichnen(g, t, c, p, m, v, f, b);
     g.restore();
-    const blitze = [[0.12, 0.5], [p.T - OUTRO, 0.75], ...(p.teile ? p.teile.slice(1).map(k => [k.S, 0.7]) : [])];
+    const blitze = [[0.12, 0.5], [p.T - OUTRO, 0.75], ...(p.teile ? p.teile.slice(1).map(k => [k.S, 0.7]) : []), ...(p.lauf && p.lauf < p.D ? [[p.lauf, 0.55]] : [])];
     for (const [z, a] of blitze) { const d = t - z; if (d >= 0 && d < 0.3) { g.fillStyle = `rgba(255,255,255,${a * (1 - d / 0.3)})`; g.fillRect(0, 0, B, H); } }
   }
   function top3Zeichnen(g, t, c, p, m, v, f, b) {
@@ -580,6 +877,196 @@
     frageBand(g, t, frageVon(c, v), f, 1310, 0.9);
     marke(g, t, m, f, 1490);
   }
+  function speedPille(g, p, xr, y) {   // „×2,0 SPEED“ rechtsbündig bis xr (nur wenn wirklich schneller), gibt die neue rechte Kante zurück
+    if (!(p.tempo >= 1.05)) return xr;
+    const tp = '×' + p.tempo.toFixed(1).replace('.', ',') + ' SPEED', w = pillenBreite(g, tp, 30);
+    pille(g, tp, xr - w, y, '#ffffff', 30, false); return xr - w - 14;
+  }
+  // ═══ Durch den Verkehr (Multiclass): Zähler, blaue Flagge, „+1“ mit Klasse, am Ende Standbild mit der Zahl ═══
+  function verkehrZeichnen(g, t, c, p, m, v, f, b) {
+    const fx = 40, fy = 690, fw = 1000, fh = 562, weg = p.marken.filter(x => t >= x.ot), n = weg.length, letzt = weg[n - 1];
+    clipRahmen(g, b[0], fx, fy, fw, fh, f, t);
+    spruchZeichnen(g, t, c.hook || v.hooks[0], f);
+    pille(g, tagText(v), fx + 6, fy - 66, f, 30, true);
+    let xr = fx + fw - 6;
+    const eigen = GROSS(String(c.klasse || '').trim());
+    if (eigen) { const w = pillenBreite(g, eigen, 30); pille(g, eigen, xr - w, fy - 66, klasseFarbe(eigen), 30, true); xr -= w + 14; }
+    speedPille(g, p, xr, fy - 66);
+    if (t < p.lauf) {
+      const nx = p.marken.find(x => x.ot > t - 0.2);   // blaue Flagge, kurz bevor das nächste Auto dran ist
+      if (nx) blaueFlagge(g, fx + 28, fy + 26, t, fp(t, nx.ot - 1.6, nx.ot - 1.3) * (1 - fp(t, nx.ot, nx.ot + 0.2)));
+      const zaehl = new Map(); for (const x of weg) { const k = GROSS(String(x.text || '').trim()) || 'AUTO'; zaehl.set(k, (zaehl.get(k) || 0) + 1); }
+      let xx = fx + 22;   // schon überholte Klassen unten links im Clip
+      for (const [k, z] of zaehl) { if (xx > fx + fw - 300) break; xx += pille(g, `${k} ×${z}`, xx, fy + fh - 72, k === 'AUTO' ? f : klasseFarbe(k), 28, false) + 10; }
+      for (const x of weg) { const k = GROSS(String(x.text || '').trim()); plusEins(g, t - x.ot, k, k ? klasseFarbe(k) : f, fx + fw / 2, fy + fh / 2 + 40); }
+    }
+    zaehlerKasten(g, fx + fw - 24 - 240, fy + 22, 240, 150, 'ÜBERHOLT', String(n), f, letzt ? fp(t, letzt.ot, letzt.ot + 0.4) : 1);
+    if (n && p.lauf < p.D) schlussBild(g, t, p.lauf, fx, fy, fw, fh, f, String(n), n === 1 ? 'AUTO ÜBERHOLT' : 'AUTOS ÜBERHOLT', `IN ${Math.max(1, Math.round(p.x.b - p.x.a))} SEKUNDEN`);
+    fortschrittPunkte(g, t, p, f, fx, fw, 1270);
+    frageBand(g, t, frageVon(c, v), f, 1310, 0.9);
+    marke(g, t, m, f, 1490);
+  }
+  // ═══ Aufholjagd: Platz-Anzeige zählt nach vorn, am Ende „+X Plätze“ ═══
+  const startPlatz = c => kl(parseInt(String(c.startplatz || '').replace(/\D/g, ''), 10) || 20, 2, 99);
+  function platzKasten(g, x, y, w, h, pos, n, d, f) {
+    const pop = fp(d, 0, 0.45), gruen = '#5cff1f', fl = 1 - pop, zh = 112, zy = y + 50;
+    g.save(); rr(g, x, y, w, h, 12); g.fillStyle = 'rgba(5,7,10,.86)'; g.fill(); g.lineWidth = 3; g.strokeStyle = fl > 0 ? gruen : f; g.shadowColor = fl > 0 ? gruen : f; g.shadowBlur = 14 + 30 * fl; g.stroke(); g.shadowBlur = 0;
+    if (fl > 0) { g.fillStyle = hexA(gruen, 0.3 * fl); g.fill(); }
+    SA(g, 28, 700); g.textAlign = 'center'; g.fillStyle = hexA(f, 1); g.fillText('POSITION', x + w / 2, y + 40);
+    g.save(); g.beginPath(); g.rect(x, zy, w, zh); g.clip(); OR(g, passt(g, 'P' + (pos + 1), w - 36, 100, OR)); g.fillStyle = '#fff'; g.shadowColor = f; g.shadowBlur = 20;
+    const q = eo(pop), mitte = zy + zh / 2 + 36;
+    if (pop < 1 && n > 0) { g.globalAlpha = 1 - q; g.fillText('P' + (pos + 1), x + w / 2, mitte - q * zh); g.globalAlpha = 1; g.fillText('P' + pos, x + w / 2, mitte + (1 - q) * zh); }   // Walze: alter Platz raus nach oben, neuer kommt von unten
+    else g.fillText('P' + pos, x + w / 2, mitte);
+    g.restore();
+    SA(g, 40, 900); g.fillStyle = n ? gruen : 'rgba(255,255,255,.55)'; g.shadowColor = n ? gruen : 'transparent'; g.shadowBlur = 14;
+    if (n) {   // Dreieck nach oben + gewonnene Plätze
+      const tw = g.measureText('+' + n).width, x0 = x + w / 2 - (tw + 38) / 2, by = y + h - 30;
+      g.beginPath(); g.moveTo(x0, by); g.lineTo(x0 + 26, by); g.lineTo(x0 + 13, by - 24); g.closePath(); g.fill();
+      g.textAlign = 'left'; g.fillText('+' + n, x0 + 38, y + h - 22);
+    } else g.fillText('START', x + w / 2, y + h - 22);
+    g.restore();
+  }
+  function aufholjagdZeichnen(g, t, c, p, m, v, f, b) {
+    const fx = 40, fy = 690, fw = 1000, fh = 562, start = startPlatz(c), weg = p.marken.filter(x => t >= x.ot).slice(0, start - 1), n = weg.length, letzt = weg[n - 1], gesamt = Math.min(p.marken.length, start - 1);
+    clipRahmen(g, b[0], fx, fy, fw, fh, f, t);
+    spruchZeichnen(g, t, c.hook || v.hooks[0], f);
+    pille(g, tagText(v), fx + 6, fy - 66, f, 30, true);
+    speedPille(g, p, fx + fw - 6, fy - 66);
+    if (t < p.lauf) for (const x of weg) plusEins(g, t - x.ot, GROSS(String(x.text || '').trim()), '#5cff1f', fx + fw / 2 - 60, fy + fh / 2 + 40);
+    platzKasten(g, fx + fw - 24 - 270, fy + 22, 270, 214, start - n, n, letzt ? t - letzt.ot : 9, f);
+    if (gesamt && p.lauf < p.D) schlussBild(g, t, p.lauf, fx, fy, fw, fh, f, '+' + gesamt, gesamt === 1 ? 'PLATZ GUTGEMACHT' : 'PLÄTZE GUTGEMACHT', `VON P${start} AUF P${start - gesamt}`);
+    fortschrittPunkte(g, t, p, f, fx, fw, 1270);
+    frageBand(g, t, frageVon(c, v), f, 1310, 0.9);
+    marke(g, t, m, f, 1490);
+  }
+  // ═══ Sektorzeiten: Zeiten-Turm wie in der F1 (Lila / Grün / Gelb), am Ende die Rundenzeit ═══
+  function zeitenTurm(g, t, p, src, x, y, f, a) {
+    const S = p.sektoren, n = S.length, rh = Math.min(54, Math.floor(420 / n)), w = 372, h = 72 + n * rh + 8;
+    if (a <= 0) return;
+    g.save(); g.globalAlpha = a;
+    rr(g, x, y, w, h, 12); g.fillStyle = 'rgba(5,7,10,.86)'; g.fill(); g.lineWidth = 2; g.strokeStyle = 'rgba(255,255,255,.18)'; g.stroke();
+    g.fillStyle = f; g.shadowColor = f; g.shadowBlur = 12; g.fillRect(x + 12, y + 14, 8, 44); g.shadowBlur = 0;
+    SA(g, 28, 700); g.fillStyle = hexA(f, 1); g.fillText('RUNDE', x + 32, y + 46);
+    OR(g, 40); g.textAlign = 'right'; g.fillStyle = '#fff'; g.fillText(zeitText(t >= p.lauf ? p.runde : src - p.x.a), x + w - 18, y + 50); g.textAlign = 'left';
+    g.fillStyle = 'rgba(255,255,255,.12)'; g.fillRect(x + 12, y + 66, w - 24, 2);
+    S.forEach((s, i) => {
+      const yy = y + 72 + i * rh, fertig = t >= s.ot, aktiv = !fertig && t >= s.ot0, blitz = fertig ? 1 - fp(t, s.ot, s.ot + 0.7) : 0, ty = yy + rh * 0.66;
+      if (blitz > 0) { g.fillStyle = hexA(s.farbe, 0.5 * blitz); rr(g, x + 6, yy + 2, w - 12, rh - 4, 8); g.fill(); }
+      g.fillStyle = fertig ? s.farbe : aktiv ? '#ffffff' : 'rgba(255,255,255,.2)'; g.fillRect(x + 14, yy + 8, 8, rh - 16);
+      SA(g, Math.min(34, rh * 0.62), 900); g.fillStyle = fertig || aktiv ? '#fff' : 'rgba(255,255,255,.4)'; g.fillText('S' + s.n, x + 36, ty);
+      OR(g, Math.min(34, rh * 0.6)); g.textAlign = 'right';
+      g.fillStyle = fertig ? s.farbe : aktiv ? '#fff' : 'rgba(255,255,255,.3)';
+      if (fertig) { g.shadowColor = s.farbe; g.shadowBlur = 14; }
+      g.fillText(fertig ? zeitText(s.zeit) : aktiv ? zeitText(src - s.start) : '-.---', x + w - 18, ty); g.shadowBlur = 0; g.textAlign = 'left';
+    });
+    g.restore();
+  }
+  function sektorKarte(g, d, s, cx, cy) {   // groß unten im Bild, wenn ein Sektor fertig ist
+    if (d < 0 || d > 1.8) return;
+    const q = eob(fp(d, 0, 0.25)), aus = fp(d, 1.45, 1.8), txt = zeitText(s.zeit), lab = 'SEKTOR ' + s.n;
+    g.save(); OR(g, 64); const tw = g.measureText(txt).width; SA(g, 32, 900); const lw = g.measureText(lab).width, w = tw + lw + 116, h = 96;
+    g.globalAlpha *= 1 - aus; g.translate(cx, cy); g.scale(q, q);
+    rr(g, -w / 2, -h / 2, w, h, 14); g.fillStyle = 'rgba(5,7,10,.9)'; g.fill(); g.lineWidth = 4; g.strokeStyle = s.farbe; g.shadowColor = s.farbe; g.shadowBlur = 26; g.stroke(); g.shadowBlur = 0;
+    rr(g, -w / 2 + 12, -h / 2 + 12, lw + 40, h - 24, 10); g.fillStyle = s.farbe; g.fill();
+    SA(g, 32, 900); g.fillStyle = '#06080a'; g.fillText(lab, -w / 2 + 32, 12);
+    OR(g, 64); g.fillStyle = s.farbe; g.shadowColor = s.farbe; g.shadowBlur = 18; g.fillText(txt, -w / 2 + lw + 80, 24);
+    g.restore();
+  }
+  function sektorBalken(g, t, p, fx, fw, py) {   // Fortschritt in Sektoren, fertige in ihrer Farbe
+    const S = p.sektoren, gap = 8, breit = fw - gap * (S.length - 1); let x = fx;
+    for (const s of S) {
+      const w = breit * (s.ot - s.ot0) / (p.lauf || 1), q = kl((t - s.ot0) / ((s.ot - s.ot0) || 1), 0, 1), fertig = t >= s.ot;
+      g.fillStyle = 'rgba(255,255,255,.12)'; g.fillRect(x, py, w, 8);
+      if (q > 0) { g.save(); g.fillStyle = fertig ? s.farbe : '#ffffff'; g.shadowColor = fertig ? s.farbe : '#ffffff'; g.shadowBlur = 14; g.fillRect(x, py, w * q, 8); g.restore(); }
+      x += w + gap;
+    }
+  }
+  function sektorenZeichnen(g, t, c, p, m, v, f, b) {
+    const fx = 40, fy = 690, fw = 1000, fh = 562, S = p.sektoren, src = p.x.a + Math.min(t, p.lauf) * p.tempo, t0 = p.lauf + 0.7;
+    clipRahmen(g, b[0], fx, fy, fw, fh, f, t);
+    spruchZeichnen(g, t, c.hook || v.hooks[0], f);
+    pille(g, tagText(v), fx + 6, fy - 66, f, 30, true);
+    let xr = fx + fw - 6; const st = GROSS(String(c.strecke || '').trim());
+    if (st) { const w = pillenBreite(g, st, 30); pille(g, st, xr - w, fy - 66, '#ffffff', 30, false); xr -= w + 14; }
+    speedPille(g, p, xr, fy - 66);
+    zeitenTurm(g, t, p, src, fx + 22, fy + 22, f, 1 - fp(t, t0, t0 + 0.3));
+    const kw = 1 - fp(t, t0 - 0.15, t0 + 0.15);   // Sektor-Karten weg, bevor die Rundenzeit kommt
+    if (kw > 0) { g.save(); g.globalAlpha = kw; for (const s of S) sektorKarte(g, t - s.ot, s, fx + fw / 2 + 160, fy + fh - 84); g.restore(); }
+    if (p.lauf < p.D) {
+      schlussBild(g, t, t0, fx, fy, fw, fh, f, zeitText(p.runde), 'RUNDENZEIT', '');
+      const q2 = eo(fp(t, t0 + 0.35, t0 + 0.7));
+      if (q2 > 0) {   // Sektoren in ihrer Farbe unter der Rundenzeit
+        g.save(); g.globalAlpha = q2; OR(g, S.length > 4 ? 28 : 36);
+        const teile = S.map(s => ({ s, txt: zeitText(s.zeit) })), lu = 40, ges = teile.reduce((w, x) => w + g.measureText(x.txt).width, 0) + lu * (teile.length - 1);
+        let x = B / 2 - ges / 2; const yy = fy + fh / 2 + 182;
+        for (const x0 of teile) { g.fillStyle = x0.s.farbe; g.shadowColor = x0.s.farbe; g.shadowBlur = 14; g.fillText(x0.txt, x, yy); x += g.measureText(x0.txt).width + lu; }
+        g.restore();
+      }
+    }
+    sektorBalken(g, t, p, fx, fw, 1270);
+    frageBand(g, t, frageVon(c, v), f, 1310, 0.9);
+    marke(g, t, m, f, 1490);
+  }
+  // ═══ Erwartung vs. Realität: oben der Plan, unten was wirklich passiert ist, am Ende Standbild mit Pointe ═══
+  function memeText(g, text, x, y, px, farbe) {
+    g.save(); RU(g, passt(g, text, 900, px, RU)); g.textAlign = 'center'; g.lineJoin = 'round';
+    g.strokeStyle = '#000'; g.lineWidth = px * 0.22; g.strokeText(text, x, y);
+    g.fillStyle = '#fff'; g.shadowColor = farbe; g.shadowBlur = 20; g.fillText(text, x, y);
+    g.restore();
+  }
+  function funkeln(g, t, x, y, w, h, f) {   // goldene Sterne über dem Plan
+    const r = zufallR(11);
+    g.save(); g.fillStyle = '#fff6d6'; g.shadowColor = f; g.shadowBlur = 16;
+    for (let i = 0; i < 12; i++) {
+      const px = x + 40 + r() * (w - 80), py = y + 120 + r() * (h - 160), ph = r() * 6.28, s = 9 + r() * 16, a = Math.sin(t * 3.2 + ph);
+      if (a <= 0.1) continue;
+      g.globalAlpha = a; const k = s * (0.6 + 0.4 * a);
+      g.beginPath(); g.moveTo(px, py - k); g.quadraticCurveTo(px, py, px + k, py); g.quadraticCurveTo(px, py, px, py + k); g.quadraticCurveTo(px, py, px - k, py); g.quadraticCurveTo(px, py, px, py - k); g.fill();
+    }
+    g.restore();
+  }
+  function erwartungZeichnen(g, t, c, p, m, v, f, b) {
+    const q = quellenVon(c), fx = 90, fw = 900, fh = 506, ya = 352, yb = 958, teil2 = t >= p.d0, steh = t >= p.lauf, rot = '#ff2a3d';
+    spruchZeichnen(g, t, c.hook || v.hooks[0], f, { y1: 300, y2: 214, px1: 112, px2: 96 });
+    // Oben: Erwartung (läuft, danach Standbild)
+    clipRahmen(g, b[0], fx, ya, fw, fh, f, t);
+    if (!teil2) funkeln(g, t, fx, ya, fw, fh, f);
+    else { g.save(); rr(g, fx, ya, fw, fh, 14); g.clip(); g.fillStyle = 'rgba(0,0,0,.28)'; g.fillRect(fx, ya, fw, fh); g.restore(); }
+    memeText(g, GROSS(String(q[0].titel || '').trim()) || v.plaetze[0], B / 2, ya + 80, 68, f);
+    // Unten: Realität (erst Fragezeichen, dann der Clip mit Wackler, am Ende Standbild grau mit Pointe)
+    const [sx, sy] = teil2 ? schuetteln(t - p.d0 - 0.02) : [0, 0], zq = eo(fp(t, p.lauf, p.lauf + 0.5));
+    g.save(); g.translate(sx, sy);
+    if (!teil2) {
+      clipRahmen(g, null, fx, yb, fw, fh, '#ffffff', t);
+      const ch = chrom('?', 300, f, 400), pu = 1 + 0.08 * Math.sin(t * 5);
+      g.save(); g.translate(B / 2, yb + fh / 2 + 40); g.scale(pu, pu); g.drawImage(ch.c, -ch.mitte, -ch.base + 100); g.restore();
+    } else {
+      clipRahmen(g, b[1], fx, yb, fw, fh, rot, t, 1 + 0.1 * zq);
+      if (zq > 0) {
+        g.save(); rr(g, fx, yb, fw, fh, 14); g.clip();
+        g.globalCompositeOperation = 'saturation'; g.globalAlpha = 0.9 * zq; g.fillStyle = '#808080'; g.fillRect(fx, yb, fw, fh);
+        g.globalCompositeOperation = 'source-over'; g.globalAlpha = zq; g.fillStyle = 'rgba(120,0,10,.22)'; g.fillRect(fx, yb, fw, fh);
+        g.restore();
+      }
+    }
+    memeText(g, GROSS(String((q[1] || {}).titel || '').trim()) || v.plaetze[1], B / 2, yb + 80, 68, teil2 ? rot : '#ffffff');
+    const sq = fp(t, p.lauf + 0.12, p.lauf + 0.36);
+    if (steh && sq > 0) {
+      const ch = chrom(GROSS(String(c.pointe || '').trim()) || 'NA TOLL.', 150, rot, 860);
+      g.save(); g.translate(B / 2, yb + fh / 2 + 60); g.rotate(-0.1); const k = 1 + (1 - eo(sq)) * 0.9; g.scale(k, k); g.globalAlpha = Math.min(1, sq * 2); g.drawImage(ch.c, -ch.mitte, -ch.base + 50); g.restore();
+    }
+    g.restore();
+    // VS in der Mitte
+    const vy = (ya + fh + yb) / 2, pu = 1 + 0.05 * Math.max(0, Math.sin(t * Math.PI * 2));
+    g.save(); g.translate(B / 2, vy); g.scale(pu, pu);
+    g.beginPath(); g.arc(0, 0, 50, 0, Math.PI * 2); g.fillStyle = '#05070a'; g.fill();
+    g.lineWidth = 6; g.strokeStyle = f; g.shadowColor = f; g.shadowBlur = 24; g.stroke();
+    RU(g, 46); g.textAlign = 'center'; g.fillStyle = '#fff'; g.shadowBlur = 12; g.fillText('VS', 0, 17); g.restore();
+    const pr = kl(t / p.lauf, 0, 1), py = yb + fh + 16;
+    g.fillStyle = 'rgba(255,255,255,.12)'; g.fillRect(fx, py, fw, 8);
+    g.save(); g.fillStyle = teil2 ? rot : f; g.shadowColor = teil2 ? rot : f; g.shadowBlur = 16; g.fillRect(fx, py, fw * pr, 8); g.restore();
+    frageBand(g, t, frageVon(c, v), f, 1538, 0.9);
+  }
   // Letzte 0,4 s: ins erste Bild überblenden, damit das Video nahtlos von vorn weiterläuft
   function loopUebergang(g, t, p, erstes) {
     if (!erstes) return;
@@ -633,27 +1120,44 @@
       return c;
     });
   }
-  function tvKopf(g, t, m, f, status) {   // Senderlogo links, LIVE / PAUSE / REPLAY rechts, Neon-Linie
+  function tvKopf(g, t, m, f, status, eq) {   // Senderlogo links, LIVE / PAUSE / REPLAY rechts, Neon-Linie (eq: Kommentator spricht)
     const replay = status !== 'live';
     const y = 298;
     logoRing(g, 76, y + 27, 28, f, m.logo, t);
-    g.save(); SA(g, passt(g, m.name, 440, 44, SAx(900), 26), 900); g.fillStyle = '#fff'; g.fillText(m.name, 120, y + 43); const w = g.measureText(m.name).width; g.restore();
+    g.save(); SA(g, passt(g, m.name, eq ? 380 : 440, 44, SAx(900), 26), 900); g.fillStyle = '#fff'; g.fillText(m.name, 120, y + 43); const w = g.measureText(m.name).width; g.restore();
     pille(g, 'TV', 120 + w + 12, y + 5, f, 27, true);
     const txt = status === 'pause' ? 'PAUSE' : replay ? 'REPLAY' : 'LIVE', farbe = replay ? f : '#ff2a2a';
     g.save(); SA(g, 36, 900); const bw = g.measureText(txt).width + 70, bx = B - 44 - bw, by = y + 2;
     g.shadowColor = farbe; g.shadowBlur = 20; g.fillStyle = farbe; g.fillRect(bx, by, bw, 50); g.shadowBlur = 0;
     g.fillStyle = replay ? '#06080a' : '#fff'; g.fillText(txt, bx + 48, by + 38);
     if (replay || Math.floor(t * 2) % 2 === 0) { g.beginPath(); g.arc(bx + 26, by + 25, 9, 0, Math.PI * 2); g.fill(); }
+    if (eq) {   // Mikrofon + Pegel-Balken: der Kommentator spricht
+      const ex = bx - 150, r = zufallR(Math.floor(t * 12) + 3);
+      g.fillStyle = '#fff'; rr(g, ex, by + 6, 16, 26, 8); g.fill(); g.strokeStyle = '#fff'; g.lineWidth = 3; g.beginPath(); g.arc(ex + 8, by + 22, 13, 0.15 * Math.PI, 0.85 * Math.PI); g.stroke(); g.fillRect(ex + 6, by + 35, 4, 9);
+      g.fillStyle = f; g.shadowColor = f; g.shadowBlur = 12;
+      for (let i = 0; i < 6; i++) { const hh = 8 + r() * 34; g.fillRect(ex + 34 + i * 15, by + 25 - hh / 2, 9, hh); }
+    }
     g.restore();
     g.save(); g.fillStyle = f; g.shadowColor = f; g.shadowBlur = 18; g.fillRect(40, y + 66, B - 80, 4); g.restore();
   }
-  function tvSchlagzeile(g, t, c, v, f) {   // Etikett + Schlagzeile, wischen von links rein
-    const zeilen = zweiZeilen(GROSS(c.hook || v.hooks[0])), px = zeilen.length > 1 ? 112 : 128, x0 = 40, y0 = 386, bw = B - 80;
+  const rundeText = r => { const s = String(r || '').trim(); return !s ? '' : /^\d+\s*(\/\s*\d+)?$/.test(s) ? 'RUNDE ' + s.replace(/\s+/g, '') : GROSS(s); };
+  function tvSchlagzeile(g, t, c, v, f) {   // Etikett + Schlagzeile, wischen von links rein (Kommentator: Serie, Runde, Spruch in „…“)
+    let zeilen = zweiZeilen(GROSS(c.hook || v.hooks[0]));
+    if (v.kommentator) zeilen = zeilen.map((z, i) => (i === 0 ? '„' : '') + z + (i === zeilen.length - 1 ? '“' : ''));
+    const px = zeilen.length > 1 ? 112 : 128, x0 = 40, y0 = 386, bw = B - 80;
     const q1 = eo(fp(t, 0.15, 0.4)), q2 = eo(fp(t, 0.28, 0.62));
     if (q1 > 0) {
       g.save(); g.beginPath(); g.rect(x0, y0, bw * q1, 56); g.clip();
-      SA(g, 37, 900); const tx = tagText(v), tw = g.measureText(tx).width + 46;
-      g.fillStyle = f; g.shadowColor = f; g.shadowBlur = 16; g.fillRect(x0, y0, tw, 56); g.shadowBlur = 0; g.fillStyle = '#06080a'; g.fillText(tx, x0 + 23, y0 + 42);
+      const tx = v.kommentator ? (GROSS(String(c.serie || '').trim()) || tagText(v)) : tagText(v), ik = v.kommentator ? 34 : 0;
+      SA(g, passt(g, tx, 560, 37, SAx(900), 24), 900); const tw = g.measureText(tx).width + 46 + ik;
+      g.fillStyle = f; g.shadowColor = f; g.shadowBlur = 16; g.fillRect(x0, y0, tw, 56); g.shadowBlur = 0; g.fillStyle = '#06080a'; g.fillText(tx, x0 + 23 + ik, y0 + 42);
+      if (ik) { rr(g, x0 + 20, y0 + 12, 14, 22, 7); g.fill(); g.strokeStyle = '#06080a'; g.lineWidth = 3; g.beginPath(); g.arc(x0 + 27, y0 + 26, 11, 0.15 * Math.PI, 0.85 * Math.PI); g.stroke(); g.fillRect(x0 + 25, y0 + 37, 4, 8); }
+      const rt = v.kommentator ? rundeText(c.runde) : '';
+      if (rt) {   // Runde rechts in derselben Zeile
+        SA(g, 34, 900); const rw = g.measureText(rt).width + 44, rx = x0 + bw - rw;
+        g.fillStyle = 'rgba(8,11,20,.92)'; g.fillRect(rx, y0, rw, 56); g.strokeStyle = f; g.lineWidth = 3; g.strokeRect(rx + 1.5, y0 + 1.5, rw - 3, 53);
+        g.fillStyle = '#fff'; g.fillText(rt, rx + 22, y0 + 41);
+      }
       g.restore();
     }
     if (q2 <= 0) return;
@@ -713,11 +1217,11 @@
     if (info) { SA(g, ipx, 700); g.fillStyle = '#3a4152'; g.fillText(info, x + 36 + ww + 34, y + 52 + 55 + ipx * 0.36); }
     g.restore();
   }
-  function tvLaufschrift(g, t, m, f) {   // Laufschrift ganz unten, Sender links, FOLGEN rechts
+  function tvLaufschrift(g, t, m, f, eigen) {   // Laufschrift ganz unten, Sender links, FOLGEN rechts (eigen: eigener Text)
     const y = 1508, h = 70, links = 236, rechts = 250;
     g.fillStyle = 'rgba(5,7,12,.95)'; g.fillRect(0, y, B, h);
     g.save(); g.fillStyle = f; g.shadowColor = f; g.shadowBlur = 14; g.fillRect(0, y - 4, B, 4); g.restore();
-    const txt = `+++ SIMRACING-CLIPS VON ${m.handle} +++ FOLGEN NICHT VERGESSEN +++ SCHREIB DEINE MEINUNG IN DIE KOMMENTARE `;
+    const txt = eigen ? `+++ ${GROSS(eigen)} +++ FOLG ${m.handle} ` : `+++ SIMRACING-CLIPS VON ${m.handle} +++ FOLGEN NICHT VERGESSEN +++ SCHREIB DEINE MEINUNG IN DIE KOMMENTARE `;
     g.save(); g.beginPath(); g.rect(links, y, B - links - rechts, h); g.clip();
     SA(g, 42, 700); const w = g.measureText(txt).width; g.fillStyle = '#fff';
     for (let x = links - ((t * 170) % w); x < B; x += w) g.fillText(txt, x, y + 49);
@@ -765,17 +1269,22 @@
     g.save(); g.translate(sx, sy);
     if (vid) { unscharf(g, vid); g.save(); g.globalAlpha = 0.88; g.drawImage(studio(f), 0, 0); g.restore(); } else g.drawImage(studio(f), 0, 0);
     const halt = angehalten(v, p, t);
-    tvKopf(g, t, m, f, halt ? 'pause' : rz ? 'replay' : 'live');
+    tvKopf(g, t, m, f, halt ? 'pause' : rz ? 'replay' : 'live', !!v.kommentator);
     tvSchlagzeile(g, t, c, v, f);
     tvBildschirm(g, t, p, f, vid, rz);
     if (halt) { g.fillStyle = 'rgba(0,0,0,.45)'; g.fillRect(40, 730, 1000, 562); }
     if (v.regen) { g.fillStyle = 'rgba(40,90,170,.14)'; g.fillRect(40, 730, 1000, 562); regen(g, t, p); }
     countdown(g, t, v, p, f, B / 2, 1011, true);
     if (rz) stempel(g, t, p, v, f, B / 2, 1031);
-    const erg = ergebnis(v, c, p, t);
+    const erg = ergebnis(v, c, p, t), fahrer = v.kommentator ? GROSS(String(c.fahrer || '').trim()) : '';
     if (erg) tvErgebnis(g, erg, f);
+    else if (fahrer) {   // Kommentator: erst der Fahrer in der Bauchbinde, dann die Frage
+      const w = Math.min(4.6, Math.max(2.4, p.D * 0.45));
+      if (t < w) tvBauchbinde(g, 'IM BILD', fahrer, f, fp(t, 0.9, 1.25) * (1 - fp(t, w - 0.3, w)));
+      else tvBauchbinde(g, 'FRAGE AN DICH', frageVon(c, v), f, fp(t, w, w + 0.35));
+    }
     else tvBauchbinde(g, 'FRAGE AN DICH', frageVon(c, v), f, fp(t, 0.9, 1.25));
-    tvLaufschrift(g, t, m, f);
+    tvLaufschrift(g, t, m, f, v.kommentator ? String(c.laufband || '').trim() : '');
     g.restore();
     if (p.R) tvWischer(g, t, f, m, p.D - 0.25);
   }
@@ -784,6 +1293,30 @@
   const TON_RATE = 48000;
   let RAUSCH = null;
   function rauschen(ctx) { if (!RAUSCH) { RAUSCH = ctx.createBuffer(1, TON_RATE * 2, TON_RATE); const d = RAUSCH.getChannelData(0), r = zufallR(7); for (let i = 0; i < d.length; i++) d[i] = r() * 2 - 1; } return RAUSCH; }
+  // Ton schneller abspielen, ohne dass der Motor höher klingt: kurze Stücke mit Überblendung, jedes passend angelegt (WSOLA)
+  function zeitraffen(ctx, buf, a, dauer, tempo) {
+    const sr = buf.sampleRate, nch = buf.numberOfChannels, N = Math.round(0.06 * sr), Hs = N >> 1, D = Math.round(0.012 * sr);
+    const n = Math.max(1, Math.floor(dauer / tempo * sr)), out = ctx.createBuffer(nch, n + N, sr), a0 = Math.floor(a * sr), L = buf.length;
+    const x = Array.from({ length: nch }, (_, k) => buf.getChannelData(k)), y = Array.from({ length: nch }, (_, k) => out.getChannelData(k));
+    const mono = new Float32Array(L); for (const ch of x) for (let i = 0; i < L; i++) mono[i] += ch[i];
+    const fen = new Float32Array(N); for (let i = 0; i < N; i++) fen[i] = 0.5 - 0.5 * Math.cos(2 * Math.PI * i / N);
+    let vor = a0;   // wo das letzte Stück im Original lag
+    for (let o = 0, k = 0; o < n; o += Hs, k++) {
+      const soll = a0 + Math.round(o * tempo);
+      let best = soll;
+      if (k) {   // Stelle suchen, die am besten an das letzte Stück anschließt
+        const weiter = vor + Hs; let bw = -Infinity;
+        for (let d = -D; d <= D; d += 2) {
+          const q = soll + d; if (q < 0 || q + Hs >= L || weiter + Hs >= L) continue;
+          let sum = 0; for (let i = 0; i < Hs; i += 4) sum += mono[q + i] * mono[weiter + i];
+          if (sum > bw) { bw = sum; best = q; }
+        }
+      }
+      for (let c2 = 0; c2 < nch; c2++) { const xs = x[c2], ys = y[c2]; for (let i = 0; i < N; i++) { const si = best + i; if (si >= 0 && si < L) ys[o + i] += xs[si] * fen[i]; } }
+      vor = best;
+    }
+    return out;
+  }
   async function tonMischen(c, p, quelle) {
     const ctx = new OfflineAudioContext(2, Math.ceil(TON_RATE * p.T), TON_RATE), aus = ctx.createDynamicsCompressor();
     aus.threshold.value = -10; aus.ratio.value = 4; aus.connect(ctx.destination);
@@ -797,20 +1330,26 @@
       };
       const teil = (buf, start, offset, dauer, vol, rate) => {
         if (!buf || dauer <= 0.05) return;
-        if (p.mehr !== 'strecke') vol *= pegel(buf, offset, dauer);
+        if (!MARKEN[p.mehr]) vol *= pegel(buf, offset, dauer);
         const sn = ctx.createBufferSource(); sn.buffer = buf; if (rate) sn.playbackRate.value = rate;
         const gn = ctx.createGain(), ende = start + dauer / (rate || 1); sn.connect(gn); gn.connect(aus);
         gn.gain.setValueAtTime(0.0001, start); gn.gain.linearRampToValueAtTime(vol, start + 0.05); gn.gain.setValueAtTime(vol, Math.max(start + 0.05, ende - 0.08)); gn.gain.linearRampToValueAtTime(0.0001, ende);
         sn.start(start, offset, dauer);
       };
-      if (p.mehr === 'top3') for (const k of p.teile) teil(spuren[k.q], k.S, k.a, k.d, 0.9);
+      if (p.mehr === 'top3' || p.mehr === 'erwartung') for (const k of p.teile) teil(spuren[k.q], k.S, k.a, k.d, 0.9);
       else if (p.mehr === 'vergleich') { teil(spuren[0], 0, p.x0.a, p.D, 0.55); teil(spuren[1], 0, p.x1.a, p.D, 0.55); }
-      else teil(spuren[0], 0, p.x.a, p.x.b - p.x.a, 0.7, p.tempo);
+      else if (p.tempo > 1.02 && spuren[0]) { const st = zeitraffen(ctx, spuren[0], p.x.a, p.x.b - p.x.a, p.tempo); teil(st, 0, 0, Math.min(st.duration, p.lauf), 0.7); }   // Zeitraffer: schneller, Motor klingt gleich
+      else teil(spuren[0], 0, p.x.a, p.x.b - p.x.a, 0.7);
     } else if (quelle) {
       const h = ctx.createBufferSource(); h.buffer = quelle; const hg = ctx.createGain(); h.connect(hg); hg.connect(aus);
       if (p.FD) {   // bis zum Anhalten, dann Stille, dann weiter ab dem Haltepunkt
         hg.gain.setValueAtTime(0.9, 0); hg.gain.setValueAtTime(0.9, Math.max(0, p.h - 0.04)); hg.gain.linearRampToValueAtTime(0.0001, p.h);
-        h.start(0, p.a, p.h);
+        if (p.h > 0.02) h.start(0, p.a, p.h);
+        else if (vorlage(c).ampel && p.a > 0.4) {   // Lights Out: während der Ampel der echte Ton aus dem Clip vor dem Anfang
+          const vorl = Math.min(p.a, p.FD), sv = ctx.createBufferSource(), gv = ctx.createGain(); sv.buffer = quelle; sv.connect(gv); gv.connect(aus);
+          gv.gain.setValueAtTime(0.0001, p.FD - vorl); gv.gain.linearRampToValueAtTime(0.75, p.FD - vorl + 0.4); gv.gain.setValueAtTime(0.75, p.FD - 0.03); gv.gain.linearRampToValueAtTime(0.0001, p.FD);
+          sv.start(p.FD - vorl, p.a - vorl, vorl);
+        }
         const h2 = ctx.createBufferSource(); h2.buffer = quelle; const hg2 = ctx.createGain(); h2.connect(hg2); hg2.connect(aus);
         hg2.gain.setValueAtTime(0.0001, p.h + p.FD); hg2.gain.linearRampToValueAtTime(0.9, p.h + p.FD + 0.05); hg2.gain.setValueAtTime(0.9, Math.max(p.h + p.FD + 0.05, p.D - 0.08)); hg2.gain.linearRampToValueAtTime(0.0001, p.D);
         h2.start(p.h + p.FD, p.F, p.b - p.F);
@@ -868,8 +1407,52 @@
       if (p.R) { zisch(p.D - 0.25, 0.3, 0.3, true); wumms(p.D, 0.8, true); }
       anstieg(p.T - OUTRO - 0.7, 0.7, 0.3); wumms(p.T - OUTRO, 0.9, true); [1318, 1661, 1976].forEach((fq, i) => ton(p.T - OUTRO + 0.25 + i * 0.07, fq, 1.2, 0.08));
     }
-    if (p.teile) for (const k of p.teile.slice(1)) { zisch(k.S - 0.3, 0.3, 0.3, true); wumms(k.S, 0.85); glitch(k.S, 0.3, 0.16); }
-    if (p.marken) for (const mk of p.marken) { ton(mk.ot, 1318, 0.22, 0.07); ton(mk.ot + 0.06, 1976, 0.25, 0.05); }
+    if (p.mehr === 'top3') for (const k of p.teile.slice(1)) { zisch(k.S - 0.3, 0.3, 0.3, true); wumms(k.S, 0.85); glitch(k.S, 0.3, 0.16); }
+    // Neue Vorlagen: eigene Sounds
+    const saege = (t, f0, f1, d, vol, lp, ab) => {   // gesägter Ton mit Tiefpass (Motor, Posaune), ab = Ausblenden
+      const o = ctx.createOscillator(), o2 = ctx.createOscillator(), fl = ctx.createBiquadFilter(), g = ctx.createGain(); o.type = 'sawtooth'; o2.type = 'sawtooth';
+      o.frequency.setValueAtTime(f0, t); o.frequency.exponentialRampToValueAtTime(f1, t + d); o2.frequency.setValueAtTime(f0 * 1.007, t); o2.frequency.exponentialRampToValueAtTime(f1 * 1.007, t + d);
+      fl.type = 'lowpass'; fl.frequency.value = lp || 900; g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(vol, t + 0.03); g.gain.setValueAtTime(vol, Math.max(t + 0.03, t + d - (ab || 0.06))); g.gain.linearRampToValueAtTime(0.0001, t + d);
+      o.connect(fl); o2.connect(fl); fl.connect(g); g.connect(aus); o.start(t); o.stop(t + d + 0.02); o2.start(t); o2.stop(t + d + 0.02); return { o, o2, fl, g };
+    };
+    if (p.mehr === 'verkehr') { for (const mk of p.marken) { zisch(mk.ot - 0.28, 0.3, 0.2); ton(mk.ot, 1568, 0.16, 0.08); ton(mk.ot + 0.05, 2093, 0.2, 0.05); } }
+    else if (p.mehr === 'aufholjagd') { p.marken.forEach((mk, i) => { const k = Math.pow(2, Math.min(i, 12) / 24); [523.25, 659.25, 783.99].forEach((fq, j) => ton(mk.ot + j * 0.055, fq * k, 0.16, 0.07)); }); }
+    else if (p.mehr === 'sektoren') { for (const s2 of p.sektoren) { const lila = s2.farbe === SEKTOR_FARBEN.lila; ton(s2.ot, 1760, 0.12, 0.08); ton(s2.ot + 0.13, lila ? 2349 : 1760, 0.2, 0.07); if (lila) ton(s2.ot + 0.26, 3136, 0.3, 0.04); } }
+    else if (p.marken) for (const mk of p.marken) { ton(mk.ot, 1318, 0.22, 0.07); ton(mk.ot + 0.06, 1976, 0.25, 0.05); }
+    if (p.lauf && p.lauf < p.D && p.mehr !== 'erwartung') { wumms(p.lauf, 0.85); [1046.5, 1318.5, 1568, 2093].forEach((fq, i) => ton(p.lauf + 0.12 + i * 0.08, fq, 0.9, 0.06)); }   // Standbild mit Ergebnis
+    if (p.mehr === 'erwartung') {
+      [440, 554.37, 659.25].forEach(fq => { const o = ctx.createOscillator(), g = ctx.createGain(); o.type = 'triangle'; o.frequency.value = fq; g.gain.setValueAtTime(0.0001, 0.2); g.gain.linearRampToValueAtTime(0.035, 0.9); g.gain.setValueAtTime(0.035, Math.max(0.9, p.d0 - 0.25)); g.gain.linearRampToValueAtTime(0.0001, p.d0); o.connect(g); g.connect(aus); o.start(0.2); o.stop(p.d0 + 0.05); });   // „himmlischer“ Akkord beim Plan
+      { const n = rn(p.d0 - 0.18, 0.3), bp = ctx.createBiquadFilter(), g = ctx.createGain(); bp.type = 'bandpass'; bp.Q.value = 3; bp.frequency.setValueAtTime(2600, p.d0 - 0.18); bp.frequency.exponentialRampToValueAtTime(400, p.d0 - 0.05); bp.frequency.exponentialRampToValueAtTime(1800, p.d0 + 0.1); g.gain.setValueAtTime(0.5, p.d0 - 0.18); g.gain.exponentialRampToValueAtTime(0.0001, p.d0 + 0.12); n.connect(bp); bp.connect(g); g.connect(aus); }   // Platten-Kratzer
+      wumms(p.d0, 0.9); glitch(p.d0, 0.25, 0.18);
+      const t0 = Math.max(p.d0 + 0.4, p.lauf - 0.45);   // traurige Posaune: wah wah wah waaah
+      [[293.66, 0.36], [277.18, 0.36], [261.63, 0.36], [246.94, 1.15]].reduce((t, [fq, d], i) => {
+        const x = saege(t, fq, fq * (i === 3 ? 0.97 : 0.985), d, 0.13, 1100);
+        if (i === 3) { const lfo = ctx.createOscillator(), lg = ctx.createGain(); lfo.frequency.value = 6; lg.gain.value = 7; lfo.connect(lg); lg.connect(x.o.frequency); lg.connect(x.o2.frequency); lfo.start(t + 0.15); lfo.stop(t + d); }
+        x.fl.frequency.setValueAtTime(500, t); x.fl.frequency.linearRampToValueAtTime(1400, t + Math.min(0.2, d * 0.5));
+        return t + d + 0.04;
+      }, t0);
+    }
+    if (v.ampel) {   // je Lampe ein dumpfer Schlag mit leisem Piepen, bei „Lichter aus“ Knall – den Motor liefert der Clip selbst
+      AMPEL_AN.forEach(z => { wumms(z, 0.35, true); ton(z, 660, 0.12, 0.04); });
+      wumms(p.FD, 0.9); zisch(p.FD - 0.3, 0.35, 0.25);
+    }
+    if (v.analyse) {   // Auslöser + Wusch beim Anhalten, Stift kritzelt, Ping beim Text, Wusch beim Weiterlaufen
+      { const n = rn(p.h, 0.05), hp = ctx.createBiquadFilter(), g = ctx.createGain(); hp.type = 'highpass'; hp.frequency.value = 2500; g.gain.setValueAtTime(0.5, p.h); g.gain.exponentialRampToValueAtTime(0.0001, p.h + 0.05); n.connect(hp); hp.connect(g); g.connect(aus); }
+      zisch(p.h - 0.15, 0.3, 0.2, true); wumms(p.h, 0.5, true);
+      for (let z = p.h + 0.3; z < p.h + 0.85; z += 0.045) { const n = rn(z, 0.04), bp = ctx.createBiquadFilter(), g = ctx.createGain(); bp.type = 'bandpass'; bp.Q.value = 2; bp.frequency.value = 2200 + Math.sin(z * 40) * 900; g.gain.setValueAtTime(0.07, z); g.gain.exponentialRampToValueAtTime(0.0001, z + 0.04); n.connect(bp); bp.connect(g); g.connect(aus); }
+      ton(p.h + 0.78, 1568, 0.4, 0.07); ton(p.h + 0.84, 2093, 0.5, 0.05);
+      zisch(p.h + p.FD - 0.3, 0.35, 0.18);
+    }
+    if (v.klassen) { for (const z of [0.5, 1.15]) { ton(z, 220, 0.25, 0.08); ton(z, 233, 0.25, 0.08); wumms(z, 0.45); glitch(z, 0.12, 0.12); } }   // „VS“-Schlag
+    if (v.kommentator) {   // Publikum jubelt zum Höhepunkt
+      const t0 = Math.max(0.5, p.D - 1.4), d = Math.min(3.2, p.D + (p.R || 0) - t0);
+      for (const [fq, vol] of [[900, 0.09], [1700, 0.06], [2900, 0.035]]) {
+        const n = rn(t0, d), bp = ctx.createBiquadFilter(), g = ctx.createGain(); bp.type = 'bandpass'; bp.Q.value = 0.9; bp.frequency.value = fq;
+        g.gain.setValueAtTime(0.0001, t0); g.gain.linearRampToValueAtTime(vol, t0 + 0.6);
+        for (let z = t0 + 0.6; z < t0 + d - 0.6; z += 0.11) g.gain.linearRampToValueAtTime(vol * (0.75 + Math.random() * 0.5), z);
+        g.gain.linearRampToValueAtTime(0.0001, t0 + d); n.connect(bp); bp.connect(g); g.connect(aus);
+      }
+    }
     zisch(p.T - LOOP, LOOP, 0.22);   // Übergang in die Schleife
     const buf = await ctx.startRendering();
     // Lautheit angleichen (Ziel ≈ −15 dBFS, Spitzen unter −1 dB)
@@ -1190,7 +1773,7 @@
       vorlage: vl.id, hook: vl.hooks[0], unten: vl.unten[0], wieder: vl.wieder, zeitlupe: vl.zl, modus: 'ganz', versatz: 0, farbe: vl.farbe, text: vorlageText(vl, {}), textEigen: false, look: LETZTER_LOOK,
       insta: true, tiktok: !!(stand().tiktok && stand().tiktok.verbunden), postMs: 0 };
   }
-  const platzZahl = v => (v.mehr === 'top3' ? 3 : v.mehr === 'vergleich' ? 2 : 1);
+  const platzZahl = v => (v.plaetze ? v.plaetze.length : 1);
   function extraZurueck(c, ab) {   // weitere Clips ab Platz „ab“ zurück in die Warteschlange (nicht, wenn es derselbe Clip ist)
     const weg = (c.extra || []).splice(Math.max(0, ab - 1));
     for (const x of weg) if (x.url !== c.url && !quellenVon(c).some(y => y.url === x.url)) CLIPS.push(clipAusQuelle(x));
@@ -1200,12 +1783,20 @@
     c.vorlage = v.id; c.hook = v.hooks[0]; c.unten = v.unten[0]; c.wieder = v.wieder; c.zeitlupe = v.zl; c.farbe = v.farbe; c.text = vorlageText(v, c); c.textEigen = false;
     extraZurueck(c, platzZahl(v));
     if (alt.mehr !== v.mehr) for (const x of quellenVon(c)) x.titel = '';   // Titel passen nicht zur anderen Vorlage
+    if (alt.id !== v.id && (MARKEN[alt.mehr] || MARKEN[v.mehr])) {   // Markierungen je Vorlage merken (Kurven sind keine überholten Autos)
+      c.markenVon = c.markenVon || {};
+      if (MARKEN[alt.mehr]) c.markenVon[alt.mehr] = c.marken || [];
+      c.marken = (MARKEN[v.mehr] && c.markenVon[v.mehr]) || [];
+    }
     if (v.mehr) {
       c.look = 'neon'; c.modus = 'ganz'; c.extra = c.extra || [];
       while (quellenVon(c).length < platzZahl(v) && CLIPS.length > 1) c.extra.push(quelleAusClip(CLIPS.splice(1, 1)[0]));
-      if (v.mehr === 'strecke') { c.start = 0; c.ende = c.dauer; }
+      if (MARKEN[v.mehr]) { if (!MARKEN[alt.mehr]) { c.start = 0; c.ende = c.dauer; } }   // ganze Runde / ganzer Clip
       else if (alt.mehr !== v.mehr) { c.start = Math.max(0, c.dauer - 8); c.ende = c.dauer; }
-    } else if (alt.mehr) { c.look = LETZTER_LOOK; c.start = Math.max(0, c.dauer - 15); c.ende = c.dauer; }
+    } else {
+      if (alt.mehr) { c.start = Math.max(0, c.dauer - 15); c.ende = c.dauer; }
+      c.look = v.nurNeon ? 'neon' : v.nurTV ? 'tv' : LETZTER_LOOK;   // manche Vorlagen gibt es nur in einem Look
+    }
   }
   const postText = c => String(c.text || '').replace(/[ \t]{2,}/g, ' ').replace(/[ \t]+\n/g, '\n').trim();
   const sek = s => (Math.round(s * 10) / 10).toLocaleString('de-DE', { minimumFractionDigits: 1 }) + ' s';
@@ -1245,14 +1836,15 @@
     const v = vorlage(c), p = zeitplan(c);
     return `<div class="kc-editor">
       <div class="kc-links">
-        <div class="kc-buehne"><canvas class="kc-vorschau" width="540" height="960" data-c="vorschau"></canvas>
+        <div class="kc-buehne"><canvas class="kc-vorschau${v.analyse ? ' ziel' : ''}" width="540" height="960" data-c="vorschau"></canvas>
           <button type="button" class="kc-ton" data-c="ton">${VOR.ton ? '🔊' : '🔇'}</button></div>
         <div class="kc-dim kc-mitte">Vorschau läuft in Schleife · ${sek(p.T)} lang${VOR.ton ? '' : ' · 🔇 tippen für Ton'}</div>
         <div class="kc-dim kc-mitte">Effekt-Sounds hörst du im fertigen Video.</div>
+        ${v.analyse ? '<div class="kc-hinweis kc-mitte">🎯 Tipp ins Bild auf die Stelle, die eingekreist werden soll.</div>' : ''}
       </div>
       <div class="kc-rechts">
         <div class="kc-schritt">1 · Vorlage</div>
-        <div class="kc-vorlagen">${VORLAGEN.map(x => `<button type="button" class="kc-vl${x.id === c.vorlage ? ' an' : ''}" data-c="vorlage" data-wert="${x.id}" style="--f:${x.farbe}"><span>${x.emoji}</span>${esc(x.name)}</button>`).join('')}</div>
+        <div class="kc-vorlagen">${GRUPPEN.map(([gr, gname]) => { const l = VORLAGEN.filter(x => gruppeVon(x) === gr); return l.length ? `<div class="kc-vgruppe">${esc(gname)}</div>` + l.map(x => `<button type="button" class="kc-vl${x.id === c.vorlage ? ' an' : ''}" data-c="vorlage" data-wert="${x.id}" style="--f:${x.farbe}"><span>${x.emoji}</span>${esc(x.name)}${x.neu ? '<em>NEU</em>' : ''}</button>`).join('') : ''; }).join('')}</div>
         ${tipp(esc(v.hilfe))}
         <div class="kc-schritt">2 · Spruch & Look</div>
         <label class="kc-feld">Spruch oben<div class="kc-zeile"><input type="text" maxlength="40" value="${esc(c.hook)}" data-c="hook"><button type="button" class="btn ki-k" data-c="wuerfeln" title="Anderer Spruch">🎲</button></div>${tipp('Der erste Satz entscheidet, ob jemand stehen bleibt. Kurz und frech. 🎲 = anderer Vorschlag.')}</label>
@@ -1260,14 +1852,14 @@
         ${c.zeitlupe ? `<label class="kc-feld">Text in der Zeitlupe<div class="kc-zeile"><input type="text" maxlength="40" value="${esc(c.wieder || '')}" placeholder="${esc(v.wieder)}" data-c="wieder"><button type="button" class="btn ki-k" data-c="wuerfeln-wieder" title="Anderer Text">🎲</button></div></label>` : ''}
         ${v.felder ? `<div class="kc-felder">${v.felder.map(([k, label, ph]) => `<label class="kc-feld">${esc(label)}<input type="text" maxlength="40" placeholder="${esc(ph)}" value="${esc(c[k] || '')}" data-c="feld" data-feld="${k}"></label>`).join('')}</div>
           ${tipp(esc(v.feldTipp || ''))}` : ''}
-        ${v.mehr ? '' : `<div class="kc-umschalt kc-looks">${LOOKS.map(([k, n]) => `<button type="button" class="${(c.look || 'neon') === k ? 'an' : ''}" data-c="look" data-wert="${k}">${n}</button>`).join('')}</div>`}
+        ${v.mehr || v.nurNeon || v.nurTV ? '' : `<div class="kc-umschalt kc-looks">${LOOKS.map(([k, n]) => `<button type="button" class="${(c.look || 'neon') === k ? 'an' : ''}" data-c="look" data-wert="${k}">${n}</button>`).join('')}</div>`}
         <div class="kc-farben">${FARBEN.map(f => `<button type="button" class="kc-farbe${f === c.farbe ? ' an' : ''}" style="--f:${f}" data-c="farbe" data-wert="${f}" aria-label="Neonfarbe ${f}"></button>`).join('')}<span class="kc-dim">Neonfarbe</span></div>
         ${v.mehr ? '' : `<div class="kc-felder">
           ${c.look === 'tv' ? '' : `<div class="kc-umschalt"><button type="button" class="${c.modus !== 'zoom' ? 'an' : ''}" data-c="modus" data-wert="ganz">▭ Ganzes Bild</button><button type="button" class="${c.modus === 'zoom' ? 'an' : ''}" data-c="modus" data-wert="zoom">▯ Zoom</button></div>`}
           <label class="kc-check"><input type="checkbox" data-c="zeitlupe" ${c.zeitlupe ? 'checked' : ''}> <span><b>Zeitlupe</b> vom Ende</span></label>
         </div>`}
         ${c.modus === 'zoom' && c.look !== 'tv' && !v.mehr ? `<label class="kc-feld">Bildausschnitt<input type="range" min="-1" max="1" step="0.05" value="${c.versatz}" data-c="versatz"></label>` : ''}
-        ${v.mehr ? tipp(TIPP_MEHR[v.mehr]) : tipp(c.look === 'tv'
+        ${v.mehr ? tipp(TIPP_MEHR[v.mehr]) : v.nurNeon ? tipp('Nur Neon-Look. Ganzes Bild: Clip im Rahmen. Zoom: Clip füllt das ganze Handy. Zeitlupe: die letzten Sekunden nochmal halb so schnell.') : tipp(c.look === 'tv'
           ? 'TV-Sendung: wie eine Live-Übertragung mit Schlagzeile, LIVE/REPLAY, Bauchbinde und Laufschrift. Zeitlupe: die letzten Sekunden nochmal halb so schnell, mit Replay-Übergang.'
           : 'Neon: Chrom-Schrift im Neon-Rahmen. Ganzes Bild: Clip im Rahmen. Zoom: Clip füllt das ganze Handy (Seiten werden abgeschnitten). Zeitlupe: die letzten Sekunden nochmal halb so schnell.')}
         ${v.mehr ? schnittMehr(c, v, p) : schnittEinfach(c, v, p)}
@@ -1292,21 +1884,30 @@
   const TIPP_MEHR = {
     top3: 'Nur Neon-Look. Jeder Platz bekommt eine große Nummer und seinen Titel im Band.',
     vergleich: 'Nur Neon-Look. Das Video ist so lang wie der kürzere Clip.',
-    strecke: 'Nur Neon-Look. Lange Runden laufen schneller (bis 4×), damit sie in etwa 30 Sekunden passen.'
+    strecke: 'Nur Neon-Look. Lange Runden laufen schneller (bis 4×), damit sie in etwa 30 Sekunden passen.',
+    verkehr: 'Nur Neon-Look. Lange Clips laufen schneller (bis 3×), damit sie in etwa 30 Sekunden passen.',
+    aufholjagd: 'Nur Neon-Look. Lange Clips laufen schneller (bis 4×), damit sie in etwa 35 Sekunden passen.',
+    sektoren: 'Nur Neon-Look. Lange Runden laufen schneller (bis 3×), die Zeiten bleiben echt.',
+    erwartung: 'Nur Neon-Look. Erst läuft die Erwartung, dann die Realität, am Ende Standbild.'
   };
   function schnittMehr(c, v, p) {
-    if (v.mehr === 'strecke') {
-      const st = VOR.stelle != null ? kl(VOR.stelle, p.a, p.b) : p.a, mk = (c.marken || []).slice().sort((x, y) => x.t - y.t);
-      return `<div class="kc-schritt">3 · Runde & Kurven</div>
+    const mc = MARKEN[v.mehr];
+    if (mc) {   // ein Clip mit Markierungen (Kurven, Autos, Plätze, Sektoren)
+      const st = VOR.stelle != null ? kl(VOR.stelle, p.a, p.b) : p.a, mk = (c.marken || []).slice().sort((x, y) => x.t - y.t), start = startPlatz(c), runde = v.mehr === 'strecke' || v.mehr === 'sektoren';
+      const kurz = i => (mc.kurz ? mc.kurz(i) : 'P' + Math.max(1, start - i - 1));
+      const farbWahl = (wert, attr) => `<select class="kc-wahl kc-sfarbe" ${attr}>${[['lila', '🟣 Lila'], ['gruen', '🟢 Grün'], ['gelb', '🟡 Gelb']].map(([k, n]) => `<option value="${k}" ${(wert || 'lila') === k ? 'selected' : ''}>${n}</option>`).join('')}</select>`;
+      const letzt = p.sektoren ? p.sektoren[p.sektoren.length - 1] : null;
+      return `<div class="kc-schritt">${mc.schritt}</div>
         <div class="kc-schnitt">
-          <label class="kc-feld">Runde beginnt <b data-c="start-wert">${sek(p.a)}</b><input type="range" min="0" max="${c.dauer}" step="0.1" value="${p.a}" data-c="start"></label>
-          <label class="kc-feld">Runde endet <b data-c="ende-wert">${sek(p.b)}</b><input type="range" min="0" max="${c.dauer}" step="0.1" value="${p.b}" data-c="ende"></label>
+          <label class="kc-feld">${mc.von} <b data-c="start-wert">${sek(p.a)}</b><input type="range" min="0" max="${c.dauer}" step="0.1" value="${p.a}" data-c="start"></label>
+          <label class="kc-feld">${mc.bis} <b data-c="ende-wert">${sek(p.b)}</b><input type="range" min="0" max="${c.dauer}" step="0.1" value="${p.b}" data-c="ende"></label>
         </div>
-        ${tipp(p.tempo >= 1.05 ? `Runde ${sek(p.b - p.a)} → im Video ${sek(p.D)} (${p.tempo.toFixed(1).replace('.', ',')}× schneller).` : `Runde ${sek(p.b - p.a)} – passt ohne Zeitraffer.`)}
-        <label class="kc-feld">Stelle für die nächste Kurve <b data-c="stelle-wert">${sek(st - p.a)}</b><input type="range" min="${p.a}" max="${p.b}" step="0.1" value="${st}" data-c="stelle"></label>
-        <div class="kc-knoepfe"><button type="button" class="btn ki-k" data-c="marke-neu">＋ Kurve an dieser Stelle</button></div>
-        ${tipp('Stelle schieben, die Vorschau zeigt das Bild. Dann „＋ Kurve“ und Text, z. B. „Copse – voll durch“ (vor dem Strich groß, dahinter klein).')}
-        ${mk.length ? `<div class="kc-marken">${mk.map((x, i) => `<div class="kc-marke"><b>T${i + 1}</b><span class="kc-dim">${sek(Math.max(0, x.t - p.a))}</span><input type="text" maxlength="40" value="${esc(x.text || '')}" placeholder="Kurvenname – Tipp" data-c="marke-text" data-k="${esc(x.id)}"><button type="button" class="btn ki-k" data-c="marke-weg" data-k="${esc(x.id)}" title="Kurve löschen">✕</button></div>`).join('')}</div>` : ''}`;
+        ${tipp(p.tempo >= 1.05 ? `${runde ? 'Runde' : 'Clip'} ${sek(p.b - p.a)} → im Video ${sek(p.lauf)} (${p.tempo.toFixed(1).replace('.', ',')}× schneller).` : `${runde ? 'Runde' : 'Clip'} ${sek(p.b - p.a)} – passt ohne Zeitraffer.`)}
+        <label class="kc-feld">${mc.stelle} <b data-c="stelle-wert">${sek(st - p.a)}</b><input type="range" min="${p.a}" max="${p.b}" step="0.1" value="${st}" data-c="stelle"></label>
+        <div class="kc-knoepfe"><button type="button" class="btn ki-k" data-c="marke-neu">${mc.knopf}</button></div>
+        ${tipp(mc.tipp)}
+        ${mk.length ? `<div class="kc-marken">${mk.map((x, i) => `<div class="kc-marke"><b>${kurz(i)}</b><span class="kc-dim">${sek(Math.max(0, x.t - p.a))}</span><input type="text" maxlength="40" value="${esc(x.text || '')}" placeholder="${esc(mc.ph)}" data-c="marke-text" data-k="${esc(x.id)}">${mc.farbe ? farbWahl(x.farbe, `data-c="marke-farbe" data-k="${esc(x.id)}"`) : ''}<button type="button" class="btn ki-k" data-c="marke-weg" data-k="${esc(x.id)}" title="Löschen">✕</button></div>`).join('')}</div>` : ''}
+        ${letzt ? `<div class="kc-marke"><b>S${letzt.n}</b><span class="kc-dim">bis Rundenende</span><span class="kc-fuell">${esc(zeitText(letzt.zeit))}</span>${farbWahl(c.sektorLetzt, 'data-c="sektor-letzt"')}</div>` : ''}`;
     }
     const q = quellenVon(c), warte = CLIPS.slice(1);
     let erstLeer = true;
@@ -1317,7 +1918,7 @@
           const knoepfe = erstLeer ? `<div class="kc-knoepfe">
               ${warte.length ? `<select class="kc-wahl" data-c="slot-wahl"><option value="">Aus der Warteschlange …</option>${warte.map((x, k) => `<option value="${k + 1}">${esc(x.name)}</option>`).join('')}</select>` : ''}
               <label class="btn ki-k kc-datei">📂 Clip wählen<input type="file" accept="video/*" data-c="slot-datei"></label>
-              ${v.mehr === 'vergleich' ? '<button type="button" class="btn ki-k" data-c="slot-gleich">Gleicher Clip, andere Stelle</button>' : ''}</div>` : '';
+              ${v.mehr === 'vergleich' || v.mehr === 'erwartung' ? '<button type="button" class="btn ki-k" data-c="slot-gleich">Gleicher Clip, andere Stelle</button>' : ''}</div>` : '';
           erstLeer = false;
           return `<div class="kc-slot leer" style="--f:${c.farbe || v.farbe}"><div class="kc-slot-kopf"><b>${esc(name)}</b><span class="kc-dim">fehlt noch</span></div>${knoepfe}</div>`;
         }
@@ -1330,7 +1931,9 @@
             <label class="kc-feld">Ende <b data-c="slot-b-wert" data-i="${i}">${sek(b)}</b><input type="range" min="0" max="${src.dauer}" step="0.1" value="${b}" data-c="slot-b" data-i="${i}"></label>
           </div></div>`;
       }).join('')}
-      ${tipp(v.mehr === 'top3' ? `Zusammen ${sek(p.D)}. Am besten 5 bis 10 Sekunden je Platz, die Action ans Ende.` : `Beide laufen ${sek(p.D)} gleichzeitig. Mit „Anfang“ legst du sie genau übereinander.`)}`;
+      ${tipp(v.mehr === 'top3' ? `Zusammen ${sek(p.D)}. Am besten 5 bis 10 Sekunden je Platz, die Action ans Ende.`
+        : v.mehr === 'erwartung' ? `Erst ${sek(p.d0)} Erwartung, dann ${sek(p.lauf - p.d0)} Realität, dann Standbild. Den Crash ans Ende der Realität legen.`
+        : `Beide laufen ${sek(p.D)} gleichzeitig. Mit „Anfang“ legst du sie genau übereinander.`)}`;
   }
   function schnittEinfach(c, v, p) {
     return `<div class="kc-schritt">3 · Schnitt</div>
@@ -1338,9 +1941,10 @@
           <label class="kc-feld">Anfang <b data-c="start-wert">${sek(p.a)}</b><input type="range" min="0" max="${c.dauer}" step="0.1" value="${p.a}" data-c="start"></label>
           <label class="kc-feld">Ende <b data-c="ende-wert">${sek(p.b)}</b><input type="range" min="0" max="${c.dauer}" step="0.1" value="${p.b}" data-c="ende"></label>
         </div>
-        ${v.pause ? `<label class="kc-feld">Anhalten bei <b data-c="halt-wert">${sek(p.F)}</b><input type="range" min="${p.a}" max="${p.b}" step="0.1" value="${p.F}" data-c="halt"></label>
-          ${tipp('Kurz bevor es knallt. Dann kommt 3-2-1 und der Clip läuft weiter.')}` : ''}
-        ${tipp(`Clip ist ${sek(c.dauer)} lang. Genommen werden ${sek(p.b - p.a)}${p.FD ? ' + Pause' : ''}${p.R ? ' + Zeitlupe' : ''}. Am besten 8 bis 20 Sekunden, die Action ans Ende.`)}`;
+        ${v.pause || v.analyse ? `<label class="kc-feld">Anhalten bei <b data-c="halt-wert">${sek(p.F)}</b><input type="range" min="${p.a}" max="${p.b}" step="0.1" value="${p.F}" data-c="halt"></label>
+          ${tipp(v.analyse ? 'Wo der Clip für die Analyse anhält. Dann in der Vorschau auf die Stelle tippen, die eingekreist werden soll.' : 'Kurz bevor es knallt. Dann kommt 3-2-1 und der Clip läuft weiter.')}` : ''}
+        ${v.ampel ? tipp('„Anfang“ auf kurz vor dem Start legen: Das erste Bild steht, bis die Lichter ausgehen.') : ''}
+        ${tipp(`Clip ist ${sek(c.dauer)} lang. Genommen werden ${sek(p.b - p.a)}${p.FD ? (v.ampel ? ' + Startampel' : v.analyse ? ' + Analyse' : ' + Pause') : ''}${p.R ? ' + Zeitlupe' : ''}. Am besten 8 bis 20 Sekunden, die Action ans Ende.`)}`;
   }
   function zeile(x, raus) {
     const v = VORLAGEN.find(y => y.id === x.vorlage) || VORLAGEN[0];
@@ -1389,13 +1993,14 @@
       const p = zeitplan(cl);
       let t;
       if (phase === '' || phase === 'neu') { vid.playbackRate = 1; vid.currentTime = p.a; vid.play().catch(() => {}); phase = 'haupt'; gehalten = false; }
+      if (VOR.sprung != null) { const z = kl(VOR.sprung, p.a, p.b - 0.1); VOR.sprung = null; vid.playbackRate = 1; vid.currentTime = z; vid.play().catch(() => {}); phase = 'haupt'; gehalten = p.FD > 0 && z > p.F; erstes = null; }
       if (phase === 'haupt' && p.FD && !gehalten && vid.currentTime >= p.F - 0.02) { vid.pause(); phase = 'halt'; haltStart = performance.now(); }
       if (phase === 'halt') { const d = (performance.now() - haltStart) / 1000; t = p.h + Math.min(d, p.FD - 0.001); if (d >= p.FD) { gehalten = true; phase = 'haupt'; vid.play().catch(() => {}); } }
       if (phase === 'haupt') { t = vid.currentTime - p.a + (gehalten ? p.FD : 0); if (vid.currentTime >= p.b - 0.03 || vid.ended) { if (p.R) { phase = 'lupe'; vid.currentTime = p.b - p.Z; vid.playbackRate = 0.5; vid.play().catch(() => {}); } else { phase = 'outro'; vid.pause(); outroStart = performance.now(); } } }
       if (phase === 'lupe') { t = p.D + (vid.currentTime - (p.b - p.Z)) * 2; if (vid.currentTime >= p.b - 0.03 || vid.ended) { phase = 'outro'; vid.pause(); outroStart = performance.now(); } }
       if (phase === 'outro') { t = p.T - OUTRO + (performance.now() - outroStart) / 1000; if (t >= p.T) { phase = 'neu'; t = p.T - 0.01; } }
       g.setTransform(cv.width / B, 0, 0, cv.height / H, 0, 0); g.clearRect(0, 0, B, H);
-      const tt = kl(t || 0, 0, p.T - 0.001);
+      const tt = kl(t || 0, 0, p.T - 0.001); VOR.t = tt;
       zeichne(g, tt, cl, p, MAT, vid);
       if (!erstes && tt < 0.25 && !vid.seeking && vid.readyState >= 2) { erstes = leinwand(cv.width, cv.height); erstes.getContext('2d').drawImage(cv, 0, 0); }
       else loopUebergang(g, tt, p, erstes);
@@ -1434,10 +2039,10 @@
       if (!cv.isConnected || cl !== c || !vorlage(cl).mehr) { for (const v of VIDS.values()) v.pause(); return; }
       const p = zeitplan(cl), q = quellenVon(cl), jetzt = performance.now(), rate = p.tempo || 1;
       let t = (jetzt - start) / 1000, scrub = null;
-      if (VOR.scrub && jetzt < VOR.scrub.bis && p.mehr === 'strecke') { scrub = VOR.scrub; t = kl((scrub.t - p.x.a) / p.tempo, 0, p.D - 0.01); }
+      if (VOR.scrub && jetzt < VOR.scrub.bis && MARKEN[p.mehr]) { scrub = VOR.scrub; t = kl((scrub.t - p.x.a) / p.tempo, 0, p.lauf - 0.01); }
       if (t >= p.T) { t = 0; erstes = null; }
       // Die Uhr folgt dem ersten Video: springt oder lädt es noch, wartet die Vorschau (höchstens 2 s), statt hinterherzuspringen
-      const sp0 = !scrub && p.spur(t)[0], q0 = sp0 && q[p.slots[sp0.s]], v0 = q0 && VIDS.get(q0.url + '#' + sp0.s);
+      const sp0 = !scrub && p.spur(t).find(x => !x.steh), q0 = sp0 && q[p.slots[sp0.s]], v0 = q0 && VIDS.get(q0.url + '#' + sp0.s);
       if (v0 && !v0.paused && !v0.seeking && v0.readyState >= 2 && Math.abs(v0.currentTime - sp0.t) < 3) { t = Math.max(0, t + (v0.currentTime - sp0.t) / rate); wartet = 0; }
       else if (v0 && t < p.D && (v0.seeking || v0.readyState < 2 || v0.paused)) {
         const ab = p.teile ? (p.teile.find(k => t >= k.S && t < k.S + k.d) || p.teile[0]).S : 0;   // nicht vor den Anfang dieses Clips zurück
@@ -1450,10 +2055,10 @@
         const v = vidFuer(src.url, sp.s); aktiv.add(v);
         if (v.playbackRate !== rate) v.playbackRate = rate;
         const drift = v.currentTime - sp.t;
-        if (scrub) { if (!v.paused) v.pause(); if (Math.abs(drift) > 0.04 && !v.seeking) springen(v, sp.t); }
+        if (scrub || sp.steh) { if (!v.paused) v.pause(); if (Math.abs(drift) > 0.04 && !v.seeking) springen(v, sp.t); }   // Standbild: stehen lassen
         else if (v.paused) { if (Math.abs(drift) > 0.15 && !v.seeking) springen(v, sp.t); v.play().catch(() => {}); }
         else if (Math.abs(drift) > (v === v0 ? 3 : 0.5) && !v.seeking && jetzt - (v._sync || 0) > 1500) { v._sync = jetzt; springen(v, sp.t + (v === v0 ? 0 : (v._lat || 0.2) * rate)); }   // zweites Video: um die Sprungdauer vorweg
-        v.muted = !VOR.ton || (p.mehr === 'vergleich' && sp.s !== 0);
+        v.muted = !VOR.ton || sp.steh || (p.mehr === 'vergleich' && sp.s !== 0);
         bilder[sp.s] = vidBild(v);
       }
       // Top 3: den nächsten Clip schon vor dem Wechsel an seinen Anfang legen
@@ -1541,6 +2146,19 @@
     if (a === 'modus' && c) { c.modus = b.dataset.wert; zeichnen(); return; }
     if (a === 'look' && c) { c.look = LETZTER_LOOK = b.dataset.wert; zeichnen(); return; }
     if (a === 'ton') { VOR.ton = !VOR.ton; if (VOR.vid) VOR.vid.muted = !VOR.ton; b.textContent = VOR.ton ? '🔊' : '🔇'; return; }
+    if (a === 'vorschau' && c && vorlage(c).analyse && VOR.vid) {   // Replay-Analyse: Stelle für den Kreis antippen
+      const r = b.getBoundingClientRect(), p = zeitplan(c), R = flaeche(c, p, p.h);
+      let x = (ev.clientX - r.left) * B / r.width, y = (ev.clientY - r.top) * H / r.height;
+      if (x < R.kx || x > R.kx + R.kw || y < R.ky || y > R.ky + R.kh) return UMG.meldung('Bitte direkt ins Clip-Bild tippen.', 1);
+      if (VOR.t != null && angehalten(vorlage(c), p, VOR.t)) {   // gerade herangezoomt → zurückrechnen
+        const d = VOR.t - p.h, k = 1 + 0.4 * eo(fp(d, 0, 0.4)) * (1 - eo(fp(d, p.FD - 0.4, p.FD))), z = analyseZiel(c, VOR.vid, R);
+        x = z.x + (x - z.x) / k; y = z.y + (y - z.y) / k;
+      }
+      const bi = bildRechteck(VOR.vid, R.x, R.y, R.w, R.h, R.zoom, R.versatz);
+      c.ziel = { u: kl((x - bi.x) / bi.w, 0.03, 0.97), v: kl((y - bi.y) / bi.h, 0.03, 0.97) };
+      VOR.sprung = Math.max(p.a, p.F - 0.6);
+      return;
+    }
     if (a === 'einplanen') return einplanen(false);
     if (a === 'laden') return einplanen(true);
     if (a === 'weglegen' && c) { extraZurueck(c, 1); clipWeg(c); zeichnen(); return; }
@@ -1549,7 +2167,8 @@
     if (a === 'slot-gleich' && c) { (c.extra = c.extra || []).push({ datei: c.datei, url: c.url, name: c.name, dauer: c.dauer, start: c.start, ende: c.ende, titel: '' }); zeichnen(); return; }
     if (a === 'marke-neu' && c) {
       const p = zeitplan(c), t = VOR.stelle != null ? kl(VOR.stelle, p.a, p.b) : p.a;
-      (c.marken = c.marken || []).push({ id: Math.random().toString(36).slice(2, 8), t, text: '' });
+      const vm = vorlage(c).mehr, vor = (c.marken || []).filter(x => x.t <= t).sort((x, y) => x.t - y.t).pop();   // Verkehr: Klasse vom Auto davor übernehmen
+      (c.marken = c.marken || []).push({ id: Math.random().toString(36).slice(2, 8), t, text: vm === 'verkehr' && vor ? vor.text || '' : '', ...(vm === 'sektoren' ? { farbe: 'lila' } : {}) });
       zeichnen();
       const felder = BOX.querySelectorAll('[data-c="marke-text"]'), mk = c.marken[c.marken.length - 1], f = [...felder].find(x => x.dataset.k === mk.id); if (f) f.focus();
       return;
@@ -1572,6 +2191,13 @@
       if (a === 'loeschen') { if (!confirm('Diesen Clip löschen? Er wird dann nicht gepostet.')) return; await UMG.igApi('POST', `/api/clip/${id}/weg`, {}); UMG.meldung('Gelöscht.'); await UMG.laden(); }
     } catch (e) { UMG.meldung(e.message, 1); await UMG.laden(); }
   }
+  // Schritt 3 beim Tippen nachziehen, ohne neu zu zeichnen (sonst geht der nächste Klick verloren): Plätze bei der Aufholjagd, letzter Sektor
+  function schritt3Auffrischen(c) {
+    const v = vorlage(c); if (!MARKEN[v.mehr]) return;
+    const p = zeitplan(c);
+    if (v.mehr === 'aufholjagd') { const st = startPlatz(c); BOX.querySelectorAll('.kc-marken .kc-marke b').forEach((b, i) => { b.textContent = 'P' + Math.max(1, st - i - 1); }); }
+    if (p.sektoren) { const el = BOX.querySelector('.kc-marke .kc-fuell'); if (el) el.textContent = zeitText(p.sektoren[p.sektoren.length - 1].zeit); }
+  }
   function eingabe(ev) {
     const t = ev.target, c = CLIPS[0]; if (!c || !t.dataset || !BOX.contains(t)) return;
     const a = t.dataset.c;
@@ -1581,6 +2207,7 @@
     else if (a === 'feld') {
       c[t.dataset.feld] = t.value;
       if (!c.textEigen && typeof vorlage(c).text === 'function') { c.text = vorlageText(vorlage(c), c); const ta = BOX.querySelector('[data-c="text"]'); if (ta) ta.value = c.text; }
+      schritt3Auffrischen(c);
     }
     else if (a === 'text') { c.text = t.value; c.textEigen = true; }
     else if (a === 'slot-titel') { const src = quellenVon(c)[+t.dataset.i]; if (src) src.titel = t.value; }
@@ -1595,11 +2222,11 @@
       VOR.stelle = +t.value; VOR.scrub = { t: VOR.stelle, bis: performance.now() + 2500 };
       const p = zeitplan(c), w = BOX.querySelector('[data-c="stelle-wert"]'); if (w) w.textContent = sek(Math.max(0, VOR.stelle - p.a));
     }
-    else if (a === 'marke-text') { const mk = (c.marken || []).find(x => x.id === t.dataset.k); if (mk) mk.text = t.value; }
+    else if (a === 'marke-text') { const mk = (c.marken || []).find(x => x.id === t.dataset.k); if (mk) mk.text = t.value; schritt3Auffrischen(c); }
     else if (a === 'versatz') c.versatz = +t.value;
     else if (a === 'halt') {
       c.halt = +t.value; const p = zeitplan(c), hw = BOX.querySelector('[data-c="halt-wert"]'); if (hw) hw.textContent = sek(p.F);
-      if (VOR.vid) VOR.vid.currentTime = Math.max(p.a, p.F - 1.5);
+      VOR.sprung = Math.max(p.a, p.F - 1.5);
     }
     else if (a === 'start' || a === 'ende') {
       const v = +t.value;
@@ -1620,6 +2247,8 @@
       return;
     }
     if (a === 'slot-a' || a === 'slot-b') { zeichnen(); return; }
+    if (a === 'marke-farbe') { const mk = (c.marken || []).find(x => x.id === t.dataset.k); if (mk) mk.farbe = t.value; return; }
+    if (a === 'sektor-letzt') { c.sektorLetzt = t.value; return; }
     if (a === 'zeitlupe') { c.zeitlupe = t.checked; zeichnen(); }
     else if (a === 'insta' || a === 'tiktok') c[a] = t.checked;
     else if (a === 'postms') c.postMs = t.value ? new Date(t.value).getTime() : 0;
@@ -1673,6 +2302,12 @@
 .kc-app .kc-vorlagen{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}
 .kc-app .kc-vl{display:flex;align-items:center;gap:8px;padding:10px 12px;background:#14161d;border:2px solid #23262f;color:#fff;font:700 14px var(--body,inherit);cursor:pointer;text-align:left;transition:.12s}
 .kc-app .kc-vl span{font-size:20px}
+.kc-app .kc-vgruppe{grid-column:1/-1;font:800 11px var(--disp,inherit);letter-spacing:.14em;text-transform:uppercase;color:var(--steel,#8b929c);margin-top:6px;padding-bottom:2px;border-bottom:1px dashed #23262f}
+.kc-app .kc-vgruppe:first-child{margin-top:0}
+.kc-app .kc-vl em{margin-left:auto;font:800 10px var(--body,inherit);font-style:normal;letter-spacing:.08em;color:#06080a;background:#5cff1f;padding:2px 5px;box-shadow:0 0 10px rgba(92,255,31,.6)}
+.kc-app .kc-vorschau.ziel{cursor:crosshair}
+.kc-app .kc-marke .kc-sfarbe{max-width:120px;flex:none}
+.kc-app .kc-marke .kc-fuell{flex:1;color:#fff;font-weight:700}
 .kc-app .kc-vl:hover{border-color:var(--f)}
 .kc-app .kc-vl.an{border-color:var(--f);box-shadow:0 0 18px color-mix(in srgb,var(--f) 55%,transparent),inset 0 0 14px color-mix(in srgb,var(--f) 25%,transparent);background:color-mix(in srgb,var(--f) 12%,#14161d)}
 .kc-app .kc-feld{display:flex;flex-direction:column;gap:5px;font-size:13px;color:var(--steel,#8b929c);min-width:0}
