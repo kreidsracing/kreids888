@@ -1724,9 +1724,14 @@
   }
   async function mp4Lesen(datei) {
     const buf = await datei.arrayBuffer(), m = mp4Zerlegen(buf);
-    const cfg = { codec: m.codec, codedWidth: m.breite, codedHeight: m.hoehe };
+    let cfg = { codec: m.codec, codedWidth: m.breite, codedHeight: m.hoehe };
     if (m.beschr) cfg.description = m.beschr;
-    if (!window.VideoDecoder || !(await VideoDecoder.isConfigSupported(cfg)).supported) throw new Error('Format ' + m.codec + ' nicht entschlüsselbar');
+    if (!window.VideoDecoder) throw new Error('Format ' + m.codec + ' nicht entschlüsselbar');
+    // Lieber ohne Grafikkarte entschlüsseln: manche Grafikkarten bleiben beim Bauen mittendrin stehen
+    const sw = { ...cfg, hardwareAcceleration: 'prefer-software' };
+    let geht = false; try { geht = (await VideoDecoder.isConfigSupported(sw)).supported; } catch (e) { /* dann mit Grafikkarte */ }
+    if (geht) cfg = sw;
+    else if (!(await VideoDecoder.isConfigSupported(cfg)).supported) throw new Error('Format ' + m.codec + ' nicht entschlüsselbar');
     let basis = Infinity; for (const x of m.proben) basis = Math.min(basis, x.cts);   // erstes Bild = 0 s (wie im Video-Element)
     for (const x of m.proben) { x.us = Math.round((x.cts - basis) * 1e6 / m.ts); x.dus = Math.round(x.dauer * 1e6 / m.ts); x.data = new Uint8Array(buf, x.off, x.groesse); }
     return { cfg, proben: m.proben };
@@ -1735,10 +1740,10 @@
     const us = i => proben[i].us;
     const keys = []; proben.forEach((x, i) => { if (x.key) keys.push(i); });
     if (!keys.length) keys.push(0);
-    let fertig = [], pos = 0, ende = false, letzte = -1, warter = null, fehler = null;
+    let fertig = [], pos = 0, ende = false, letzte = -1, warter = null, fehler = null, ausgaben = 0;
     const wecken = () => { if (warter) { const w = warter; warter = null; w(); } };
     const dec = new VideoDecoder({
-      output: fr => { let i = fertig.length; while (i > 0 && fertig[i - 1].timestamp > fr.timestamp) i--; fertig.splice(i, 0, fr); wecken(); },
+      output: fr => { ausgaben++; let i = fertig.length; while (i > 0 && fertig[i - 1].timestamp > fr.timestamp) i--; fertig.splice(i, 0, fr); wecken(); },
       error: e => { fehler = e; wecken(); }
     });
     dec.configure(cfg);
@@ -1755,7 +1760,8 @@
       const weit = keyVor(tus) > pos && us(keyVor(tus)) - (fertig.length ? fertig[fertig.length - 1].timestamp : -1e12) > 1e6;
       if (letzte < 0 || tus + eps < letzte || (fertig.length && tus + eps < fertig[0].timestamp) || weit) springen(tus);
       letzte = tus;
-      for (let runde = 0; runde < 20000; runde++) {
+      let seit = performance.now(), neu = false, zahl = ausgaben;
+      for (;;) {
         while (fertig.length >= 2 && fertig[1].timestamp <= tus + eps) fertig.shift().close();
         if (fertig.length >= 2 || (ende && fertig.length)) return fertig[0];
         if (fehler) throw fehler;
@@ -1764,19 +1770,46 @@
             const x = proben[pos];
             dec.decode(new EncodedVideoChunk({ type: x.key ? 'key' : 'delta', timestamp: x.us, duration: x.dus, data: x.data }));
           }
-        } else if (!ende) { try { await dec.flush(); } catch (e) { fehler = fehler || e; } ende = true; continue; }
+        } else if (!ende) {
+          // Ende der Datei: gehaltene Bilder als Kopie behalten und freigeben – sonst gibt manche Grafikkarte die letzten Bilder nie raus
+          for (const fr of fertig.slice()) {
+            if (!(fr instanceof VideoFrame)) continue;
+            try {
+              const bm = await createImageBitmap(fr), i = fertig.indexOf(fr);
+              Object.assign(bm, { timestamp: fr.timestamp, displayWidth: fr.displayWidth, displayHeight: fr.displayHeight });
+              if (i >= 0) { fertig[i] = bm; fr.close(); } else bm.close();
+            } catch (e) { /* bleibt das Original */ }
+          }
+          await Promise.race([dec.flush().catch(e => { if (e && e.name !== 'AbortError') fehler = fehler || e; }), warte(1500)]);   // nie ewig warten
+          ende = true; continue;
+        }
         else return fertig[0] || null;
+        if (ausgaben !== zahl) { zahl = ausgaben; seit = performance.now(); }
+        if (performance.now() - seit > 4000) {   // 4 s kein neues Bild vom Decoder: hängt → einmal neu starten, sonst aufgeben
+          if (neu) throw new Error('Decoder hängt');
+          neu = true; springen(tus); seit = performance.now();
+        }
         await new Promise(r => { warter = r; setTimeout(() => { if (warter === r) { warter = null; r(); } }, 15); });
       }
-      return fertig[0] || null;
     }
     return { bei, zu() { for (const fr of fertig) fr.close(); fertig = []; try { dec.close(); } catch (e) { /* schon zu */ } }, art: 'webcodecs' };
   }
   async function leser(c) {
-    try { return decoderLeser(await mp4Lesen(c.datei)); }
+    let d = null, vid = null, kaputt = false;
+    try { d = decoderLeser(await mp4Lesen(c.datei)); }
     catch (e) { console.warn('Clip-Fabrik: Bild-für-Bild-Lesen geht nicht, springe im Video', e); }
-    const vid = await videoElement(c.url);
-    return { bei: async t => { await suchen(vid, t); return vid; }, zu() { vid.removeAttribute('src'); vid.load(); }, art: 'video' };
+    const imVideo = async t => { if (!vid) vid = await videoElement(c.url); await suchen(vid, t); return vid; };
+    return {
+      async bei(t) {
+        if (d && !kaputt) {
+          try { return await d.bei(t); }
+          catch (e) { console.warn('Clip-Fabrik: Bild-für-Bild-Lesen hängt – weiter im Video', e); kaputt = true; try { d.zu(); } catch (e2) { /* egal */ } }
+        }
+        return imVideo(t);
+      },
+      zu() { if (d && !kaputt) d.zu(); if (vid) { vid.removeAttribute('src'); vid.load(); } },
+      get art() { return !d ? 'video' : kaputt ? 'webcodecs→video' : 'webcodecs'; }
+    };
   }
 
   // ─── MP4 bauen (H.264 + AAC, begrenzter Farbbereich wie bei den anderen Posts) ───
@@ -1828,9 +1861,12 @@
     try {
     for (const i of (p.mehr ? p.slots : [0])) lesers.push(await leser(q[i]));
     let vcfg = null;
-    for (const codec of ['avc1.640028', 'avc1.640032', 'avc1.4d0028', 'avc1.42e028']) {
-      const k = { codec, width: B, height: H, bitrate: 9000000, framerate: FPS, latencyMode: 'quality', avc: { format: 'avc' } };
-      try { if ((await VideoEncoder.isConfigSupported(k)).supported) { vcfg = k; break; } } catch (e) { /* weiter */ }
+    for (const hw of ['prefer-software', 'no-preference']) {   // erst ohne Grafikkarte (hängt nicht), sonst mit
+      for (const codec of ['avc1.640028', 'avc1.640032', 'avc1.4d0028', 'avc1.42e028']) {
+        const k = { codec, width: B, height: H, bitrate: 9000000, framerate: FPS, latencyMode: 'quality', avc: { format: 'avc' }, hardwareAcceleration: hw };
+        try { if ((await VideoEncoder.isConfigSupported(k)).supported) { vcfg = k; break; } } catch (e) { /* weiter */ }
+      }
+      if (vcfg) break;
     }
     if (!vcfg) throw new Error('Dieser Browser kann kein H.264. Bitte Chrome oder Edge nehmen.');
     let acfg = null;
@@ -1855,7 +1891,11 @@
       zuI420(g.getImageData(0, 0, B, H).data, B, H, puffer);
       const fr = new VideoFrame(puffer, { format: 'I420', codedWidth: B, codedHeight: H, timestamp: Math.round(i * 1e6 / FPS), duration: Math.round(1e6 / FPS), colorSpace: cs });
       enc.encode(fr, { keyFrame: i % FPS === 0 }); fr.close();
-      while (enc.encodeQueueSize > 8) await warte(4);
+      for (const w0 = performance.now(); enc.encodeQueueSize > 8;) {
+        if (fehler) throw fehler;
+        if (performance.now() - w0 > 30000) throw new Error('Der Video-Baustein vom Browser hängt. Bitte Seite neu laden (Strg+F5) und nochmal bauen.');
+        await new Promise(r => { const f = () => { enc.removeEventListener('dequeue', f); r(); }; enc.addEventListener('dequeue', f); setTimeout(f, 20); });
+      }
       if (fortschritt && i % 10 === 0) fortschritt(i / n);
     }
     await enc.flush(); enc.close();
