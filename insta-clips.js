@@ -28,154 +28,192 @@
   const nr = x => { const n = parseInt(String(x == null ? '' : x).replace(/\D/g, ''), 10); return n > 0 ? n : 0; };   // „P17“, „17.“ → 17
   // ─── Vorlagen: jede mit eigener Neonfarbe, Sprüchen, Frage unten und Text für den Post ───
   const VORLAGEN = [
-    { id: 'schuld', name: 'Wer war schuld?', emoji: '⚖️', farbe: '#ff2d6f', tag: 'VORFALL', zl: true, wieder: 'NOCHMAL GENAU HINSCHAUEN',
-      hooks: ['WER WAR SCHULD?', 'WER IST SCHULD?', 'RENNUNFALL ODER PECH?', 'DEINE MEINUNG?'], unten: ['A ODER B? KOMMENTIER!', 'WER WAR SCHULD? SCHREIB’S REIN!', 'RENNUNFALL ODER STRAFE?'],
+    { id: 'schuld', name: 'Wer war schuld?', emoji: '⚖️', farbe: '#ff2d6f', tag: 'VORFALL', zl: true, wieder: 'Nochmal genau hinschauen',
+      hooks: ['Wer war schuld?', 'Strafe oder Rennunfall?', 'Stewards, übernehmen Sie!', 'Das war kein Rennunfall.', 'Wie kann man so fahren?!', 'Dafür gibt’s 4x. Mindestens.', 'Netcode oder Absicht?', 'Richter gesucht!', 'Du entscheidest.', 'Sag mir, dass das OK war', 'POV: Du warst unschuldig', 'Ich war’s nicht. Oder?', 'Darüber streiten alle', 'Das gibt Ärger …', 'Spiegel? Nie gehört.', 'Wer hat hier gepennt?'], unten: ['A oder B? Kommentier!', 'Wer war schuld? Schreib’s rein!', 'Rennunfall oder Strafe?', 'Wie viel Strafe gibst du?', 'Dein Urteil in die Kommentare!', 'Schreib 1 für A, 2 für B!', 'Hättest du Protest eingelegt?', 'Wer hätte zurückstecken müssen?', 'Strafe: ja oder nein?'], wiederAuch: ['Nochmal für die Stewards', 'Beweismittel A', 'Wer berührt wen?'],
       text: 'Wer war hier schuld? 🤔 A oder B? Schreib’s in die Kommentare 👇\n\n#simracing #iracing #racingincident #simracer #kreids888',
       hilfe: 'Für Unfälle und Szenen, über die man streiten kann. Die Leute kommentieren – das bringt Reichweite.' },
-    { id: 'ueberholer', name: 'Überholer der Woche', emoji: '🚀', farbe: '#5cff1f', tag: 'KW {kw}', zl: true, wieder: 'SO GEHT DAS',
-      hooks: ['ÜBERHOLER DER WOCHE', 'SO GEHT ÜBERHOLEN', 'AUSGEBREMST!', 'VORBEI. EINFACH VORBEI.'], unten: ['WIE VIELE PUNKTE? 1 BIS 10', 'SAUBER ODER ZU HART?', 'HÄTTEST DU’S AUCH GEWAGT?'],
+    { id: 'ueberholer', name: 'Überholer der Woche', emoji: '🚀', farbe: '#5cff1f', tag: 'KW {kw}', zl: true, wieder: 'So geht das',
+      hooks: ['Überholer der Woche', 'So geht Überholen', 'Ausgebremst!', 'Vorbei. Einfach vorbei.', 'Stewards hassen diesen Trick', 'Das hat er nicht kommen sehen', 'Die Lücke war da. Ich auch.', 'Lehrbuch. Oder zu frech?', 'Später bremsen geht nicht', 'Tschüss und danke!', 'Nächstes Opfer, bitte', 'Wer bremst, verliert', 'Das hat gesessen', 'Sauber. Brutal. Schön.', 'Zu hart oder genial?', 'Spiegel checken hätte geholfen'], unten: ['Wie viele Punkte? 1 bis 10', 'Sauber oder zu hart?', 'Hättest du’s auch gewagt?', 'Hättest du die Tür zugemacht?', 'Divebomb oder sauber?', 'Zeig mir deinen Besten!', 'Besser als dein Bester?', 'Schick’s deinem Rennkumpel'], wiederAuch: ['Lehrbuch. In Zeitlupe.', 'Und nochmal genießen'],
       text: 'Überholer der Woche 🚀 Wie viele Punkte gibst du? 1 bis 10 👇\n\n#simracing #iracing #overtake #simracer #kreids888',
       hilfe: 'Dein bester Überholer. Am besten jede Woche einen, immer gleich – so erkennt man dich.' },
-    { id: 'save', name: 'Save des Tages', emoji: '😮‍💨', farbe: '#18e8ff', tag: 'SAVE', zl: true, wieder: 'WIE?!',
-      hooks: ['SAVE DES TAGES', 'DAS WAR KNAPP', 'WIE HAB ICH DAS GEHALTEN?!', 'FAST WAR’S VORBEI'], unten: ['HÄTTEST DU’S GEHALTEN?', 'GLÜCK ODER KÖNNEN?', 'SCHON MAL SO GERETTET?'],
+    { id: 'save', name: 'Save des Tages', emoji: '😮‍💨', farbe: '#18e8ff', tag: 'SAVE', zl: true, wieder: 'Wie?!',
+      hooks: ['Save des Tages', 'Das war knapp', 'Wie hab ich das gehalten?!', 'Fast war’s vorbei', 'Nicht heute, Kiesbett!', 'Physik? Kenn ich nicht.', 'Puls: 220', 'Glück? Nein. Skill.', 'Ich hab keine Ahnung, wie', 'Das geht nicht. Doch!', 'Herzinfarkt in 3 Sekunden', 'Mama, ich lebe noch!', 'Gegenlenken wie ein Gott', 'Warte … wie?!', 'Das Auto wollte sterben', 'Hält. Hält nicht. Hält!'], unten: ['Hättest du’s gehalten?', 'Glück oder Können?', 'Schon mal so gerettet?', 'Dein bester Save? Erzähl!', 'Glück oder Skill? Sei ehrlich', 'Hättest du gegengelenkt?', 'Puls auf 180? Du auch?', 'Wie viele hätten’s gehalten?'], wiederAuch: ['Wie hab ich das gemacht?!', 'Puls immer noch oben'],
       text: 'Das war knapp 😮‍💨 Hättest du den gehalten? 👇\n\n#simracing #iracing #save #simracer #kreids888',
       hilfe: 'Wenn du das Auto gerade noch gefangen hast.' },
-    { id: 'crash', name: 'Crash', emoji: '💥', farbe: '#ff7a00', tag: 'CRASH', zl: true, wieder: 'AUTSCH. NOCHMAL.', stempel: 'CRASH',
-      hooks: ['DAS GING SCHIEF', 'AUTSCH.', 'TOTALSCHADEN', 'DAS TUT WEH'], unten: ['WAS HÄTTEST DU GEMACHT?', 'WER WAR SCHULD?', 'SCHON MAL SO ABGEFLOGEN?'],
+    { id: 'crash', name: 'Crash', emoji: '💥', farbe: '#ff7a00', tag: 'CRASH', zl: true, wieder: 'Autsch. Nochmal.', stempel: 'CRASH',
+      hooks: ['Das ging schief', 'Autsch.', 'Totalschaden', 'Das tut weh', 'Warte bis zum Ende …', 'Das war’s dann wohl', 'Mein Safety Rating weint', 'Ich hab nichts gesehen', 'Das Auto ist jetzt Kunst', 'Mechaniker, Überstunden!', 'Nein. Nein. Nein. Nein.', 'Da hilft kein Reset mehr', 'Schrottplatz, wir kommen', 'Der Crash des Jahres?', 'Keine Absicht. Ehrlich.', 'POV: Dein Vordermann bremst'], unten: ['Was hättest du gemacht?', 'Wer war schuld?', 'Schon mal so abgeflogen?', 'Dein schlimmster Crash?', 'Vermeidbar oder nicht?', 'Reset oder weiterfahren?', 'Note für den Crash: 1–10', 'Wie viele Incidents gibt das?'], wiederAuch: ['Spoiler: Es wird nicht besser', 'Nochmal für die Versicherung'],
       text: 'Das ging schief 💥 Was hättest du gemacht? 👇\n\n#simracing #iracing #crash #simracer #kreids888',
       hilfe: 'Für Abflüge und Crashs. Mit Wackeln und CRASH-Stempel in der Zeitlupe.' },
-    { id: 'hotlap', name: 'Hotlap-Challenge', emoji: '⏱️', farbe: '#b44dff', tag: 'HOTLAP', zl: false, wieder: 'NOCHMAL!',
+    { id: 'hotlap', name: 'Hotlap-Challenge', emoji: '⏱️', farbe: '#b44dff', tag: 'HOTLAP', zl: false, wieder: 'Nochmal!',
       felder: [['rundenzeit', 'Rundenzeit', '1:52.414'], ['strecke', 'Strecke', 'Spa'], ['auto', 'Auto', 'Porsche 992 Cup']], pflicht: 'rundenzeit',
       zeigen: 'rundenzeit', zeigenLabel: 'RUNDENZEIT', info: c => [c.strecke, c.auto].filter(Boolean).join(' · '), feldTipp: 'Die Zeit kommt am Ende groß ins Bild.',
-      hooks: ['SCHAFFST DU DAS?', 'SCHLAG MEINE ZEIT', 'BIST DU SCHNELLER?'], unten: ['SCHREIB DEINE ZEIT!', 'WER IST SCHNELLER?', 'WIE NAH KOMMST DU RAN?'],
+      hooks: ['Schaffst du das?', 'Schlag meine Zeit', 'Bist du schneller?', 'Nur Aliens sind schneller', 'Diese Zeit ist illegal', 'Keiner schlägt das. Keiner.', 'Die Runde meines Lebens', 'Zeig mir, was du kannst', 'Trau dich!', 'Challenge angenommen?', 'Jedes Limit ausgereizt', 'Du hast keine Chance', 'Perfekt? Fast.', 'Wetten, du schaffst das nicht?'], unten: ['Schreib deine Zeit!', 'Wer ist schneller?', 'Wie nah kommst du ran?', 'Deine Bestzeit? Her damit!', 'Wo verlier ich noch Zeit?', 'Schneller? Beweis es!', 'Wie viel fehlt dir?', 'Markier deinen Rennkumpel'],
       text: c => `Hotlap${c.strecke ? ' ' + c.strecke : ''}${c.rundenzeit ? ' ⏱ ' + c.rundenzeit : ''} – schaffst du das? Schreib deine Zeit in die Kommentare 👇\n\n#simracing #iracing #hotlap #simracer #kreids888`,
       hilfe: 'Eine schnelle Runde. Trag die Rundenzeit ein, sie kommt am Ende groß ins Bild. Die Leute posten ihre Zeiten.' },
-    { id: 'highlight', name: 'Highlight', emoji: '🔥', farbe: '#ff1f3d', tag: 'HIGHLIGHT', zl: false, wieder: 'NOCHMAL!',
-      hooks: ['WAS FÜR EIN MOMENT', 'DAS MUSST DU SEHEN', 'PURES SIMRACING', 'GÄNSEHAUT'], unten: ['FOLG FÜR MEHR SIMRACING', 'WIE FINDEST DU’S?', 'MEHR DAVON?'],
+    { id: 'highlight', name: 'Highlight', emoji: '🔥', farbe: '#ff1f3d', tag: 'HIGHLIGHT', zl: false, wieder: 'Nochmal!',
+      hooks: ['Was für ein Moment', 'Das musst du sehen', 'Pures Simracing', 'Gänsehaut', 'Echt oder Simulator?', 'Deshalb lieben wir das', 'Warte auf das Ende …', 'Das glaubt mir keiner', 'Nicht wegschauen!', 'Ton an!', 'Ich hab keine Worte', 'Das hier ist kein Spiel', 'Bester Moment des Jahres?', 'Und dann das …'], unten: ['Folg für mehr Simracing', 'Wie findest du’s?', 'Mehr davon?', 'Echt oder Sim? Tipp ab!', 'Note von 1 bis 10?', 'Schick’s deinem Rennkumpel', 'Dein Lieblingsmoment?', 'Soll ich mehr davon posten?'],
       text: 'Was für ein Moment 🔥 Folg für mehr Simracing!\n\n#simracing #iracing #simracer #racing #kreids888',
       hilfe: 'Für alles andere: schöne Szenen, Starts, Zieleinläufe.' },
-    { id: 'start', name: 'Start-Chaos', emoji: '🚦', farbe: '#ffd400', tag: 'START', zl: true, wieder: 'NOCHMAL IN ZEITLUPE',
-      hooks: ['WER KOMMT DURCH?', 'START-CHAOS', 'KURVE 1. WIE IMMER.', 'ALLE AUF EINMAL'], unten: ['WO WÄRST DU HINGEFAHREN?', 'WER IST SCHULD?', 'INNEN ODER AUSSEN?'],
+    { id: 'start', name: 'Start-Chaos', emoji: '🚦', farbe: '#ffd400', tag: 'START', zl: true, wieder: 'Nochmal in Zeitlupe',
+      hooks: ['Wer kommt durch?', 'Start-Chaos', 'Kurve 1. Wie immer.', 'Alle auf einmal', 'Lap 1, Turn 1 …', 'Warum bremst keiner?!', 'Bremsen ist für Verlierer', 'Jedes. Verdammte. Mal.', 'Wer überlebt Kurve 1?', 'Autoscooter-Meisterschaft', 'POV: Du startest von hinten', '1 Kurve. Alle wollen rein.', 'Hier wird’s eng …', 'Das wird teuer'], unten: ['Wo wärst du hingefahren?', 'Wer ist schuld?', 'Innen oder außen?', 'Wer überlebt Kurve 1?', 'Hättest du gebremst?', 'Dein schlimmster Start?', 'Zu wild oder normal?', 'Wie viele kommen heil durch?'], wiederAuch: ['Nochmal für die Stewards', 'Wer hat angefangen?'],
       text: 'Start-Chaos 🚦 Wer kommt hier heil durch? Wo wärst du hingefahren? 👇\n\n#simracing #iracing #racestart #simracer #kreids888',
       hilfe: 'Für Rennstarts und die erste Kurve – da passiert immer was.' },
-    { id: 'finish', name: 'Knappes Finish', emoji: '📸', farbe: '#00ffa3', tag: 'ZIEL', zl: true, wieder: 'FOTOFINISH',
-      hooks: ['KNAPPER GEHT’S NICHT', 'FOTOFINISH', 'WER WAR VORNE?', 'ZEHNTEL ENTSCHEIDEN'], unten: ['WIE KNAPP WAR’S BEI DIR?', 'WER WAR VORNE?', 'SCHON MAL SO KNAPP?'],
+    { id: 'finish', name: 'Knappes Finish', emoji: '📸', farbe: '#00ffa3', tag: 'ZIEL', zl: true, wieder: 'Fotofinish',
+      hooks: ['Knapper geht’s nicht', 'Fotofinish', 'Wer war vorne?', 'Zehntel entscheiden', 'Tausendstel. Kein Witz.', 'Eine Nasenspitze', 'Bis zur Linie', 'Nerven aus Stahl', 'Das Foto entscheidet', 'Schau auf die Linie!', 'POV: Letzte Kurve, P2', 'So knapp. So geil.', 'Herzinfarkt auf der Ziellinie', 'Das knappste Finish ever?'], unten: ['Wie knapp war’s bei dir?', 'Wer war vorne?', 'Schon mal so knapp?', 'Tipp: Wer hat gewonnen?', 'Dein knappstes Finish?', 'Geholt oder nicht? Tipp ab!', 'Zehntel oder Tausendstel?'], wiederAuch: ['Wer war vorne?', 'Zentimeter für Zentimeter'],
       felder: [['abstand', 'Abstand im Ziel', '0,042 s']], zeigen: 'abstand', zeigenLabel: 'ABSTAND IM ZIEL', info: () => 'ABSTAND IM ZIEL',
       feldTipp: 'Der Abstand kommt am Ende groß ins Bild. Leer lassen geht auch.',
       text: c => `Knapper geht’s nicht 🏁${c.abstand ? ' ' + c.abstand + ' Abstand im Ziel!' : ''} Wie knapp war’s bei dir schon mal? 👇\n\n#simracing #iracing #photofinish #simracer #kreids888`,
       hilfe: 'Für Zieleinläufe, bei denen es um Zehntel geht.' },
-    { id: 'fail', name: 'Fail des Tages', emoji: '🤡', farbe: '#ff4fd8', tag: 'FAIL', zl: true, wieder: 'NOCHMAL. LANGSAM.', stempel: 'FAIL',
-      hooks: ['FAIL DES TAGES', 'DAS WAR NIX', 'PROFI AM WERK', 'UND TSCHÜSS'], unten: ['SCHON MAL PASSIERT? EHRLICH!', 'WIE VIELE PUNKTE FÜR DEN FAIL?', 'PASSIERT DIR DAS AUCH?'],
+    { id: 'fail', name: 'Fail des Tages', emoji: '🤡', farbe: '#ff4fd8', tag: 'FAIL', zl: true, wieder: 'Nochmal. Langsam.', stempel: 'FAIL',
+      hooks: ['Fail des Tages', 'Das war nix', 'Profi am Werk', 'Und tschüss', 'Halt mal mein Bier', 'Ich kann das erklären …', 'Bitte nicht lachen', 'Bitte nicht nachmachen', 'Skill Issue.', 'Lag. Eindeutig Lag.', 'iRating: Tschüss', 'Das passiert nur mir', 'Bremspunkt? Nie gehört.', 'Mein Coach weint', 'Keine Fragen, bitte.', 'So fährt ein Profi. Nicht.'], unten: ['Schon mal passiert? Ehrlich!', 'Wie viele Punkte für den Fail?', 'Passiert dir das auch?', 'Lag oder Skill Issue?', 'Dein peinlichster Moment?', 'Brauche eine Ausrede. Hilfe!', 'Note für den Fail: 1–10', 'Markier jemanden, der das kennt'], wiederAuch: ['Autsch. Nochmal.', 'In Zeitlupe noch peinlicher', 'Spoiler: Es wird nicht besser'],
       text: 'Fail des Tages 🤡 Ist dir das auch schon passiert? Sei ehrlich 👇\n\n#simracing #iracing #fail #simracer #kreids888',
       hilfe: 'Dreher, Verbremser, Patzer – Fails gehen immer. Mit FAIL-Stempel in der Zeitlupe.' },
-    { id: 'duell', name: 'Duell', emoji: '⚔️', farbe: '#3d7bff', tag: 'DUELL', zl: true, wieder: 'GANZ GENAU HINSEHEN',
-      hooks: ['WER GEWINNT?', 'RAD AN RAD', 'DUELL!', 'KEINER GIBT NACH'], unten: ['WER GEWINNT? TIPP AB!', 'WER WAR STÄRKER?', 'FAIR ODER ZU HART?'],
+    { id: 'duell', name: 'Duell', emoji: '⚔️', farbe: '#3d7bff', tag: 'DUELL', zl: true, wieder: 'Ganz genau hinsehen',
+      hooks: ['Wer gewinnt?', 'Rad an Rad', 'Duell!', 'Keiner gibt nach', 'Keiner bremst', 'Nur einer kommt raus', 'So geht Racing', 'Hart. Aber fair?', 'Zentimeter-Arbeit', 'Wer zuckt zuerst?', 'Das ist Racing, Baby', 'Zwei Verrückte. Eine Kurve.', 'Mann gegen Mann', 'Kopf an Kopf. Runde für Runde.'], unten: ['Wer gewinnt? Tipp ab!', 'Wer war stärker?', 'Fair oder zu hart?', 'Wer zuckt zuerst?', 'Hättest du nachgegeben?', 'Sauberes Racing? 1–10', 'Dein härtestes Duell?', 'Wer hat das Duell gewonnen?'], wiederAuch: ['Wer zuckt zuerst?', 'Zentimeter für Zentimeter'],
       text: 'Rad an Rad ⚔️ Wer gewinnt das Duell? Tipp ab in den Kommentaren 👇\n\n#simracing #iracing #battle #simracer #kreids888',
       hilfe: 'Für Zweikämpfe Rad an Rad. Die Leute tippen, wer gewinnt.' },
-    { id: 'raten', name: 'Welche Strecke?', emoji: '🗺️', farbe: '#5cff1f', tag: 'RATEN', zl: false, wieder: 'NOCHMAL IN ZEITLUPE', countdown: true, gross: true,
-      hooks: ['WELCHE STRECKE?', 'ERKENNST DU DIE STRECKE?', 'WO BIN ICH HIER?', 'NUR PROFIS WISSEN’S'], unten: ['SCHREIB DEINEN TIPP!', 'TIPP AB – AUFLÖSUNG AM ENDE', 'WER WEISS ES ZUERST?'],
+    { id: 'raten', name: 'Welche Strecke?', emoji: '🗺️', farbe: '#5cff1f', tag: 'RATEN', zl: false, wieder: 'Nochmal in Zeitlupe', countdown: true, gross: true,
+      hooks: ['Welche Strecke?', 'Erkennst du die Strecke?', 'Wo bin ich hier?', 'Nur Profis wissen’s', 'Nur echte Fans erkennen das', 'Du hast 5 Sekunden', 'Zu leicht? Beweis es!', 'Keiner errät das', 'Google ist verboten', 'Wetten, du weißt es nicht?', 'Erste Antwort zählt!', 'In 3 Sekunden erraten?', 'Nur für Experten'], unten: ['Schreib deinen Tipp!', 'Tipp ab – Auflösung am Ende', 'Wer weiß es zuerst?', 'Nicht spicken! Erst tippen', 'Sofort erkannt?', 'Schreib die Strecke rein!', 'Richtig geraten? Sei ehrlich', 'Wie schnell hast du’s gewusst?'],
       felder: [['strecke', 'Strecke (Auflösung)', 'Spa-Francorchamps']], pflicht: 'strecke', zeigen: 'strecke', zeigenLabel: 'AUFLÖSUNG', info: () => 'RICHTIG GERATEN?',
       feldTipp: 'Wird erst ganz am Ende gezeigt (mit 3-2-1). Vorher raten die Leute in den Kommentaren.',
       text: 'Welche Strecke ist das? 🗺️ Schreib deinen Tipp in die Kommentare – die Auflösung kommt am Ende 👇\n\n#simracing #iracing #racetrack #simracer #kreids888',
       hilfe: 'Ratespiel: Die Leute tippen die Strecke, am Ende kommt die Auflösung. Bringt viele Kommentare.' },
-    { id: 'jetzt', name: 'Was passiert jetzt?', emoji: '⏸️', farbe: '#ff9f1c', tag: 'RÄTSEL', zl: true, wieder: 'NOCHMAL IN ZEITLUPE', pause: true,
-      hooks: ['WAS PASSIERT JETZT?', 'RATE MAL', 'GLEICH KNALLT’S', 'PASS GENAU AUF'], unten: ['WAS PASSIERT? TIPP AB!', 'CRASH ODER SAVE?', 'SCHREIB DEINEN TIPP!'],
+    { id: 'jetzt', name: 'Was passiert jetzt?', emoji: '⏸️', farbe: '#ff9f1c', tag: 'RÄTSEL', zl: true, wieder: 'Nochmal in Zeitlupe', pause: true,
+      hooks: ['Was passiert jetzt?', 'Rate mal', 'Gleich knallt’s', 'Pass genau auf', 'Stopp! Was passiert?', 'Du wirst es nicht glauben', 'Crash oder Save?', 'Erst tippen, dann gucken', 'Wetten, du liegst falsch?', 'Niemand rät das richtig', 'Gleich wird’s wild', 'Was würdest du tun?', 'Drei … zwei … eins …', 'Bleib dran!'], unten: ['Was passiert? Tipp ab!', 'Crash oder Save?', 'Schreib deinen Tipp!', 'Richtig gelegen?', 'Hast du’s kommen sehen?', 'Erst tippen, dann gucken!', 'Ehrlich: Richtig getippt?', 'Wer hat’s richtig geraten?'], wiederAuch: ['Richtig getippt?'],
       text: 'Was passiert jetzt? 🤔 Tipp ab, bevor du weiterschaust! 👇\n\n#simracing #iracing #guess #simracer #kreids888',
       hilfe: 'Der Clip hält kurz vor der Action an, Countdown 3-2-1, dann geht’s weiter. Wo er anhält, stellst du bei „Schnitt“ ein.' },
-    { id: 'wagnis', name: 'Hättest du’s gewagt?', emoji: '😬', farbe: '#ff1f3d', tag: 'RISIKO', zl: true, wieder: 'NOCHMAL GANZ LANGSAM',
-      hooks: ['HÄTTEST DU’S GEWAGT?', 'ALLES ODER NICHTS', 'MUTIG ODER DUMM?', 'VOLLES RISIKO'], unten: ['JA ODER NEIN? KOMMENTIER!', 'MUTIG ODER DUMM?', 'WÄRST DU AUCH GEGANGEN?'],
+    { id: 'wagnis', name: 'Hättest du’s gewagt?', emoji: '😬', farbe: '#ff1f3d', tag: 'RISIKO', zl: true, wieder: 'Nochmal ganz langsam',
+      hooks: ['Hättest du’s gewagt?', 'Alles oder nichts', 'Mutig oder dumm?', 'Volles Risiko', 'Send it!', 'Lücke gesehen. Gefahren.', 'Bremsen? Nö.', 'Genie oder Wahnsinn?', 'Das hätte schiefgehen können', 'Mut wird belohnt … oder?', 'Nur für Verrückte', 'Kein Mut, kein Ruhm', 'Risiko: 100 %', 'Da passt doch keiner durch', 'Wer nicht wagt …'], unten: ['Ja oder nein? Kommentier!', 'Mutig oder dumm?', 'Wärst du auch gegangen?', 'Genie oder Wahnsinn?', 'Send it oder zurückstecken?', 'Dein mutigstes Manöver?', 'Wie viel Mut hast du? 1–10', 'Hättest du zurückgesteckt?'], wiederAuch: ['Da war die Lücke', 'Mutig. Oder?'],
       text: 'Hättest du’s gewagt? 😬 Ja oder nein? 👇\n\n#simracing #iracing #sendit #simracer #kreids888',
       hilfe: 'Für riskante Manöver: Lücke, Spätbremser, außen rum.' },
-    { id: 'regen', name: 'Regen-Chaos', emoji: '🌧️', farbe: '#00c2ff', tag: 'REGEN', zl: true, wieder: 'NOCHMAL. LANGSAM.', regen: true,
-      hooks: ['REGEN-CHAOS', 'WER BLEIBT DRAUF?', 'AQUAPLANING!', 'NASS. NÄSSER. SPA.'], unten: ['WER BLEIBT DRAUF?', 'SLICKS ODER REGENREIFEN?', 'WER FLIEGT ZUERST RAUS?'],
+    { id: 'regen', name: 'Regen-Chaos', emoji: '🌧️', farbe: '#00c2ff', tag: 'REGEN', zl: true, wieder: 'Nochmal. Langsam.', regen: true,
+      hooks: ['Regen-Chaos', 'Wer bleibt drauf?', 'Aquaplaning!', 'Nass. Nässer. Chaos.', 'Schwimmen statt Fahren', 'Sicht: null. Gas: voll.', 'Wer braucht schon Grip?', 'Seife auf der Strecke', 'Im Regen zählt nur Gefühl', 'Kein Grip. Keine Angst.', 'Blindflug in der Gischt', 'Regengott oder Opfer?', 'Das wird rutschig …'], unten: ['Wer bleibt drauf?', 'Slicks oder Regenreifen?', 'Wer fliegt zuerst raus?', 'Regen: Liebe oder Hass?', 'Wie fährst du im Regen?', 'Hättest du’s draufgehalten?', 'Regengott oder Opfer?', 'Nass oder trocken – was lieber?'], wiederAuch: ['Gischt. Überall Gischt.'],
       text: 'Regen-Chaos 🌧️ Wer bleibt hier drauf? 👇\n\n#simracing #iracing #rain #simracer #kreids888',
       hilfe: 'Für Regenrennen: mit Regen und Blitz im Bild, Donner und Regen im Ton.' },
     // Vorlagen mit mehreren Clips bzw. Zeitraffer (eigener Zeitplan und eigenes Bild, nur Neon-Look)
     { id: 'top3', name: 'Top 3 der Woche', emoji: '🏆', farbe: '#ffd400', tag: 'TOP 3', zl: false, wieder: '', mehr: 'top3', plaetze: ['PLATZ 3', 'PLATZ 2', 'PLATZ 1'],
-      hooks: ['TOP 3 DER WOCHE', 'MEINE TOP 3', 'DIE BESTEN MOMENTE'], unten: ['WAS IST DEIN PLATZ 1?', 'EINVERSTANDEN? KOMMENTIER!', 'WAS FEHLT IN DER LISTE?'],
+      hooks: ['Top 3 der Woche', 'Meine Top 3', 'Die besten Momente', 'Platz 1 ist Wahnsinn', 'Warte auf Platz 1 …', 'Die Woche in 3 Clips', 'Nummer 1 ist krank', 'Top 3. Nicht skippen!', 'Bis zum Ende schauen!', 'Drei Momente. Ein Wahnsinn.', 'Platz 1 glaubt mir keiner'], unten: ['Was ist dein Platz 1?', 'Einverstanden? Kommentier!', 'Was fehlt in der Liste?', 'Falsche Reihenfolge?', '1, 2 oder 3 – dein Favorit?', 'Welcher ist der beste?', 'Deine Top 3 der Woche?'],
       text: 'Meine Top 3 der Woche 🏆 Was ist dein Platz 1? 👇\n\n#simracing #iracing #top3 #simracer #kreids888',
       hilfe: 'Drei Clips nacheinander, Platz 3 bis Platz 1. Zieh am besten drei Clips auf einmal rein, dann sind die Plätze gleich gefüllt.' },
     { id: 'vergleich', name: 'Vorher / Nachher', emoji: '🔀', farbe: '#18e8ff', tag: 'VERGLEICH', zl: false, wieder: '', mehr: 'vergleich', plaetze: ['VORHER', 'NACHHER'],
-      hooks: ['VORHER / NACHHER', 'SIEHST DU DEN UNTERSCHIED?', 'GLEICHE STELLE. ANDERES ENDE.'], unten: ['WAS HAT SICH GEÄNDERT?', 'WELCHE IST SCHNELLER?', 'OBEN ODER UNTEN?'],
+      hooks: ['Vorher / Nachher', 'Siehst du den Unterschied?', 'Gleiche Stelle. Anderes Ende.', 'Finde den Fehler', 'Erst so … dann so', 'Der Unterschied ist krass', 'Übung macht den Meister', 'Was hat sich geändert?', 'So hab ich es gelernt', 'Ein Detail. Riesenunterschied.', 'Oben oder unten?'], unten: ['Was hat sich geändert?', 'Welche ist schneller?', 'Oben oder unten?', 'Siehst du den Fehler?', 'Wo ist der Unterschied?', 'Oben oder unten? Tipp ab!', 'Welche Version fährst du?'],
       text: 'Vorher / Nachher 🔀 Siehst du den Unterschied? 👇\n\n#simracing #iracing #beforeafter #simracer #kreids888',
       hilfe: 'Zwei Clips gleichzeitig untereinander, z. B. Quali und Rennen oder Fehler und sauber. Geht auch zweimal mit demselben Clip.' },
     { id: 'strecke', name: 'Strecke in 30 Sek.', emoji: '🛣️', farbe: '#5cff1f', tag: 'ONBOARD', zl: false, wieder: '', mehr: 'strecke',
       felder: [['strecke', 'Strecke', 'Silverstone']], pflicht: 'strecke', feldTipp: 'Steht groß oben im Video.',
-      hooks: ['EINE RUNDE IN 30 SEK.', 'DIE STRECKE IN 30 SEK.', 'SO FÄHRT MAN DAS'], unten: ['WIE IST DEINE BESTZEIT HIER?', 'WO VERLIERST DU HIER ZEIT?', 'KENNST DU DIE STRECKE?'],
+      hooks: ['Eine Runde in 30 Sek.', 'Die Strecke in 30 Sek.', 'So fährt man das', 'Lern die Strecke in 30 Sek.', 'Speichern fürs nächste Rennen', 'Nie wieder verfahren', 'Alle Kurven. Eine Runde.', 'Kennst du jede Kurve?', 'Streckenguide in 30 Sek.', 'Die Ideallinie zum Mitnehmen', 'Spickzettel fürs Rennen'], unten: ['Wie ist deine Bestzeit hier?', 'Wo verlierst du hier Zeit?', 'Kennst du die Strecke?', 'Speichern fürs nächste Rennen!', 'Welche Strecke als Nächstes?', 'Deine Lieblingskurve hier?', 'Wo ist die schwerste Kurve?'],
       text: c => `${c.strecke ? c.strecke + ' in 30 Sekunden' : 'Eine Runde in 30 Sekunden'} 🛣️ Wie ist deine Bestzeit hier? 👇\n\n#simracing #iracing #onboard #simracer #kreids888`,
       hilfe: 'Eine Runde im Zeitraffer. Kurvennamen und Tipps blendest du an der richtigen Stelle ein (Schritt 3).' },
     // ── Rennen ──
-    { id: 'rennstart', name: 'Rennstart', emoji: '🟢', farbe: '#27f25a', tag: 'RENNSTART', zl: true, wieder: 'DER START IN ZEITLUPE', gruenStart: true, gruppe: 'rennen', neu: true,
+    { id: 'rennstart', name: 'Rennstart', emoji: '🟢', farbe: '#27f25a', tag: 'RENNSTART', zl: true, wieder: 'Der Start in Zeitlupe', gruenStart: true, gruppe: 'rennen', neu: true,
       felder: [['startplatz', 'Startplatz', '17'], ['nachStart', 'Platz nach dem Start', '14']], feldTipp: 'Freiwillig. Mit beiden Plätzen kommt am Ende groß, wie viele Plätze du am Start geholt hast.',
       ergebnisVon: c => { const s0 = nr(c.startplatz), n0 = nr(c.nachStart); if (!s0 || !n0) return null; const d = s0 - n0; return { wert: d > 0 ? '+' + d : d < 0 ? '-' + -d : '±0', label: 'PLÄTZE AM START', info: `VON P${s0} AUF P${n0}` }; },
-      hooks: ['GRÜNE FLAGGE!', 'RENNSTART', 'UND LOS GEHT’S!', 'WER KOMMT BESSER WEG?'], unten: ['WIE WAR MEIN START?', 'GUTER START ODER ZU WILD?', 'WIE VIELE PLÄTZE HÄTTEST DU GEHOLT?'],
+      hooks: ['Grüne Flagge!', 'Rennstart', 'Und los geht’s!', 'Wer kommt besser weg?', 'Start wie eine Rakete', 'Der perfekte Start?', 'Los! Los! Los!', 'Jetzt zählt jeder Meter', 'Keine Gefangenen', 'Vollgas ab Meter 1', 'Kurve 1, ich komme!', 'Die ersten Sekunden zählen', 'So startet man ein Rennen'], unten: ['Wie war mein Start?', 'Guter Start oder zu wild?', 'Wie viele Plätze holst du?', 'Note für den Start: 1–10', 'Dein bester Start?', 'Zu aggressiv oder perfekt?', 'Startest du auch so?'], wiederAuch: ['Wer kommt besser weg?', 'Nochmal für die Stewards'],
       text: c => `Rennstart 🟢${nr(c.startplatz) ? ' von P' + nr(c.startplatz) : ''}${nr(c.nachStart) ? ', nach dem Start P' + nr(c.nachStart) : ''} – wie war mein Start? 👇\n\n#simracing #iracing #racestart #simracer #kreids888`,
       hilfe: 'Für Rennstarts: grüne Flagge am Anfang, dein Startplatz im Bild und am Ende, wie viele Plätze du am Start geholt hast.' },
     { id: 'bestzeit', name: 'Bestzeit im Rennen', emoji: '⚡', farbe: '#b84dff', tag: 'SCHNELLSTE RUNDE', zl: false, wieder: '', bestzeit: true, linie: true, gruppe: 'rennen', neu: true,
       felder: [['rundenzeit', 'Rundenzeit', '1:52.414'], ['runde', 'Runde', '23'], ['auto', 'Auto', 'Porsche 911 GT3 R']], pflicht: 'rundenzeit', feldTipp: 'Die Zeit läuft im Bild mit und wird an der Ziellinie lila.',
       ergebnisVon: c => { const z = String(c.rundenzeit || '').trim(); return z ? { wert: z, label: 'SCHNELLSTE RUNDE', info: GROSS([nr(c.runde) ? 'Runde ' + nr(c.runde) : '', c.auto].filter(Boolean).join(' · ')) } : null; },
-      hooks: ['SCHNELLSTE RUNDE!', 'BESTZEIT IM RENNEN', 'LILA!', 'DAS WAR DIE SCHNELLSTE'], unten: ['WIE SCHNELL BIST DU HIER?', 'SCHREIB DEINE BESTZEIT!', 'GEHT DA NOCH WAS?'],
+      hooks: ['Schnellste Runde!', 'Bestzeit im Rennen', 'Lila!', 'Das war die Schnellste', 'Alles lila', 'Diese Runde ist krank', 'Niemand war schneller', 'Die Runde des Rennens', 'Schneller geht’s nicht', 'Pure Geschwindigkeit', 'Aus dem Nichts: Lila!', 'Mitten im Rennen. Bestzeit.'], unten: ['Wie schnell bist du hier?', 'Schreib deine Bestzeit!', 'Geht da noch was?', 'Wo holst du noch Zeit?', 'Schlägst du die Zeit?', 'Wie viel fehlt dir?'],
       text: c => `Schnellste Runde im Rennen${c.rundenzeit ? ' ⏱ ' + c.rundenzeit : ''} ⚡ Wie schnell bist du hier? 👇\n\n#simracing #iracing #fastestlap #simracer #kreids888`,
       hilfe: 'Für die schnellste Runde im Rennen: Die Rundenzeit läuft mit und wird an der Ziellinie lila, dazu „Schnellste Runde“ wie in der F1. Die Ziellinie stellst du in Schritt 3 ein.' },
     { id: 'ziel', name: 'Zieleinlauf', emoji: '🏁', farbe: '#ffd400', tag: 'ZIEL', zl: false, wieder: '', zielflagge: true, linie: true, gruppe: 'rennen', neu: true,
       felder: [['platz', 'Platz im Ziel', '4'], ['startplatz', 'Startplatz', '17'], ['serie', 'Rennen / Serie', 'SPR GT3 Cup']], pflicht: 'platz', feldTipp: 'Der Platz kommt groß ins Standbild, mit Startplatz auch die gewonnenen Plätze.',
       ergebnisVon: c => { const z = nr(c.platz); if (!z) return null; const s0 = nr(c.startplatz), d = s0 ? s0 - z : 0; return { wert: 'P' + z, label: 'IM ZIEL', info: GROSS([s0 ? `von P${s0} gestartet` : '', d > 0 ? `+${d} Plätze` : '', c.serie].filter(Boolean).join(' · ')) }; },
-      hooks: ['ZIEL!', 'KARIERTE FLAGGE', 'GESCHAFFT!', 'ZIELEINLAUF'], unten: ['WIE LIEF DEIN RENNEN?', 'ZUFRIEDEN MIT DEM ERGEBNIS?', 'WAS WAR DEIN BESTES ERGEBNIS?'],
+      hooks: ['Ziel!', 'Karierte Flagge', 'Geschafft!', 'Zieleinlauf', 'Es ist vorbei!', 'Was für ein Rennen', 'Alles gegeben', 'Dafür haben wir gekämpft', 'Endlich im Ziel', 'Warte auf das Ergebnis …', 'Das Ende war wild', 'Mission erfüllt?'], unten: ['Wie lief dein Rennen?', 'Zufrieden mit dem Ergebnis?', 'Was war dein bestes Ergebnis?', 'Hast du das erwartet?', 'Note fürs Rennen: 1–10', 'Nächstes Mal aufs Podium?'],
       text: c => `Zieleinlauf${nr(c.platz) ? ' auf P' + nr(c.platz) : ''}${nr(c.startplatz) ? ' – gestartet von P' + nr(c.startplatz) : ''} 🏁 Wie lief dein Rennen? 👇\n\n#simracing #iracing #finish #simracer #kreids888`,
       hilfe: 'Für die Zieldurchfahrt: An der Ziellinie steht das Bild, die karierte Flagge weht und dein Ergebnis kommt groß. Die Ziellinie stellst du in Schritt 3 ein.' },
     // ── Multiclass ──
     { id: 'verkehr', name: 'Durch den Verkehr', emoji: '🏎️', farbe: '#2f8bff', tag: 'MULTICLASS', zl: false, wieder: '', mehr: 'verkehr', gruppe: 'multi', neu: true,
       felder: [['klasse', 'Deine Klasse', 'LMP2']], feldTipp: 'Steht als Schild oben rechts. Leer lassen geht auch.',
-      hooks: ['DURCH DEN VERKEHR', 'MULTICLASS-CHAOS', 'PLATZ DA!', 'BLAUE FLAGGE!'], unten: ['WIE VIELE HAST DU GEZÄHLT?', 'SAUBER ODER ZU HART?', 'LIEBER PROTO ODER GT?'],
+      hooks: ['Durch den Verkehr', 'Multiclass-Chaos', 'Platz da!', 'Blaue Flagge!', 'Achtung, ich komme!', 'Wie im Berufsverkehr', 'Rushhour auf der Strecke', 'Keiner schaut in den Spiegel', 'Lücke für Lücke', 'Blau heißt Platz machen', 'Der Verkehr ist der Gegner', 'Slalom durch die Klassen'], unten: ['Wie viele hast du gezählt?', 'Sauber oder zu hart?', 'Lieber Proto oder GT?', 'Hättest du Platz gemacht?', 'Multiclass: Liebe oder Hass?'],
       text: c => `Durch den Verkehr 🏎️${c.klasse ? ' im ' + c.klasse : ''} – wie viele hast du gezählt? 👇\n\n#simracing #iracing #multiclass #simracer #kreids888`,
       hilfe: 'Multiclass: Du fährst durch die langsameren Klassen. Jedes überholte Auto markierst du in Schritt 3 – der Zähler läuft mit, die Klasse kommt als Schild ins Bild.' },
-    { id: 'klassen', name: 'Klassen-Duell', emoji: '🆚', farbe: '#ff3df0', tag: 'KLASSEN-DUELL', zl: true, wieder: 'GANZ GENAU HINSEHEN', klassen: true, nurNeon: true, gruppe: 'multi', neu: true,
+    { id: 'klassen', name: 'Klassen-Duell', emoji: '🆚', farbe: '#ff3df0', tag: 'KLASSEN-DUELL', zl: true, wieder: 'Ganz genau hinsehen', klassen: true, nurNeon: true, gruppe: 'multi', neu: true,
       felder: [['klasseA', 'Klasse A', 'LMP2'], ['klasseB', 'Klasse B', 'GT3']], feldTipp: 'Die beiden Klassen stehen oben über dem Clip und unten zum Abstimmen (A oder B).',
-      hooks: ['KLASSEN-DUELL', 'PROTO GEGEN GT', 'WER MUSS PLATZ MACHEN?', 'SCHNELL GEGEN SCHNELLER'], unten: ['WER WAR IM RECHT? A ODER B!', 'WER HÄTTE PLATZ MACHEN MÜSSEN?', 'A ODER B? KOMMENTIER!'],
+      hooks: ['Klassen-Duell', 'Proto gegen GT', 'Wer muss Platz machen?', 'Schnell gegen schneller', 'Wer hat Vorfahrt?', 'Die ewige Multiclass-Frage', 'David gegen Goliath', 'Keiner will nachgeben', 'Wer war im Recht?', 'Streitfrage der Saison', 'Das gibt Diskussionen …'], unten: ['Wer war im Recht? A oder B!', 'Wer hätte Platz machen müssen?', 'A oder B? Kommentier!', 'Schreib A oder B!', 'Wer hat Vorfahrt?', 'Team A oder Team B?'], wiederAuch: ['Nochmal für die Stewards', 'Wer hatte Vorfahrt?'],
       text: c => `${c.klasseA || 'LMP2'} gegen ${c.klasseB || 'GT3'} 🆚 Wer war im Recht – A oder B? 👇\n\n#simracing #iracing #multiclass #simracer #kreids888`,
       hilfe: 'Zwei Klassen, eine Kurve. Die Leute stimmen ab: A oder B – das bringt Kommentare.' },
     // ── Action ──
     { id: 'aufholjagd', name: 'Aufholjagd', emoji: '📈', farbe: '#5cff1f', tag: 'AUFHOLJAGD', zl: false, wieder: '', mehr: 'aufholjagd', gruppe: 'action', neu: true,
       felder: [['startplatz', 'Startplatz', '18']], pflicht: 'startplatz', feldTipp: 'Von hier zählt die Platz-Anzeige nach vorn.',
-      hooks: ['AUFHOLJAGD', 'VON GANZ HINTEN', 'PLATZ FÜR PLATZ', 'NIEMALS AUFGEBEN'], unten: ['WIE VIELE PLÄTZE SCHAFFST DU?', 'BESTE AUFHOLJAGD?', 'WAS WAR DEIN REKORD?'],
+      hooks: ['Aufholjagd', 'Von ganz hinten', 'Platz für Platz', 'Niemals aufgeben', 'Von letzter Reihe nach vorn', 'Keiner hat an mich geglaubt', 'Das Comeback des Jahres?', 'Einer nach dem anderen', 'Wie weit komm ich?', 'Der Nächste, bitte!', 'Ich hol euch alle', 'Hinten? Kein Problem.'], unten: ['Wie viele Plätze schaffst du?', 'Beste Aufholjagd?', 'Was war dein Rekord?', 'Wie viele Plätze tippst du?', 'Dein bestes Comeback?', 'Hättest du aufgegeben?'],
       text: c => `Aufholjagd 📈${String(c.startplatz || '').replace(/\D/g, '') ? ' von P' + String(c.startplatz).replace(/\D/g, '') : ''} – wie viele Plätze schaffst du? 👇\n\n#simracing #iracing #comeback #simracer #kreids888`,
       hilfe: 'Von hinten nach vorn: Jeder Überholer ist ein Platz. Die Platz-Anzeige zählt mit, am Ende kommt „+X Plätze“.' },
-    { id: 'ampel', name: 'Lights Out', emoji: '🚥', farbe: '#ff2a2a', tag: 'LIGHTS OUT', zl: true, wieder: 'NOCHMAL IN ZEITLUPE', ampel: true, nurNeon: true, gruppe: 'action', neu: true,
-      hooks: ['WER KOMMT BESSER WEG?', 'START-DUELL', 'REAKTIONSTEST', 'KURVE 1 WARTET'], unten: ['WIE WAR DEIN START?', 'GUTER START ODER FRÜHSTART?', 'WER GEWINNT KURVE 1?'],
+    { id: 'ampel', name: 'Lights Out', emoji: '🚥', farbe: '#ff2a2a', tag: 'LIGHTS OUT', zl: true, wieder: 'Nochmal in Zeitlupe', ampel: true, nurNeon: true, gruppe: 'action', neu: true,
+      hooks: ['Wer kommt besser weg?', 'Start-Duell', 'Reaktionstest', 'Kurve 1 wartet', 'Lights out and away we go', 'Fünf Lichter. Ein Schuss.', 'Warte auf die Lichter …', 'Frühstart oder perfekt?', 'Nerven behalten …', 'Puls auf 200', 'Bloß nicht abwürgen', 'Reaktion: göttlich?'], unten: ['Wie war dein Start?', 'Guter Start oder Frühstart?', 'Wer gewinnt Kurve 1?', 'Wie schnell ist deine Reaktion?', 'Frühstart? Sei ehrlich!', 'Deine Reaktionszeit?'], wiederAuch: ['Reaktion in Zeitlupe'],
       text: 'Lights out 🚥 Wer kommt hier besser weg? 👇\n\n#simracing #iracing #racestart #simracer #kreids888',
       hilfe: 'Für Rennstarts: Das Bild steht, fünf rote Lichter gehen an – Lichter aus und los. Mit Motor-Sound. Der Clip sollte kurz vor dem Start anfangen.' },
-    { id: 'analyse', name: 'Replay-Analyse', emoji: '🎯', farbe: '#18e8ff', tag: 'ANALYSE', zl: true, wieder: 'NOCHMAL IN ZEITLUPE', analyse: true, nurNeon: true, gruppe: 'action', neu: true,
+    { id: 'analyse', name: 'Replay-Analyse', emoji: '🎯', farbe: '#18e8ff', tag: 'ANALYSE', zl: true, wieder: 'Nochmal in Zeitlupe', analyse: true, nurNeon: true, gruppe: 'action', neu: true,
       felder: [['analyseText', 'Text bei der Analyse', 'Hier zu früh eingelenkt']], pflicht: 'analyseText', feldTipp: 'Erscheint im Standbild neben dem Kreis.',
-      hooks: ['GENAU HIER!', 'DER FEHLER', 'SIEHST DU’S?', 'ANALYSE'], unten: ['HÄTTEST DU’S GESEHEN?', 'WAS HÄTTEST DU ANDERS GEMACHT?', 'EINVERSTANDEN?'],
+      hooks: ['Genau hier!', 'Der Fehler', 'Siehst du’s?', 'Analyse', 'Hier liegt der Fehler', 'Darum bist du langsam', 'Der Fehler, den jeder macht', 'Machst du das auch?', 'Das kostet richtig Zeit', 'Nur Profis sehen das', 'Stopp! Schau hier hin', 'Der eine Fehler'], unten: ['Hättest du’s gesehen?', 'Was hättest du anders gemacht?', 'Einverstanden?', 'Machst du das auch so?', 'Mehr Analysen? Schreib ja!', 'Wo verlierst du Zeit?'], wiederAuch: ['Jetzt siehst du’s'],
       text: 'Replay-Analyse 🎯 Genau hier passiert’s. Was hättest du anders gemacht? 👇\n\n#simracing #iracing #analysis #simracer #kreids888',
       hilfe: 'Wie im TV: Der Clip hält an, die wichtige Stelle wird eingekreist und erklärt, dann läuft er weiter. Stelle und Kreis legst du in Schritt 3 fest.' },
     { id: 'sektoren', name: 'Sektorzeiten', emoji: '🟣', farbe: '#b44dff', tag: 'HOTLAP', zl: false, wieder: '', mehr: 'sektoren', gruppe: 'action', neu: true,
       felder: [['strecke', 'Strecke', 'Spa'], ['rundenzeit', 'Rundenzeit', '2:17.384']], feldTipp: 'Rundenzeit leer = wird aus dem Clip gemessen.',
-      hooks: ['LILA. LILA. LILA.', 'JEDE TAUSENDSTEL ZÄHLT', 'DIE PERFEKTE RUNDE?', 'SCHLÄGST DU DAS?'], unten: ['SCHREIB DEINE ZEIT!', 'WO HOLST DU NOCH ZEIT?', 'WER IST SCHNELLER?'],
+      hooks: ['Lila. Lila. Lila.', 'Jedes Tausendstel zählt', 'Die perfekte Runde?', 'Schlägst du das?', 'Alles lila. Fast.', 'Wo ist die Zeit hin?', 'Grün, gelb oder lila?', 'Diese Runde ist illegal', 'Perfektion in 3 Sektoren', 'Sektor für Sektor'], unten: ['Schreib deine Zeit!', 'Wo holst du noch Zeit?', 'Wer ist schneller?', 'Welcher Sektor ist dein bester?', 'Lila oder nicht? Tipp ab!', 'Schneller? Beweis es!'],
       text: c => `Sektor für Sektor${c.strecke ? ' in ' + c.strecke : ''}${c.rundenzeit ? ' ⏱ ' + c.rundenzeit : ''} 🟣 Schlägst du das? 👇\n\n#simracing #iracing #hotlap #simracer #kreids888`,
       hilfe: 'Hotlap mit Zeiten-Turm wie in der F1: Sektorzeiten in Lila, Grün oder Gelb, am Ende die Rundenzeit. Die Sektoren markierst du in Schritt 3.' },
     // ── Trends ──
     { id: 'erwartung', name: 'Erwartung vs. Realität', emoji: '🎭', farbe: '#ffb800', tag: 'MEME', zl: false, wieder: '', mehr: 'erwartung', plaetze: ['ERWARTUNG', 'REALITÄT'], gruppe: 'trend', neu: true,
       felder: [['pointe', 'Text am Schluss', 'NA TOLL.']], feldTipp: 'Knallt am Ende auf das Standbild. Leer = „NA TOLL.“',
-      hooks: ['ERWARTUNG VS. REALITÄT', 'SO SOLLTE ES LAUFEN …', 'DER PLAN VS. DAS RENNEN'], unten: ['PASSIERT DIR DAS AUCH?', 'KENNST DU DAS?', 'SEI EHRLICH: WIE OFT?'],
+      hooks: ['Erwartung vs. Realität', 'So sollte es laufen …', 'Der Plan vs. das Rennen', 'Der Plan war gut …', 'Im Kopf sah es besser aus', 'Was ich wollte vs. was kam', 'Es fing so gut an …', 'Theorie vs. Praxis', 'Ich vs. die Physik', 'Quali: Gott. Rennen: …', 'Plan A, B und C. Alle weg.'], unten: ['Passiert dir das auch?', 'Kennst du das?', 'Sei ehrlich: Wie oft?', 'Markier jemanden, der das kennt', 'Deine Realität? Erzähl!', 'Wie oft passiert dir das?'],
       text: 'Erwartung vs. Realität 🎭 Kennst du das? Sei ehrlich 👇\n\n#simracing #iracing #expectationvsreality #simracer #kreids888',
       hilfe: 'Meme: Erst der Plan (schöner Clip), dann was wirklich passiert ist (Crash, Fail). Am Ende Standbild mit traurigem Trompeten-Sound.' },
-    { id: 'kommentator', name: 'Kommentator', emoji: '🎙️', farbe: '#ff7a00', tag: 'KOMMENTAR', zl: true, wieder: 'NOCHMAL IN ZEITLUPE', kommentator: true, nurTV: true, gruppe: 'trend', neu: true,
+    { id: 'kommentator', name: 'Kommentator', emoji: '🎙️', farbe: '#ff7a00', tag: 'KOMMENTAR', zl: true, wieder: 'Nochmal in Zeitlupe', kommentator: true, nurTV: true, gruppe: 'trend', neu: true,
       felder: [['serie', 'Serie', 'SPR GT3 Cup'], ['runde', 'Runde', '12/30'], ['fahrer', 'Fahrer im Bild', 'Kreids888 · P4'], ['laufband', 'Laufschrift', 'Kreids888 holt drei Plätze in einer Runde']],
       feldTipp: 'Alles freiwillig: Serie steht oben, Runde rechts daneben, der Fahrer in der Bauchbinde, die Laufschrift ganz unten.',
-      hooks: ['WAS FÜR EIN MANÖVER!', 'UNGLAUBLICH!', 'DAS GIBT’S DOCH NICHT!', 'UND ER IST VORBEI!'], unten: ['WIE HÄTTEST DU’S KOMMENTIERT?', 'WAS SAGST DU DAZU?', 'MANÖVER DES RENNENS?'],
+      hooks: ['Was für ein Manöver!', 'Unglaublich!', 'Das gibt’s doch nicht!', 'Und er ist vorbei!', 'Wahnsinn! Wahnsinn!', 'Das habe ich noch nie gesehen!', 'Was macht er denn da?!', 'Das ist Racing!', 'Meine Damen und Herren …', 'Das wird Ärger geben!', 'Er hat es wirklich getan!', 'Die Menge tobt!', 'Unfassbar, was hier passiert!'], unten: ['Wie hättest du’s kommentiert?', 'Was sagst du dazu?', 'Manöver des Rennens?', 'Besser als im TV?', 'Schreib deinen Kommentar!', 'Note fürs Manöver: 1–10'], wiederAuch: ['Das müssen wir nochmal sehen', 'Die Wiederholung!'],
       text: 'Was für ein Manöver! 🎙️ Wie hättest du’s kommentiert? 👇\n\n#simracing #iracing #racing #simracer #kreids888',
       hilfe: 'Wie eine echte TV-Übertragung: Serie, Runde, Fahrer-Bauchbinde, eigene Laufschrift und Jubel am Ende.' }
   ];
   const GRUPPEN = [['klassik', 'Klassiker'], ['rennen', 'Rennen'], ['mehr', 'Mehrere Clips & Runde'], ['multi', 'Multiclass'], ['action', 'Action'], ['trend', 'Trends']];
   const gruppeVon = v => v.gruppe || (v.mehr ? 'mehr' : 'klassik');
   const LOOKS = [['neon', '✨ Neon'], ['tv', '📺 TV-Sendung']];
-  const WIEDER = ['NOCHMAL GENAU HINSCHAUEN', 'NOCHMAL IN ZEITLUPE', 'GANZ GENAU HINSEHEN', 'NOCHMAL. LANGSAM.', 'WIE?!', 'AUTSCH. NOCHMAL.', 'SO GEHT DAS', 'FOTOFINISH'];
+  const WIEDER = ['Nochmal genau hinschauen', 'Nochmal in Zeitlupe', 'Ganz genau hinsehen', 'Nochmal. Langsam.', 'Wie?!', 'Jetzt ganz langsam …', 'In Zeitlupe noch krasser', 'Hast du’s gesehen?', 'Frame für Frame', 'Replay!', 'Das muss ich nochmal sehen', 'Zurückspulen …', 'Für alle, die’s verpasst haben', 'Nochmal, weil’s so schön war', 'Achtung … jetzt!'];   // Zeitlupe: passt zu jeder Vorlage (dazu je Vorlage „wieder“ + „wiederAuch“)
+  const wiederListe = v => [v.wieder, ...(v.wiederAuch || []), ...WIEDER].filter((x, i, a) => x && a.indexOf(x) === i);
+  // Sprüche ziehen: zufällig, aber die zuletzt benutzten kommen erst wieder, wenn alle anderen dran waren
+  const ZULETZT = 'k888-clip-sprueche';
+  function zuletzt() { try { return JSON.parse(localStorage.getItem(ZULETZT) || '{}') || {}; } catch (e) { return {}; } }
+  function ziehen(liste, art, jetzt) {
+    const z = zuletzt(), l = (z[art] || []).slice();
+    const kand = liste.filter(x => x !== jetzt);
+    if (!kand.length) return liste[0] || '';
+    const alter = x => { const i = l.indexOf(x); return i < 0 ? 1e9 : i; };   // höher = länger nicht benutzt
+    const nie = kand.filter(x => alter(x) === 1e9);
+    const pool = nie.length ? nie : kand.slice().sort((a, b) => alter(b) - alter(a)).slice(0, Math.max(1, Math.ceil(kand.length / 3)));
+    const w = pool[Math.floor(Math.random() * pool.length)];
+    try { z[art] = [w, ...l.filter(x => x !== w)].slice(0, 120); localStorage.setItem(ZULETZT, JSON.stringify(z)); } catch (e) { /* ohne Speicher */ }
+    return w;
+  }
+  const spruecheNeu = v => ({ hook: ziehen(v.hooks, 'hook'), unten: ziehen(v.unten, 'unten'), wieder: v.wieder ? ziehen(wiederListe(v), 'wieder') : '' });
   const frageVon = (c, v) => GROSS(String(c.unten || '').trim() || v.unten[0]);
   const wiederVon = (c, v) => GROSS(String(c.wieder || '').trim() || v.wieder);
   const FARBEN = ['#ff2d6f', '#5cff1f', '#18e8ff', '#ff7a00', '#b44dff', '#ff1f3d', '#ffd400', '#00ffa3', '#ff4fd8', '#3d7bff', '#ff9f1c', '#00c2ff'];
   const vorlage = c => VORLAGEN.find(v => v.id === c.vorlage) || VORLAGEN[0];
   const vorlageText = (v, c) => (typeof v.text === 'function' ? v.text(c || {}) : v.text);
+  // Text unter dem Post: Spruch oben + Infos (Zeit, Platz …) + Frage unten + Hashtags – baut sich neu, bis du ihn selbst änderst
+  const TEXT_INFO = {
+    hotlap: c => [c.strecke, c.rundenzeit, c.auto],
+    finish: c => [c.abstand && c.abstand + ' Abstand im Ziel'],
+    strecke: c => [c.strecke],
+    rennstart: c => [nr(c.startplatz) && 'Start von P' + nr(c.startplatz), nr(c.nachStart) && 'nach dem Start P' + nr(c.nachStart)],
+    bestzeit: c => [c.rundenzeit, nr(c.runde) && 'Runde ' + nr(c.runde), c.auto],
+    ziel: c => [nr(c.platz) && 'P' + nr(c.platz) + ' im Ziel', nr(c.startplatz) && 'gestartet von P' + nr(c.startplatz), c.serie],
+    verkehr: c => [c.klasse && 'Klasse ' + c.klasse],
+    klassen: c => [(String(c.klasseA || '').trim() || 'LMP2') + ' gegen ' + (String(c.klasseB || '').trim() || 'GT3')],
+    aufholjagd: c => [nr(c.startplatz) && 'Gestartet von P' + nr(c.startplatz)],
+    sektoren: c => [c.strecke, c.rundenzeit],
+    kommentator: c => [c.serie, c.runde && 'Runde ' + c.runde]
+  };
+  const textEmoji = v => (String(vorlageText(v, {})).match(/\p{Extended_Pictographic}(?:\uFE0F|\u200D\p{Extended_Pictographic}\uFE0F?)*/gu) || []).find(x => x !== '\u{1F447}') || v.emoji;   // erstes Emoji im Vorlagen-Text (nicht 👇)
+  const textTags = v => { const z = String(vorlageText(v, {})).trim().split('\n').pop().trim(); return z.startsWith('#') ? z : '#simracing #iracing #simracer #kreids888'; };
+  function textBauen(v, c) {
+    const hook = String(c.hook || '').trim() || v.hooks[0], frage = String(c.unten || '').trim() || v.unten[0];
+    const info = (TEXT_INFO[v.id] ? TEXT_INFO[v.id](c) : []).map(x => String(x || '').trim()).filter(Boolean).join(' · ');
+    return [hook + ' ' + textEmoji(v), info, frage + ' 👇'].filter(Boolean).join('\n') + '\n\n' + textTags(v);
+  }
+  const mitText = c => { c.text = textBauen(vorlage(c), c); return c; };
   const kw = () => { const d = new Date(); const t = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate())); const tag = t.getUTCDay() || 7; t.setUTCDate(t.getUTCDate() + 4 - tag); const j = new Date(Date.UTC(t.getUTCFullYear(), 0, 1)); return Math.ceil(((t - j) / 86400000 + 1) / 7); };
   const tagText = v => v.tag.replace('{kw}', kw());
 
@@ -1873,9 +1911,9 @@
       const url = URL.createObjectURL(datei), v = document.createElement('video'); v.preload = 'metadata'; v.muted = true;
       v.onloadedmetadata = () => {
         const dauer = v.duration || 0, vl = VORLAGEN[0];
-        ok(dauer >= 2 ? { id: Math.random().toString(36).slice(2), datei, url, name: datei.name, dauer, start: Math.max(0, dauer - 15), ende: dauer,
-          vorlage: vl.id, hook: vl.hooks[0], unten: vl.unten[0], wieder: vl.wieder, zeitlupe: vl.zl, modus: 'ganz', versatz: 0, farbe: vl.farbe, text: vorlageText(vl, {}), textEigen: false, look: LETZTER_LOOK,
-          insta: true, tiktok: !!(stand().tiktok && stand().tiktok.verbunden), postMs: 0 } : null);
+        ok(dauer >= 2 ? mitText({ id: Math.random().toString(36).slice(2), datei, url, name: datei.name, dauer, start: Math.max(0, dauer - 15), ende: dauer,
+          vorlage: vl.id, ...spruecheNeu(vl), zeitlupe: vl.zl, modus: 'ganz', versatz: 0, farbe: vl.farbe, text: '', textEigen: false, look: LETZTER_LOOK,
+          insta: true, tiktok: !!(stand().tiktok && stand().tiktok.verbunden), postMs: 0 }) : null);
       };
       v.onerror = () => ok(null);
       v.src = url;
@@ -1904,9 +1942,9 @@
   const quelleAusClip = x => ({ datei: x.datei, url: x.url, name: x.name, dauer: x.dauer, start: Math.max(0, x.dauer - 8), ende: x.dauer, titel: '' });
   function clipAusQuelle(x) {   // Platz frei machen: Clip kommt zurück in die Warteschlange
     const vl = VORLAGEN[0];
-    return { id: Math.random().toString(36).slice(2), datei: x.datei, url: x.url, name: x.name, dauer: x.dauer, start: Math.max(0, x.dauer - 15), ende: x.dauer,
-      vorlage: vl.id, hook: vl.hooks[0], unten: vl.unten[0], wieder: vl.wieder, zeitlupe: vl.zl, modus: 'ganz', versatz: 0, farbe: vl.farbe, text: vorlageText(vl, {}), textEigen: false, look: LETZTER_LOOK,
-      insta: true, tiktok: !!(stand().tiktok && stand().tiktok.verbunden), postMs: 0 };
+    return mitText({ id: Math.random().toString(36).slice(2), datei: x.datei, url: x.url, name: x.name, dauer: x.dauer, start: Math.max(0, x.dauer - 15), ende: x.dauer,
+      vorlage: vl.id, ...spruecheNeu(vl), zeitlupe: vl.zl, modus: 'ganz', versatz: 0, farbe: vl.farbe, text: '', textEigen: false, look: LETZTER_LOOK,
+      insta: true, tiktok: !!(stand().tiktok && stand().tiktok.verbunden), postMs: 0 });
   }
   const platzZahl = v => (v.plaetze ? v.plaetze.length : 1);
   function extraZurueck(c, ab) {   // weitere Clips ab Platz „ab“ zurück in die Warteschlange (nicht, wenn es derselbe Clip ist)
@@ -1915,7 +1953,7 @@
   }
   function vorlageSetzen(c, id) {
     const v = VORLAGEN.find(x => x.id === id) || VORLAGEN[0], alt = vorlage(c);
-    c.vorlage = v.id; c.hook = v.hooks[0]; c.unten = v.unten[0]; c.wieder = v.wieder; c.zeitlupe = v.zl; c.farbe = v.farbe; c.text = vorlageText(v, c); c.textEigen = false;
+    c.vorlage = v.id; Object.assign(c, spruecheNeu(v)); c.zeitlupe = v.zl; c.farbe = v.farbe; c.textEigen = false; mitText(c);
     extraZurueck(c, platzZahl(v));
     if (alt.mehr !== v.mehr) for (const x of quellenVon(c)) x.titel = '';   // Titel passen nicht zur anderen Vorlage
     if (alt.id !== v.id && (MARKEN[alt.mehr] || MARKEN[v.mehr])) {   // Markierungen je Vorlage merken (Kurven sind keine überholten Autos)
@@ -2311,9 +2349,9 @@
     const b = ev.target.closest('[data-c]'); if (!b || !BOX.contains(b)) return;
     const a = b.dataset.c, c = CLIPS[0], z = b.closest('[data-id]'), id = z && z.dataset.id;
     if (a === 'vorlage' && c) { vorlageSetzen(c, b.dataset.wert); zeichnen(); return; }
-    if (a === 'wuerfeln' && c) { const h = vorlage(c).hooks, i = (h.indexOf(c.hook) + 1) % h.length; c.hook = h[i]; zeichnen(); return; }
-    if (a === 'wuerfeln-unten' && c) { const h = vorlage(c).unten, i = (h.indexOf(c.unten) + 1) % h.length; c.unten = h[i]; zeichnen(); return; }
-    if (a === 'wuerfeln-wieder' && c) { const h = [vorlage(c).wieder, ...WIEDER.filter(x => x !== vorlage(c).wieder)], i = (h.indexOf(c.wieder) + 1) % h.length; c.wieder = h[i]; zeichnen(); return; }
+    if (a === 'wuerfeln' && c) { c.hook = ziehen(vorlage(c).hooks, 'hook', c.hook); if (!c.textEigen) mitText(c); zeichnen(); return; }
+    if (a === 'wuerfeln-unten' && c) { c.unten = ziehen(vorlage(c).unten, 'unten', c.unten); if (!c.textEigen) mitText(c); zeichnen(); return; }
+    if (a === 'wuerfeln-wieder' && c) { c.wieder = ziehen(wiederListe(vorlage(c)), 'wieder', c.wieder); zeichnen(); return; }
     if (a === 'farbe' && c) { c.farbe = b.dataset.wert; zeichnen(); return; }
     if (a === 'modus' && c) { c.modus = b.dataset.wert; zeichnen(); return; }
     if (a === 'look' && c) { c.look = LETZTER_LOOK = b.dataset.wert; zeichnen(); return; }
@@ -2387,12 +2425,13 @@
   function eingabe(ev) {
     const t = ev.target, c = CLIPS[0]; if (!c || !t.dataset || !BOX.contains(t)) return;
     const a = t.dataset.c;
-    if (a === 'hook') c.hook = t.value;
-    else if (a === 'unten') c.unten = t.value;
+    const textMit = () => { if (c.textEigen) return; mitText(c); const ta = BOX.querySelector('[data-c="text"]'); if (ta) ta.value = c.text; };
+    if (a === 'hook') { c.hook = t.value; textMit(); }
+    else if (a === 'unten') { c.unten = t.value; textMit(); }
     else if (a === 'wieder') c.wieder = t.value;
     else if (a === 'feld') {
       c[t.dataset.feld] = t.value;
-      if (!c.textEigen && typeof vorlage(c).text === 'function') { c.text = vorlageText(vorlage(c), c); const ta = BOX.querySelector('[data-c="text"]'); if (ta) ta.value = c.text; }
+      textMit();
       schritt3Auffrischen(c);
     }
     else if (a === 'text') { c.text = t.value; c.textEigen = true; }

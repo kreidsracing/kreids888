@@ -599,6 +599,7 @@ async function zyklus(env) {
   // 2b. Thumbnail-Sprüche: jedes Rennen der nächsten 7 Tage bekommt von selbst einen eigenen (höchstens 2 pro Lauf)
   try {
     const thrs = await s.liste('thr:');
+    const benutzt = new Set(Object.values(thrs).map(x => x && x.spruch).filter(Boolean));   // jeder Spruch nur einmal
     let n = 2;
     const fertig = new Set();
     for (const p of plan) {
@@ -609,9 +610,10 @@ async function zyklus(env) {
       const alt = thrs['thr:' + rk] || {};
       if (alt.spruch) continue;
       n--;
-      const { liste } = await sprueche(env, p);
-      if (!liste || !liste.length) continue;
-      await s.schreib('thr:' + rk, { ...alt, spruch: liste[Math.floor(Math.random() * liste.length)], auto: true, startMs: alt.startMs || p.startMs });
+      const { auto } = await sprueche(env, p, benutzt);
+      if (!auto) continue;
+      benutzt.add(auto);
+      await s.schreib('thr:' + rk, { ...alt, spruch: auto, auto: true, startMs: alt.startMs || p.startMs });
     }
   } catch (e) { /* nächster Lauf */ }
   // 3. Token verlängern
@@ -1088,7 +1090,8 @@ async function api(req, env, url) {
     const rennen = plan.filter(x => rennKey(x.id) === body.rennKey);
     const p = rennen.find(x => x.typ === 'erg') || rennen[0];
     if (!p) return fehler('Dieses Rennen ist nicht (mehr) in der Planung.', 404);
-    return antwort(await sprueche(env, p));
+    const thrs = await s.liste('thr:');
+    return antwort(await sprueche(env, p, Object.values(thrs).map(x => x && x.spruch).filter(Boolean)));
   }
 
   // Ergebnis eines eigenen Rennens von Hand eintragen (oder mit loeschen: true wieder entfernen)

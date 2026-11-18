@@ -149,6 +149,7 @@
   // ─── Daten eines Rennens → Platzhalter ───
   function berlin(ms) { return window.K888Bilder ? window.K888Bilder.berlin(ms) : { tag: '', zeit: '', wochentag: '' }; }
   function ersatzSpruch(r) {
+    if (window.K888Bilder && window.K888Bilder.ersatzSpruch) return window.K888Bilder.ersatzSpruch(r);   // derselbe wie auf den Post-Bildern
     const e = r.ergebnis;
     if (e && e.ziel) return e.start && e.start > e.ziel ? `VON P${e.start} AUF P${e.ziel}?!` : e.ziel === 1 ? 'SIEG!' : e.ziel <= 3 ? 'ENDLICH PODIUM!' : 'DAS WAR KNAPP!';
     if (e) return 'DAS ENDE WAR WILD…';

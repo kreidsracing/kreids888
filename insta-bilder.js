@@ -128,11 +128,20 @@
     return o;
   }
   // Spruch (wie beim YouTube-Thumbnail): eigener Spruch des Rennens, sonst ein passender Standard
-  function ersatzSpruch(r) {
-    const e = r.ergebnis;
-    if (e && e.ziel) return e.start && e.start > e.ziel ? `VON P${e.start} AUF P${e.ziel}?!` : e.ziel === 1 ? 'SIEG!' : e.ziel <= 3 ? 'ENDLICH PODIUM!' : 'DAS WAR KNAPP!';
-    if (e) return 'DAS ENDE WAR WILD…';
-    return 'ALLES ODER NICHTS!';
+  function ersatzSpruch(r) {   // je Rennen fest (gleicher Spruch auf Thumbnail, Ankündigung und Story), aber nicht überall derselbe
+    const e = r.ergebnis, k = String(r.rennKey || r.startMs || r.id || '');
+    let h = 0; for (const ch of k) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
+    const nimm = l => l[h % l.length];
+    if (e && e.ziel) {
+      const z = e.ziel, d = e.start ? e.start - z : 0;
+      if (z === 1) return nimm(['SIEG!', 'P1. EINFACH P1.', 'ERSTER! ENDLICH!', 'KEINER HOLT MICH EIN']);
+      if (d >= 3) return nimm([`VON P${e.start} AUF P${z}?!`, `+${d} PLÄTZE?!`, 'DIE AUFHOLJAGD DES JAHRES']);
+      if (z <= 3) return nimm(['ENDLICH PODIUM!', `P${z}! PODIUM!`, 'SO KNAPP AM SIEG …']);
+      if (d <= -3) return nimm(['WAS IST DA PASSIERT?!', 'SO WAR DAS NICHT GEPLANT', 'DAS TUT WEH …']);
+      return nimm(['DAS WAR KNAPP!', 'WAS FÜR EIN RENNEN!', 'DRAMA BIS ZUM SCHLUSS', `P${z}! ZUFRIEDEN?`]);
+    }
+    if (e) return nimm(['DAS ENDE WAR WILD …', 'NICHT MEIN TAG …', 'AUS. EINFACH AUS.']);
+    return nimm(['ALLES ODER NICHTS!', 'HEUTE ODER NIE', 'CRASH ODER PODIUM?', 'HEUTE KNALLT’S', 'DAS WIRD WILD', 'WIRD DAS MEIN TAG?', 'KURVE 1 WIRD BRUTAL', 'NUR EINER KANN GEWINNEN']);
   }
   function spruchSvg(text, e, f1, B) {
     const max = Math.max(30, Math.min(220, e.g || 90));
