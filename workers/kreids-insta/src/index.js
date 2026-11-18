@@ -18,6 +18,7 @@ import { konto, posten, pruefen, tokenVerlaengern, verlaengerbar } from './insta
 import { istUhrzeit, berlin, berlinZuMs, tageZurueck } from './zeit.js';
 import { ytEingerichtet, ytAnmeldeLink, ytCodeTauschen, ytZugang, ytKanal, ytStreams, ytPlanen, ytThumbnail, ytTexte, ytLetzteBeschreibung, ytInfos } from './youtube.js';
 import { ttEingerichtet, ttAnmeldeLink, ttCodeTauschen, ttZugang, ttKonto, ttEntwurf, ttVideoEntwurf } from './tiktok.js';
+import { discordEingerichtet, discordMelden, textTeile, ART_NAME, FARBE } from './discord.js';
 
 // ─── Speicher (Durable Object, SQLite) ──────────────────────
 export class Speicher extends DurableObject {
@@ -319,6 +320,18 @@ async function veroeffentlichen(env, s, post, design, cfg) {
     });
     zust.gepostet = { zeit: Date.now(), mediaId };
     zust.fehler = '';
+    if (post.typ !== 'live') await dcMelden(s, async () => {   // „Jetzt live“ meldet der YouTube-Teil
+      let link = ''; try { link = (await pruefen(token, mediaId)).link || ''; } catch (e) { /* ohne Link */ }
+      zust.gepostet.link = link;
+      const story = istStory(post.typ, cfg), name = ART_NAME[post.typ] || 'Post', t = textTeile(story ? '' : bildtext(post, cfg, design, zust.werte, zust.edit));
+      const was = [post.track || post.titel, post.serie].filter(Boolean).join(' – ');
+      await discordMelden(env, {
+        text: story ? `📱 Neue Instagram-Story: **${name}**` : `📸 Neuer Instagram-Beitrag: **${name}**`,
+        titel: story ? (was ? `${name} · ${was}` : name) : (t.titel || name), link: link || (k.username ? `https://www.instagram.com/${k.username}/` : ''),
+        beschreibung: story ? 'Story – 24 Stunden zu sehen' : t.rest, bild: `${env.ORIGIN}/bild/${post.id}/${zust.version}.jpg`,
+        farbe: FARBE.instagram, fuss: story ? 'Instagram · Story' : 'Instagram · Beitrag'
+      });
+    });
   } catch (e) {
     zust.fehler = String((e && e.message) || e).slice(0, 400);
     zust.versuche = (zust.versuche || 0) + 1;
@@ -326,6 +339,11 @@ async function veroeffentlichen(env, s, post, design, cfg) {
   zust.laeuft = 0;
   await s.schreib('post:' + post.id, zust);
   return zust;
+}
+// Discord-Meldung: Fehler nur merken (fürs Dashboard), Posten läuft immer weiter
+async function dcMelden(s, fn) {
+  try { await fn(); await s.loesch('dc:fehler'); }
+  catch (e) { try { await s.schreib('dc:fehler', { zeit: Date.now(), text: String((e && e.message) || e).slice(0, 200) }); } catch (e2) { /* egal */ } }
 }
 
 // ─── YouTube: Livestreams planen ────────────────────────────
@@ -372,7 +390,12 @@ async function ytEinRennen(env, s, zugang, r, cfg, erzwingen, beschr) {
       const neu = !z.id;
       z.id = await ytPlanen(zugang, r, cfg.youtube, z.id, beschr); z.hash = hash;
       z.titel = ytTexte(r, cfg.youtube, beschr).titel;
-      if (neu) await ytEigeneMerken(s, z.id);
+      if (neu) {
+        await ytEigeneMerken(s, z.id);
+        const b = berlin(r.liveMs || r.startMs);
+        await dcMelden(s, () => discordMelden(env, { text: '📅 Neuer YouTube-Stream geplant', titel: z.titel, link: 'https://youtu.be/' + z.id,
+          beschreibung: `Live am ${b.wochentag}, ${b.tag} um ${b.zeit} Uhr`, bild: `https://i.ytimg.com/vi/${z.id}/hqdefault.jpg`, farbe: FARBE.youtube, fuss: 'YouTube · Livestream' }));
+      }
     }
     const th = await s.lies('ytbh:' + r.rennKey);
     if (th && th.h && th.h !== z.thumbH) {
@@ -513,6 +536,10 @@ async function clipPosten(env, s, id) {
       c.gepostet = { zeit: Date.now(), mediaId, test };
       try { c.gepostet.link = (await pruefen(token, mediaId)).link || ''; } catch (e) { /* Link ist nur schön */ }
       c.fehler = '';
+      const t = textTeile(c.text);
+      await dcMelden(s, () => discordMelden(env, { text: '🎬 Neues Reel auf Instagram' + (test ? ' (Test-Reel)' : ''), titel: t.titel || c.titel || 'Neues Reel',
+        link: c.gepostet.link || (k.username ? `https://www.instagram.com/${k.username}/reels/` : ''), beschreibung: t.rest, bild: `${env.ORIGIN}/cbild/${id}.jpg`,
+        farbe: FARBE.instagram, fuss: test ? 'Instagram · Test-Reel (zuerst für Nicht-Follower)' : 'Instagram · Reel' }));
     } catch (e) { c.fehler = String((e && e.message) || e).slice(0, 400); c.versuche = (c.versuche || 0) + 1; }
   }
   if (c.tiktok && !c.tt && ttEingerichtet(env) && await s.lies('tt:token')) {
@@ -582,6 +609,23 @@ async function zyklus(env) {
   } catch (e) { /* nächster Lauf */ }
   // 1c. YouTube-Livestreams planen
   try { await ytAbgleich(env, s, plan, cfg, jetzt); } catch (e) { await s.schreib('yt:fehler', { zeit: jetzt, text: String(e.message || e).slice(0, 300) }); }
+  // 1d. Discord: „Jetzt live“ – einmal, wenn der Stream startet (höchstens alle 2 Std.)
+  if (discordEingerichtet(env)) {
+    try {
+      if (live === null) live = await liveJetzt();
+      const dl = (await s.lies('dc:live')) || {};
+      if (live && !dl.an) {
+        if (jetzt - (dl.gemeldet || 0) > 2 * 3600000) {
+          let z = null;   // passender, vom Dashboard geplanter Livestream (Live-Beginn ±3 Std.)
+          for (const [k, x] of Object.entries(await s.liste('yt:'))) if (!YT_META.includes(k) && x && x.id && Math.abs((x.liveMs || x.startMs || 0) - jetzt) < 3 * 3600000) z = x;
+          await dcMelden(s, () => discordMelden(env, { text: '🔴 **Kreids888 ist jetzt live!**', titel: (z && z.titel) || 'Jetzt live auf YouTube',
+            link: z ? 'https://youtu.be/' + z.id : 'https://www.youtube.com/@Kreids888/live', bild: z ? `https://i.ytimg.com/vi/${z.id}/hqdefault.jpg` : '', farbe: FARBE.youtube, fuss: 'YouTube · live' }));
+          dl.gemeldet = jetzt;
+        }
+        await s.schreib('dc:live', { ...dl, an: true });
+      } else if (!live && dl.an) await s.schreib('dc:live', { ...dl, an: false });
+    } catch (e) { /* nächster Lauf */ }
+  }
   // 2. KI-Hintergründe für die Rennen der nächsten 48 Stunden (höchstens 2 pro Lauf)
   let ki = 2;
   const gesehen = new Set();
@@ -723,6 +767,7 @@ async function stand(env, s) {
   const tag = new Date().toISOString().slice(0, 10);
   const [cfg, design, st, lauf, kiHeute, bgvs, bgms, kbus, thrs, vorlage, ytz, ytbh, ttTok, ytFehler] = await Promise.all([ladeCfg(s), ladeDesign(s), s.liste('post:'), s.lies('lauf'),
     s.lies('ki:' + tag), s.liste('bgv:'), s.liste('bgm:'), s.liste('kbu:'), s.liste('thr:'), s.lies('thumbvorlage'), s.liste('yt:'), s.liste('ytbh:'), s.lies('tt:token'), s.lies('yt:fehler')]);
+  const dcFehler = await s.lies('dc:fehler');
   const daten = await datenLaden(s, jetzt);
   const plan = bauePlan(daten, cfg, jetzt);
   const k = await kontoLesen(env, s, false);
@@ -799,6 +844,7 @@ async function stand(env, s) {
     konto: { verbunden: !!k.verbunden, username: k.username || '', fehler: k.fehler || '' },
     youtube: { eingerichtet: ytEingerichtet(env), verbunden: !!ytz['yt:token'], kanal: (ytz['yt:kanal'] || {}).name || '', fehler: ytFehler && ytFehler.zeit > Date.now() - 3600000 ? ytFehler.text : '' },
     tiktok: { eingerichtet: ttEingerichtet(env), verbunden: !!ttTok, name: (ttTok && ttTok.name) || '' },
+    discord: { eingerichtet: discordEingerichtet(env), fehler: dcFehler && dcFehler.zeit > Date.now() - 86400000 ? dcFehler.text : '' },
     lauf: lauf || null, jetzt,
     ki: { genutzt: kiHeute || 0, max: KI_PRO_TAG, frei: Math.max(0, KI_PRO_TAG - (kiHeute || 0)) }
   };
@@ -1081,6 +1127,16 @@ async function api(req, env, url) {
     }
     if (typeof body.spruch === 'string') delete neu.auto;
     await s.schreib('thr:' + th[1], neu);
+    return antwort({ ok: true });
+  }
+  // Discord: Test-Nachricht
+  if (pfad === '/api/discord/test' && req.method === 'POST') {
+    if (!discordEingerichtet(env)) return fehler('Discord ist noch nicht eingerichtet: In Cloudflare fehlt DISCORD_WEBHOOK.', 400);
+    try {
+      await discordMelden(env, { text: '✅ Test: Ab jetzt kommt hier eine Nachricht, sobald etwas gepostet wurde.', titel: 'kreids888 · Discord-Meldungen', link: 'https://kreids888.com',
+        beschreibung: 'Instagram: Beitrag, Story, Reel\nYouTube: Stream geplant, jetzt live', fuss: 'Test' });
+      await s.loesch('dc:fehler');
+    } catch (e) { return fehler('Discord: ' + String((e && e.message) || e).slice(0, 200), 502); }
     return antwort({ ok: true });
   }
   // Clickbait-Sprüche (Cloudflare-KI, sonst feste Vorschläge)

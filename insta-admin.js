@@ -409,6 +409,16 @@
       <div class="ki-knoepfe"><button class="btn btn-red ki-k" data-aktion="kanal-speichern"><span>💾 Speichern</span></button></div>
     </div>`;
   }
+  function discordPanel() {
+    const d = STAND.discord || {};
+    const status = !d.eingerichtet ? '<div class="ki-hinweis">Noch nicht eingerichtet: In Cloudflare fehlt beim Worker kreids-insta das Geheimnis DISCORD_WEBHOOK.</div>'
+      : d.fehler ? `<div class="ki-hinweis rot">Letzte Nachricht ging nicht raus: ${esc(d.fehler)}</div>` : '<div class="ki-konto gruen">● Eingerichtet</div>';
+    return `<div class="ki-panel"><h3>💬 Discord · Meldungen</h3>
+      ${status}
+      <div class="ki-dim">Sobald etwas gepostet ist, kommt eine Nachricht mit Bild und Link: Instagram (Beitrag, Story, Reel) und YouTube (Stream geplant, jetzt live). TikTok nicht – dort sind es nur Entwürfe.</div>
+      ${d.eingerichtet ? '<div class="ki-knoepfe"><button class="btn btn-ghost ki-k" data-aktion="discord-test"><span>📣 Test-Nachricht schicken</span></button></div>' : ''}
+    </div>`;
+  }
   async function streamsLaden() {
     if (STREAMS || !(STAND.youtube || {}).verbunden) return;
     try { STREAMS = (await igApi('GET', '/api/youtube/streams')).streams || []; if (REITER === 'kanaele') zeichnen(); }
@@ -893,7 +903,7 @@
       ${REITER === 'clips' ? '' : `<p class="hint">${cfg.modus === 'auto' ? 'Posts gehen zur eingestellten Zeit von selbst raus – die Bilder werden gezeichnet, sobald du diesen Reiter öffnest.' : 'Jeder Post wartet, bis du ihn freigibst. Die Bilder werden gezeichnet, sobald du diesen Reiter öffnest.'}</p>`}
       <div class="ki-malt"${MALT ? '' : ' hidden'}>${esc(MALT)}</div>
       <div class="side ki-reiter">
-        ${[['posts', `🗓 Posts (${liste.length})`], ['clips', `🎬 Clips${clipsOffen ? ` (${clipsOffen})` : ''}`], ['thumb', '▶ Thumbnail'], ['zeiten', '⏰ Zeiten & Text'], ['vorlagen', '🧩 Vorlagen'], ['zuteilung', '🔁 Zuteilung'], ['design', '🎨 Aussehen'], ['kanaele', '📡 YouTube & TikTok']].map(([k, t]) =>
+        ${[['posts', `🗓 Posts (${liste.length})`], ['clips', `🎬 Clips${clipsOffen ? ` (${clipsOffen})` : ''}`], ['thumb', '▶ Thumbnail'], ['zeiten', '⏰ Zeiten & Text'], ['vorlagen', '🧩 Vorlagen'], ['zuteilung', '🔁 Zuteilung'], ['design', '🎨 Aussehen'], ['kanaele', '📡 YouTube · TikTok · Discord']].map(([k, t]) =>
           `<a class="${REITER === k ? 'active' : ''}" data-aktion="reiter" data-wert="${k}">${t}</a>`).join('')}
       </div>
       ${REITER === 'posts' ? `
@@ -906,7 +916,7 @@
         <div class="ki-grid">${zeitenPanel(cfg)}${textPanel(cfg)}</div>
         <div class="actions"><button class="btn btn-red" data-aktion="cfg"><span>💾 Zeiten und Texte speichern</span></button></div>` : ''}
       ${REITER === 'design' ? `<div class="ki-grid">${designPanel(STAND.design)}</div>` : ''}
-      ${REITER === 'kanaele' ? `<div class="ki-grid">${youtubePanel()}${tiktokPanel()}</div>` : ''}
+      ${REITER === 'kanaele' ? `<div class="ki-grid">${youtubePanel()}${tiktokPanel()}${discordPanel()}</div>` : ''}
       ${REITER === 'vorlagen' ? '<div class="ki-vorlagenbox"></div>' : ''}
       ${REITER === 'zuteilung' ? '<div class="ki-zuteilungbox"></div>' : ''}
       ${REITER === 'clips' ? '<div class="ki-clipsbox"></div>' : ''}`;
@@ -1176,6 +1186,7 @@
       if (!confirm('Verbindung wirklich trennen?')) return;
       await igApi('POST', '/api/trennen/' + b.dataset.wert, {}); STREAMS = null; YTLISTE = null; await laden(true);
     });
+    if (a === 'discord-test') return ausfuehren(b, async () => { await igApi('POST', '/api/discord/test', {}); meldung('Test-Nachricht ist raus – schau in den Discord.'); await laden(true); });
     if (a === 'kanal-speichern') return ausfuehren(b, async () => {
       await igApi('POST', '/api/einstellungen', { cfg: kanaeleAusFormular() });
       meldung('Gespeichert. Schon angelegte Livestreams werden beim nächsten Lauf angepasst.'); YTLISTE = null; await laden();
