@@ -1934,6 +1934,39 @@
     }
   }
   const postText = c => String(c.text || '').replace(/[ \t]{2,}/g, ' ').replace(/[ \t]+\n/g, '\n').trim();
+  // ─── Freie Termine vorschlagen: Tage ohne Clip, möglichst ohne andere Posts; ist um die Uhrzeit schon ein Post, eine andere gute Uhrzeit ───
+  const BERLIN = new Intl.DateTimeFormat('de-DE', { timeZone: 'Europe/Berlin', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' });
+  function berlinTeile(ms) { const f = BERLIN.formatToParts(new Date(ms)), g = k => +(f.find(x => x.type === k) || {}).value; return { y: g('year'), mo: g('month'), d: g('day'), h: g('hour'), mi: g('minute') }; }
+  const berlinDatum = ms => { const t = berlinTeile(ms); return `${t.y}-${String(t.mo).padStart(2, '0')}-${String(t.d).padStart(2, '0')}`; };
+  function berlinMs(datum, zeit) {   // „2026-11-20“ + „18:30“ (Berliner Zeit) → Zeitpunkt
+    const [y, mo, d] = datum.split('-').map(Number), [h, mi] = String(zeit).split(':').map(Number), soll = Date.UTC(y, mo - 1, d, h, mi || 0);
+    let ms = soll; for (let i = 0; i < 2; i++) { const t = berlinTeile(ms); ms = soll - (Date.UTC(t.y, t.mo - 1, t.d, t.h, t.mi) - ms); }
+    return ms;
+  }
+  const POST_NAME = { ank: 'Ankündigung', erg: 'Ergebnis', tab: 'Tabellenstand', meilen: 'Meilenstein', monat: 'Monatsbilanz' };
+  function terminVorschlaege() {
+    const st = stand(), zeit = (st.clipcfg && st.clipcfg.zeit) || '18:30', jetzt = Date.now(), heute = berlinTeile(jetzt);
+    const clipTage = new Set((st.clips || []).filter(x => x.postMs && !x.gepostet).map(x => berlinDatum(x.postMs)));
+    const posts = (st.posts || []).filter(x => x.postMs > jetzt - 3600000 && x.status !== 'uebersprungen' && x.status !== 'gepostet' && POST_NAME[x.typ]);   // Storys zählen nicht
+    const raus = [];
+    for (let d = 0; d < 28 && raus.length < 5; d++) {
+      const t = new Date(Date.UTC(heute.y, heute.mo - 1, heute.d + d, 12)), tag = t.toISOString().slice(0, 10);
+      if (clipTage.has(tag)) continue;   // ein Clip pro Tag
+      const amTag = posts.filter(x => berlinDatum(x.postMs) === tag);
+      for (const z of [zeit, '12:30', '20:30', '17:00']) {
+        const ms = berlinMs(tag, z);
+        if (ms < jetzt + 20 * 60000 || amTag.some(x => Math.abs(x.postMs - ms) < 2.5 * 3600000)) continue;
+        raus.push({ ms, frei: !amTag.length, neben: [...new Set(amTag.map(x => POST_NAME[x.typ]))].join(', ') });
+        break;
+      }
+    }
+    return raus;
+  }
+  function termineHtml(c) {
+    const l = terminVorschlaege();
+    if (!l.length) return '';
+    return `<div class="kc-termine"><span class="kc-dim">Freie Termine:</span>${l.map(x => `<button type="button" class="kc-termin${c.postMs === x.ms ? ' an' : ''}" data-c="termin" data-ms="${x.ms}">${esc(zeit(x.ms))}${x.frei ? '<em class="frei">frei</em>' : `<em>neben ${esc(x.neben)}</em>`}</button>`).join('')}</div>`;
+  }
   const sek = s => (Math.round(s * 10) / 10).toLocaleString('de-DE', { minimumFractionDigits: 1 }) + ' s';
   const tipp = t => `<div class="kc-tipp">${t}</div>`;
 
@@ -2001,12 +2034,13 @@
         <div class="kc-schritt">4 · Text & Termin</div>
         <label class="kc-feld">Text unter dem Post<textarea rows="4" maxlength="2200" data-c="text">${esc(c.text)}</textarea>${tipp('Mit Frage am Ende – Kommentare bringen Reichweite. Höchstens 5 Hashtags.')}</label>
         <div class="kc-felder">
-          <label class="kc-feld">Geht raus am<input type="datetime-local" value="${c.postMs ? esc(lokal(c.postMs)) : ''}" data-c="postms">${tipp(c.postMs ? '' : 'Leer = nächster freier Tag.')}</label>
+          <label class="kc-feld">Geht raus am<input type="datetime-local" value="${c.postMs ? esc(lokal(c.postMs)) : ''}" data-c="postms">${tipp(c.postMs ? '' : 'Leer = nächster freier Tag. Oder unten einen freien Termin antippen.')}</label>
           <div class="kc-ziele">
             <label class="kc-check"><input type="checkbox" data-c="insta" ${c.insta ? 'checked' : ''}> <span><b>Instagram</b> (Reel)</span></label>
             <label class="kc-check${tk.verbunden ? '' : ' aus'}"><input type="checkbox" data-c="tiktok" ${c.tiktok && tk.verbunden ? 'checked' : ''} ${tk.verbunden ? '' : 'disabled'}> <span><b>TikTok</b> (Entwurf)</span></label>
           </div>
         </div>
+        ${termineHtml(c)}
         ${tipp(tk.verbunden ? 'TikTok: Das Video landet als Entwurf in deiner TikTok-App. Dort nur noch einen Trend-Sound drauf und posten.' : 'TikTok ist nicht verbunden (Reiter „📡 YouTube & TikTok“). Für TikTok: „📥 Video laden“ und selbst hochladen.')}
         <div class="kc-knoepfe gross">
           <button type="button" class="btn ki-k kc-los" data-c="einplanen" ${ARBEIT ? 'disabled' : ''}>🚀 Video bauen & einplanen</button>
@@ -2290,6 +2324,12 @@
       c.fenster = { w: kl(w, 360, 1040), h: kl(h, 280, maxH) }; for (const x of quellenVon(c)) x.bild = null;
       zeichnen(); return;
     }
+    if (a === 'termin' && c) {
+      c.postMs = +b.dataset.ms;
+      const f = BOX.querySelector('[data-c="postms"]'); if (f) f.value = lokal(c.postMs);
+      BOX.querySelectorAll('[data-c="termin"]').forEach(x => x.classList.toggle('an', x === b));
+      return;
+    }
     if (a === 'bild-reset' && c) { c.fenster = null; for (const x of quellenVon(c)) x.bild = null; zeichnen(); return; }
     if (a === 'vorschau' && c && vorlage(c).analyse && VOR.vid) {   // Replay-Analyse: Stelle für den Kreis antippen
       if (performance.now() - (VOR.gezogen || 0) < 400) return;   // war Ziehen, kein Tippen
@@ -2400,7 +2440,7 @@
     if (a === 'sektor-letzt') { c.sektorLetzt = t.value; return; }
     if (a === 'zeitlupe') { c.zeitlupe = t.checked; zeichnen(); }
     else if (a === 'insta' || a === 'tiktok') c[a] = t.checked;
-    else if (a === 'postms') c.postMs = t.value ? new Date(t.value).getTime() : 0;
+    else if (a === 'postms') { c.postMs = t.value ? new Date(t.value).getTime() : 0; BOX.querySelectorAll('[data-c="termin"]').forEach(x => x.classList.toggle('an', +x.dataset.ms === c.postMs)); }
     else if (a === 'start' || a === 'ende' || a === 'halt' || a === 'linie') zeichnen();
   }
   // ─── Video im Fenster mit Maus/Finger verschieben, Mausrad = Größe ───
@@ -2503,6 +2543,12 @@
 .kc-app .kc-bildpanel{display:flex;flex-direction:column;gap:8px;margin-top:4px;padding:10px 12px;background:#0b0c10;border:1px solid var(--line,#23262f)}
 .kc-app .kc-bildkopf{font-size:13px;color:#fff;font-weight:600;line-height:1.35}
 .kc-app .kc-bildpanel .kc-knoepfe .btn{font-size:13px;padding:7px 10px}
+.kc-app .kc-termine{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.kc-app .kc-termin{display:flex;flex-direction:column;align-items:flex-start;gap:2px;background:#0b0c10;border:1px solid var(--line,#23262f);color:#fff;font:700 13px var(--body,inherit);padding:7px 11px;cursor:pointer;text-align:left}
+.kc-app .kc-termin em{font-style:normal;font-weight:600;font-size:11.5px;color:#f5c518}
+.kc-app .kc-termin em.frei{color:#5cff1f}
+.kc-app .kc-termin:hover{border-color:#5cff1f}
+.kc-app .kc-termin.an{border-color:#5cff1f;background:rgba(92,255,31,.12);box-shadow:0 0 14px rgba(92,255,31,.35)}
 .kc-app .kc-marke .kc-sfarbe{max-width:120px;flex:none}
 .kc-app .kc-marke .kc-fuell{flex:1;color:#fff;font-weight:700}
 .kc-app .kc-vl:hover{border-color:var(--f)}
