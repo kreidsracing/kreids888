@@ -263,6 +263,10 @@ function mitEdit(post, edit) {
 // tw = Werte des Tabellenstands (rechnet das Dashboard beim Zeichnen: { platz, punkte, abstand })
 export function bildtext(post, cfg, design, tw, edit) {
   post = mitEdit(post, edit);
+  const eigen0 = edit && typeof edit.text === 'string' && edit.text.trim() ? edit.text.trim().slice(0, 2200) : '';
+  // Wochenplan und „Jetzt live“ sind sonst Storys – als Beitrag bekommen sie einen kurzen eigenen Text
+  if (post.typ === 'woche') return eigen0 || 'Meine Streams diese Woche 🗓 Alle Termine: Link in Bio\n\n#simracing #iracing #kreids888';
+  if (post.typ === 'live') return eigen0 || '🔴 Jetzt live! Schau rein – Link in Bio\n\n#simracing #iracing #kreids888';
   const s = berlin(post.startMs), tage = post.tage | 0;
   const strecke = [post.track, post.layout].filter(Boolean).join(' – ') || post.titel;
   const erg = post.ergebnis || null;

@@ -748,5 +748,26 @@
     blob.boxen = boxen;
     return blob;
   }
-  window.K888Bilder = { post, bildDaten, schriften, berlin, SITE, TEAM, teamUrl, layoutAus, ersatzSpruch, boxen: () => BOXEN, LOOKS, felder, zahlen, mitAenderung };
+  // Bild ins Zielformat bringen: Beitrag 1080×1350 (4:5) oder Story 1080×1920 (9:16).
+  // Passt es schon, bleibt es. Sonst: Bild ganz drin (runde Ecken, Schatten), dahinter dasselbe Bild unscharf und dunkler.
+  async function formatAnpassen(blob, story) {
+    if (!blob || (blob.type && !/^image\//.test(blob.type))) return blob;
+    const W = 1080, H = story ? 1920 : 1350;
+    let img;
+    try { img = await createImageBitmap(blob); } catch (e) { return blob; }
+    if (Math.abs(img.height / img.width - H / W) < 0.03) { if (img.close) img.close(); return blob; }
+    const c = document.createElement('canvas'); c.width = W; c.height = H;
+    const g = c.getContext('2d'), s = Math.max(W / img.width, H / img.height);
+    g.fillStyle = '#05070a'; g.fillRect(0, 0, W, H);
+    g.filter = 'blur(42px) brightness(0.5) saturate(1.15)'; g.drawImage(img, (W - img.width * s) / 2, (H - img.height * s) / 2, img.width * s, img.height * s); g.filter = 'none';
+    const rand = 36, k = Math.min((W - 2 * rand) / img.width, (H - 2 * rand) / img.height), w = img.width * k, h = img.height * k, x = (W - w) / 2, y = (H - h) / 2, r = 26;
+    g.save(); g.shadowColor = 'rgba(0,0,0,.65)'; g.shadowBlur = 50; g.shadowOffsetY = 12; g.beginPath(); g.roundRect(x, y, w, h, r); g.fillStyle = '#000'; g.fill(); g.restore();
+    g.save(); g.beginPath(); g.roundRect(x, y, w, h, r); g.clip(); g.drawImage(img, x, y, w, h); g.restore();
+    if (img.close) img.close();
+    const neu = await new Promise(ok => c.toBlob(ok, 'image/jpeg', 0.9));
+    if (!neu) return blob;
+    if (blob.boxen) neu.boxen = blob.boxen.map(b => ({ ...b, x: x + b.x * k, y: y + b.y * k, w: b.w * k, h: b.h * k }));
+    return neu;
+  }
+  window.K888Bilder = { post, bildDaten, schriften, berlin, SITE, TEAM, teamUrl, layoutAus, ersatzSpruch, boxen: () => BOXEN, LOOKS, felder, zahlen, mitAenderung, formatAnpassen };
 })();

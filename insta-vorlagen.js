@@ -959,7 +959,7 @@
     return `<div class="ki-panel"><h3>🧩 Deine Vorlagen (${l.length})</h3><div class="ki-dim" style="margin-bottom:10px">Hier nur bauen. Wo sie drankommen, stellst du im Reiter „🔁 Zuteilung“ ein.</div>
       <div class="kv-liste">${l.map(v => `<button type="button" class="kv-karte${v.id === E.id ? ' an' : ''}${v.an === false ? ' aus' : ''}" data-v="oeffnen" data-id="${esc(v.id)}">
         <canvas data-mini="${esc(v.id)}" width="108" height="${v.format === 'story' ? 192 : 135}"></canvas>
-        <span>${esc(v.name)}</span><small>${v.format === 'story' ? 'Story 9:16' : 'Feed 4:5'}</small></button>`).join('') || '<p class="hint">Noch keine eigene Vorlage – unten einen Vorschlag nehmen oder leer anfangen.</p>'}</div>
+        <span>${esc(v.name)}</span><small>${v.format === 'story' ? 'Story 9:16' : 'Beitrag 4:5'}</small></button>`).join('') || '<p class="hint">Noch keine eigene Vorlage – unten einen Vorschlag nehmen oder leer anfangen.</p>'}</div>
       <div class="ki-knoepfe" style="margin-top:12px"><button class="btn btn-red ki-k" data-v="neuauf"><span>${E.neuOffen ? '✕ Auswahl schließen' : '＋ Neue Vorlage'}</span></button></div>
       ${E.neuOffen ? neuGalerie() : ''}</div>`;
   }
@@ -978,7 +978,7 @@
     const gruppe = (titel, inhalt) => inhalt ? `<div class="kv-ngruppe"><b>${esc(titel)}</b><div class="kv-nreihe">${inhalt}</div></div>` : '';
     const vs = gr => VORSCHLAEGE.map((v, i) => [v, i]).filter(([v]) => v.format === fmt && (v.gruppe || 'Klassisch') === gr).map(([v, i]) => kachel('v' + i, v.name, gr === 'Animiert' || gr === 'Mit Video' ? '🎬 Video' : '')).join('');
     return `<div class="kv-galerie">
-      <div class="ki-modus" role="group"><button type="button" class="${fmt === 'story' ? 'an' : ''}" data-v="neuformat" data-wert="story">Story 9:16</button><button type="button" class="${fmt === 'feed' ? 'an' : ''}" data-v="neuformat" data-wert="feed">Feed 4:5</button></div>
+      <div class="ki-modus" role="group"><button type="button" class="${fmt === 'story' ? 'an' : ''}" data-v="neuformat" data-wert="story">Story 9:16</button><button type="button" class="${fmt === 'feed' ? 'an' : ''}" data-v="neuformat" data-wert="feed">Beitrag 4:5</button></div>
       <div class="ki-dim">${fmt === 'story' ? 'Für Raceday-Story und Wochenplan' : 'Für Ankündigung und Ergebnis'} · Bild anklicken = Vorlage anlegen</div>
       ${gruppe('Leer', kachel('leer', 'Leer anfangen'))}
       ${gruppe('Klassisch', vs('Klassisch'))}${gruppe('Ausgefallen', vs('Ausgefallen'))}${gruppe('Animiert', vs('Animiert'))}${gruppe('Mit Video', vs('Mit Video'))}
@@ -1014,7 +1014,7 @@
           </div>
         </div>
         <div class="kv-rechts">
-          <div class="ki-panel"><h3>Vorlage · ${v.format === 'story' ? 'Story 9:16' : 'Feed 4:5'}</h3>
+          <div class="ki-panel"><h3>Vorlage · ${v.format === 'story' ? 'Story 9:16' : 'Beitrag 4:5'}</h3>
             ${regler('v.dauer', `Video-Länge: ${klemm(v.dauer || 8, 2, MAX_SEK)} Sek. (nur mit Animation oder Video)`, v.dauer || 8, 2, MAX_SEK, 1)}
             <div class="ki-dim">${istVideo(v, vorschauPost(), E.umg) ? '🎬 Diese Vorlage geht als <b>Video</b> raus (Story-Video bzw. Reel, TikTok-Video).' : '🖼 Diese Vorlage geht als Bild raus.'}</div>
           </div>
@@ -1402,11 +1402,11 @@
       const dabei = passend.filter(v => (v.fuer || []).includes(typ));
       const kachel = (id, name, an, extra) => `<label class="kv-kachel${an ? ' an' : ''}"><canvas data-zmini="${esc(id)}" data-typ="${typ}" width="${fmt === 'story' ? 120 : 150}" height="${fmt === 'story' ? 213 : 188}"></canvas>
           <span><input type="checkbox" ${extra} ${an ? 'checked' : ''}> ${esc(name)}</span></label>`;
-      return `<div class="ki-panel"><div class="kv-wkopf"><h3>${name}</h3><span class="ki-dim">${fmt === 'story' ? 'Story 9:16' : 'Feed 4:5'} · ${dabei.length + (c.kreids !== false ? 1 : 0)} im Wechsel</span>
+      return `<div class="ki-panel"><div class="kv-wkopf"><h3>${name}</h3><span class="ki-dim">${fmt === 'story' ? 'Story 9:16' : 'Beitrag 4:5'} · ${dabei.length + (c.kreids !== false ? 1 : 0)} im Wechsel</span>
           <select data-w="modus" data-typ="${typ}">${[['reihe', 'Der Reihe nach'], ['zufall', 'Zufällig'], ['fest', 'Immer dieselbe']].map(([k, n]) => `<option value="${k}" ${(c.modus || 'reihe') === k ? 'selected' : ''}>${n}</option>`).join('')}</select>
           ${(c.modus || 'reihe') === 'fest' ? `<select data-w="fest" data-typ="${typ}"><option value="kreids">Kreids-Design</option>${dabei.map(v => `<option value="${esc(v.id)}" ${c.fest === v.id ? 'selected' : ''}>${esc(v.name)}</option>`).join('')}</select>` : ''}</div>
         <div class="kv-kacheln">${kachel('kreids', 'Kreids-Design', c.kreids !== false, `data-w="kreids" data-typ="${typ}"`)}${passend.map(v => kachel(v.id, v.name, (v.fuer || []).includes(typ), `data-zuord="${esc(v.id)}" data-typ="${typ}"`)).join('')}</div>
-        ${passend.length ? '' : `<div class="ki-dim">Noch keine ${fmt === 'story' ? 'Story' : 'Feed'}-Vorlage gebaut – im Reiter „🧩 Vorlagen“ anlegen.</div>`}</div>`;
+        ${passend.length ? '' : `<div class="ki-dim">Noch keine ${fmt === 'story' ? 'Story' : 'Beitrag'}-Vorlage gebaut – im Reiter „🧩 Vorlagen“ anlegen.</div>`}</div>`;
     };
     const serien = [...new Set([...(Z.umg.stand().posts || []).map(p => p.serie).filter(Boolean), ...l.flatMap(v => v.serien || [])])].sort();
     Z.box.innerHTML = `<div class="kv">
@@ -1414,7 +1414,7 @@
       <div class="ki-grid">${ARTEN.map(art).join('')}</div>
       <div class="ki-panel"><h3>🏁 Nur für bestimmte Serien</h3>
         <div class="ki-dim" style="margin-bottom:8px">Ohne Haken gilt eine Vorlage für alle Serien. Gibt es für eine Serie eigene Vorlagen, kommen bei ihr nur diese dran.</div>
-        ${l.length && serien.length ? `<table class="kv-serien"><tr><th></th>${serien.map(s => `<th>${esc(s)}</th>`).join('')}</tr>${l.map(v => `<tr><td>${esc(v.name)} <span class="ki-dim">${v.format === 'story' ? 'Story' : 'Feed'}</span></td>${serien.map(s => `<td><input type="checkbox" data-zserie="${esc(v.id)}" data-wert="${esc(s)}" ${(v.serien || []).includes(s) ? 'checked' : ''}></td>`).join('')}</tr>`).join('')}</table>` : '<div class="ki-dim">Noch keine Vorlagen oder Serien.</div>'}
+        ${l.length && serien.length ? `<table class="kv-serien"><tr><th></th>${serien.map(s => `<th>${esc(s)}</th>`).join('')}</tr>${l.map(v => `<tr><td>${esc(v.name)} <span class="ki-dim">${v.format === 'story' ? 'Story' : 'Beitrag'}</span></td>${serien.map(s => `<td><input type="checkbox" data-zserie="${esc(v.id)}" data-wert="${esc(s)}" ${(v.serien || []).includes(s) ? 'checked' : ''}></td>`).join('')}</tr>`).join('')}</table>` : '<div class="ki-dim">Noch keine Vorlagen oder Serien.</div>'}
       </div>
       <div class="ki-knoepfe"><button class="btn btn-ghost ki-k" data-z="verteilen"><span>🔀 Offene Posts neu verteilen</span></button></div>
       <div class="ki-dim">Neue Posts bekommen ihre Vorlage beim Öffnen. Schon verteilte behalten sie – außer du klickst „Neu verteilen“. Auf jeder Post-Karte kannst du sie auch einzeln ändern.</div>

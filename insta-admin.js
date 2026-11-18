@@ -121,7 +121,8 @@
       TABELLEN[p.id] = tab;
       if (p.edit && p.edit.tabelle) tab = { ...tab, werte: werteAus(p.edit.tabelle, tab.werte.fp) };
     }
-    const blob = vk ? await window.K888Vorlagen.bildFuer(vk, p, STAND.design, VORLAGEN_UMG) : await window.K888Bilder.post(tab ? { ...p, ...tab.bild } : p, STAND.design);
+    let blob = vk ? await window.K888Vorlagen.bildFuer(vk, p, STAND.design, VORLAGEN_UMG) : await window.K888Bilder.post(tab ? { ...p, ...tab.bild } : p, STAND.design);
+    if (!alsVideo) blob = await window.K888Bilder.formatAnpassen(blob, istStoryArt(p.typ, p));
     const r = await fetch(INSTA + `/api/post/${encodeURIComponent(p.id)}/fertig?h=${encodeURIComponent(p.soll)}&video=${alsVideo ? 1 : 0}${tab ? '&w=' + encodeURIComponent(JSON.stringify(tab.werte)) : ''}`, {
       method: 'POST', headers: { Authorization: 'Bearer ' + token(), 'Content-Type': 'image/jpeg' }, body: blob
     });
@@ -167,8 +168,12 @@
     wartet: ['Wartet auf Freigabe', 'gelb'], geplant: ['Geplant', 'blau'],
     fehler: ['Fehler', 'rot'], uebersprungen: ['Übersprungen', 'grau'], verpasst: ['Nicht gepostet – Zeit verpasst', 'rot']
   };
-  const TYP = { ank: '📣 Ankündigung · Feed', story: '📱 Raceday · Story', erg: '🏁 Ergebnis · Feed', woche: '🗓 Wochenplan · Story',
-    tab: '📊 Tabellenstand · Feed', monat: '📅 Monatsbilanz · Feed', meilen: '🏆 Meilenstein · Feed', live: '🔴 Jetzt live · Story' };
+  const TYP_NAME = { ank: '📣 Ankündigung', story: '📱 Raceday', erg: '🏁 Ergebnis', woche: '🗓 Wochenplan', tab: '📊 Tabellenstand', monat: '📅 Monatsbilanz', meilen: '🏆 Meilenstein', live: '🔴 Jetzt live' };
+  const STORY_STANDARD = ['story', 'woche', 'live'];   // Standard: diese gehen in die Story, der Rest wird ein Beitrag
+  const formatStandard = t => (STORY_STANDARD.includes(t) ? 'story' : 'beitrag');
+  // Geht der Post in die Story? (Post kennt sein Format vom Worker, sonst aus den Einstellungen)
+  const istStoryArt = (typ, p) => (p && p.format ? p.format : ((STAND && STAND.cfg && STAND.cfg.format) || {})[typ] || formatStandard(typ)) === 'story';
+  const TYP = new Proxy({}, { get: (_, t) => (TYP_NAME[t] ? TYP_NAME[t] + (istStoryArt(t) ? ' · Story' : ' · Beitrag') : undefined) });
   const NEUE_ARTEN = ['tab', 'monat', 'meilen', 'live'];
   const MONATSNAME = m => { const [j, n] = String(m || '').split('-').map(Number); return n ? new Date(Date.UTC(j, n - 1, 15)).toLocaleDateString('de-DE', { month: 'long', year: 'numeric', timeZone: 'UTC' }) : ''; };
   const datumKurz = d => String(d || '').split('-').reverse().slice(0, 2).join('.') + '.';
@@ -421,28 +426,33 @@
   function zeitenPanel(cfg) {
     const a = cfg.ankuendigung, s = cfg.story, e = cfg.ergebnis;
     const typ = t => `<label class="chk"><input type="checkbox" data-typ="${t}" ${cfg.typen.includes(t) ? 'checked' : ''}> ${t}</label>`;
+    const fo = cfg.format || {}, wohin = t => { const std = formatStandard(t), w = fo[t] || std;
+      return `<div class="ki-fg"><label>Geht als</label><select data-format="${t}"><option value="beitrag" ${w === 'beitrag' ? 'selected' : ''}>Beitrag${std === 'beitrag' ? ' (Standard)' : ''}</option><option value="story" ${w === 'story' ? 'selected' : ''}>Story${std === 'story' ? ' (Standard)' : ''}</option></select></div>`; };
     return `<div class="ki-panel"><h3>⏰ Zeiten</h3>
-      <label class="chk"><input type="checkbox" id="ki-ank-an" ${a.aktiv ? 'checked' : ''}> Ankündigung im Feed</label>
+      <label class="chk"><input type="checkbox" id="ki-ank-an" ${a.aktiv ? 'checked' : ''}> Ankündigung</label>
       <div class="ki-reihe">
         <div class="ki-fg"><label for="ki-ank-tage">Tage vorher</label><input id="ki-ank-tage" type="number" min="0" max="14" value="${esc(a.tage)}"></div>
         <div class="ki-fg"><label for="ki-ank-zeit">Uhrzeit</label><input id="ki-ank-zeit" type="time" value="${esc(a.zeit)}"></div>
+        ${wohin('ank')}
       </div>
-      <label class="chk"><input type="checkbox" id="ki-story-an" ${s.aktiv ? 'checked' : ''}> Raceday-Story am Renntag</label>
-      <div class="ki-reihe"><div class="ki-fg"><label for="ki-story-zeit">Uhrzeit</label><input id="ki-story-zeit" type="time" value="${esc(s.zeit)}"></div></div>
-      <label class="chk"><input type="checkbox" id="ki-erg-an" ${e.aktiv ? 'checked' : ''}> Rennergebnis im Feed (am Tag nach dem Rennen)</label>
-      <div class="ki-reihe"><div class="ki-fg"><label for="ki-erg-zeit">Uhrzeit</label><input id="ki-erg-zeit" type="time" value="${esc(e.zeit)}"></div></div>
-      <label class="chk"><input type="checkbox" id="ki-woche-an" ${(cfg.woche || {}).aktiv !== false ? 'checked' : ''}> Wochenplan als Story (sonntags, für die Woche danach)</label>
+      <label class="chk"><input type="checkbox" id="ki-story-an" ${s.aktiv ? 'checked' : ''}> Raceday am Renntag</label>
+      <div class="ki-reihe"><div class="ki-fg"><label for="ki-story-zeit">Uhrzeit</label><input id="ki-story-zeit" type="time" value="${esc(s.zeit)}"></div>${wohin('story')}</div>
+      <label class="chk"><input type="checkbox" id="ki-erg-an" ${e.aktiv ? 'checked' : ''}> Rennergebnis (am Tag nach dem Rennen)</label>
+      <div class="ki-reihe"><div class="ki-fg"><label for="ki-erg-zeit">Uhrzeit</label><input id="ki-erg-zeit" type="time" value="${esc(e.zeit)}"></div>${wohin('erg')}</div>
+      <label class="chk"><input type="checkbox" id="ki-woche-an" ${(cfg.woche || {}).aktiv !== false ? 'checked' : ''}> Wochenplan (sonntags, für die Woche danach)</label>
       <div class="ki-reihe">
         <div class="ki-fg"><label for="ki-woche-zeit">Uhrzeit</label><input id="ki-woche-zeit" type="time" value="${esc((cfg.woche || {}).zeit || '17:00')}"></div>
         <div class="ki-fg"><label for="ki-woche-pose">Bild von dir</label><select id="ki-woche-pose"><option value="">– kein Bild –</option>${((window.K888Thumb && window.K888Thumb.POSEN) || []).map(([d, n]) => `<option value="${esc(d)}" ${(cfg.woche || {}).pose === d ? 'selected' : ''}>${esc(n)}</option>`).join('')}</select></div>
+        ${wohin('woche')}
       </div>
-      <label class="chk"><input type="checkbox" id="ki-tab-an" ${(cfg.tabelle || {}).aktiv !== false ? 'checked' : ''}> Tabellenstand im Feed (2 Tage nach dem Rennen, SPR)</label>
-      <div class="ki-reihe"><div class="ki-fg"><label for="ki-tab-zeit">Uhrzeit</label><input id="ki-tab-zeit" type="time" value="${esc((cfg.tabelle || {}).zeit || '18:00')}"></div></div>
-      <label class="chk"><input type="checkbox" id="ki-monat-an" ${(cfg.monat || {}).aktiv !== false ? 'checked' : ''}> Monatsbilanz im Feed (am 1. für den Monat davor)</label>
-      <div class="ki-reihe"><div class="ki-fg"><label for="ki-monat-zeit">Uhrzeit</label><input id="ki-monat-zeit" type="time" value="${esc((cfg.monat || {}).zeit || '18:00')}"></div></div>
-      <label class="chk"><input type="checkbox" id="ki-meilen-an" ${(cfg.meilen || {}).aktiv !== false ? 'checked' : ''}> Meilensteine im Feed (am Tag nach dem Rennen, SPR)</label>
-      <div class="ki-reihe"><div class="ki-fg"><label for="ki-meilen-zeit">Uhrzeit</label><input id="ki-meilen-zeit" type="time" value="${esc((cfg.meilen || {}).zeit || '20:00')}"></div></div>
-      <label class="chk"><input type="checkbox" id="ki-livestory-an" ${(cfg.live || {}).aktiv !== false ? 'checked' : ''}> „Jetzt live“ als Story (sobald du auf YouTube live bist)</label>
+      <label class="chk"><input type="checkbox" id="ki-tab-an" ${(cfg.tabelle || {}).aktiv !== false ? 'checked' : ''}> Tabellenstand (2 Tage nach dem Rennen, SPR)</label>
+      <div class="ki-reihe"><div class="ki-fg"><label for="ki-tab-zeit">Uhrzeit</label><input id="ki-tab-zeit" type="time" value="${esc((cfg.tabelle || {}).zeit || '18:00')}"></div>${wohin('tab')}</div>
+      <label class="chk"><input type="checkbox" id="ki-monat-an" ${(cfg.monat || {}).aktiv !== false ? 'checked' : ''}> Monatsbilanz (am 1. für den Monat davor)</label>
+      <div class="ki-reihe"><div class="ki-fg"><label for="ki-monat-zeit">Uhrzeit</label><input id="ki-monat-zeit" type="time" value="${esc((cfg.monat || {}).zeit || '18:00')}"></div>${wohin('monat')}</div>
+      <label class="chk"><input type="checkbox" id="ki-meilen-an" ${(cfg.meilen || {}).aktiv !== false ? 'checked' : ''}> Meilensteine (am Tag nach dem Rennen, SPR)</label>
+      <div class="ki-reihe"><div class="ki-fg"><label for="ki-meilen-zeit">Uhrzeit</label><input id="ki-meilen-zeit" type="time" value="${esc((cfg.meilen || {}).zeit || '20:00')}"></div>${wohin('meilen')}</div>
+      <label class="chk"><input type="checkbox" id="ki-livestory-an" ${(cfg.live || {}).aktiv !== false ? 'checked' : ''}> „Jetzt live“ (sobald du auf YouTube live bist)</label>
+      <div class="ki-reihe">${wohin('live')}</div>
       <div class="ki-fg"><label>Posts für</label><div class="ki-reihe">${['Rennen', 'Stream', 'Training'].map(typ).join('')}</div></div>
       <div class="ki-fg"><label for="ki-live">„Live ab“ bei SPR-Rennen</label><select id="ki-live">
         <option value="quali" ${cfg.liveAb === 'quali' ? 'selected' : ''}>Quali-Start (Start + Training)</option>
@@ -507,7 +517,7 @@
     <div class="ki-panel ki-design"><h3>Vorschau</h3>
       <div class="ki-reiter side" style="margin:0">${formate.map(([t, n]) => `<a class="${DFORMAT === t ? 'active' : ''}" data-aktion="dformat" data-wert="${t}">${n}</a>`).join('')}</div>
       <div class="ki-dvorbox"><img class="ki-dvor" alt="Vorschau"><div class="ki-ziele"></div></div>
-      <div class="ki-dim">Logo, Team-Bild und Spruch mit der Maus ziehen · Mausrad = Größe. Feed (Ankündigung + Ergebnis) und Story haben eigene Plätze.</div>
+      <div class="ki-dim">Logo, Team-Bild und Spruch mit der Maus ziehen · Mausrad = Größe. Beitrag (Ankündigung + Ergebnis) und Story haben eigene Plätze.</div>
       <div class="ki-knoepfe"><button class="btn btn-ghost ki-k" data-aktion="dreset"><span>↺ Plätze zurücksetzen</span></button></div>
     </div>`;
   }
@@ -662,7 +672,7 @@
     const wann = p.typ === 'live' ? `ab ${uhrzeit(p.liveMs)}` : uhrzeit(p.postMs);
     return `<div class="kp-zeile${offen ? ' offen' : ''}${istFertig(p) ? ' fertig' : ''}" style="--f:${ART_FARBE[p.typ] || '#888'}" data-aktion="kp-auf" data-id="${id}">
       <div class="kp-zeit">${esc(wann)}</div>
-      ${kpMini(p.bild, STORY_ART.includes(p.typ), p.bild ? '' : '🖌')}
+      ${kpMini(p.bild, istStoryArt(p.typ, p), p.bild ? '' : '🖌')}
       <div class="kp-was"><b>${esc(TYP[p.typ] || p.typ)}</b><span>${titel(p)}${p.typ === 'tab' && p.tab && p.tab.platz ? ` · P${esc(p.tab.platz)}` : ''}${p.typ === 'meilen' ? ` · ${esc(p.zahl)}. ${esc(p.wort)}` : ''}${p.edit ? ' · ✎' : ''} · ${kpZiele(p)}</span></div>
       <span class="ki-chip ${fa}">${esc(st)}</span>
       <div class="kp-knoepfe">${frei}<button class="btn btn-ghost ki-k" data-aktion="kp-auf" data-id="${id}"><span>${offen ? '▴ Zu' : '✎ Bearbeiten'}</span></button></div>
@@ -674,7 +684,7 @@
     return `<div class="kp-zeile clip${c.gepostet ? ' fertig' : ''}" style="--f:${ART_FARBE.clip}">
       <div class="kp-zeit">${esc(uhrzeit(c.postMs))}</div>
       ${kpMini(c.bild, true, '🎬')}
-      <div class="kp-was"><b>🎬 Clip · ${esc(clipName(c))}</b><span>${esc(c.titel || '')}${wohin ? ' · ' + wohin : ''}</span></div>
+      <div class="kp-was"><b>🎬 Reel · ${esc(clipName(c))}</b><span>${esc(c.titel || '')}${wohin ? ' · ' + wohin : ''}</span></div>
       <span class="ki-chip ${st[1]}">${st[0]}</span>
       <div class="kp-knoepfe"><button class="btn btn-ghost ki-k" data-aktion="reiter" data-wert="clips"><span>→ Clips</span></button></div>
     </div>`;
@@ -687,7 +697,7 @@
           if (e.c) return `<button type="button" class="kp-karte" style="--f:${ART_FARBE.clip}" data-aktion="reiter" data-wert="clips" title="Clip · ${esc(clipName(e.c))}"><span class="kp-kzeit">${esc(uhrzeit(e.ms))}</span><span class="kp-ktext">🎬 ${esc(clipName(e.c))}</span><span class="kp-kziel">${clipZiele(e.c)}</span><i class="kp-dot ${e.c.gepostet ? 'gruen' : 'blau'}"></i></button>`;
           const p = e.p, [st, fa] = kpStatus(p);
           return `<button type="button" class="kp-karte${p.id === OFFEN_ID ? ' offen' : ''}${istFertig(p) ? ' fertig' : ''}" style="--f:${ART_FARBE[p.typ] || '#888'}" data-aktion="kp-auf" data-id="${esc(p.id)}" title="${esc((TYP[p.typ] || '') + ' · ' + st)}">
-            ${p.bild ? `<img src="${esc(p.bild)}" alt="" loading="lazy" class="${STORY_ART.includes(p.typ) ? 'hoch' : ''}">` : ''}
+            ${p.bild ? `<img src="${esc(p.bild)}" alt="" loading="lazy" class="${istStoryArt(p.typ, p) ? 'hoch' : ''}">` : ''}
             <span class="kp-kzeit">${esc(p.typ === 'live' ? 'live' : uhrzeit(p.postMs))}</span><span class="kp-ktext">${esc((TYP[p.typ] || p.typ).split(' · ')[0])}</span><span class="kp-kziel">${kpZiele(p)}</span><i class="kp-dot ${fa}"></i></button>`;
         }).join('') || '<div class="kp-frei-tag"></div>'}</div>`;
     }).join('')}</div></div>`;
@@ -711,7 +721,7 @@
   }
   function kpEditor(p, modus) {
     if (!p) return '';
-    const K = window.K888Bilder, f = kpForm(p), id = esc(p.id), story = STORY_ART.includes(p.typ), [st, fa] = kpStatus(p);
+    const K = window.K888Bilder, f = kpForm(p), id = esc(p.id), story = STORY_ART.includes(p.typ), alsStory = istStoryArt(p.typ, p), [st, fa] = kpStatus(p);   // story: Vorlagen-Format · alsStory: wohin es geht
     const basis = kpBildPost(p), felder = K ? K.felder(basis) : [], zahlen = K ? K.zahlen(basis) : [];
     let schritt = 0; const nr = () => ++schritt;   // Schritte fortlaufend nummerieren
     const feld = ([k, label, std], art) => `<label class="kp-feld"><span>${esc(label)}</span><input type="text" maxlength="80" data-kp="${art}" data-k="${esc(k)}" value="${esc(f.felder[k] != null ? f.felder[k] : '')}" placeholder="${esc(std == null ? '' : std)}"></label>`;
@@ -738,7 +748,7 @@
           <table><thead><tr><th>Pos.</th><th>Fahrer</th><th class="r">Punkte</th><th class="r">±</th></tr></thead><tbody>${t.alle.map(r => `<tr class="${r.ich ? 'ich' : ''}"><td>${esc(r.pos)}</td><td>${esc(r.name)}</td><td class="r">${esc(r.pts)}</td><td class="r ${r.delta > 0 ? 'hoch' : r.delta < 0 ? 'runter' : ''}">${r.delta > 0 ? '▲' + r.delta : r.delta < 0 ? '▼' + -r.delta : ''}</td></tr>`).join('')}</tbody></table></details>` : ''}`;
     } else if (zahlen.length) zahl = `<div class="kp-schritt">${nr()} · Zahlen im Bild <em>leer = automatisch</em></div><div class="kp-felder">${zahlen.map(x => feld(x, 'feld')).join('')}</div>`;
     // 4 · Text unter dem Post
-    const text = story ? '' : `<div class="kp-schritt">${nr()} · Text unter dem Post ${f.text ? '<em>eigener Text</em>' : '<em>aus der Vorlage</em>'}</div>
+    const text = alsStory ? '' : `<div class="kp-schritt">${nr()} · Text unter dem Post ${f.text ? '<em>eigener Text</em>' : '<em>aus der Vorlage</em>'}</div>
       <textarea rows="6" data-kp="text" placeholder="${esc(p.textStandard || p.text || '')}">${esc(f.text)}</textarea>
       <div class="kp-tipp">Leer lassen = Text aus „⏰ Zeiten & Text“. Platzhalter wie {serie} {strecke} {platz} gehen auch hier.</div>`;
     // 5 · Hintergrund (nur bei Rennen)
@@ -766,14 +776,14 @@
     if (p.fehler) h.push(`<div class="kp-hinweis rot">⚠ ${esc(p.fehler)}</div>`);
     if (p.status === 'verpasst') h.push('<div class="kp-hinweis rot">Zeit verpasst – „🚀 Jetzt posten“ schickt ihn sofort.</div>');
     if (p.typ === 'live' && !istFertig(p)) h.push(`<div class="kp-hinweis">Geht von selbst raus, sobald du auf YouTube live bist (45 Min. vor bis 3 Std. nach „Live ab“)${modus === 'freigabe' ? ' – vorher freigeben' : ''}.</div>`);
-    if (p.typ === 'story') h.push('<div class="kp-hinweis">Link-Sticker geht nur von Hand: „📥 Bild laden“ → in der Insta-App posten → „✓ Hab ich selbst gepostet“.</div>');
+    if (p.typ === 'story' && alsStory) h.push('<div class="kp-hinweis">Link-Sticker geht nur von Hand: „📥 Bild laden“ → in der Insta-App posten → „✓ Hab ich selbst gepostet“.</div>');
     if (mitThumb && p.yt && yt.verbunden && p.yt.id) h.push(`<div class="kp-tipp">▶ YouTube: geplant · <a class="ki-link" href="https://www.youtube.com/watch?v=${esc(p.yt.id)}" target="_blank" rel="noopener">ansehen</a></div>`);
     if (p.yt && p.yt.fehler) h.push(`<div class="kp-hinweis rot">▶ YouTube: ${esc(p.yt.fehler)}</div>`);
     if (p.tiktok && p.tiktok.zeit) h.push(`<div class="kp-tipp">♪ TikTok: Entwurf gesendet ${esc(zeit(p.tiktok.zeit))}</div>`);
     const bild = p.video ? `<video src="${esc(p.video)}" poster="${esc(p.bild)}" muted loop playsinline controls preload="none"></video>` : `<img class="kp-vorschau" data-vorschau="${id}" src="${esc(p.bild || '')}" alt="">`;
     return `<div class="kp-editor" style="--f:${ART_FARBE[p.typ] || '#ff2d6f'}">
       <div class="kp-links">
-        <div class="kp-buehne${story ? ' hoch' : ''}">${bild}<span class="kp-laeuft" hidden>🖌 zeichnet …</span></div>
+        <div class="kp-buehne${alsStory ? ' hoch' : ''}">${bild}<span class="kp-laeuft" hidden>🖌 zeichnet …</span></div>
         <div class="kp-tipp kp-mitte">${p.video ? '🎬 Video-Post' : 'Live-Vorschau · ändert sich beim Tippen'}</div>
         ${mitThumb ? thumbFeld(p) : ''}
       </div>
@@ -803,7 +813,8 @@
       if (p.typ === 'tab' && !TABELLEN[p.id]) await kpTabelleLaden(p);
       const vk = p.vorlage && !['kreids', 'kneon', 'khell'].includes(p.vorlage) && window.K888Vorlagen ? (STAND.vorlagen || []).find(x => x.id === p.vorlage) : null;
       const q = kpBildPost(p), mitEdit = window.K888Bilder.mitAenderung(q);
-      const blob = vk ? await window.K888Vorlagen.bildFuer(JSON.parse(JSON.stringify(vk)), mitEdit, STAND.design, VORLAGEN_UMG) : await window.K888Bilder.post(q, STAND.design);
+      let blob = vk ? await window.K888Vorlagen.bildFuer(JSON.parse(JSON.stringify(vk)), mitEdit, STAND.design, VORLAGEN_UMG) : await window.K888Bilder.post(q, STAND.design);
+      blob = await window.K888Bilder.formatAnpassen(blob, istStoryArt(p.typ, p));
       if (p.id !== OFFEN_ID) return;
       if (VORSCHAU_URL) URL.revokeObjectURL(VORSCHAU_URL);
       VORSCHAU_URL = URL.createObjectURL(blob);
@@ -1114,6 +1125,7 @@
       monat: { aktiv: v('ki-monat-an').checked, zeit: v('ki-monat-zeit').value },
       meilen: { aktiv: v('ki-meilen-an').checked, zeit: v('ki-meilen-zeit').value },
       live: { aktiv: v('ki-livestory-an').checked },
+      format: Object.fromEntries([...BOX.querySelectorAll('[data-format]')].map(x => [x.dataset.format, x.value])),
       typen: [...BOX.querySelectorAll('[data-typ]')].filter(x => x.checked).map(x => x.dataset.typ),
       liveAb: v('ki-live').value,
       kiHinweis: v('ki-ki').checked,

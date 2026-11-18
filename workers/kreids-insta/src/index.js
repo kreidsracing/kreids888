@@ -50,6 +50,7 @@ const CFG_STANDARD = {
     beschreibung: 'Live ab {zeit} Uhr: {serie} · {runde} · {strecke}\n{klassen}\n\n🌐 kreids888.com\n#simracing #iracing #kreids888' },
   // TikTok: diese Post-Arten gehen zusätzlich als Entwurf in die TikTok-Inbox
   tiktok: { typen: ['story', 'woche', 'erg'] },
+  format: {},                                // je Art „beitrag“ oder „story“ – leer = Standard (Raceday, Wochenplan, Jetzt live als Story, Rest als Beitrag)
   typen: ['Rennen', 'Stream'],
   liveAb: 'quali',
   kiHinweis: true,
@@ -137,6 +138,9 @@ function cfgPruefen(e) {
   c.monat = { aktiv: mo.aktiv !== false, zeit: istUhrzeit(mo.zeit) ? mo.zeit : '18:00' };
   c.meilen = { aktiv: me.aktiv !== false, zeit: istUhrzeit(me.zeit) ? me.zeit : '20:00' };
   c.live = { aktiv: li.aktiv !== false };
+  const fo = e.format || {};
+  c.format = {};
+  for (const t of ['ank', 'story', 'erg', 'woche', 'tab', 'monat', 'meilen', 'live']) if (fo[t] === 'beitrag' || fo[t] === 'story') c.format[t] = fo[t];
   const vl = e.vorlagen || {};
   c.vorlagen = {};
   for (const t of ['ank', 'story', 'erg', 'woche']) {
@@ -280,6 +284,9 @@ async function tokenPflege(env, s) {
 }
 
 const STORY_ARTEN = ['story', 'woche', 'live'];
+// Geht der Post in die Story? Standard wie STORY_ARTEN, in den Einstellungen je Art umstellbar
+const istStory = (typ, cfg) => { const f = cfg && cfg.format && cfg.format[typ]; return f ? f === 'story' : STORY_ARTEN.includes(typ); };
+const formatAbweichend = (typ, cfg) => istStory(typ, cfg) !== STORY_ARTEN.includes(typ);
 // Läuft der Stream gerade? (kreids888-live, derselbe Dienst wie „ON AIR“ auf kreids888.com)
 const LIVE_API = 'https://kreids888-live.kreids.workers.dev/';
 async function liveJetzt() {
@@ -307,7 +314,7 @@ async function veroeffentlichen(env, s, post, design, cfg) {
       token, uid: k.user_id,
       bildUrl: `${env.ORIGIN}/bild/${post.id}/${zust.version}.jpg`,
       videoUrl: zust.istVideo ? `${env.ORIGIN}/pvideo/${post.id}/${zust.video.v}.mp4` : '',
-      typ: STORY_ARTEN.includes(post.typ) ? 'story' : 'ank', text: STORY_ARTEN.includes(post.typ) ? '' : bildtext(post, cfg, design, zust.werte, zust.edit),
+      typ: istStory(post.typ, cfg) ? 'story' : 'ank', text: istStory(post.typ, cfg) ? '' : bildtext(post, cfg, design, zust.werte, zust.edit),
       tags: [], kiHinweis: cfg.kiHinweis && !!zust.ki
     });
     zust.gepostet = { zeit: Date.now(), mediaId };
@@ -431,7 +438,7 @@ async function ttSenden(env, s, post, cfg, design) {
   if (z.istVideo && !(z.video && z.video.hash === z.hash)) throw new Error('Video fehlt noch – den Instagram-Reiter einmal öffnen.');
   const zugang = await ttZugang(env, s);
   const titel = post.typ === 'woche' ? 'Stream Week' : post.typ === 'monat' ? 'Monatsbilanz' : [post.track || post.titel, post.serie].filter(Boolean).join(' · ');
-  const text = STORY_ARTEN.includes(post.typ) ? '#simracing #iracing #kreids888' : bildtext(post, cfg, design, z.werte, z.edit);
+  const text = istStory(post.typ, cfg) ? '#simracing #iracing #kreids888' : bildtext(post, cfg, design, z.werte, z.edit);
   try {
     const id = z.istVideo ? await ttVideoEntwurf(zugang, `${env.ORIGIN}/pvideo/${post.id}/${z.video.v}.mp4`)
       : await ttEntwurf(zugang, `${env.ORIGIN}/bild/${post.id}/${z.version}.jpg`, titel, text);
@@ -734,7 +741,7 @@ async function stand(env, s) {
     const spruch = (thrs['thr:' + rk] || {}).spruch || '';
     const vid = NEUE_ARTEN.includes(p.typ) ? (LOOKS.includes(z.vorlage) ? z.vorlage : 'kreids') : z.vorlage && (z.vorlage === 'kreids' || vVersion[z.vorlage] !== undefined) ? z.vorlage : 'kreids';
     const rennVideo = (thrs['thr:' + rk] || {}).video || '';
-    const soll = kurzHash(inhaltSchluessel({ ...p, spruch }, design, cfg, bgv) + '|' + vid + ':' + (vVersion[vid] || 0) + '|' + rennVideo + (z.edit ? '|' + JSON.stringify([z.edit.felder || null, z.edit.tabelle || null]) : ''));
+    const soll = kurzHash(inhaltSchluessel({ ...p, spruch }, design, cfg, bgv) + '|' + vid + ':' + (vVersion[vid] || 0) + '|' + rennVideo + (z.edit ? '|' + JSON.stringify([z.edit.felder || null, z.edit.tabelle || null]) : '') + (formatAbweichend(p.typ, cfg) ? '|f:' + (istStory(p.typ, cfg) ? 'story' : 'beitrag') : ''));
     return {
       id: p.id, typ: p.typ, art: p.art, spr: p.spr, titel: p.titel, serie: p.serie, nr: p.nr, track: p.track, layout: p.layout, datum: p.datum,
       postMs: p.postMs, startMs: p.startMs, qualiMs: p.qualiMs || p.startMs, rennMs: p.rennMs || p.startMs, liveMs: p.liveMs, tage: p.tage || 0,
@@ -756,8 +763,9 @@ async function stand(env, s) {
       ytThumbH: (ytbh['ytbh:' + rk] || {}).h || '',
       tiktok: z.tiktok ? { zeit: z.tiktok.zeit || 0, fehler: z.tiktok.zeit ? '' : (z.tiktok.fehler || '') } : null,
       autos: autos(p, design.fahrzeuge || ''),
-      text: STORY_ARTEN.includes(p.typ) ? '' : bildtext(p, cfg, design, z.werte, z.edit),
-      textStandard: STORY_ARTEN.includes(p.typ) ? '' : bildtext(p, cfg, design, z.werte, z.edit ? { ...z.edit, text: '' } : null),
+      text: istStory(p.typ, cfg) ? '' : bildtext(p, cfg, design, z.werte, z.edit),
+      textStandard: istStory(p.typ, cfg) ? '' : bildtext(p, cfg, design, z.werte, z.edit ? { ...z.edit, text: '' } : null),
+      format: istStory(p.typ, cfg) ? 'story' : 'beitrag',
       edit: z.edit || null
     };
   });
