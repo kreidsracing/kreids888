@@ -215,11 +215,177 @@
     const hook = String(c.hook || '').trim() || v.hooks[0], frage = String(c.unten || '').trim() || v.unten[0];
     const info = (TEXT_INFO[v.id] ? TEXT_INFO[v.id](c) : []).map(x => String(x || '').trim()).filter(Boolean).join(' · ');
     const rest = ohnePflicht(textTags(v));
-    return [ohnePflicht(hook + ' ' + textEmoji(v)) + ' ' + PFLICHT, info, frage + ' 👇'].filter(Boolean).join('\n') + (rest ? '\n\n' + rest : '');
+    return [ohnePflicht(hook + ' ' + textEmoji(v) + ortZusatz(c, hook)) + ' ' + PFLICHT, info, frage + ' 👇'].filter(Boolean).join('\n') + (rest ? '\n\n' + rest : '');
   }
   const mitText = c => { c.text = textBauen(vorlage(c), c); return c; };
   const kw = () => { const d = new Date(); const t = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate())); const tag = t.getUTCDay() || 7; t.setUTCDate(t.getUTCDate() + 4 - tag); const j = new Date(Date.UTC(t.getUTCFullYear(), 0, 1)); return Math.ceil(((t - j) / 86400000 + 1) / 7); };
   const tagText = v => v.tag.replace('{kw}', kw());
+
+  // ═══ 🔎 Stichwörter aus dem Dateinamen (NEU 19.11.2026) ═══
+  // „Spa_EauRouge_Crash.mp4“ oder „Monza Parabolica überholt.mp4“ → Strecke, Stelle (Kurve), was passiert, Auto.
+  // Daraus: passende Vorlage, Sprüche mit Ort und eine Titelzeile mit Strecke (die erste Zeile ist bei YouTube der Titel).
+  const stNorm = s => String(s || '').toLowerCase().replace(/ä/g, 'ae').replace(/ö/g, 'oe').replace(/ü/g, 'ue').replace(/ß/g, 'ss')
+    .normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]/g, '');
+  const ST_STRECKEN = [
+    ['Spa-Francorchamps', 'spa spafrancorchamps francorchamps'], ['Monza', 'monza'], ['Nordschleife', 'nordschleife nuerburgringnordschleife nurburgringnordschleife greenhell gruenehoelle'],
+    ['Nürburgring Combined', 'nuerburgringcombined nurburgringcombined combined gesamtstrecke'], ['Nürburgring', 'nuerburgring nurburgring nuerburgringgp nurburgringgp'],
+    ['Le Mans', 'lemans sarthe circuitdelasarthe'], ['Daytona', 'daytona'], ['Sebring', 'sebring'], ['Road Atlanta', 'roadatlanta'], ['Road America', 'roadamerica elkhartlake'],
+    ['Watkins Glen', 'watkinsglen watkins theglen'], ['Laguna Seca', 'lagunaseca laguna'], ['Long Beach', 'longbeach'], ['Sonoma', 'sonoma'], ['VIR', 'vir'], ['Lime Rock', 'limerock'],
+    ['Mid-Ohio', 'midohio'], ['Indianapolis', 'indianapolis indy'], ['COTA', 'cota circuitoftheamericas austin'], ['Interlagos', 'interlagos'], ['Imola', 'imola'], ['Mugello', 'mugello'],
+    ['Misano', 'misano'], ['Silverstone', 'silverstone'], ['Brands Hatch', 'brandshatch'], ['Donington', 'donington'], ['Oulton Park', 'oultonpark oulton'], ['Snetterton', 'snetterton'],
+    ['Knockhill', 'knockhill'], ['Thruxton', 'thruxton'], ['Zandvoort', 'zandvoort'], ['Zolder', 'zolder'], ['Hockenheim', 'hockenheim hockenheimring'], ['Oschersleben', 'oschersleben'],
+    ['Lausitzring', 'lausitzring lausitz'], ['Norisring', 'norisring'], ['Red Bull Ring', 'redbullring rbr spielberg'], ['Hungaroring', 'hungaroring'], ['Barcelona', 'barcelona catalunya montmelo'],
+    ['Valencia', 'valencia'], ['Jerez', 'jerez'], ['Navarra', 'navarra'], ['Algarve', 'algarve portimao'], ['Paul Ricard', 'paulricard ricard'], ['Magny-Cours', 'magnycours'],
+    ['Suzuka', 'suzuka'], ['Fuji', 'fuji'], ['Motegi', 'motegi'], ['Okayama', 'okayama'], ['Tsukuba', 'tsukuba'], ['Bathurst', 'bathurst mountpanorama'], ['Phillip Island', 'phillipisland'],
+    ['Kyalami', 'kyalami'], ['Brno', 'brno'], ['Mosport', 'mosport ctmp canadiantire'], ['Barber', 'barber'], ['Portland', 'portland'], ['Charlotte', 'charlotte'], ['Detroit', 'detroit'],
+    ['Montreal', 'montreal'], ['Winton', 'winton'], ['Sachsenring', 'sachsenring'], ['Most', 'autodrommost']
+  ];
+  // Stellen: [Name, Schlüsselwörter, Strecke (wenn eindeutig)]
+  const ST_STELLEN = [
+    ['Eau Rouge', 'eaurouge', 'Spa-Francorchamps'], ['Raidillon', 'raidillon', 'Spa-Francorchamps'], ['Kemmel-Gerade', 'kemmel kemmelgerade kemmelstraight camelstraight', 'Spa-Francorchamps'],
+    ['La Source', 'lasource', 'Spa-Francorchamps'], ['Les Combes', 'lescombes combes', 'Spa-Francorchamps'], ['Bruxelles', 'bruxelles', 'Spa-Francorchamps'], ['Pouhon', 'pouhon', 'Spa-Francorchamps'],
+    ['Fagnes', 'fagnes lesfagnes', 'Spa-Francorchamps'], ['Stavelot', 'stavelot', 'Spa-Francorchamps'], ['Blanchimont', 'blanchimont', 'Spa-Francorchamps'], ['Bus Stop', 'busstop', ''],
+    ['Rettifilo', 'rettifilo variantedelrettifilo', 'Monza'], ['Curva Grande', 'curvagrande', 'Monza'], ['Roggia', 'roggia variantedellaroggia', 'Monza'], ['Lesmo', 'lesmo lesmo1 lesmo2', 'Monza'],
+    ['Ascari', 'ascari', 'Monza'], ['Parabolica', 'parabolica alboreto curvaalboreto', 'Monza'],
+    ['Hatzenbach', 'hatzenbach', 'Nordschleife'], ['Flugplatz', 'flugplatz', 'Nordschleife'], ['Schwedenkreuz', 'schwedenkreuz', 'Nordschleife'], ['Aremberg', 'aremberg', 'Nordschleife'],
+    ['Fuchsröhre', 'fuchsroehre fuchsrohre', 'Nordschleife'], ['Adenauer Forst', 'adenauerforst', 'Nordschleife'], ['Metzgesfeld', 'metzgesfeld', 'Nordschleife'], ['Kallenhard', 'kallenhard', 'Nordschleife'],
+    ['Wehrseifen', 'wehrseifen', 'Nordschleife'], ['Breidscheid', 'breidscheid', 'Nordschleife'], ['Ex-Mühle', 'exmuehle exmuhle', 'Nordschleife'], ['Bergwerk', 'bergwerk', 'Nordschleife'],
+    ['Kesselchen', 'kesselchen', 'Nordschleife'], ['Klostertal', 'klostertal', 'Nordschleife'], ['Karussell', 'karussell karusell carousel caracciola', 'Nordschleife'], ['Hohe Acht', 'hoheacht', 'Nordschleife'],
+    ['Brünnchen', 'bruennchen brunnchen', 'Nordschleife'], ['Pflanzgarten', 'pflanzgarten', 'Nordschleife'], ['Schwalbenschwanz', 'schwalbenschwanz', 'Nordschleife'], ['Galgenkopf', 'galgenkopf', 'Nordschleife'],
+    ['Döttinger Höhe', 'doettingerhoehe dottingerhohe doettinger', 'Nordschleife'], ['Tiergarten', 'tiergarten', 'Nordschleife'],
+    ['Mercedes-Arena', 'mercedesarena', 'Nürburgring'], ['Yokohama-S', 'yokohama yokohamas', 'Nürburgring'], ['Dunlop-Kehre', 'dunlopkehre', 'Nürburgring'], ['Veedol-Schikane', 'veedol', 'Nürburgring'],
+    ['Tertre Rouge', 'tertrerouge', 'Le Mans'], ['Mulsanne', 'mulsanne hunaudieres', 'Le Mans'], ['Arnage', 'arnage', 'Le Mans'], ['Porsche-Kurven', 'porschekurven porschecurves', 'Le Mans'], ['Ford-Schikane', 'fordschikane fordchicane', 'Le Mans'],
+    ['Steilkurve', 'banking steilkurve', 'Daytona'], ['Horseshoe', 'horseshoe', 'Daytona'],
+    ['Tamburello', 'tamburello', 'Imola'], ['Villeneuve', 'villeneuve', 'Imola'], ['Tosa', 'tosa', 'Imola'], ['Piratella', 'piratella', 'Imola'], ['Acque Minerali', 'acqueminerali', 'Imola'],
+    ['Variante Alta', 'variantealta', 'Imola'], ['Rivazza', 'rivazza', 'Imola'],
+    ['130R', '130r', 'Suzuka'], ['Spoon', 'spoon', 'Suzuka'], ['Degner', 'degner', 'Suzuka'], ['Casio-Schikane', 'casio', 'Suzuka'],
+    ['Copse', 'copse', 'Silverstone'], ['Maggotts', 'maggotts', 'Silverstone'], ['Becketts', 'becketts', 'Silverstone'], ['Stowe', 'stowe', 'Silverstone'], ['Luffield', 'luffield', 'Silverstone'],
+    ['Conrod Straight', 'conrod conrodstraight', 'Bathurst'], ['The Chase', 'thechase', 'Bathurst'], ['Skyline', 'skyline', 'Bathurst'], ['The Dipper', 'dipper thedipper', 'Bathurst'], ['Forrest’s Elbow', 'forrestselbow', 'Bathurst'],
+    ['Corkscrew', 'corkscrew korkenzieher', 'Laguna Seca'], ['Tarzan', 'tarzan tarzanbocht', 'Zandvoort'], ['Hugenholtz', 'hugenholtz', 'Zandvoort'], ['Scheivlak', 'scheivlak', 'Zandvoort'],
+    ['Senna-S', 'sennas sdosenna', 'Interlagos'], ['Descida do Lago', 'descidadolago', 'Interlagos'], ['Remus', 'remus', 'Red Bull Ring'], ['Rindt', 'rindt', 'Red Bull Ring'],
+    ['Paddock Hill', 'paddockhill', 'Brands Hatch'], ['Druids', 'druids', 'Brands Hatch'], ['Clearways', 'clearways', 'Brands Hatch'],
+    ['Arrabbiata', 'arrabbiata', 'Mugello'], ['Casanova', 'casanova', 'Mugello'], ['Savelli', 'savelli', 'Mugello'], ['Bucine', 'bucine', 'Mugello'], ['San Donato', 'sandonato', 'Mugello'],
+    ['Spitzkehre', 'spitzkehre', 'Hockenheim'], ['Sachs-Kurve', 'sachskurve', 'Hockenheim'],
+    ['Start-Ziel-Gerade', 'startziel startzielgerade zielgerade mainstraight', ''], ['Boxengasse', 'boxengasse pitlane boxenausfahrt boxeneinfahrt', ''], ['Schikane', 'schikane chicane', ''],
+    ['Haarnadel', 'haarnadel hairpin', ''], ['Esses', 'esses', ''], ['Kiesbett', 'kiesbett gravel', '']
+  ];
+  // Was passiert → Vorlage
+  const ST_SITU = [
+    ['ueberholtworden', 'duell', 'Überholt worden', '🥲'],
+    ['crash', 'crash', 'Crash', '💥', 'crash unfall einschlag abflug abgeflogen mauer wand reifenstapel barriere totalschaden wreck massencrash pileup bigone'],
+    ['dreher', 'fail', 'Dreher', '🌀', 'dreher spin gedreht dreht pirouette'],
+    ['fehler', 'fail', 'Fehler', '🤡', 'fehler fail peinlich verbremst verpasst bremspunktverpasst abgekuerzt offtrack'],
+    ['ueberholt', 'ueberholer', 'Überholt', '🚀', 'ueberholen ueberholt ueberholmanoever ueberholmanover overtake pass passed vorbei spaetbremser sendit divebomb aussenrum'],
+    ['duell', 'duell', 'Duell', '⚔️', 'duell zweikampf kampf battle fight radanrad tuerantuer'],
+    ['save', 'save', 'Save', '😮‍💨', 'save gerettet rettung gehalten glueck fastweg'],
+    ['kontakt', 'schuld', 'Kontakt', '⚖️', 'kontakt rempler schuld touch punt abgeschossen umgedreht torpedo bumper gerammt rammen'],
+    ['ampel', 'ampel', 'Lights Out', '🚥', 'ampel lightsout lichteraus'],
+    ['start', 'start', 'Start', '🚦', 'start rennstart startchaos ersterunde lap1 runde1'],
+    ['finish', 'finish', 'Fotofinish', '📸', 'finish fotofinish zielfoto photofinish knappesziel'],
+    ['ziel', 'ziel', 'Ziel', '🏁', 'ziel zieleinlauf zielflagge checkered sieg win gewonnen podium pokal'],
+    ['regen', 'regen', 'Regen', '🌧️', 'regen nass wet rain aquaplaning'],
+    ['bestzeit', 'bestzeit', 'Bestzeit', '⚡', 'bestzeit fastestlap schnellsterunde lila purple rekord record'],
+    ['hotlap', 'hotlap', 'Hotlap', '⏱️', 'hotlap quali qualifying pole'],
+    ['wagnis', 'wagnis', 'Gewagt', '😬', 'gewagt risiko mutig wagnis yolo'],
+    ['verkehr', 'highlight', 'Verkehr', '🏎️', 'verkehr multiclass ueberrundet blauflagge blaueflagge traffic lapped'],
+    ['highlight', 'highlight', 'Highlight', '🔥', 'highlight moment wahnsinn krass wow']
+  ];
+  const ST_AUTOS = [['Porsche', 'porsche'], ['BMW', 'bmw'], ['Ferrari', 'ferrari'], ['Mercedes-AMG', 'mercedes amg'], ['Audi', 'audi'], ['Lamborghini', 'lamborghini lambo'], ['McLaren', 'mclaren'],
+    ['Corvette', 'corvette'], ['Aston Martin', 'astonmartin aston'], ['Ford Mustang', 'mustang'], ['Lexus', 'lexus'], ['Acura', 'acura'], ['Honda', 'honda'], ['Toyota', 'toyota supra'], ['Cadillac', 'cadillac'],
+    ['Dallara', 'dallara'], ['Ligier', 'ligier'], ['Oreca', 'oreca']];
+  const ST_KLASSEN = { gt3: 'GT3', gt4: 'GT4', gte: 'GTE', gtp: 'GTP', lmp2: 'LMP2', lmp3: 'LMP3', tcr: 'TCR', mx5: 'MX-5', cup: 'Cup' };
+  const ST_RAUSCH = new Set('replay clip clips iracing racing simracing sim obs video final cut neu new edit kreids kreids888 kreidsclipper clipper mp4 mov teil part und and mit der die das den dem im in am beim vom von zu bei ich mir mich wird wurde ist hat runde lap rennen race session test training practice liga league season saison woche week'.split(' '));
+  const ST_MAP = new Map();
+  ST_STRECKEN.forEach(([n, a]) => a.split(' ').forEach(k => ST_MAP.set(k, { art: 'strecke', n })));
+  ST_STELLEN.forEach(([n, a, s]) => a.split(' ').forEach(k => ST_MAP.set(k, { art: 'stelle', n, s })));
+  ST_SITU.forEach(([id, v, n, e, a]) => (a || '').split(' ').filter(Boolean).forEach(k => ST_MAP.set(k, { art: 'situ', id })));
+  ST_AUTOS.forEach(([n, a]) => a.split(' ').forEach(k => ST_MAP.set(k, { art: 'auto', n })));
+  const situVon = id => ST_SITU.find(x => x[0] === id);
+  // Dateiname/Text → { strecke, stelle, situ, auto, klasse, woerter }
+  function stichwoerter(roh) {
+    const ohneEndung = String(roh || '').replace(/\.(mp4|mov|m4v|webm|mkv)$/i, '');
+    const teile = ohneEndung.replace(/([a-zäöüß])([A-ZÄÖÜ])/g, '$1 $2').split(/[\s_\-.,+()[\]{}|/\\]+/).filter(Boolean);
+    const r = { strecke: '', stelle: '', situ: '', auto: '', klasse: '', fremd: [], woerter: teile };
+    const situs = [];
+    for (let i = 0; i < teile.length;) {
+      let treffer = null, n = 1;
+      for (let k = Math.min(4, teile.length - i); k >= 1 && !treffer; k--) {   // längster Treffer zuerst („Eau Rouge“, „Watkins Glen“)
+        const key = stNorm(teile.slice(i, i + k).join('')), m = ST_MAP.get(key);
+        if (m) { treffer = m; n = k; }
+      }
+      const w = teile[i], wn = stNorm(w);
+      if (treffer) {
+        if (treffer.art === 'strecke' && !r.strecke) r.strecke = treffer.n;
+        else if (treffer.art === 'stelle' && !r.stelle) { r.stelle = treffer.n; if (treffer.s && !r.strecke) r.streckeVonStelle = treffer.s; }
+        else if (treffer.art === 'situ') situs.push(treffer.id);
+        else if (treffer.art === 'auto' && !r.auto) r.auto = treffer.n;
+      } else if (/^(t|turn|kurve|k)(\d{1,2})$/.test(wn)) { if (!r.stelle) r.stelle = 'Kurve ' + wn.replace(/\D/g, ''); }
+      else if (ST_KLASSEN[wn]) { if (!r.klasse) r.klasse = ST_KLASSEN[wn]; }
+      else if (wn === 'worden' || wn === 'kassiert' || wn === 'verloren') situs.push('worden');
+      else if (wn && !/^\d+$/.test(wn) && wn.length > 1 && !ST_RAUSCH.has(wn)) r.fremd.push(w);
+      i += n;
+    }
+    if (!r.strecke && r.streckeVonStelle) r.strecke = r.streckeVonStelle;
+    // Unbekannte Wörter = Stelle (z. B. eine Kurve, die nicht in der Liste steht)
+    if (!r.stelle && r.fremd.length) r.stelle = r.fremd.slice(0, 3).map(x => x.charAt(0).toUpperCase() + x.slice(1)).join(' ');
+    if (situs.includes('worden') && (situs.includes('ueberholt') || !situs.length || situs.every(x => x === 'worden'))) r.situ = 'ueberholtworden';
+    else r.situ = situs.find(x => x !== 'worden') || '';
+    return r;
+  }
+  const stichLeer = sw => !sw || (!sw.strecke && !sw.stelle && !sw.situ && !sw.auto);
+  // Sprüche mit Ort ({ort} = Stelle, sonst Strecke · {strecke} = Strecke, sonst Stelle)
+  const ORT_SPRUECHE = {
+    crash: ['Crash in {ort}', '{ort}. Vollgas. Mauer.', '{ort} verzeiht nichts', 'Das war’s in {ort}', 'Bremsen in {ort}? Nö.', 'Abflug in {ort}', 'Wer bremst in {ort}?', '{ort} sagt NEIN'],
+    fail: ['Dreher in {ort}', '{ort} hat gewonnen', 'Peinlich in {ort}', '{ort}: 1, ich: 0', 'Wie fährt man {ort}?', 'Pirouette in {ort}'],
+    ueberholer: ['Überholt in {ort}!', 'Die Lücke in {ort}', 'Spätbremser in {ort}', 'Außen rum in {ort}?!', 'So fährt man {ort}', 'Vorbei in {ort}!'],
+    duell: ['Rad an Rad in {ort}', 'Duell in {ort}', 'Tür zu in {ort}?', 'Wer gewinnt {ort}?', 'Kassiert in {ort}'],
+    ueberholtworden: ['Kassiert in {ort}', 'Überholt in {ort}. Autsch.', 'Tür offen in {ort}', '{ort}: Platz weg'],
+    save: ['Gerettet in {ort}!', 'Wie hielt ich {ort}?!', '{ort}. Fast. Weg.', 'Glück in {ort}', 'Das hält in {ort}?!'],
+    schuld: ['Kontakt in {ort}', 'Rempler in {ort}', 'Wer war schuld in {ort}?', 'Abgeschossen in {ort}'],
+    start: ['Startchaos in {strecke}', 'Kurve 1 in {strecke}. Chaos.', 'Erste Runde in {strecke}', 'Start in {strecke}. Krass.'],
+    ampel: ['Lights out in {strecke}', 'Start in {strecke}'],
+    finish: ['Fotofinish in {strecke}', 'Zentimeter in {strecke}', 'Ziel in {strecke}. Knapp!'],
+    ziel: ['Zieleinlauf in {strecke}', 'Geschafft in {strecke}!'],
+    regen: ['Regen in {ort}', 'Aquaplaning in {ort}', 'Nass in {ort}. Viel Glück.'],
+    bestzeit: ['Bestzeit in {strecke}!', 'Lila in {ort}', 'Die Runde in {strecke}'],
+    hotlap: ['Hotlap {strecke}', 'Schaffst du {strecke}?'],
+    wagnis: ['Hättest du’s gewagt? {ort}', 'Mutig in {ort}?'],
+    jetzt: ['Was passiert in {ort}?', 'Rate mal: {ort}'],
+    highlight: ['Wahnsinn in {ort}', 'Das passiert in {ort}', '{ort}. Einfach krass.']
+  };
+  function ortSprueche(c) {
+    const ort = c.stelle || c.strecke, strecke = c.strecke || c.stelle;
+    if (!ort) return [];
+    const l = ORT_SPRUECHE[c.situ === 'ueberholtworden' ? 'ueberholtworden' : c.vorlage] || ORT_SPRUECHE.highlight;
+    return l.map(x => x.replace(/\{ort\}/g, ort).replace(/\{strecke\}/g, strecke)).filter(x => x.length <= 40);
+  }
+  // Stichwörter auf den Clip anwenden: Vorlage (wenn erkannt), Strecke/Stelle/Auto, Spruch mit Ort
+  function stichAnwenden(c, text) {
+    const sw = stichwoerter(text);
+    c.stichText = String(text || '').replace(/\.(mp4|mov|m4v|webm|mkv)$/i, '').replace(/[_]+/g, ' ').trim();
+    if (stichLeer(sw)) { c.stich = null; return false; }
+    const si = sw.situ && situVon(sw.situ);
+    if (si && si[1] !== c.vorlage && VORLAGEN.some(v => v.id === si[1])) vorlageSetzen(c, si[1]);
+    Object.assign(c, { stich: sw, situ: sw.situ, stelle: sw.stelle, strecke: sw.strecke || c.strecke || '', auto: sw.auto || c.auto || '', klasse: sw.klasse || c.klasse || '' });
+    const l = ortSprueche(c);
+    if (l.length) c.hook = ziehen(l, 'ort-' + (c.situ || c.vorlage), c.hook);
+    c.textEigen = false; mitText(c);
+    return true;
+  }
+  // Titelzeile: Ort dazu, wenn er noch nicht im Spruch steht (z. B. „Crash in Eau Rouge 💥 | Spa-Francorchamps · Porsche“)
+  const mitStich = c => { stichAnwenden(c, c.name); return c; };
+  function stichChips(c) {
+    const sw = c.stich;
+    if (!sw) return c.stichText ? '<div class="kc-dim">Nichts erkannt. Beispiel: Spa Eau Rouge Crash</div>' : '';
+    const si = sw.situ && situVon(sw.situ), vn = si && (VORLAGEN.find(v => v.id === si[1]) || {}).name;
+    const l = [sw.strecke && ['📍', sw.strecke], sw.stelle && ['↪', sw.stelle], si && [si[3], si[2] + (vn ? ' → ' + vn : '')], sw.auto && ['🏎', sw.auto], sw.klasse && ['🏷', sw.klasse]].filter(Boolean);
+    return `<div class="kc-chips kc-stich">${l.map(([i, t]) => `<span class="ki-chip">${i} ${esc(t)}</span>`).join('')}</div>`;
+  }
+  function ortZusatz(c, hook) {
+    if (!c.stich) return '';
+    const h = stNorm(hook), teile = [c.stelle, c.strecke, c.auto].filter(x => x && !h.includes(stNorm(x)));
+    return teile.length ? ' | ' + [...new Set(teile)].join(' · ') : '';
+  }
 
   // ─── Schriften ───
   let SCHRIFT = null;
@@ -809,7 +975,7 @@
   function zeichne(g, t, c, p, m, vid) {
     if (p.mehr) return zeichneMehr(g, t, c, p, m, vid);
     if (c.look === 'tv') return zeichneTV(g, t, c, p, m, vid);
-    const v = vorlage(c), f = c.farbe || v.farbe, zoom = c.modus === 'zoom';
+    const v = vorlage(c), f = c.farbe || v.farbe, zoom = c.modus === 'zoom', st = stilVon(c), neon = st === 'neon';
     const outro = t >= p.T - OUTRO, rz = !outro && t >= p.D && t < p.D + p.R, imClip = !outro;
     const halt = imClip && angehalten(v, p, t), ana = halt && v.analyse && vid, R = flaeche(c, p, t);
     const [sx, sy] = rz && v.stempel ? schuetteln(t - p.D) : [0, 0];
@@ -821,13 +987,15 @@
         else quellBild(g, vid, -40, -40, B + 80, H + 80, rz ? 1.12 : R.zoom, c.versatz, c.bild);
         const v1 = g.createLinearGradient(0, 0, 0, 840); v1.addColorStop(0, 'rgba(3,4,6,.92)'); v1.addColorStop(0.45, 'rgba(3,4,6,.8)'); v1.addColorStop(1, 'rgba(3,4,6,0)'); g.fillStyle = v1; g.fillRect(0, 0, B, 840);
         const v2 = g.createLinearGradient(0, 1100, 0, H); v2.addColorStop(0, 'rgba(3,4,6,0)'); v2.addColorStop(0.4, 'rgba(3,4,6,.88)'); g.fillStyle = v2; g.fillRect(0, 1100, B, H - 1100);
-      } else weichesBild(g, vid, f);
-    } else g.drawImage(grund(f), 0, 0);
+        if (!neon) stilZoomUeber(g, st, t, f);
+      } else if (neon) weichesBild(g, vid, f); else stilGrund(g, st, vid, f, t);
+    } else if (neon) g.drawImage(grund(f), 0, 0); else stilGrund(g, st, null, f, t);
     if (imClip) {
       // Clip im Neon-Rahmen (oder ganzes Bild bei „Zoom“)
       const L0 = lage(c), fx = zoom ? 34 : L0.fx, fy = zoom ? 690 : L0.fy, fw = zoom ? B - 68 : L0.fw, fh = zoom ? 600 : L0.fh, dy = zoom ? 0 : L0.dy;
       const fl = flackern(t);
-      if (!zoom && vid) {
+      if (!zoom && vid && !neon) stilFenster(g, st, t, f, fx, fy, fw, fh, rz, dx => { if (ana) analyseBild(g, t, c, p, vid, R); else quellBild(g, vid, fx + dx, fy, fw, fh, rz ? 1.15 : 1, 0, c.bild); });
+      else if (!zoom && vid) {
         g.save(); rr(g, fx, fy, fw, fh, 14); g.clip();
         g.fillStyle = '#000'; g.fillRect(fx, fy, fw, fh);
         if (ana) analyseBild(g, t, c, p, vid, R); else quellBild(g, vid, fx, fy, fw, fh, rz ? 1.15 : 1, 0, c.bild);
@@ -837,10 +1005,12 @@
       }
       if (halt && !v.analyse) { g.fillStyle = v.ampel ? 'rgba(0,0,0,.55)' : v.zielflagge ? 'rgba(0,0,0,.15)' : 'rgba(0,0,0,.42)'; if (zoom) g.fillRect(0, 0, B, H); else { g.save(); rr(g, fx, fy, fw, fh, 14); g.clip(); g.fillRect(fx, fy, fw, fh); g.restore(); } }
       if (v.regen) { g.fillStyle = 'rgba(40,90,170,.14)'; g.fillRect(zoom ? 0 : fx, zoom ? 0 : fy, zoom ? B : fw, zoom ? H : fh); regen(g, t, p); }
-      g.save(); g.globalAlpha = fl;
-      if (!zoom) ecken(g, fx - 10, fy - 10, fw + 20, fh + 20, f, 74);
-      else ecken(g, 34, 296, B - 68, 1258, f, 90);
-      g.restore();
+      if (neon) {
+        g.save(); g.globalAlpha = fl;
+        if (!zoom) ecken(g, fx - 10, fy - 10, fw + 20, fh + 20, f, 74);
+        else ecken(g, 34, 296, B - 68, 1258, f, 90);
+        g.restore();
+      }
       const mx = B / 2, my = zoom ? 1000 : fy + fh / 2;   // Mitte des Clips
       if (v.ampel) ampelZeichnen(g, t, p, mx, my, Math.min(fw, 1000));
       if (ana) analyseOben(g, t, c, p, vid, R, f);
@@ -868,7 +1038,7 @@
       const pr = kl(t / (p.T - OUTRO), 0, 1), py = zoom ? 1270 : fy + fh + 18;
       g.fillStyle = 'rgba(255,255,255,.12)'; g.fillRect(fx, py, fw, 8);
       g.save(); g.fillStyle = f; g.shadowColor = f; g.shadowBlur = 16; g.fillRect(fx, py, fw * pr, 8); g.restore();
-      spruchZeichnen(g, t, c.hook || v.hooks[0], f, !zoom && L0.hoch ? { y1: 476 - L0.hoch, y2: 428 - L0.hoch } : undefined);
+      (neon ? spruchZeichnen : (gg, tt, tx, ff, oo) => stilSpruch(gg, st, tt, tx, ff, oo))(g, t, c.hook || v.hooks[0], f, !zoom && L0.hoch ? { y1: 476 - L0.hoch, y2: 428 - L0.hoch } : undefined);
       // Zeitlupe: Band mit Ansage, Crash-Stempel
       if (rz) {
         const q = fp(t, p.D, p.D + 0.25), aus = fp(t, p.D + 1.6, p.D + 1.9);
@@ -892,7 +1062,8 @@
       } else {
         // Frage unten als Neon-Band, Pfeile zu den Kommentaren
         const ub = fp(t, 0.9, 1.25);
-        if (ub > 0) {
+        if (!neon) stilFrage(g, st, t, frageVon(c, v), f, 1310 + dy - 6);
+        else if (ub > 0) {
           const bd = band(frageVon(c, v), f, 46), y = 1310 + dy;
           g.save(); g.translate(-(1 - eo(ub)) * B, 0); g.drawImage(bd.c, B / 2 - bd.bandW / 2 - 40, y - 60); g.restore();
           if (ub >= 1 && y + 120 < 1640) chevrons(g, B / 2, y + 92, t, f);
@@ -905,6 +1076,198 @@
     // Blitze: Anfang, Zeitlupe, Abspann, Lichter aus, Standbild (Analyse)
     const blitze = [[0.12, 0.5], [p.D, p.R ? 0.6 : 0], [p.T - OUTRO, 0.75], [p.h + p.FD, v.ampel ? 0.7 : 0], [p.h, v.analyse ? 0.45 : v.zielflagge ? 0.7 : 0], [p.L || 0, v.bestzeit ? 0.35 : 0]];
     for (const [z, a] of blitze) { const d = t - z; if (a && d >= 0 && d < 0.3) { g.fillStyle = `rgba(255,255,255,${a * (1 - d / 0.3)})`; g.fillRect(0, 0, B, H); } }
+  }
+  // ═══ 🎨 Stile (NEU 19.11.2026): andere Darstellung bei gleicher Vorlage (nur Neon-Look, Vorlagen mit einem Clip) ═══
+  // Jeder neue Clip und jede andere Vorlage bekommt von selbst einen anderen Stil (nie zweimal hintereinander derselbe).
+  const STILE = [['neon', '✨ Neon'], ['kino', '🎬 Kino'], ['comic', '💥 Comic'], ['glitch', '👾 Glitch'], ['sport', '🏁 Sport'], ['clean', '◻️ Clean']];
+  const STIL_IDS = STILE.map(x => x[0]);
+  const stilVon = c => (c && c.look !== 'tv' && STIL_IDS.includes(c.stil) ? c.stil : 'neon');
+  const stilNeu = alt => ziehen(STIL_IDS, 'stil', alt);
+  const hell = h => { const n = parseInt(String(h || '#888888').slice(1), 16); return (0.2126 * (n >> 16) + 0.7152 * ((n >> 8) & 255) + 0.0722 * (n & 255)) / 255; };
+  // Hintergrund (ohne Clip: nur Grund)
+  function stilGrund(g, st, vid, f, t) {
+    if (st === 'kino') {
+      g.fillStyle = '#000'; g.fillRect(0, 0, B, H);
+      if (vid) { g.save(); g.globalAlpha = 0.45; unscharf(g, vid); g.restore(); g.fillStyle = 'rgba(0,0,0,.6)'; g.fillRect(0, 0, B, H); }
+      const v = g.createRadialGradient(B / 2, H * 0.48, 260, B / 2, H * 0.48, 1250); v.addColorStop(0, 'rgba(0,0,0,0)'); v.addColorStop(1, 'rgba(0,0,0,.85)'); g.fillStyle = v; g.fillRect(0, 0, B, H);
+      const r = zufallR(Math.floor(t * 24) + 3); g.fillStyle = 'rgba(255,255,255,.05)'; for (let i = 0; i < 90; i++) g.fillRect(r() * B, r() * H, 1 + r() * 2, 1 + r() * 2);   // Filmkorn
+      return;
+    }
+    if (st === 'comic') {
+      g.drawImage(merk('comic' + f, () => {
+        const c = leinwand(B, H), k = c.getContext('2d');
+        k.fillStyle = '#111018'; k.fillRect(0, 0, B, H);
+        k.save(); k.translate(B / 2, H * 0.45); for (let i = 0; i < 24; i++) { k.rotate(Math.PI / 12); k.fillStyle = i % 2 ? hexA(f, 0.16) : 'rgba(255,255,255,.03)'; k.beginPath(); k.moveTo(0, 0); k.lineTo(-170, -1500); k.lineTo(170, -1500); k.closePath(); k.fill(); } k.restore();
+        k.fillStyle = hexA(f, 0.28); for (let y = 0; y < H; y += 26) for (let x = (y / 26) % 2 ? 13 : 0; x < B; x += 26) { const rad = 2 + 5 * (y / H); k.beginPath(); k.arc(x, y, rad, 0, Math.PI * 2); k.fill(); }
+        return c;
+      }), 0, 0);
+      if (vid) { g.save(); g.globalAlpha = 0.18; unscharf(g, vid); g.restore(); }
+      return;
+    }
+    if (st === 'glitch') {
+      g.fillStyle = '#05060a'; g.fillRect(0, 0, B, H);
+      if (vid) {
+        g.save(); g.globalAlpha = 0.5; unscharf(g, vid); g.restore();
+        g.save(); g.globalCompositeOperation = 'lighter'; g.globalAlpha = 0.18; g.translate(-14, 0); unscharf(g, vid); g.restore();
+        g.fillStyle = 'rgba(5,6,10,.55)'; g.fillRect(0, 0, B, H);
+      }
+      g.fillStyle = 'rgba(0,0,0,.25)'; for (let y = 0; y < H; y += 6) g.fillRect(0, y, B, 2);   // Zeilen
+      const r = zufallR(Math.floor(t * 8) * 7 + 1);
+      for (let i = 0; i < 4; i++) { g.fillStyle = [hexA('#00ffff', 0.08), hexA('#ff00aa', 0.08), hexA(f, 0.1)][i % 3]; g.fillRect(0, r() * H, B, 6 + r() * 40); }
+      return;
+    }
+    if (st === 'sport') {
+      g.drawImage(merk('sport' + f, () => {
+        const c = leinwand(B, H), k = c.getContext('2d'), lg = k.createLinearGradient(0, 0, 0, H);
+        lg.addColorStop(0, '#0b0d12'); lg.addColorStop(1, '#030405'); k.fillStyle = lg; k.fillRect(0, 0, B, H);
+        k.save(); k.transform(1, 0, -0.45, 1, 0, 0);
+        [[120, 120, 0.9], [300, 40, 0.5], [1500, 160, 0.85], [1720, 50, 0.45]].forEach(([x, w, a]) => { k.fillStyle = hexA(f, a * 0.45); k.fillRect(x, 0, w, H); });
+        k.restore();
+        const q = 34; for (let y = 0; y < 5; y++) for (let x = 0; x < 9; x++) if ((x + y) % 2 === 0) { k.fillStyle = 'rgba(255,255,255,.05)'; k.fillRect(B - 9 * q + x * q, H - 5 * q + y * q, q, q); }   // Zielflagge unten rechts
+        return c;
+      }), 0, 0);
+      if (vid) { g.save(); g.globalAlpha = 0.22; unscharf(g, vid); g.restore(); }
+      return;
+    }
+    // clean
+    const lg = g.createLinearGradient(0, 0, 0, H); lg.addColorStop(0, '#11141a'); lg.addColorStop(1, '#06070a'); g.fillStyle = lg; g.fillRect(0, 0, B, H);
+    if (vid) { g.save(); g.globalAlpha = 0.3; unscharf(g, vid); g.restore(); g.fillStyle = 'rgba(8,10,14,.55)'; g.fillRect(0, 0, B, H); }
+  }
+  // Clip-Fenster mit Rahmen im jeweiligen Stil (bildRein zeichnet den Clip ins Fenster)
+  function stilFenster(g, st, t, f, fx, fy, fw, fh, rz, bildRein) {
+    const zeilen = () => { if (rz) { g.fillStyle = 'rgba(0,0,0,.12)'; for (let yy = fy; yy < fy + fh; yy += 6) g.fillRect(fx, yy, fw, 2); } };
+    if (st === 'kino') {
+      g.save(); g.beginPath(); g.rect(fx, fy, fw, fh); g.clip(); g.fillStyle = '#000'; g.fillRect(fx, fy, fw, fh); bildRein(0); zeilen(); g.restore();
+      g.fillStyle = 'rgba(255,255,255,.85)'; g.fillRect(fx, fy - 10, fw, 2); g.fillRect(fx, fy + fh + 8, fw, 2);
+      return;
+    }
+    if (st === 'comic') {
+      g.fillStyle = f; g.fillRect(fx + 22, fy + 22, fw, fh);
+      g.fillStyle = '#000'; g.fillRect(fx - 12, fy - 12, fw + 24, fh + 24);
+      g.save(); g.beginPath(); g.rect(fx, fy, fw, fh); g.clip(); bildRein(0); zeilen(); g.restore();
+      return;
+    }
+    if (st === 'glitch') {
+      g.save(); g.beginPath(); g.rect(fx, fy, fw, fh); g.clip(); g.fillStyle = '#000'; g.fillRect(fx, fy, fw, fh); bildRein(0);
+      const r = zufallR(Math.floor(t * 12) * 13 + 5);
+      if (r() < 0.3) for (let k = 0; k < 3; k++) { const y = fy + r() * fh, h = 12 + r() * 46, dx = (r() - 0.5) * 80; g.save(); g.beginPath(); g.rect(fx, y, fw, h); g.clip(); bildRein(dx); g.restore(); }   // Bildrisse
+      g.fillStyle = 'rgba(0,0,0,.16)'; for (let yy = fy; yy < fy + fh; yy += 4) g.fillRect(fx, yy, fw, 1);
+      g.restore();
+      g.save(); g.lineWidth = 4; g.strokeStyle = 'rgba(0,255,255,.9)'; g.strokeRect(fx - 7, fy - 5, fw, fh); g.strokeStyle = 'rgba(255,0,170,.9)'; g.strokeRect(fx + 7, fy + 5, fw, fh); g.restore();
+      return;
+    }
+    if (st === 'sport') {
+      const k = 46, pfad = () => { g.beginPath(); g.moveTo(fx + k, fy); g.lineTo(fx + fw, fy); g.lineTo(fx + fw - k, fy + fh); g.lineTo(fx, fy + fh); g.closePath(); };
+      g.save(); g.fillStyle = f; g.beginPath(); g.moveTo(fx + k - 30, fy - 14); g.lineTo(fx + k + 10, fy - 14); g.lineTo(fx - 4 + 10, fy + fh + 14); g.lineTo(fx - 4 - 30, fy + fh + 14); g.closePath(); g.fill(); g.restore();   // Farbkante links
+      g.save(); pfad(); g.clip(); g.fillStyle = '#000'; g.fillRect(fx, fy, fw, fh); bildRein(0); zeilen(); g.restore();
+      g.save(); pfad(); g.lineWidth = 5; g.strokeStyle = '#ffffff'; g.stroke(); g.restore();
+      return;
+    }
+    // clean
+    g.save(); g.shadowColor = 'rgba(0,0,0,.65)'; g.shadowBlur = 44; g.shadowOffsetY = 18; rr(g, fx, fy, fw, fh, 30); g.fillStyle = '#000'; g.fill(); g.restore();
+    g.save(); rr(g, fx, fy, fw, fh, 30); g.clip(); bildRein(0); zeilen(); g.restore();
+    g.save(); rr(g, fx, fy, fw, fh, 30); g.lineWidth = 3; g.strokeStyle = hexA(f, 0.9); g.stroke(); g.restore();
+  }
+  // Spruch oben im jeweiligen Stil (gleiche Stelle wie beim Neon-Spruch)
+  function stilSpruch(g, st, t, text, f, o) {
+    o = o || {};
+    const zl = zweiZeilen(GROSS(text)), zwei = zl.length > 1, y0 = zwei ? (o.y2 || 428) : (o.y1 || 476);
+    if (st === 'kino') {
+      const px = zwei ? 104 : 124;
+      zl.forEach((z, i) => {
+        const q = fp(t, 0.15 + i * 0.22, 0.8 + i * 0.22); if (q <= 0) return;
+        g.save(); g.globalAlpha = q; SA(g, passt(g, z, 960, px, SAx(800)), 800); g.letterSpacing = '6px'; g.textAlign = 'center'; g.fillStyle = '#fff'; g.shadowColor = 'rgba(0,0,0,.9)'; g.shadowBlur = 24;
+        g.fillText(z, B / 2, y0 + i * px * 1.02 - (1 - eo(q)) * 26); g.restore();
+      });
+      const lq = eo(fp(t, 0.6, 1.1)); g.fillStyle = f; g.fillRect(B / 2 - 170 * lq, y0 + (zl.length - 1) * px * 1.02 + 38, 340 * lq, 6);
+      return;
+    }
+    if (st === 'comic') {
+      const px = zwei ? 92 : 112;
+      zl.forEach((z, i) => {
+        const q = fp(t, 0.12 + i * 0.14, 0.42 + i * 0.14); if (q <= 0) return;
+        g.save(); RU(g, passt(g, z, 900, px, RU)); const w = g.measureText(z).width + 70, h = px * 1.25, cy = y0 + i * (h + 18) - h * 0.6;
+        g.translate(B / 2, cy + h / 2); g.rotate(i ? 0.03 : -0.035); const k = 0.4 + 0.6 * eob(q); g.scale(k, k);
+        g.fillStyle = '#000'; g.fillRect(-w / 2 + 12, -h / 2 + 12, w, h);
+        g.fillStyle = i ? f : '#ffe23d'; g.fillRect(-w / 2, -h / 2, w, h); g.lineWidth = 7; g.strokeStyle = '#000'; g.strokeRect(-w / 2, -h / 2, w, h);
+        g.fillStyle = '#000'; g.textAlign = 'center'; g.fillText(z, 0, px * 0.36); g.restore();
+      });
+      return;
+    }
+    if (st === 'glitch') {
+      const px = zwei ? 84 : 100, zeichen = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789#%&@';
+      zl.forEach((z, i) => {
+        const t0 = 0.12 + i * 0.2, q = fp(t, t0, t0 + 0.7); if (q <= 0) return;
+        const r = zufallR(Math.floor(t * 20) + i * 31), fertig = Math.floor(z.length * q);
+        const txt = q >= 1 ? z : z.split('').map((ch, j) => (j < fertig || ch === ' ' ? ch : zeichen[Math.floor(r() * zeichen.length)])).join('');   // entschlüsselt sich
+        g.save(); OR(g, passt(g, z, 980, px, OR)); g.textAlign = 'center'; const y = y0 + i * px * 1.12;
+        const wa = (Math.floor(t * 10) % 13 === 0) ? 10 : 4;
+        g.globalCompositeOperation = 'lighter'; g.fillStyle = 'rgba(0,255,255,.85)'; g.fillText(txt, B / 2 - wa, y); g.fillStyle = 'rgba(255,0,170,.85)'; g.fillText(txt, B / 2 + wa, y);
+        g.globalCompositeOperation = 'source-over'; g.fillStyle = '#fff'; g.fillText(txt, B / 2, y); g.restore();
+      });
+      return;
+    }
+    if (st === 'sport') {
+      const px = zwei ? 92 : 108;
+      zl.forEach((z, i) => {
+        const q = eo(fp(t, 0.12 + i * 0.16, 0.5 + i * 0.16)); if (q <= 0) return;
+        g.save(); RU(g, passt(g, z, 900, px, RU)); const w = g.measureText(z).width + 90, h = px * 1.3, s = h * 0.35, x = B / 2 - w / 2 - (1 - q) * B, y = y0 + i * (h + 14) - h * 0.78;
+        g.fillStyle = i ? '#ffffff' : f; g.beginPath(); g.moveTo(x + s, y); g.lineTo(x + w + s, y); g.lineTo(x + w, y + h); g.lineTo(x, y + h); g.closePath(); g.fill();
+        g.fillStyle = i ? '#06080a' : (hell(f) > 0.55 ? '#06080a' : '#ffffff'); g.textAlign = 'center'; g.fillText(z, x + w / 2 + s / 2, y + h / 2 + px * 0.36); g.restore();
+      });
+      return;
+    }
+    // clean
+    const px = zwei ? 88 : 104;
+    zl.forEach((z, i) => {
+      const q = eo(fp(t, 0.15 + i * 0.15, 0.6 + i * 0.15)); if (q <= 0) return;
+      g.save(); g.globalAlpha = q; SA(g, passt(g, z, 960, px, SAx(800)), 800); g.textAlign = 'center'; g.fillStyle = '#fff'; g.fillText(z, B / 2, y0 + i * px * 1.02 + (1 - q) * 24); g.restore();
+    });
+    const lq = eo(fp(t, 0.1, 0.5)); g.fillStyle = f; g.fillRect(B / 2 - 40 * lq, y0 - (zwei ? 120 : 140), 80 * lq, 8);
+  }
+  // Frage unten im jeweiligen Stil (y = gleiche Höhe wie beim Neon-Band)
+  function stilFrage(g, st, t, text, f, y) {
+    const ub = fp(t, 0.9, 1.25); if (ub <= 0) return;
+    const q = eo(ub);
+    if (st === 'kino') {
+      g.save(); g.globalAlpha = q; SA(g, passt(g, text, 900, 60, SAx(700)), 700); const w = g.measureText(text).width + 70;
+      g.fillStyle = 'rgba(0,0,0,.78)'; rr(g, B / 2 - w / 2, y, w, 92, 10); g.fill(); g.fillStyle = '#fff'; g.textAlign = 'center'; g.fillText(text, B / 2, y + 64); g.restore();
+      return;
+    }
+    if (st === 'comic') {
+      g.save(); RU(g, passt(g, text, 820, 46, RU)); const w = g.measureText(text).width + 90, h = 112, x = B / 2 - w / 2;
+      g.translate(B / 2, y + h / 2); const k = 0.5 + 0.5 * eob(ub); g.scale(k, k); g.translate(-B / 2, -(y + h / 2));
+      g.fillStyle = '#fff'; g.strokeStyle = '#000'; g.lineWidth = 7;
+      g.beginPath(); g.ellipse(B / 2, y + h / 2, w / 2, h / 2, 0, 0, Math.PI * 2); g.fill(); g.stroke();
+      g.beginPath(); g.moveTo(x + w * 0.68, y + h - 8); g.lineTo(x + w * 0.76, y + h + 30); g.lineTo(x + w * 0.58, y + h - 4); g.closePath(); g.fill(); g.stroke();
+      g.fillStyle = '#fff'; g.fillRect(x + w * 0.58, y + h - 16, w * 0.16, 14);
+      g.fillStyle = '#000'; g.textAlign = 'center'; g.fillText(text, B / 2, y + h / 2 + 16); g.restore();
+      return;
+    }
+    if (st === 'glitch') {
+      g.save(); g.globalAlpha = q; OR(g, passt(g, '> ' + text + '_', 900, 40, OR)); const txt = '> ' + text + (Math.floor(t * 2.5) % 2 ? '_' : ' ');
+      const w = g.measureText(txt).width + 60; g.fillStyle = 'rgba(0,0,0,.82)'; g.fillRect(B / 2 - w / 2, y, w, 86); g.strokeStyle = 'rgba(0,255,255,.8)'; g.lineWidth = 3; g.strokeRect(B / 2 - w / 2, y, w, 86);
+      g.fillStyle = '#5cffe0'; g.textAlign = 'center'; g.fillText(txt, B / 2, y + 56); g.restore();
+      return;
+    }
+    if (st === 'sport') {
+      g.save(); RU(g, passt(g, text, 860, 44, RU)); const w = g.measureText(text).width + 80, h = 78, s = h * 0.35, x = B / 2 - w / 2 + (1 - q) * B;
+      g.fillStyle = '#ffffff'; g.beginPath(); g.moveTo(x + s, y); g.lineTo(x + w + s, y); g.lineTo(x + w, y + h); g.lineTo(x, y + h); g.closePath(); g.fill();
+      g.fillStyle = f; g.fillRect(x - 18, y, 12, h);
+      g.fillStyle = '#06080a'; g.textAlign = 'center'; g.fillText(text, x + w / 2 + s / 2, y + h / 2 + 16); g.restore();
+      if (ub >= 1 && y + 120 < 1640) chevrons(g, B / 2, y + 100, t, f);
+      return;
+    }
+    // clean
+    g.save(); g.globalAlpha = q; SA(g, passt(g, text, 920, 62, SAx(700)), 700); g.textAlign = 'center'; g.fillStyle = '#e8ebf0'; g.fillText(text, B / 2, y + 56);
+    g.strokeStyle = f; g.lineWidth = 6; g.lineCap = 'round'; const yy = y + 86 + Math.abs(Math.sin(t * 4)) * 8; g.beginPath(); g.moveTo(B / 2 - 16, yy); g.lineTo(B / 2, yy + 14); g.lineTo(B / 2 + 16, yy); g.stroke(); g.restore();
+  }
+  // Zoom (Clip füllt das Bild): kleine Zusätze je Stil
+  function stilZoomUeber(g, st, t, f) {
+    if (st === 'kino') { g.fillStyle = '#000'; g.fillRect(0, 0, B, 150); g.fillRect(0, H - 150, B, 150); return; }
+    if (st === 'glitch') { g.fillStyle = 'rgba(0,0,0,.18)'; for (let y = 0; y < H; y += 5) g.fillRect(0, y, B, 1); return; }
+    if (st === 'comic') { g.save(); g.globalAlpha = 0.12; g.drawImage(merk('comicpunkte', () => { const c = leinwand(B, H), k = c.getContext('2d'); k.fillStyle = '#000'; for (let y = 0; y < H; y += 18) for (let x = (y / 18) % 2 ? 9 : 0; x < B; x += 18) { k.beginPath(); k.arc(x, y, 3, 0, Math.PI * 2); k.fill(); } return c; }), 0, 0); g.restore(); return; }
+    if (st === 'sport') { g.save(); g.fillStyle = hexA(f, 0.85); g.transform(1, 0, -0.45, 1, 0, 0); g.fillRect(-40, 0, 26, H); g.fillRect(B + 760, 0, 26, H); g.restore(); }
   }
   // ═══ Top 3 · Vorher/Nachher · Strecke in 30 Sek. (Neon) ═══
   // bilder[s] = Bild des Platzes s (aus spur(t)); was gerade nicht läuft, ist leer
@@ -1955,9 +2318,9 @@
       const url = URL.createObjectURL(datei), v = document.createElement('video'); v.preload = 'metadata'; v.muted = true;
       v.onloadedmetadata = () => {
         const dauer = v.duration || 0, vl = VORLAGEN[0];
-        ok(dauer >= 2 ? mitText({ id: Math.random().toString(36).slice(2), datei, url, name: datei.name, dauer, start: Math.max(0, dauer - 15), ende: dauer,
-          vorlage: vl.id, ...spruecheNeu(vl), zeitlupe: vl.zl, modus: 'ganz', versatz: 0, farbe: vl.farbe, text: '', textEigen: false, look: LETZTER_LOOK,
-          insta: true, tiktok: !!(stand().tiktok && stand().tiktok.verbunden), youtube: !!(stand().youtube && stand().youtube.verbunden), postMs: 0 }) : null);
+        ok(dauer >= 2 ? mitStich(mitText({ id: Math.random().toString(36).slice(2), datei, url, name: datei.name, dauer, start: Math.max(0, dauer - 15), ende: dauer,
+          vorlage: vl.id, ...spruecheNeu(vl), zeitlupe: vl.zl, modus: 'ganz', versatz: 0, farbe: vl.farbe, text: '', textEigen: false, look: LETZTER_LOOK, stil: stilNeu(''),
+          insta: true, tiktok: !!(stand().tiktok && stand().tiktok.verbunden), youtube: !!(stand().youtube && stand().youtube.verbunden), postMs: 0 })) : null);
       };
       v.onerror = () => ok(null);
       v.src = url;
@@ -1986,9 +2349,9 @@
   const quelleAusClip = x => ({ datei: x.datei, url: x.url, name: x.name, dauer: x.dauer, start: Math.max(0, x.dauer - 8), ende: x.dauer, titel: '' });
   function clipAusQuelle(x) {   // Platz frei machen: Clip kommt zurück in die Warteschlange
     const vl = VORLAGEN[0];
-    return mitText({ id: Math.random().toString(36).slice(2), datei: x.datei, url: x.url, name: x.name, dauer: x.dauer, start: Math.max(0, x.dauer - 15), ende: x.dauer,
-      vorlage: vl.id, ...spruecheNeu(vl), zeitlupe: vl.zl, modus: 'ganz', versatz: 0, farbe: vl.farbe, text: '', textEigen: false, look: LETZTER_LOOK,
-      insta: true, tiktok: !!(stand().tiktok && stand().tiktok.verbunden), youtube: !!(stand().youtube && stand().youtube.verbunden), postMs: 0 });
+    return mitStich(mitText({ id: Math.random().toString(36).slice(2), datei: x.datei, url: x.url, name: x.name, dauer: x.dauer, start: Math.max(0, x.dauer - 15), ende: x.dauer,
+      vorlage: vl.id, ...spruecheNeu(vl), zeitlupe: vl.zl, modus: 'ganz', versatz: 0, farbe: vl.farbe, text: '', textEigen: false, look: LETZTER_LOOK, stil: stilNeu(''),
+      insta: true, tiktok: !!(stand().tiktok && stand().tiktok.verbunden), youtube: !!(stand().youtube && stand().youtube.verbunden), postMs: 0 }));
   }
   const platzZahl = v => (v.plaetze ? v.plaetze.length : 1);
   function extraZurueck(c, ab) {   // weitere Clips ab Platz „ab“ zurück in die Warteschlange (nicht, wenn es derselbe Clip ist)
@@ -1998,6 +2361,8 @@
   function vorlageSetzen(c, id) {
     const v = VORLAGEN.find(x => x.id === id) || VORLAGEN[0], alt = vorlage(c);
     c.vorlage = v.id; Object.assign(c, spruecheNeu(v)); c.zeitlupe = v.zl; c.farbe = v.farbe; c.textEigen = false; mitText(c);
+    if (alt.id !== v.id) c.stil = stilNeu(c.stil);   // andere Vorlage = auch ein anderer Stil (Darstellung)
+    if (c.stich) { const l = ortSprueche(c); if (l.length) { c.hook = ziehen(l, 'ort-' + v.id, c.hook); mitText(c); } }   // Stichwörter da: Spruch mit Ort
     extraZurueck(c, platzZahl(v));
     if (alt.mehr !== v.mehr) for (const x of quellenVon(c)) x.titel = '';   // Titel passen nicht zur anderen Vorlage
     if (alt.id !== v.id && (MARKEN[alt.mehr] || MARKEN[v.mehr])) {   // Markierungen je Vorlage merken (Kurven sind keine überholten Autos)
@@ -2059,7 +2424,7 @@
     const tk = st.tiktok || {};
     return `<div class="kc-app">
       <details class="kc-so" ${(OFFEN['kc-so'] ?? !(CLIPS.length || liste.length)) ? 'open' : ''}><summary>💡 So geht’s (in 3 Schritten)</summary>
-        <ol><li><b>Clip reinziehen</b> – einfach die MP4 aus dem Kreids Clipper hier reinziehen (auch mehrere auf einmal).</li>
+        <ol><li><b>Clip reinziehen</b> – einfach die MP4 aus dem Kreids Clipper hier reinziehen (auch mehrere auf einmal). Tipp: Datei so benennen wie <b>Spa_EauRouge_Crash</b>, dann kommen Vorlage, Spruch und Titel von selbst.</li>
         <li><b>Vorlage antippen</b> – z. B. „Wer war schuld?“. Spruch, Farbe und Text sind schon fertig, ändern geht immer.</li>
         <li><b>🚀 Einplanen</b> – das Video wird hier gebaut und geht zur geplanten Zeit raus: Instagram-Reel und TikTok-Entwurf. Ein Clip pro Tag.</li></ol>
         <div class="kc-dim">Tipp für Reichweite: 2 bis 3 Wochen lang jeden Tag einen Clip, immer zur gleichen Uhrzeit.</div></details>
@@ -2096,6 +2461,7 @@
       </div>
       <div class="kc-rechts">
         <div class="kc-schritt">1 · Vorlage</div>
+        <label class="kc-feld">🔎 Stichwörter<div class="kc-zeile"><input type="text" maxlength="100" value="${esc(c.stichText || '')}" placeholder="z. B. Spa Eau Rouge Crash" data-c="stich"><button type="button" class="btn ki-k" data-c="stich-los">✓ Übernehmen</button></div>${stichChips(c)}${tipp('Kommen aus dem Dateinamen (z. B. Spa_EauRouge_Crash.mp4). Erkennt Strecke, Kurve, was passiert und das Auto. Daraus: Vorlage, Spruch und Titel.')}</label>
         <div class="kc-vorlagen">${GRUPPEN.map(([gr, gname]) => { const l = VORLAGEN.filter(x => gruppeVon(x) === gr); return l.length ? `<div class="kc-vgruppe">${esc(gname)}</div>` + l.map(x => `<button type="button" class="kc-vl${x.id === c.vorlage ? ' an' : ''}" data-c="vorlage" data-wert="${x.id}" style="--f:${x.farbe}"><span>${x.emoji}</span>${esc(x.name)}${x.neu ? '<em>NEU</em>' : ''}</button>`).join('') : ''; }).join('')}</div>
         ${tipp(esc(v.hilfe))}
         <div class="kc-schritt">2 · Spruch & Look</div>
@@ -2105,6 +2471,7 @@
         ${v.felder ? `<div class="kc-felder">${v.felder.map(([k, label, ph]) => `<label class="kc-feld">${esc(label)}<input type="text" maxlength="40" placeholder="${esc(ph)}" value="${esc(c[k] || '')}" data-c="feld" data-feld="${k}"></label>`).join('')}</div>
           ${tipp(esc(v.feldTipp || ''))}` : ''}
         ${v.mehr || v.nurNeon || v.nurTV ? '' : `<div class="kc-umschalt kc-looks">${LOOKS.map(([k, n]) => `<button type="button" class="${(c.look || 'neon') === k ? 'an' : ''}" data-c="look" data-wert="${k}">${n}</button>`).join('')}</div>`}
+        ${v.mehr || c.look === 'tv' ? '' : `<div class="kc-feld">Stil<div class="kc-stile">${STILE.map(([k, n]) => `<button type="button" class="${stilVon(c) === k ? 'an' : ''}" data-c="stil" data-wert="${k}">${n}</button>`).join('')}<button type="button" class="kc-stil-w" data-c="stil-wuerfeln" title="Anderer Stil" aria-label="Anderer Stil">🎲</button></div>${tipp('Wechselt bei jedem neuen Clip und jeder anderen Vorlage von selbst. 🎲 = nächster Stil.')}</div>`}
         <div class="kc-farben">${FARBEN.map(f => `<button type="button" class="kc-farbe${f === c.farbe ? ' an' : ''}" style="--f:${f}" data-c="farbe" data-wert="${f}" aria-label="Neonfarbe ${f}"></button>`).join('')}<span class="kc-dim">Neonfarbe</span></div>
         ${v.mehr ? '' : `<div class="kc-felder">
           ${c.look === 'tv' ? '' : `<div class="kc-umschalt"><button type="button" class="${c.modus !== 'zoom' ? 'an' : ''}" data-c="modus" data-wert="ganz">▭ Ganzes Bild</button><button type="button" class="${c.modus === 'zoom' ? 'an' : ''}" data-c="modus" data-wert="zoom">▯ Zoom</button></div>`}
@@ -2397,12 +2764,15 @@
     const b = ev.target.closest('[data-c]'); if (!b || !BOX.contains(b)) return;
     const a = b.dataset.c, c = CLIPS[0], z = b.closest('[data-id]'), id = z && z.dataset.id;
     if (a === 'vorlage' && c) { vorlageSetzen(c, b.dataset.wert); zeichnen(); return; }
+    if (a === 'stich-los' && c) { const f = BOX.querySelector('[data-c="stich"]'); stichAnwenden(c, f ? f.value : c.stichText); zeichnen(); return; }
     if (a === 'wuerfeln' && c) { c.hook = ziehen(vorlage(c).hooks, 'hook', c.hook); if (!c.textEigen) mitText(c); zeichnen(); return; }
     if (a === 'wuerfeln-unten' && c) { c.unten = ziehen(vorlage(c).unten, 'unten', c.unten); if (!c.textEigen) mitText(c); zeichnen(); return; }
     if (a === 'wuerfeln-wieder' && c) { c.wieder = ziehen(wiederListe(vorlage(c)), 'wieder', c.wieder); zeichnen(); return; }
     if (a === 'farbe' && c) { c.farbe = b.dataset.wert; zeichnen(); return; }
     if (a === 'modus' && c) { c.modus = b.dataset.wert; zeichnen(); return; }
     if (a === 'look' && c) { c.look = LETZTER_LOOK = b.dataset.wert; zeichnen(); return; }
+    if (a === 'stil' && c) { c.stil = b.dataset.wert; zeichnen(); return; }
+    if (a === 'stil-wuerfeln' && c) { c.stil = stilNeu(stilVon(c)); zeichnen(); return; }
     if (a === 'ton') { VOR.ton = !VOR.ton; if (VOR.vid) VOR.vid.muted = !VOR.ton; b.textContent = VOR.ton ? '🔊' : '🔇'; return; }
     if (a === 'fenster-auto' && c) {   // Fenster bekommt die Form vom Video, Video wieder ganz drin
       const v = vorlage(c), src = v.mehr === 'top3' ? quelleUnter(c, B / 2, 900).src : c, mm = videoMasse(src), maxH = c.look === 'tv' ? FENSTER_MAX.tv : FENSTER_MAX.neon, ar = mm.w / mm.h;
@@ -2474,7 +2844,8 @@
     const t = ev.target, c = CLIPS[0]; if (!c || !t.dataset || !BOX.contains(t)) return;
     const a = t.dataset.c;
     const textMit = () => { if (c.textEigen) return; mitText(c); const ta = BOX.querySelector('[data-c="text"]'); if (ta) ta.value = c.text; };
-    if (a === 'hook') { c.hook = t.value; textMit(); }
+    if (a === 'stich') { c.stichText = t.value; }
+    else if (a === 'hook') { c.hook = t.value; textMit(); }
     else if (a === 'unten') { c.unten = t.value; textMit(); }
     else if (a === 'wieder') c.wieder = t.value;
     else if (a === 'feld') {
@@ -2525,6 +2896,7 @@
     if (a === 'slot-a' || a === 'slot-b') { zeichnen(); return; }
     if (a === 'marke-farbe') { const mk = (c.marken || []).find(x => x.id === t.dataset.k); if (mk) mk.farbe = t.value; return; }
     if (a === 'sektor-letzt') { c.sektorLetzt = t.value; return; }
+    if (a === 'stich') { stichAnwenden(c, t.value); zeichnen(); return; }
     if (a === 'zeitlupe') { c.zeitlupe = t.checked; zeichnen(); }
     else if (a === 'insta' || a === 'tiktok' || a === 'youtube') c[a] = t.checked;
     else if (a === 'postms') { c.postMs = t.value ? new Date(t.value).getTime() : 0; BOX.querySelectorAll('[data-c="termin"]').forEach(x => x.classList.toggle('an', +x.dataset.ms === c.postMs)); }
@@ -2569,7 +2941,7 @@
     quellenVon(c).forEach((src, i) => { const s2 = BOX.querySelector(`[data-c="slot-z"][data-i="${i}"]`), w2 = BOX.querySelector(`[data-c="slot-z-wert"][data-i="${i}"]`), z2 = tfVon(src).z || 1; if (s2) s2.value = z2; if (w2) w2.textContent = Math.round(z2 * 100) + ' %'; });
   }
   window.K888Clips = {
-    VORLAGEN, bauen, zeitplan, zeichne, material, schriften, vorschaubild,
+    VORLAGEN, STILE, bauen, zeitplan, zeichne, material, schriften, vorschaubild, stichwoerter,
     async start(box, umg) {
       UMG = umg;
       if (BOX !== box) {
@@ -2654,6 +3026,10 @@
 .kc-app .kc-umschalt button{background:transparent;border:0;color:var(--steel,#8b929c);font:700 13px var(--body,inherit);padding:10px 14px;cursor:pointer}
 .kc-app .kc-umschalt button.an{background:#ff2d6f;color:#fff}
 .kc-app .kc-looks{align-self:flex-start}
+.kc-app .kc-stile{display:flex;flex-wrap:wrap;gap:6px;margin-top:4px}
+.kc-app .kc-stile button{background:#0b0c10;border:1px solid var(--line,#23262f);color:#cfd3dc;font:600 13px var(--body,inherit);padding:8px 12px;cursor:pointer}
+.kc-app .kc-stile button.an{border-color:#5cff1f;color:#fff;box-shadow:0 0 12px rgba(92,255,31,.35) inset}
+.kc-app .kc-stile .kc-stil-w{font-size:15px;padding:6px 10px}
 .kc-app .kc-looks button{font-size:14px;padding:11px 16px}
 .kc-app .kc-check{display:flex;gap:8px;align-items:flex-start;font-size:14px;color:#fff;cursor:pointer}
 .kc-app .kc-check input{margin-top:3px;accent-color:#ff2d6f;width:18px;height:18px}
@@ -2688,6 +3064,8 @@
 .kc-app .kc-info{flex:1;min-width:0;display:flex;flex-direction:column;gap:6px}
 .kc-app .kc-titel{font-family:var(--disp,inherit);font-weight:800;font-size:17px;text-transform:uppercase;color:#fff;text-shadow:0 0 12px var(--f)}
 .kc-app .kc-chips{display:flex;flex-wrap:wrap;gap:6px}
+.kc-app .kc-stich{margin-top:6px}
+.kc-app .kc-stich .ki-chip{border-color:#5cff1f;color:#d9ffcc}
 .kc-app .kc-hinweis{font-size:13px;color:#f5c518;background:#0b0c10;border:1px solid rgba(245,197,24,.45);padding:6px 10px}
 .kc-app .kc-hinweis.rot{color:#ff6b75;border-color:rgba(225,19,36,.45)}
 .kc-app .kc-raus,.kc-app .kc-einst{background:#0d0e13;border:1px solid var(--line,#23262f);padding:10px 14px}
