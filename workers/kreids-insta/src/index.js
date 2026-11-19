@@ -16,9 +16,10 @@ import { ADMIN, ERG_TAGE, LIVE_VOR, LOOKS, EDIT_FELDER, NEUE_ARTEN, ladeDaten, b
 import { kiBild, sprueche, STIMMUNGEN, KAMERAS, autos } from './ki.js';
 import { konto, posten, pruefen, tokenVerlaengern, verlaengerbar } from './insta.js';
 import { istUhrzeit, berlin, berlinZuMs, tageZurueck } from './zeit.js';
-import { ytEingerichtet, ytAnmeldeLink, ytCodeTauschen, ytZugang, ytKanal, ytStreams, ytPlanen, ytThumbnail, ytTexte, ytLetzteBeschreibung, ytInfos, ytShortHochladen } from './youtube.js';
+import { ytEingerichtet, ytAnmeldeLink, ytCodeTauschen, ytZugang, ytKanal, ytStreams, ytPlanen, ytThumbnail, ytTexte, ytLetzteBeschreibung, ytInfos, ytShortHochladen, ytTitelSetzen } from './youtube.js';
 import { ttEingerichtet, ttAnmeldeLink, ttCodeTauschen, ttZugang, ttKonto, ttEntwurf, ttVideoEntwurf } from './tiktok.js';
 import { discordEingerichtet, discordMelden, textTeile, ART_NAME, FARBE } from './discord.js';
+import { textMitTags, titelMitTags } from './tags.js';
 
 // ─── Speicher (Durable Object, SQLite) ──────────────────────
 export class Speicher extends DurableObject {
@@ -465,8 +466,8 @@ async function ttSenden(env, s, post, cfg, design) {
   if (!z.version) throw new Error('Bild fehlt noch – den Instagram-Reiter einmal öffnen.');
   if (z.istVideo && !(z.video && z.video.hash === z.hash)) throw new Error('Video fehlt noch – den Instagram-Reiter einmal öffnen.');
   const zugang = await ttZugang(env, s);
-  const titel = post.typ === 'woche' ? 'Stream Week' : post.typ === 'monat' ? 'Monatsbilanz' : [post.track || post.titel, post.serie].filter(Boolean).join(' · ');
-  const text = istStory(post.typ, cfg) ? '#simracing #iracing #kreids888' : bildtext(post, cfg, design, z.werte, z.edit);
+  const titel = titelMitTags(post.typ === 'woche' ? 'Stream Week' : post.typ === 'monat' ? 'Monatsbilanz' : [post.track || post.titel, post.serie].filter(Boolean).join(' · '), 90);
+  const text = istStory(post.typ, cfg) ? textMitTags('#simracing #iracing #kreids888') : bildtext(post, cfg, design, z.werte, z.edit);
   try {
     const id = z.istVideo ? await ttVideoEntwurf(zugang, `${env.ORIGIN}/pvideo/${post.id}/${z.video.v}.mp4`)
       : await ttEntwurf(zugang, `${env.ORIGIN}/bild/${post.id}/${z.version}.jpg`, titel, text);
@@ -536,6 +537,7 @@ async function clipPosten(env, s, id, opt = {}) {
   c.laeuft = Date.now();
   await s.schreib('clip:' + id, c);
   const videoUrl = `${env.ORIGIN}/cvideo/${id}/${c.video.v}.mp4`, cfg = await ladeClipCfg(s);
+  const text = textMitTags(c.text || '');   // #simracing #iracing #gt3 #crash am Ende der ersten Zeile (auch bei schon angelegten Clips)
   if (c.insta && !c.gepostet && opt.insta !== false) {
     try {
       const token = await aktuellerToken(env, s);
@@ -544,19 +546,19 @@ async function clipPosten(env, s, id, opt = {}) {
       if (!k.verbunden) throw new Error(k.fehler || 'Instagram nicht verbunden.');
       // Test-Reel ging zuletzt nicht → eine Woche lang gleich normal posten, dann wieder probieren
       let test = c.test !== false && cfg.test && !(cfg.testFehler && Date.now() - cfg.testFehlerZeit < 7 * 86400000), mediaId;
-      try { mediaId = await posten({ token, uid: k.user_id, videoUrl, typ: 'reel', text: c.text || '', thumbMs: c.thumbMs || 0, test }); }
+      try { mediaId = await posten({ token, uid: k.user_id, videoUrl, typ: 'reel', text, thumbMs: c.thumbMs || 0, test }); }
       catch (e) {
         const msg = String((e && e.message) || e);
         if (!test || /verarbeiten/.test(msg)) throw e;
         // Test-Reels gehen (noch) nicht bei diesem Konto → normal posten und merken
-        mediaId = await posten({ token, uid: k.user_id, videoUrl, typ: 'reel', text: c.text || '', thumbMs: c.thumbMs || 0 });
+        mediaId = await posten({ token, uid: k.user_id, videoUrl, typ: 'reel', text, thumbMs: c.thumbMs || 0 });
         test = false;
         await s.schreib('clipcfg', { ...cfg, testFehler: msg.slice(0, 200), testFehlerZeit: Date.now() });
       }
       c.gepostet = { zeit: Date.now(), mediaId, test };
       try { c.gepostet.link = (await pruefen(token, mediaId)).link || ''; } catch (e) { /* Link ist nur schön */ }
       c.fehler = '';
-      const t = textTeile(c.text);
+      const t = textTeile(text);
       await dcMelden(s, () => discordMelden(env, { text: '🎬 Neues Reel auf Instagram' + (test ? ' (Test-Reel)' : ''), titel: t.titel || c.titel || 'Neues Reel',
         link: c.gepostet.link || (k.username ? `https://www.instagram.com/${k.username}/reels/` : ''), beschreibung: t.rest, bild: `${env.ORIGIN}/cbild/${id}.jpg`,
         farbe: FARBE.instagram, fuss: test ? 'Instagram · Test-Reel (zuerst für Nicht-Follower)' : 'Instagram · Reel' }));
@@ -568,11 +570,11 @@ async function clipPosten(env, s, id, opt = {}) {
   }
   if (c.youtube && !c.yt && opt.youtube !== false && ytEingerichtet(env) && await s.lies('yt:token')) {
     try {
-      const zugang = await ytZugang(env, s), t = textTeile(c.text);
-      const tags = [...new Set((String(c.text || '').match(/#[\p{L}\d_]+/gu) || []).map(x => x.slice(1)))];
-      const beschr = String(c.text || '').trim() + (/#shorts/i.test(c.text || '') ? '' : '\n\n#shorts');
-      const v = await ytShortHochladen(zugang, { titel: t.titel || c.titel || 'Simracing', beschreibung: beschr, tags, body: await clipStrom(env, s, c), groesse: c.video.groesse });
-      c.yt = { zeit: Date.now(), id: v.id, privat: v.sichtbar !== 'public' };
+      const zugang = await ytZugang(env, s), t = textTeile(text);
+      const tags = [...new Set((text.match(/#[\p{L}\d_]+/gu) || []).map(x => x.slice(1).toLowerCase()))];
+      const beschr = text.trim() + (/#shorts/i.test(text) ? '' : '\n\n#shorts');
+      const v = await ytShortHochladen(zugang, { titel: titelMitTags(t.titel || c.titel || 'Simracing', 100), beschreibung: beschr, tags, body: await clipStrom(env, s, c), groesse: c.video.groesse });
+      c.yt = { zeit: Date.now(), id: v.id, privat: v.sichtbar !== 'public', tags: true };
       c.ytFehler = '';
       if (!c.yt.privat) await dcMelden(s, () => discordMelden(env, { text: '▶ Neuer YouTube-Short', titel: t.titel || c.titel || 'Neuer Short', link: 'https://youtube.com/shorts/' + v.id,
         beschreibung: t.rest, bild: `${env.ORIGIN}/cbild/${id}.jpg`, farbe: FARBE.youtube, fuss: 'YouTube · Short' }));
@@ -585,7 +587,7 @@ async function clipPosten(env, s, id, opt = {}) {
 async function clipsListe(env, s) {
   const roh = await s.liste('clip:');
   return Object.values(roh).filter(c => c && c.id).sort((a, b) => (a.postMs || 0) - (b.postMs || 0)).map(c => ({
-    id: c.id, vorlage: c.vorlage || '', titel: c.titel || '', text: c.text || '', postMs: c.postMs || 0, dauer: c.dauer || 0,
+    id: c.id, vorlage: c.vorlage || '', titel: c.titel || '', text: c.text ? textMitTags(c.text) : '', postMs: c.postMs || 0, dauer: c.dauer || 0,
     insta: c.insta !== false, tiktok: !!c.tiktok, test: c.test !== false,
     video: c.video ? `${env.ORIGIN}/cvideo/${c.id}/${c.video.v}.mp4` : '', bild: c.bild ? `${env.ORIGIN}/cbild/${c.id}.jpg?v=${c.bild}` : '',
     gepostet: c.gepostet ? { zeit: c.gepostet.zeit || 0, link: c.gepostet.link || '', test: !!c.gepostet.test } : null,
@@ -638,6 +640,16 @@ async function zyklus(env) {
     if (ytOk && !(await s.lies('clipyt'))) {   // einmalig: alle bisherigen Clips auch auf YouTube
       for (const c of clips) if (c.video && c.youtube === undefined) { c.youtube = true; await s.schreib('clip:' + c.id, c); }
       await s.schreib('clipyt', { zeit: jetzt });
+    }
+    if (ytOk) {   // schon hochgeladene Shorts: Pflicht-Hashtags in den Titel nachtragen (einmal je Short, höchstens 3 pro Lauf)
+      let n = 3;
+      for (const c of clips) {
+        if (n <= 0 || !c.yt || !c.yt.id || c.yt.tags) continue;
+        n--;
+        try { await ytTitelSetzen(await ytZugang(env, s), c.yt.id, textTeile(textMitTags(c.text || '')).titel || c.titel || 'Simracing'); c.yt.tags = true; }
+        catch (e) { if (/not ?found|videoNotFound/i.test(String(e.message || e))) c.yt.tags = 'weg'; else if ((c.yt.tagsV = (c.yt.tagsV || 0) + 1) >= 3) c.yt.tags = 'fehler'; }
+        await s.schreib('clip:' + c.id, c);
+      }
     }
     let ytFrei = 2;
     for (const c of clips) {

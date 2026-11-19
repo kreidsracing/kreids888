@@ -6,6 +6,7 @@
 // Cloudflare: GOOGLE_CLIENT_ID (Text) + GOOGLE_CLIENT_SECRET (Secret)
 // ═══════════════════════════════════════════════════════════
 import { berlin } from './zeit.js';
+import { titelMitTags } from './tags.js';
 
 const API = 'https://www.googleapis.com/youtube/v3';
 const SCOPE = 'https://www.googleapis.com/auth/youtube';
@@ -94,7 +95,8 @@ function fuellen(vorlage, r) {
 // Titel (max. 100 Zeichen, ohne < >) und Beschreibung (max. 5000).
 // beschr = Beschreibung vom letzten eigenen YouTube-Stream (unverändert übernommen), sonst der eigene Text mit Platzhaltern
 export function ytTexte(r, cfg, beschr) {
-  const titel = fuellen(cfg.titel, r).replace(/[<>]/g, '').replace(/\s+/g, ' ').slice(0, 100) || (r.titel || 'Livestream');
+  // Titel + Pflicht-Hashtags (#simracing #iracing #gt3 #crash), zusammen max. 100 Zeichen
+  const titel = titelMitTags(fuellen(cfg.titel, r).replace(/[<>]/g, '').replace(/\s+/g, ' ').trim() || r.titel || 'Livestream', 100);
   const beschreibung = (beschr ? String(beschr) : fuellen(cfg.beschreibung, r)).replace(/[<>]/g, '').slice(0, 5000);
   return { titel, beschreibung };
 }
@@ -181,4 +183,18 @@ export async function ytShortHochladen(zugang, { titel, beschreibung, tags, body
     throw new Error('YouTube-Upload: ' + (e.message || r2.status));
   }
   return { id: d.id, sichtbar: (d.status && d.status.privacyStatus) || '' };
+}
+
+// Titel eines schon hochgeladenen Videos (Short): Pflicht-Hashtags dazu. Snippet holen, nur Titel (und Tags) tauschen, Rest bleibt
+export async function ytTitelSetzen(zugang, id, neuTitel) {
+  const d = await yt(zugang, '/videos?part=snippet&id=' + encodeURIComponent(id));
+  const v = (d.items || [])[0];
+  if (!v) throw new Error('YouTube: Video nicht gefunden (videoNotFound)');
+  const sn = v.snippet || {};
+  const titel = titelMitTags(sn.title || neuTitel || 'Simracing', 100);   // eigener Titel aus YouTube Studio bleibt, nur die Hashtags kommen dazu
+  const tags = [...new Set([...(sn.tags || []), 'simracing', 'iracing', 'gt3', 'crash'])].slice(0, 30);
+  if (titel === sn.title && (sn.tags || []).length === tags.length) return titel;
+  await yt(zugang, '/videos?part=snippet', { method: 'PUT', json: { id, snippet: { title: titel, description: sn.description || '', categoryId: sn.categoryId || '20', tags,
+    ...(sn.defaultLanguage ? { defaultLanguage: sn.defaultLanguage } : {}), ...(sn.defaultAudioLanguage ? { defaultAudioLanguage: sn.defaultAudioLanguage } : {}) } } });
+  return titel;
 }

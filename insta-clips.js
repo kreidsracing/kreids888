@@ -208,10 +208,14 @@
   };
   const textEmoji = v => (String(vorlageText(v, {})).match(/\p{Extended_Pictographic}(?:\uFE0F|\u200D\p{Extended_Pictographic}\uFE0F?)*/gu) || []).find(x => x !== '\u{1F447}') || v.emoji;   // erstes Emoji im Vorlagen-Text (nicht 👇)
   const textTags = v => { const z = String(vorlageText(v, {})).trim().split('\n').pop().trim(); return z.startsWith('#') ? z : '#simracing #iracing #simracer #kreids888'; };
+  // Pflicht-Hashtags (19.11.2026): stehen immer in der ersten Zeile (= Titel bei YouTube), sonst nirgends doppelt
+  const PFLICHT = '#simracing #iracing #gt3 #crash';
+  const ohnePflicht = t => String(t || '').replace(/(^|[^\p{L}\p{N}_#])#(simracing|iracing|gt3|crash)(?![\p{L}\p{N}_])/giu, '$1').replace(/[ \t]{2,}/g, ' ').trim();
   function textBauen(v, c) {
     const hook = String(c.hook || '').trim() || v.hooks[0], frage = String(c.unten || '').trim() || v.unten[0];
     const info = (TEXT_INFO[v.id] ? TEXT_INFO[v.id](c) : []).map(x => String(x || '').trim()).filter(Boolean).join(' · ');
-    return [hook + ' ' + textEmoji(v), info, frage + ' 👇'].filter(Boolean).join('\n') + '\n\n' + textTags(v);
+    const rest = ohnePflicht(textTags(v));
+    return [ohnePflicht(hook + ' ' + textEmoji(v)) + ' ' + PFLICHT, info, frage + ' 👇'].filter(Boolean).join('\n') + (rest ? '\n\n' + rest : '');
   }
   const mitText = c => { c.text = textBauen(vorlage(c), c); return c; };
   const kw = () => { const d = new Date(); const t = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate())); const tag = t.getUTCDay() || 7; t.setUTCDate(t.getUTCDate() + 4 - tag); const j = new Date(Date.UTC(t.getUTCFullYear(), 0, 1)); return Math.ceil(((t - j) / 86400000 + 1) / 7); };

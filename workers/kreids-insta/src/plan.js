@@ -6,6 +6,7 @@
 // Tabellenstand (Feed), Monatsbilanz (Feed), Meilenstein (Feed), Jetzt live (Story, sobald der Stream läuft).
 // ═══════════════════════════════════════════════════════════
 import { berlinZuMs, tageZurueck, minuten, berlin } from './zeit.js';
+import { textMitTags } from './tags.js';
 
 export const ADMIN = 'https://kreids888-admin.kreids.workers.dev';
 
@@ -265,8 +266,9 @@ export function bildtext(post, cfg, design, tw, edit) {
   post = mitEdit(post, edit);
   const eigen0 = edit && typeof edit.text === 'string' && edit.text.trim() ? edit.text.trim().slice(0, 2200) : '';
   // Wochenplan und „Jetzt live“ sind sonst Storys – als Beitrag bekommen sie einen kurzen eigenen Text
-  if (post.typ === 'woche') return eigen0 || 'Meine Streams diese Woche 🗓 Alle Termine: Link in Bio\n\n#simracing #iracing #kreids888';
-  if (post.typ === 'live') return eigen0 || '🔴 Jetzt live! Schau rein – Link in Bio\n\n#simracing #iracing #kreids888';
+  // Pflicht-Hashtags (#simracing #iracing #gt3 #crash) immer am Ende der ersten Zeile (tags.js)
+  if (post.typ === 'woche') return textMitTags(eigen0 || 'Meine Streams diese Woche 🗓 Alle Termine: Link in Bio\n\n#simracing #iracing #kreids888');
+  if (post.typ === 'live') return textMitTags(eigen0 || '🔴 Jetzt live! Schau rein – Link in Bio\n\n#simracing #iracing #kreids888');
   const s = berlin(post.startMs), tage = post.tage | 0;
   const strecke = [post.track, post.layout].filter(Boolean).join(' – ') || post.titel;
   const erg = post.ergebnis || null;
@@ -302,9 +304,9 @@ export function bildtext(post, cfg, design, tw, edit) {
   if (post.typ === 'meilen') w.meilenstein = `${post.zahl}. ${post.wort}${post.zusatz ? ' ' + post.zusatz : ''}`;
   const eigen = edit && typeof edit.text === 'string' && edit.text.trim() ? edit.text : '';   // eigener Text für diesen Post
   const vorlage = eigen || { erg: cfg.textErgebnis, tab: cfg.textTabelle, monat: cfg.textMonat, meilen: cfg.textMeilen }[post.typ] || cfg.text;
-  return String(vorlage || '').split('\n').map(z => {
+  return textMitTags(String(vorlage || '').split('\n').map(z => {
     let leer = false;
     const r = z.replace(/\{(\w+)\}/g, (m, k) => { if (!(k in w)) return m; if (!w[k]) leer = true; return w[k]; });
     return leer ? null : r;
-  }).filter(z => z !== null).join('\n').replace(/\n{3,}/g, '\n\n').trim().slice(0, 2200);
+  }).filter(z => z !== null).join('\n').replace(/\n{3,}/g, '\n\n').trim()).slice(0, 2200);
 }
