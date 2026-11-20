@@ -87,6 +87,28 @@ export async function posten({ token, uid, bildUrl, videoUrl, typ, text, tags, k
   return pub.id;
 }
 
+// 🖼 Karussell (NEU 20.11.2026): 2 bis 10 Bilder als ein Post zum Wischen
+export async function karussellPosten({ token, uid, bildUrls, text }) {
+  const H = host(token), fertig = async (id, was) => {
+    for (let i = 0; i < 12; i++) {
+      const s = await ig(`${H}/${id}?fields=status_code&${q(token)}`);
+      if (s.status_code === 'FINISHED') return;
+      if (s.status_code === 'ERROR' || s.status_code === 'EXPIRED') throw new Error(`Instagram konnte ${was} nicht verarbeiten (${s.status_code}).`);
+      if (i === 11) throw new Error('Instagram braucht zu lange zum Verarbeiten. Beim nächsten Lauf nochmal.');
+      await warte(2500);
+    }
+  };
+  const kinder = [];
+  for (const [i, u] of bildUrls.slice(0, 10).entries()) {
+    const c = await ig(`${H}/${uid}/media`, { method: 'POST', body: new URLSearchParams({ access_token: token, image_url: u, is_carousel_item: 'true' }) });
+    await fertig(c.id, `Bild ${i + 1} des Karussells`); kinder.push(c.id);
+  }
+  const k = await ig(`${H}/${uid}/media`, { method: 'POST', body: new URLSearchParams({ access_token: token, media_type: 'CAROUSEL', children: kinder.join(','), caption: hashtagsBegrenzen(text) }) });
+  await fertig(k.id, 'das Karussell');
+  const pub = await ig(`${H}/${uid}/media_publish`, { method: 'POST', body: new URLSearchParams({ creation_id: k.id, access_token: token }) });
+  return pub.id;
+}
+
 // Gibt es den Post auf Instagram wirklich? → { id, typ, link, zeit }
 export async function pruefen(token, mediaId) {
   const d = await ig(`${host(token)}/${mediaId}?fields=id,media_type,media_product_type,permalink,timestamp&${q(token)}`);

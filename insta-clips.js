@@ -1896,6 +1896,150 @@
     finally { TRAILER_LAEUFT = false; }
   }
 
+  // ═══ 🖼 Karussells (NEU 20.11.2026): Bilder zum Wischen (nur Instagram). Bauen sich von selbst, wenn der Reiter „🎬 Clips“ offen ist ═══
+  //   🏁 Rennabend: nach jedem Rennen aus Ergebnis, Tabelle und nächstem Stream · 🏆 Top 5 der Woche: die Clips mit den meisten Aufrufen
+  const KB = 1080, KH = 1350, GOLD = '#ffd400';
+  const KAR_V = { kartop5: { emoji: '🏆', name: 'Top 5 der Woche', farbe: GOLD }, karabend: { emoji: '🏁', name: 'Rennabend', farbe: '#5cff1f' }, karbilder: { emoji: '🖼', name: 'Standbilder', farbe: '#18e8ff' } };
+  const karV = v => (KAR_V[v] ? { id: v, ...KAR_V[v] } : /^kar/.test(v || '') ? { id: v, emoji: '🖼', name: 'Karussell', farbe: '#18e8ff' } : null);
+  const kMitte = (g, text, y, px, w, farbe) => { g.save(); SA(g, px, w || 800); g.textAlign = 'center'; g.fillStyle = farbe || '#fff'; g.shadowColor = 'rgba(0,0,0,.85)'; g.shadowBlur = 12; g.fillText(text, KB / 2, y); g.restore(); };
+  const kChrom = (g, text, y, px, farbe, maxB) => { const ch = chrom(text, px, farbe, maxB || 960); g.drawImage(ch.c, KB / 2 - ch.mitte, y - ch.base); };
+  const kNeon = (g, text, y, px, f) => { g.save(); const p = passt(g, text, 940, px, RU, 30); neonText(g, text, KB / 2, y, p, f, RU, 'center'); g.restore(); };
+  function kBild(g, img, x, y, w, h, r, f, m) {   // Bild im Neon-Rahmen (ohne Bild: Logo)
+    g.save(); g.beginPath(); g.roundRect(x, y, w, h, r); g.clip(); g.fillStyle = '#0b0c10'; g.fillRect(x, y, w, h);
+    if (img) { const iw = img.naturalWidth || img.width, ih = img.naturalHeight || img.height, s = Math.max(w / iw, h / ih); g.drawImage(img, x + (w - iw * s) / 2, y + (h - ih * s) / 2, iw * s, ih * s); }
+    else logoRing(g, x + w / 2, y + h / 2, Math.min(w, h) * 0.3, f, m.logo, 0);
+    g.restore();
+    g.save(); g.lineWidth = 6; g.strokeStyle = f; g.shadowColor = f; g.shadowBlur = 30; g.beginPath(); g.roundRect(x, y, w, h, r); g.stroke(); g.restore();
+  }
+  function kKarte(g, x, y, w, h, f, stark) { g.save(); g.fillStyle = 'rgba(6,8,10,.82)'; g.beginPath(); g.roundRect(x, y, w, h, 22); g.fill(); g.lineWidth = stark ? 6 : 3; g.strokeStyle = f; g.shadowColor = f; g.shadowBlur = stark ? 30 : 14; g.stroke(); g.restore(); }
+  function karSeite(m, f, nr, n, mal) {   // eine Seite 1080×1350: Neon-Grund, Kopf (Logo, Kanal, Seite), Fuß (YouTube)
+    const c = leinwand(KB, KH), g = c.getContext('2d'), letzte = nr === n;
+    g.drawImage(grund(f), 0, -(H - KH) / 2);
+    logoRing(g, 104, 104, 54, f, m.logo, 0);
+    g.save(); SA(g, 46, 800); g.fillStyle = '#fff'; g.textAlign = 'left'; g.shadowColor = 'rgba(0,0,0,.85)'; g.shadowBlur = 10; g.fillText(m.ytHandle || m.handle || '@Kreids888', 180, 120); g.restore();
+    const st = `${nr}/${n}`; pille(g, st, KB - 60 - pillenBreite(g, st, 40), 72, f, 40, false);
+    mal(g);
+    pille(g, letzte ? 'JETZT ABONNIEREN' : 'LIVE AUF YOUTUBE', 60, KH - 132, f, 44, true);
+    g.save(); SA(g, 46, 800); g.textAlign = 'right'; g.fillStyle = '#fff'; g.shadowColor = 'rgba(0,0,0,.85)'; g.shadowBlur = 10; g.fillText(letzte ? 'YOUTUBE · ' + (m.ytHandle || '@Kreids888') : 'WISCHEN »', KB - 60, KH - 82); g.restore();
+    return c;
+  }
+  const zahlText = v => Number(v || 0).toLocaleString('de-DE');
+  function streamSeite(m, f, nr, n, s) {   // letzte Seite: nächster Stream oder einfach der Kanal
+    return karSeite(m, f, nr, n, g => {
+      if (s) {
+        const d = new Date(s.liveMs), tag = GROSS(d.toLocaleDateString('de-DE', { timeZone: 'Europe/Berlin', weekday: 'long' })), dat = d.toLocaleDateString('de-DE', { timeZone: 'Europe/Berlin', day: '2-digit', month: '2-digit' }), uhr = d.toLocaleTimeString('de-DE', { timeZone: 'Europe/Berlin', hour: '2-digit', minute: '2-digit' });
+        kMitte(g, 'NÄCHSTER STREAM', 330, 72); kChrom(g, uhr, 640, 300, f === GOLD ? '#18e8ff' : GOLD); kMitte(g, `UHR · ${tag}, ${dat}`, 760, 60);
+        kNeon(g, GROSS(s.serie || s.titel || 'SIMRACING'), 920, 96, f); if (s.track) kMitte(g, GROSS(s.track), 1010, 56, 700, 'rgba(255,255,255,.85)');
+      } else {
+        kMitte(g, 'MEHR DAVON?', 400, 84); kChrom(g, 'LIVE AUF', 640, 190, f); kChrom(g, 'YOUTUBE', 850, 210, f); kNeon(g, m.ytHandle || '@Kreids888', 1010, 90, f);
+      }
+    });
+  }
+  // 🏆 Top 5 der Woche · liste = [{ titel, wert, bild }] bester zuerst
+  function top5Seiten(m, liste, was, f, strm) {
+    const n = liste.length, ges = n + 2, aus = [];
+    aus.push(karSeite(m, f, 1, ges, g => {
+      kChrom(g, `TOP ${n}`, 420, 250, f); kNeon(g, 'DER WOCHE', 540, 104, f);
+      const h = Math.min(118, 560 / n);
+      liste.forEach((x, i) => { const y = 610 + i * h; kKarte(g, 70, y, 940, h - 14, i ? '#3a4048' : f, !i);
+        g.save(); RU(g, 54); g.fillStyle = i ? '#fff' : f; g.textAlign = 'left'; g.fillText('#' + (i + 1), 100, y + (h - 14) / 2 + 20);
+        const wt = zahlText(x.wert); RU(g, 46); g.textAlign = 'right'; g.fillStyle = GOLD; g.fillText(wt, 980, y + (h - 14) / 2 + 17); const ww = g.measureText(wt).width;
+        passt(g, x.titel, 940 - 150 - ww - 60, 44, (gg, px) => SA(gg, px, 800), 24); g.textAlign = 'left'; g.fillStyle = '#fff'; g.fillText(x.titel, 215, y + (h - 14) / 2 + 15); g.restore(); });
+    }));
+    for (let i = n - 1; i >= 0; i--) aus.push(karSeite(m, i ? f : GOLD, aus.length + 1, ges, g => {
+      const x = liste[i], ff = i ? f : GOLD;
+      kChrom(g, 'PLATZ ' + (i + 1), 330, 170, ff); kBild(g, x.bild, (KB - 382) / 2, 372, 382, 680, 22, ff, m);
+      g.save(); passt(g, x.titel, 960, 54, (gg, px) => SA(gg, px, 800), 26); g.textAlign = 'center'; g.fillStyle = '#fff'; g.shadowColor = 'rgba(0,0,0,.85)'; g.shadowBlur = 10; g.fillText(x.titel, KB / 2, 1118); g.restore();
+      kNeon(g, `${zahlText(x.wert)} ${was}`, 1186, 50, ff);
+    }));
+    aus.push(streamSeite(m, f, ges, ges, strm));
+    return aus;
+  }
+  // 🏁 Rennabend · p = Ergebnis-Post, tab = { platz, punkte, abstand } oder null
+  function abendSeiten(m, p, tab, hg, f, strm) {
+    const e = p.ergebnis || {}, ziel = nr(e.ziel), start = nr(e.start), delta = start && ziel ? start - ziel : 0, serie = GROSS(p.serie || p.titel || 'RENNEN'), track = GROSS(p.track || ''), zf = ziel && ziel <= 3 ? GOLD : f;
+    const zahlen = [[e.punkte ? zahlText(e.punkte) : '', 'PUNKTE'], [e.runden ? zahlText(e.runden) : '', 'RUNDEN'], [e.inc != null && (e.inc || e.runden) ? e.inc + 'x' : '', e.inc ? 'INCIDENTS' : 'INCIDENTS · SAUBER']].filter(z => z[0]);
+    const mal = [];
+    mal.push(g => { kMitte(g, 'MEIN RENNABEND', 300, 68); kChrom(g, serie, 450, 140, f); if (track) kNeon(g, track, 548, 76, f); kBild(g, hg, 100, 610, 880, 440, 26, f, m);
+      const d = new Date(p.startMs || Date.now()); kMitte(g, GROSS(d.toLocaleDateString('de-DE', { timeZone: 'Europe/Berlin', weekday: 'long', day: '2-digit', month: '2-digit' })), 1140, 54, 700, 'rgba(255,255,255,.85)'); });
+    mal.push(g => { kMitte(g, 'ZIEL', 330, 76); kChrom(g, 'P' + ziel, 760, 520, zf);
+      if (start) kMitte(g, 'START P' + start, 900, 70);
+      if (start) kNeon(g, delta > 0 ? `+${delta} ${delta === 1 ? 'PLATZ' : 'PLÄTZE'} GUTGEMACHT` : delta < 0 ? `${delta} ${delta === -1 ? 'PLATZ' : 'PLÄTZE'}` : 'PLATZ GEHALTEN', 1030, 80, delta > 0 ? '#5cff1f' : delta < 0 ? '#ff2a2a' : f); });
+    if (zahlen.length) mal.push(g => { kMitte(g, 'DIE ZAHLEN', 300, 72); const h = Math.min(290, 860 / zahlen.length);
+      zahlen.forEach((z, i) => { const y = 350 + i * h; kKarte(g, 90, y, 900, h - 26, f, false); kChrom(g, z[0], y + (h - 26) / 2 + 24, Math.min(160, h * 0.56), f, 820); kMitte(g, z[1], y + h - 58, 44, 700, 'rgba(255,255,255,.8)'); }); });
+    if (tab && tab.platz) mal.push(g => { kMitte(g, 'TABELLE', 330, 76); kChrom(g, 'PLATZ ' + tab.platz, 640, 250, tab.platz <= 3 ? GOLD : f); kNeon(g, `${zahlText(tab.punkte)} PUNKTE`, 800, 104, f);
+      kMitte(g, tab.platz === 1 ? 'TABELLENFÜHRER' : tab.abstand > 0 ? `${zahlText(tab.abstand)} ${tab.abstand === 1 ? 'PUNKT' : 'PUNKTE'} HINTER P1` : 'PUNKTGLEICH MIT P1', 920, 62); kMitte(g, serie, 1030, 50, 700, 'rgba(255,255,255,.8)'); });
+    const ges = mal.length + 1;
+    return [...mal.map((fn, i) => karSeite(m, f, i + 1, ges, fn)), streamSeite(m, f, ges, ges, strm)];
+  }
+  async function karHochladen(seiten, koerper) {   // Karussell anlegen, Bilder hochladen, kleines Vorschaubild dazu
+    const r = await UMG.igApi('POST', '/api/clip/neu', { ...koerper, kar: true, insta: true, tiktok: false, youtube: false, test: false });
+    try {
+      const v = Date.now();
+      for (let i = 0; i < seiten.length; i++) { const b = await new Promise(ok => seiten[i].toBlob(ok, 'image/jpeg', 0.9)); await senden(`/api/clip/${r.id}/kbild/${i}?v=${v}`, b); arbeit(`⬆ Bilder hochladen … ${i + 1} von ${seiten.length}`); }
+      await UMG.igApi('POST', `/api/clip/${r.id}/kfertig?v=${v}`, { n: seiten.length });
+      try { const k = leinwand(432, 540); k.getContext('2d').drawImage(seiten[0], 0, 0, 432, 540); const vb = await new Promise(ok => k.toBlob(ok, 'image/jpeg', 0.85)); if (vb) await senden(`/api/clip/${r.id}/bild`, vb); } catch (e) { /* Vorschaubild ist nur schön */ }
+    } catch (e) { try { await UMG.igApi('POST', `/api/clip/${r.id}/weg`, {}); } catch (x) { /* egal */ } throw e; }
+    return r;
+  }
+  const clipWert = c => { const z = c.zahlen || {}; return { aufrufe: ((z.ig && z.ig.aufrufe) || 0) + ((z.yt && z.yt.aufrufe) || 0), likes: ((z.ig && z.ig.likes) || 0) + ((z.yt && z.yt.likes) || 0) }; };
+  function top5Liste(clips, jetzt) {   // gepostete Clips der letzten 7 Tage, die meisten Aufrufe zuerst (ohne Aufrufe: Likes)
+    const raus = c => Math.max((c.gepostet && c.gepostet.zeit) || 0, (c.yt && c.yt.zeit) || 0);
+    const alle = (clips || []).filter(c => !/^(trailer|kar)/.test(c.vorlage || '') && raus(c) > jetzt - 7 * 86400000 && c.zahlen).map(c => ({ c, ...clipWert(c) }));
+    const was = alle.some(x => x.aufrufe > 0) ? 'aufrufe' : 'likes';
+    return { was: was === 'aufrufe' ? 'AUFRUFE' : 'LIKES', liste: alle.filter(x => x[was] > 0).sort((a, b) => b[was] - a[was]).slice(0, 5).map(x => ({ titel: GROSS(String(x.c.titel || 'Clip').replace(/\s*#\S+/g, '').trim() || 'Clip'), wert: x[was], bildUrl: x.c.bild || '' })) };
+  }
+  let KAR_LAEUFT = false; const KAR_FERTIG = new Set();
+  async function karPruefen(erzwinge) {   // erzwinge = 'top5' (Knopf in den Einstellungen)
+    const st = stand();
+    if (KAR_LAEUFT || TRAILER_LAEUFT || ARBEIT || (CLIPS.length && !erzwinge) || !Array.isArray(st.clips)) return;
+    const cfg = st.clipcfg || {}, jetzt = Date.now(), da = q => KAR_FERTIG.has(q) || st.clips.some(c => c.quelle === q), auftraege = [];
+    const farbeFuer = q => { let h = 0; for (const ch of q) h = (h * 31 + ch.charCodeAt(0)) >>> 0; return TR_FARBEN[h % TR_FARBEN.length]; }, strm = (st.streams || [])[0] || null;
+    if (cfg.abend !== false && !erzwinge) {   // 🏁 Rennabend: für jedes Ergebnis der letzten Tage
+      const gesehen = new Set();
+      for (const p of st.posts || []) {
+        const rk = p.rennKey || p.key, q = 'abend:' + rk;
+        if (p.typ !== 'erg' || !p.ergebnis || !nr(p.ergebnis.ziel) || gesehen.has(rk) || da(q) || jetzt - (p.startMs || 0) > 3.5 * 86400000) continue;
+        gesehen.add(rk); auftraege.push({ art: 'abend', q, p, postMs: Math.max(jetzt + 20 * 60000, (p.postMs || jetzt) + 3 * 3600000) });
+      }
+    }
+    const heute = new Date(), wt = heute.getDay();
+    if (erzwinge === 'top5' || (cfg.top5 !== false && (wt === 6 || (wt === 0 && heute.getHours() < 20)))) {   // 🏆 Top 5: Samstag oder Sonntag bauen, Sonntag 18 Uhr posten
+      const so = new Date(heute); so.setDate(so.getDate() + ((7 - wt) % 7)); so.setHours(18, 0, 0, 0);
+      const q = 'top5:' + so.getFullYear() + '-' + String(so.getMonth() + 1).padStart(2, '0') + '-' + String(so.getDate()).padStart(2, '0'), t = top5Liste(st.clips, jetzt);
+      if (erzwinge === 'top5' && da(q)) UMG.meldung('Die Top 5 für diesen Sonntag sind schon eingeplant.', 1);
+      else if (t.liste.length < 3) { if (erzwinge === 'top5') UMG.meldung('Dafür braucht es mindestens 3 gepostete Clips mit Zahlen aus den letzten 7 Tagen.', 1); }
+      else if (!da(q)) auftraege.push({ art: 'top5', q, t, postMs: Math.max(jetzt + 20 * 60000, so.getTime()) });
+    }
+    if (!auftraege.length) return;
+    KAR_LAEUFT = true;
+    try {
+      await schriften(); const m = MAT || await material();
+      for (const a of auftraege.slice(0, 3)) {
+        const f = farbeFuer(a.q); let seiten, koerper;
+        if (a.art === 'abend') {
+          arbeit(`🏁 Karussell „Rennabend“ wird gebaut …`);
+          const p = a.p, rk = p.rennKey || p.key, tabPost = (st.posts || []).find(x => x.typ === 'tab' && (x.rennKey || x.key) === rk), e = p.ergebnis, ziel = nr(e.ziel), start = nr(e.start);
+          let hg = null; try { if (p.hg) hg = await bild(p.hg); } catch (x) { hg = null; }
+          seiten = abendSeiten(m, p, tabPost && tabPost.tab, hg, f, strm);
+          koerper = { vorlage: 'karabend', quelle: a.q, postMs: a.postMs, titel: `RENNABEND · ${GROSS(p.serie || p.titel || 'Rennen')}`.slice(0, 80),
+            text: `🏁 P${ziel}${p.track ? ' in ' + p.track : ''}${p.serie ? ' · ' + p.serie : ''}\n${start ? `Start P${start} → Ziel P${ziel}. ` : ''}Alle Zahlen zum Wischen 👉 Wie fandet ihr das Rennen? 👇\n\n#simracing #iracing #kreids888` };
+        } else {
+          arbeit(`🏆 Karussell „Top ${a.t.liste.length} der Woche“ wird gebaut …`);
+          for (const x of a.t.liste) { try { x.bild = x.bildUrl ? await bild(x.bildUrl) : null; } catch (e) { x.bild = null; } }
+          seiten = top5Seiten(m, a.t.liste, a.t.was, f, strm);
+          koerper = { vorlage: 'kartop5', quelle: a.q, postMs: a.postMs, titel: `TOP ${a.t.liste.length} DER WOCHE`,
+            text: `🏆 Top ${a.t.liste.length} der Woche: Welcher Clip ist dein Favorit? Schreib die Nummer in die Kommentare 👇\n\n#simracing #iracing #kreids888` };
+        }
+        const r = await karHochladen(seiten, koerper);
+        KAR_FERTIG.add(a.q);
+        UMG.meldung(`${a.art === 'abend' ? '🏁 Rennabend' : '🏆 Top der Woche'} eingeplant: ${zeit(r.postMs || a.postMs)}`);
+      }
+      ARBEIT = ''; await UMG.laden();
+    } catch (e) { ARBEIT = ''; zeichnen(); if (erzwinge) UMG.meldung(e.message || String(e), 1); else console.warn('Karussell nicht gebaut:', e && e.message); }
+    finally { KAR_LAEUFT = false; }
+  }
+
   // ═══ Look „📺 TV-Sendung“: Senderlogo, LIVE/REPLAY, Schlagzeile, Bildschirm, Bauchbinde, Laufschrift ═══
   const SAx = w => (g, px) => SA(g, px, w);
   function studio(farbe) {   // Studio-Hintergrund: dunkel, Lichtkegel, feines Zeilenraster
@@ -2703,7 +2847,7 @@
     const mit = raus.filter(x => x.zahlen && (auf(x.zahlen) || lik(x.zahlen)));
     if (!mit.length) return '<div class="kc-leer">Noch keine Zahlen. Sie kommen ein paar Stunden nach dem Posten und werden dann laufend aktualisiert.</div>';
     for (const x of mit) { const e = m.get(x.vorlage) || { n: 0, a: 0, l: 0 }; e.n++; e.a += auf(x.zahlen); e.l += lik(x.zahlen); m.set(x.vorlage, e); }
-    const n = v => Math.round(v).toLocaleString('de-DE'), vor = id => trailerV(id) || VORLAGEN.find(y => y.id === id) || { emoji: '🎬', name: id || 'Clip' };
+    const n = v => Math.round(v).toLocaleString('de-DE'), vor = id => trailerV(id) || karV(id) || VORLAGEN.find(y => y.id === id) || { emoji: '🎬', name: id || 'Clip' };
     const l = [...m.entries()].map(([id, e]) => ({ v: vor(id), n: e.n, a: e.a / e.n, l: e.l / e.n })).sort((p, q) => q.a - p.a || q.l - p.l);
     const top = mit.slice().sort((p, q) => auf(q.zahlen) - auf(p.zahlen) || lik(q.zahlen) - lik(p.zahlen)).slice(0, 3);
     return `<table class="kc-best"><tr><th>Vorlage</th><th>Clips</th><th>Ø Aufrufe</th><th>Ø Likes</th></tr>${l.slice(0, 8).map(e => `<tr><td>${e.v.emoji} ${esc(e.v.name)}</td><td>${e.n}</td><td><b>${n(e.a)}</b></td><td>${n(e.l)}</td></tr>`).join('')}</table>
@@ -2735,6 +2879,8 @@
           <label class="kc-feld">Uhrzeit für neue Clips<input type="time" value="${esc(cfg.zeit)}" data-c="cfg-zeit">${tipp('Jeder neue Clip kommt auf den nächsten freien Tag um diese Uhrzeit.')}</label>
           <label class="kc-check"><input type="checkbox" data-c="cfg-test" ${cfg.test ? 'checked' : ''}> <span><b>Test-Reels</b>${tipp('Instagram zeigt den Clip zuerst nur Leuten, die dir noch nicht folgen. Läuft er gut, sehen ihn auch deine Follower. Geht laut einem Planungstool erst ab 1.000 Followern – sonst wird ganz normal gepostet.')}</span></label>
           <label class="kc-check"><input type="checkbox" data-c="cfg-trailer" ${cfg.trailer !== false ? 'checked' : ''}> <span><b>🔴 Stream-Trailer</b>${tipp('Baut für jeden Stream der nächsten 4 Tage von selbst ein kurzes Video „HEUTE LIVE“ und plant es 2,5 Stunden vor „Live ab“ ein. 8 Vorlagen und 7 Farben wechseln von selbst. Dafür diesen Reiter vor dem Stream einmal öffnen.')}</span></label>
+          <label class="kc-check"><input type="checkbox" data-c="cfg-abend" ${cfg.abend !== false ? 'checked' : ''}> <span><b>🏁 Karussell „Rennabend“</b>${tipp('Nach jedem Rennen mit Ergebnis: Bilder zum Wischen mit Platz, Zahlen, Tabelle und nächstem Stream. Geht 3 Stunden nach dem Ergebnis-Post raus (nur Instagram).')}</span></label>
+          <label class="kc-check"><input type="checkbox" data-c="cfg-top5" ${cfg.top5 !== false ? 'checked' : ''}> <span><b>🏆 Karussell „Top 5 der Woche“</b>${tipp('Deine Clips der letzten 7 Tage mit den meisten Aufrufen. Baut sich am Samstag oder Sonntag und geht Sonntag um 18 Uhr raus (nur Instagram). Braucht mindestens 3 Clips mit Zahlen.')} <button type="button" class="btn ki-k" data-c="top5-jetzt">Jetzt bauen</button></span></label>
         </div>
         ${cfg.testFehler ? `<div class="kc-hinweis">Test-Reels gingen beim letzten Mal nicht, deshalb wurde normal gepostet. Instagram sagt: ${esc(cfg.testFehler)}</div>` : ''}
         <div class="kc-knoepfe"><button type="button" class="btn ki-k" data-c="cfg-speichern">💾 Speichern</button></div>
@@ -2865,20 +3011,20 @@
         ${tipp(`Clip ist ${sek(c.dauer)} lang. Genommen werden ${sek(p.b - p.a)}${p.FD ? (v.ampel ? ' + Startampel' : v.analyse ? ' + Analyse' : v.zielflagge ? ' + Ziel-Standbild' : ' + Pause') : ''}${p.R ? ' + Zeitlupe' : ''}. Am besten 8 bis 20 Sekunden, die Action ans Ende.`)}`;
   }
   function zeile(x, raus) {
-    const v = trailerV(x.vorlage) || VORLAGEN.find(y => y.id === x.vorlage) || VORLAGEN[0];
+    const v = trailerV(x.vorlage) || karV(x.vorlage) || VORLAGEN.find(y => y.id === x.vorlage) || VORLAGEN[0];
     const chips = [];
-    if (x.insta) chips.push(x.gepostet ? `<span class="ki-chip gruen">Instagram ✓${x.gepostet.test ? ' (Test-Reel)' : ''}</span>` : '<span class="ki-chip blau">Instagram</span>');
+    if (x.insta) chips.push(x.gepostet ? `<span class="ki-chip gruen">Instagram ✓${x.gepostet.test ? ' (Test-Reel)' : ''}</span>` : `<span class="ki-chip blau">Instagram${x.kar ? ' · Karussell' : ''}</span>`);
     if (x.tiktok) chips.push(x.tt ? '<span class="ki-chip gruen">TikTok-Entwurf ✓</span>' : '<span class="ki-chip blau">TikTok</span>');
     if (x.youtube) chips.push(x.yt ? (x.yt.privat ? '<span class="ki-chip rot">YouTube: nur privat</span>' : '<span class="ki-chip gruen">YouTube ✓</span>') : '<span class="ki-chip blau">YouTube</span>');
-    if (!x.video && !x.weg) chips.push('<span class="ki-chip rot">Video fehlt – löschen und neu einplanen</span>');
+    if (!x.video && !x.karussell && !x.weg) chips.push(`<span class="ki-chip rot">${x.kar ? 'Bilder fehlen' : 'Video fehlt'} – löschen und neu einplanen</span>`);
     if (x.fehler) chips.push('<span class="ki-chip rot">Fehler</span>');
     const zz = x.zahlen || {}, zn = v => (v == null ? '–' : Number(v).toLocaleString('de-DE'));
     const zahlenHtml = raus && (zz.ig || zz.yt) ? `<div class="kc-zahlen">${zz.ig ? `<span title="Instagram">📸 ${zz.ig.aufrufe != null ? `👁 <b>${zn(zz.ig.aufrufe)}</b> · ` : ''}❤ ${zn(zz.ig.likes)} · 💬 ${zn(zz.ig.kommentare)}${zz.ig.geteilt != null ? ` · ↗ ${zn(zz.ig.geteilt)}` : ''}</span>` : ''}${zz.yt ? `<span title="YouTube">▶ 👁 <b>${zn(zz.yt.aufrufe)}</b> · 👍 ${zn(zz.yt.likes)} · 💬 ${zn(zz.yt.kommentare)}</span>` : ''}</div>` : '';
     return `<div class="kc-post" data-id="${esc(x.id)}">
-      <a class="kc-mini" href="${esc(x.video || (x.yt && x.yt.link) || (x.gepostet && x.gepostet.link) || '#')}" target="_blank" rel="noopener" title="Video ansehen">${x.bild ? `<img src="${esc(x.bild)}" alt="">` : '🎬'}</a>
+      <a class="kc-mini" href="${esc(x.video || (x.kbilder && x.kbilder[0]) || (x.yt && x.yt.link) || (x.gepostet && x.gepostet.link) || '#')}" target="_blank" rel="noopener" title="Ansehen">${x.bild ? `<img src="${esc(x.bild)}" alt="">` : '🎬'}</a>
       <div class="kc-info">
         <div class="kc-titel" style="--f:${v.farbe}">${v.emoji} ${esc(x.titel || v.name)}</div>
-        <div class="kc-dim">${raus ? 'Gepostet' : 'Geht raus'}: <b>${esc(zeit(raus ? ((x.gepostet && x.gepostet.zeit) || (x.tt && x.tt.zeit) || x.postMs) : x.postMs))}</b>${x.dauer ? ' · ' + sek(x.dauer) : ''}</div>
+        <div class="kc-dim">${raus ? 'Gepostet' : 'Geht raus'}: <b>${esc(zeit(raus ? ((x.gepostet && x.gepostet.zeit) || (x.tt && x.tt.zeit) || x.postMs) : x.postMs))}</b>${x.dauer ? ' · ' + sek(x.dauer) : ''}${x.karussell ? ` · ${x.karussell} Bilder` : ''}</div>
         <div class="kc-chips">${chips.join('')}</div>${zahlenHtml}
         ${x.fehler ? `<div class="kc-hinweis rot">⚠ ${esc(x.fehler)}</div>` : ''}${x.ttFehler && !x.tt ? `<div class="kc-hinweis rot">TikTok: ${esc(x.ttFehler)}</div>` : ''}${x.ytFehler && !x.yt ? `<div class="kc-hinweis rot">YouTube: ${esc(x.ytFehler)}</div>` : ''}
         <div class="kc-knoepfe">
@@ -3113,8 +3259,9 @@
       return;
     }
     if (a === 'marke-weg' && c) { c.marken = (c.marken || []).filter(x => x.id !== b.dataset.k); zeichnen(); return; }
+    if (a === 'top5-jetzt') { ev.preventDefault(); karPruefen('top5'); return; }
     if (a === 'cfg-speichern') {
-      try { await UMG.igApi('POST', '/api/clips/einstellungen', { zeit: BOX.querySelector('[data-c="cfg-zeit"]').value, test: BOX.querySelector('[data-c="cfg-test"]').checked, trailer: BOX.querySelector('[data-c="cfg-trailer"]').checked }); UMG.meldung('Gespeichert.'); await UMG.laden(); } catch (e) { UMG.meldung(e.message, 1); }
+      try { await UMG.igApi('POST', '/api/clips/einstellungen', { zeit: BOX.querySelector('[data-c="cfg-zeit"]').value, test: BOX.querySelector('[data-c="cfg-test"]').checked, trailer: BOX.querySelector('[data-c="cfg-trailer"]').checked, abend: BOX.querySelector('[data-c="cfg-abend"]').checked, top5: BOX.querySelector('[data-c="cfg-top5"]').checked }); UMG.meldung('Gespeichert.'); await UMG.laden(); } catch (e) { UMG.meldung(e.message, 1); }
       return;
     }
     if (!id) return;
@@ -3238,7 +3385,7 @@
     quellenVon(c).forEach((src, i) => { const s2 = BOX.querySelector(`[data-c="slot-z"][data-i="${i}"]`), w2 = BOX.querySelector(`[data-c="slot-z-wert"][data-i="${i}"]`), z2 = tfVon(src).z || 1; if (s2) s2.value = z2; if (w2) w2.textContent = Math.round(z2 * 100) + ' %'; });
   }
   window.K888Clips = {
-    VORLAGEN, STILE, bauen, zeitplan, zeichne, material, schriften, vorschaubild, stichwoerter, trailerZeichnen, trailerBauen, trailerPruefen, trailerTon, trailerWahl, TR_ARTEN, TR_FARBEN,
+    VORLAGEN, STILE, bauen, zeitplan, zeichne, material, schriften, vorschaubild, stichwoerter, trailerZeichnen, trailerBauen, trailerPruefen, trailerTon, trailerWahl, TR_ARTEN, TR_FARBEN, karPruefen, top5Seiten, abendSeiten, top5Liste,
     async start(box, umg) {
       UMG = umg;
       if (BOX !== box) {
@@ -3259,7 +3406,7 @@
       MAT = null;
       schriften();
       zeichnen();
-      setTimeout(() => { trailerPruefen(); }, 1500);   // 🔴 Stream-Trailer für die nächsten Streams von selbst bauen
+      setTimeout(async () => { await trailerPruefen(); await karPruefen(); }, 1500);   // 🔴 Stream-Trailer und 🖼 Karussells von selbst bauen
     }
   };
 
