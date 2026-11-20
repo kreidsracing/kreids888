@@ -1681,11 +1681,11 @@
     } else if (t < 6.2 && !frei) {   // roter Punkt „LIVE“ oben
       g.save(); g.globalAlpha = ein(0.1) * aus(5.95, 0.25); const an = Math.floor(t * 2) % 2 === 0;
       g.fillStyle = an ? '#ff2a2a' : 'rgba(255,42,42,.35)'; g.shadowColor = '#ff2a2a'; g.shadowBlur = an ? 26 : 0; g.beginPath(); g.arc(B / 2 - 96, 318, 17, 0, Math.PI * 2); g.fill(); g.restore();
-      g.save(); g.globalAlpha = ein(0.1) * aus(5.95, 0.25); SA(g, 54, 900); g.fillStyle = '#fff'; g.fillText('LIVE', B / 2 - 62, 337); g.restore();
+      g.save(); g.globalAlpha = ein(0.1) * aus(5.95, 0.25); SA(g, 54, 900); g.fillStyle = '#fff'; g.fillText(x.oben || 'LIVE', B / 2 - 62, 337); g.restore();
     }
     if (t < 6.2) {   // unten die ganze Zeit: wo es läuft
       g.save(); g.globalAlpha = ein(0.5) * aus(5.95, 0.25);
-      const txt = 'LIVE AUF YOUTUBE', bw = pillenBreite(g, txt, 50); pille(g, txt, (B - bw) / 2, 1420, f, 50, true);
+      const txt = x.unten || 'LIVE AUF YOUTUBE', bw = pillenBreite(g, txt, 50); pille(g, txt, (B - bw) / 2, 1420, f, 50, true);
       SA(g, 62, 800); g.textAlign = 'center'; g.fillStyle = '#fff'; g.shadowColor = 'rgba(0,0,0,.85)'; g.shadowBlur = 12; g.fillText(m.ytHandle || m.handle || '@Kreids888', B / 2, 1582);   // über den Texten von Shorts und Reels
       g.restore();
     }
@@ -1699,7 +1699,7 @@
       } else if (art === 'eil') {
         g.save(); g.translate(-(1 - ein(0.05)) * 700, 0); const tx = 'EILMELDUNG', bw = pillenBreite(g, tx, 70); pille(g, tx, (B - bw) / 2, 590, f, 70, true); g.restore();
         if (t > 0.3) chromM(GROSS(m.name || 'KREIDS'), 930, 220, f, knall(0.3));
-        if (t > 0.65) { g.save(); g.globalAlpha = a1 * ein(0.65, 0.25); neonM('GEHT ' + (wort === 'HEUTE' ? 'HEUTE ' : '') + 'LIVE', 1110, 120); g.restore(); }
+        if (t > 0.65) { g.save(); g.globalAlpha = a1 * ein(0.65, 0.25); neonM('GEHT ' + (wort !== 'GLEICH' ? wort + ' ' : '') + 'LIVE', 1110, 120); g.restore(); }
       } else if (art === 'frage') {
         g.save(); g.globalAlpha = a1 * ein(0.05); mitte('WAS MACHST DU', 780, 104, 800); g.restore();
         if (t > 0.4) chromM(tz + '?', 1010, 210, f, knall(0.4));
@@ -1713,12 +1713,24 @@
         chromM('BEREIT?', 1020, 220, f, knall(0.1)); mitte(wort + ' LIVE', 1150, 76, 800);
       } else {
         chromM(wort, 900, 250, f, 1 + 0.9 * (1 - eob(fp(t, 0.05, 0.45))));
-        const p2 = fp(t, 0.38, 0.75); if (p2 > 0) { g.globalAlpha = a1 * Math.min(1, p2 * 2); neonText(g, 'LIVE', B / 2, 1170, 300 * (0.7 + 0.3 * eob(p2)), f, RU, 'center'); }
+        const p2 = fp(t, 0.38, 0.75); if (p2 > 0) { const w2 = x.wort2 || 'LIVE', px2 = passt(g, w2, 960, 300, RU, 80); g.globalAlpha = a1 * Math.min(1, p2 * 2); neonText(g, w2, B / 2, 1170 - (300 - px2) * 0.3, px2 * (0.7 + 0.3 * eob(p2)), f, RU, 'center'); }
       }
       g.restore();
     }
+    if (x.modus === 'woche' && t >= 1.5 && t < 6.2) {   // 📅 Wochenvorschau: die Streams der Woche als Liste
+      const al = ein(1.5) * aus(5.95, 0.25);
+      g.save(); g.globalAlpha = al; mitte('DIESE WOCHE LIVE', 420, 64, 800);
+      (x.liste || []).slice(0, 5).forEach((z, i) => {
+        const p = ein(1.6 + i * 0.3, 0.35), y = 480 + i * 170; if (p <= 0) return;
+        g.save(); g.globalAlpha = al * p; g.translate((1 - p) * (i % 2 ? 500 : -500), 0);
+        g.fillStyle = 'rgba(6,8,10,.82)'; g.beginPath(); g.roundRect(60, y, 960, 150, 20); g.fill(); g.lineWidth = 3; g.strokeStyle = f; g.shadowColor = f; g.shadowBlur = 14; g.stroke(); g.shadowBlur = 0;
+        SA(g, 44, 800); g.textAlign = 'left'; g.fillStyle = '#fff'; g.fillText(z.tag, 92, y + 62); RU(g, 52); g.fillStyle = zf; g.fillText(z.zeit, 92, y + 124);
+        passt(g, z.serie, 590, 58, RU, 30); g.textAlign = 'right'; g.fillStyle = '#fff'; g.fillText(z.serie, 990, y + 96); g.restore();
+      });
+      g.restore();
+    }
     const a2 = ein(1.5) * aus(3.95);
-    if (a2 > 0 && !frei) {   // 2 · Worum es geht: Bild, Serie, Strecke (drei Aufteilungen)
+    if (a2 > 0 && !frei && x.modus !== 'woche') {   // 2 · Worum es geht: Bild, Serie, Strecke (drei Aufteilungen)
       const s2 = art === 'eil' || art === 'ampel' ? 'gross' : art === 'frage' || art === 'tacho' ? 'zeilen' : 'karte', zoom = 1.04 + 0.06 * fp(t, 1.5, 4);
       g.save(); g.globalAlpha = a2;
       if (s2 === 'karte') {
@@ -1739,9 +1751,11 @@
       g.restore();
     }
     const a3 = ein(4.0) * aus(6.0);
-    if (a3 > 0 && !frei) {   // 3 · Wann (große Uhr oder Tafel)
+    if (a3 > 0 && !frei && x.modus !== 'woche') {   // 3 · Wann (große Uhr oder Tafel)
       g.save(); g.globalAlpha = a3;
-      if (art === 'eil' || art === 'ampel' || art === 'count') {
+      if (x.modus === 'verpasst') {   // ▶ Stream verpasst?: statt der Uhrzeit der Hinweis aufs ganze Video
+        mitte('DEN GANZEN STREAM', 720, 76, 800); chromM('ANSEHEN', 1040, 250, zf, 1 + 0.5 * (1 - eob(fp(t, 4.0, 4.4)))); mitte('JETZT AUF YOUTUBE', 1180, 64, 800);
+      } else if (art === 'eil' || art === 'ampel' || art === 'count') {
         [['TAG', GROSS(x.wann || tz)], ['LIVE AB', x.zeit + ' UHR'], ['RENNEN', serie]].forEach((z, i) => {
           const p = ein(4.0 + i * 0.18, 0.35), y = 520 + i * 250, haupt = i === 1; if (p <= 0) return;
           g.save(); g.globalAlpha = a3 * p; g.translate((1 - p) * (i % 2 ? 500 : -500), 0);
@@ -1901,7 +1915,7 @@
   }
 
   // ═══ 🖼 Karussells (NEU 20.11.2026): Bilder zum Wischen (nur Instagram). Bauen sich von selbst, wenn der Reiter „🎬 Clips“ offen ist ═══
-  //   🏁 Rennabend: nach jedem Rennen aus Ergebnis, Tabelle und nächstem Stream · 🏆 Top 5 der Woche: die Clips mit den meisten Aufrufen
+  //   🏆 Top 5 der Woche: die Clips mit den meisten Aufrufen. (Rennabend und „Tag 2/Tag 3“ sind wieder raus: keine Wiederholungen.)
   const KB = 1080, KH = 1350, GOLD = '#ffd400';
   const KAR_V = { kartop5: { emoji: '🏆', name: 'Top 5 der Woche', farbe: GOLD }, karabend: { emoji: '🏁', name: 'Rennabend', farbe: '#5cff1f' }, karbilder: { emoji: '🖼', name: 'Standbilder', farbe: '#18e8ff' } };
   const karV = v => (KAR_V[v] ? { id: v, ...KAR_V[v] } : /^kar/.test(v || '') ? { id: v, emoji: '🖼', name: 'Karussell', farbe: '#18e8ff' } : null);
@@ -1959,23 +1973,6 @@
     aus.push(streamSeite(m, f, ges, ges, strm));
     return aus;
   }
-  // 🏁 Rennabend · p = Ergebnis-Post, tab = { platz, punkte, abstand } oder null
-  function abendSeiten(m, p, tab, hg, f, strm) {
-    const e = p.ergebnis || {}, ziel = nr(e.ziel), start = nr(e.start), delta = start && ziel ? start - ziel : 0, serie = GROSS(p.serie || p.titel || 'RENNEN'), track = GROSS(p.track || ''), zf = ziel && ziel <= 3 ? GOLD : f;
-    const zahlen = [[e.punkte ? zahlText(e.punkte) : '', 'PUNKTE'], [e.runden ? zahlText(e.runden) : '', 'RUNDEN'], [e.inc != null && (e.inc || e.runden) ? e.inc + 'x' : '', e.inc ? 'INCIDENTS' : 'INCIDENTS · SAUBER']].filter(z => z[0]);
-    const mal = [];
-    mal.push(g => { kMitte(g, 'MEIN RENNABEND', 300, 68); kChrom(g, serie, 450, 140, f); if (track) kNeon(g, track, 548, 76, f); kBild(g, hg, 100, 610, 880, 440, 26, f, m);
-      const d = new Date(p.startMs || Date.now()); kMitte(g, GROSS(d.toLocaleDateString('de-DE', { timeZone: 'Europe/Berlin', weekday: 'long', day: '2-digit', month: '2-digit' })), 1140, 54, 700, 'rgba(255,255,255,.85)'); });
-    mal.push(g => { kMitte(g, 'ZIEL', 330, 76); kChrom(g, 'P' + ziel, 760, 520, zf);
-      if (start) kMitte(g, 'START P' + start, 900, 70);
-      if (start) kNeon(g, delta > 0 ? `+${delta} ${delta === 1 ? 'PLATZ' : 'PLÄTZE'} GUTGEMACHT` : delta < 0 ? `${delta} ${delta === -1 ? 'PLATZ' : 'PLÄTZE'}` : 'PLATZ GEHALTEN', 1030, 80, delta > 0 ? '#5cff1f' : delta < 0 ? '#ff2a2a' : f); });
-    if (zahlen.length) mal.push(g => { kMitte(g, 'DIE ZAHLEN', 300, 72); const h = Math.min(290, 860 / zahlen.length);
-      zahlen.forEach((z, i) => { const y = 350 + i * h; kKarte(g, 90, y, 900, h - 26, f, false); kChrom(g, z[0], y + (h - 26) / 2 + 24, Math.min(160, h * 0.56), f, 820); kMitte(g, z[1], y + h - 58, 44, 700, 'rgba(255,255,255,.8)'); }); });
-    if (tab && tab.platz) mal.push(g => { kMitte(g, 'TABELLE', 330, 76); kChrom(g, 'PLATZ ' + tab.platz, 640, 250, tab.platz <= 3 ? GOLD : f); kNeon(g, `${zahlText(tab.punkte)} PUNKTE`, 800, 104, f);
-      kMitte(g, tab.platz === 1 ? 'TABELLENFÜHRER' : tab.abstand > 0 ? `${zahlText(tab.abstand)} ${tab.abstand === 1 ? 'PUNKT' : 'PUNKTE'} HINTER P1` : 'PUNKTGLEICH MIT P1', 920, 62); kMitte(g, serie, 1030, 50, 700, 'rgba(255,255,255,.8)'); });
-    const ges = mal.length + 1;
-    return [...mal.map((fn, i) => karSeite(m, f, i + 1, ges, fn)), streamSeite(m, f, ges, ges, strm)];
-  }
   async function karHochladen(seiten, koerper) {   // Karussell anlegen, Bilder hochladen, kleines Vorschaubild dazu
     const r = await UMG.igApi('POST', '/api/clip/neu', { ...koerper, kar: true, insta: true, tiktok: false, youtube: false, test: false });
     try {
@@ -1993,98 +1990,77 @@
     const was = alle.some(x => x.aufrufe > 0) ? 'aufrufe' : 'likes';
     return { was: was === 'aufrufe' ? 'AUFRUFE' : 'LIKES', liste: alle.filter(x => x[was] > 0).sort((a, b) => b[was] - a[was]).slice(0, 5).map(x => ({ titel: GROSS(String(x.c.titel || 'Clip').replace(/\s*#\S+/g, '').trim() || 'Clip'), wert: x[was], bildUrl: x.c.bild || '' })) };
   }
-  let KAR_LAEUFT = false; const KAR_FERTIG = new Set();
-  async function karPruefen(erzwinge) {   // erzwinge = 'top5' (Knopf in den Einstellungen)
-    const st = stand();
-    if (KAR_LAEUFT || TRAILER_LAEUFT || ARBEIT || (CLIPS.length && !erzwinge) || !Array.isArray(st.clips)) return;
-    const cfg = st.clipcfg || {}, jetzt = Date.now(), da = q => KAR_FERTIG.has(q) || st.clips.some(c => c.quelle === q), auftraege = [];
-    const farbeFuer = q => { let h = 0; for (const ch of q) h = (h * 31 + ch.charCodeAt(0)) >>> 0; return TR_FARBEN[h % TR_FARBEN.length]; }, strm = (st.streams || [])[0] || null;
-    if (cfg.abend !== false && !erzwinge) {   // 🏁 Rennabend: für jedes Ergebnis der letzten Tage
-      const gesehen = new Set();
-      for (const p of st.posts || []) {
-        const rk = p.rennKey || p.key, q = 'abend:' + rk;
-        if (p.typ !== 'erg' || !p.ergebnis || !nr(p.ergebnis.ziel) || gesehen.has(rk) || da(q) || jetzt - (p.startMs || 0) > 3.5 * 86400000) continue;
-        gesehen.add(rk); auftraege.push({ art: 'abend', q, p, postMs: Math.max(jetzt + 20 * 60000, (p.postMs || jetzt) + 3 * 3600000) });
+  let KAR_LAEUFT = false;
+  // ═══ 📅 Lücken füllen (NEU 20.11.2026): lieber jeden Tag ein Post als mehrere an einem Tag ═══
+  // Die Leiste „🤖 Automatik“ zeigt die nächsten 7 Tage. Für einen Tag ohne Post schlägt sie genau einen Post vor, der keinen Clip braucht:
+  // „Stream verpasst?“ (Tag nach dem Stream), „Morgen live“ (Tag davor), Top 5 der Woche, Wochenvorschau. Gebaut wird erst auf Knopfdruck.
+  const tagVon = ms => new Date(ms).toLocaleDateString('sv-SE', { timeZone: 'Europe/Berlin' });   // 2026-11-20
+  const NEIN_KEY = 'k888_vorschlag_nein', neinListe = () => { try { return JSON.parse(localStorage.getItem(NEIN_KEY) || '[]'); } catch (e) { return []; } };
+  const autoV = x => {   // Name und Zeichen eines automatischen Posts (auch für die Wochenansicht)
+    const q = String((x && x.quelle) || ''), b = x && (trailerV(x.vorlage) || karV(x.vorlage)); if (!b) return null;
+    return /^verpasst:/.test(q) ? { ...b, emoji: '▶', name: 'Stream verpasst?' } : /^morgen:/.test(q) ? { ...b, emoji: '🔴', name: 'Morgen live' } : /^woche:/.test(q) ? { ...b, emoji: '📅', name: 'Wochenvorschau' } : b;
+  };
+  function lueckenPlan(st, jetzt) {   // → 7 Tage: { tag, n (Posts an dem Tag), ms (Post-Zeit für einen Vorschlag), vorschlag }
+    const cfg = st.clipcfg || {}, belegt = {}, zaehl = ms => { if (ms) { const t = tagVon(ms); belegt[t] = (belegt[t] || 0) + 1; } };
+    for (const p of st.posts || []) if (p.status !== 'uebersprungen' && !p.gepostet) zaehl(p.typ === 'live' ? p.liveMs : p.postMs);
+    for (const e of st.erledigt || []) zaehl(e.wann);
+    for (const c of st.clips || []) if (!c.aus) zaehl((c.gepostet && c.gepostet.zeit) || (c.yt && c.yt.zeit) || c.postMs);
+    const nein = new Set(neinListe()), streams = st.streams || [], alt = st.streamsAlt || [], benutzt = new Set((st.clips || []).map(c => c.quelle).filter(Boolean)), tage = [];
+    const neu = c => Math.max(c.postMs || 0, (c.gepostet && c.gepostet.zeit) || 0) > jetzt - 6 * 86400000, top = top5Liste(st.clips, jetzt);
+    let topFrei = top.liste.length >= 3 && !(st.clips || []).some(c => /^top5:/.test(c.quelle || '') && neu(c));
+    let wocheFrei = !(st.posts || []).some(p => p.typ === 'woche') && !(st.clips || []).some(c => /^woche:/.test(c.quelle || '') && neu(c));
+    for (let i = 0; i < 7; i++) {
+      const mitte = jetzt + i * 86400000, tag = tagVon(mitte), n = belegt[tag] || 0;
+      let ms = new Date(`${tag}T${cfg.zeit || '18:30'}:00`).getTime(); if (ms < jetzt + 20 * 60000) ms = i === 0 && new Date(jetzt).getHours() < 22 ? jetzt + 20 * 60000 : 0;
+      const e = { tag, n, ms, vorschlag: null };
+      if (!n && ms && cfg.luecken !== false) {
+        const gestern = alt.find(s => tagVon(s.liveMs) === tagVon(mitte - 86400000)), morgen = streams.find(s => tagVon(s.liveMs) === tagVon(mitte + 86400000)), woche = streams.filter(s => s.liveMs > ms && s.liveMs < ms + 7 * 86400000);
+        e.vorschlag = [gestern && { art: 'verpasst', q: 'verpasst:' + gestern.rennKey, s: gestern, text: `▶ „Stream verpasst?“ · ${gestern.serie || gestern.titel}` },
+          morgen && { art: 'morgen', q: 'morgen:' + morgen.rennKey, s: morgen, text: `🔴 „Morgen live“ · ${morgen.serie || morgen.titel}` },
+          topFrei && { art: 'top5', q: 'top5:' + tag, top, text: `🏆 Top ${top.liste.length} der Woche` },
+          wocheFrei && woche.length >= 2 && { art: 'woche', q: 'woche:' + tag, liste: woche, text: `📅 Wochenvorschau · ${woche.length} Streams` }].filter(k => k && !nein.has(k.q) && !benutzt.has(k.q))[0] || null;
+        if (e.vorschlag && e.vorschlag.art === 'top5') topFrei = false;
+        if (e.vorschlag && e.vorschlag.art === 'woche') wocheFrei = false;
       }
+      tage.push(e);
     }
-    const heute = new Date(), wt = heute.getDay();
-    if (erzwinge === 'top5' || (cfg.top5 !== false && (wt === 6 || (wt === 0 && heute.getHours() < 20)))) {   // 🏆 Top 5: Samstag oder Sonntag bauen, Sonntag 18 Uhr posten
-      const so = new Date(heute); so.setDate(so.getDate() + ((7 - wt) % 7)); so.setHours(18, 0, 0, 0);
-      const q = 'top5:' + so.getFullYear() + '-' + String(so.getMonth() + 1).padStart(2, '0') + '-' + String(so.getDate()).padStart(2, '0'), t = top5Liste(st.clips, jetzt);
-      if (erzwinge === 'top5' && da(q)) UMG.meldung('Die Top 5 für diesen Sonntag sind schon eingeplant.', 1);
-      else if (t.liste.length < 3) { if (erzwinge === 'top5') UMG.meldung('Dafür braucht es mindestens 3 gepostete Clips mit Zahlen aus den letzten 7 Tagen.', 1); }
-      else if (!da(q)) auftraege.push({ art: 'top5', q, t, postMs: Math.max(jetzt + 20 * 60000, so.getTime()) });
-    }
-    if (!auftraege.length) return;
+    return tage;
+  }
+  async function lueckeBauen(tag) {   // Vorschlag bauen und gleich freigegeben einplanen (der Klick ist die Freigabe)
+    const st = stand(), e = lueckenPlan(st, Date.now()).find(y => y.tag === tag), v = e && e.vorschlag;
+    if (!v || ARBEIT || TRAILER_LAEUFT || KAR_LAEUFT) return;
     KAR_LAEUFT = true;
     try {
-      await schriften(); const m = MAT || await material();
-      for (const a of auftraege.slice(0, 3)) {
-        const f = farbeFuer(a.q); let seiten, koerper;
-        if (a.art === 'abend') {
-          arbeit(`🏁 Karussell „Rennabend“ wird gebaut …`);
-          const p = a.p, rk = p.rennKey || p.key, tabPost = (st.posts || []).find(x => x.typ === 'tab' && (x.rennKey || x.key) === rk), e = p.ergebnis, ziel = nr(e.ziel), start = nr(e.start);
-          let hg = null; try { if (p.hg) hg = await bild(p.hg); } catch (x) { hg = null; }
-          seiten = abendSeiten(m, p, tabPost && tabPost.tab, hg, f, strm);
-          koerper = { vorlage: 'karabend', auto: true, quelle: a.q, postMs: a.postMs, titel: `RENNABEND · ${GROSS(p.serie || p.titel || 'Rennen')}`.slice(0, 80),
-            text: `🏁 P${ziel}${p.track ? ' in ' + p.track : ''}${p.serie ? ' · ' + p.serie : ''}\n${start ? `Start P${start} → Ziel P${ziel}. ` : ''}Alle Zahlen zum Wischen 👉 Wie fandet ihr das Rennen? 👇\n\n#simracing #iracing #kreids888` };
-        } else {
-          arbeit(`🏆 Karussell „Top ${a.t.liste.length} der Woche“ wird gebaut …`);
-          for (const x of a.t.liste) { try { x.bild = x.bildUrl ? await bild(x.bildUrl) : null; } catch (e) { x.bild = null; } }
-          seiten = top5Seiten(m, a.t.liste, a.t.was, f, strm);
-          koerper = { vorlage: 'kartop5', auto: true, quelle: a.q, postMs: a.postMs, titel: `TOP ${a.t.liste.length} DER WOCHE`,
-            text: `🏆 Top ${a.t.liste.length} der Woche: Welcher Clip ist dein Favorit? Schreib die Nummer in die Kommentare 👇\n\n#simracing #iracing #kreids888` };
-        }
-        const r = await karHochladen(seiten, koerper);
-        KAR_FERTIG.add(a.q);
-        UMG.meldung(`${a.art === 'abend' ? '🏁 Rennabend' : '🏆 Top der Woche'} ${cfg.freigabe !== false ? 'gebaut. Wartet oben bei „🤖 Automatik“ auf deine Freigabe.' : 'eingeplant: ' + zeit(r.postMs || a.postMs)}`);
+      await schriften(); const m = MAT || await material(), strm = (st.streams || [])[0] || null;
+      let h = 0; for (const ch of v.q) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
+      if (v.art === 'top5') {
+        arbeit(`🏆 Karussell „Top ${v.top.liste.length} der Woche“ wird gebaut …`);
+        for (const y of v.top.liste) { try { y.bild = y.bildUrl ? await bild(y.bildUrl) : null; } catch (err) { y.bild = null; } }
+        await karHochladen(top5Seiten(m, v.top.liste, v.top.was, TR_FARBEN[h % TR_FARBEN.length], strm), { vorlage: 'kartop5', auto: true, frei: true, quelle: v.q, postMs: e.ms, titel: `TOP ${v.top.liste.length} DER WOCHE`,
+          text: `🏆 Top ${v.top.liste.length} der Woche: Welcher Clip ist dein Favorit? Schreib die Nummer in die Kommentare 👇\n\n#simracing #iracing #kreids888` });
+      } else {
+        const s = v.s || v.liste[0], dz = ms => new Date(ms), uhrVon = ms => dz(ms).toLocaleTimeString('de-DE', { timeZone: 'Europe/Berlin', hour: '2-digit', minute: '2-digit' });
+        const tagKurz = ms => GROSS(dz(ms).toLocaleDateString('de-DE', { timeZone: 'Europe/Berlin', weekday: 'short', day: '2-digit', month: '2-digit' })), serie = s.serie || s.titel || 'Simracing', uhr = uhrVon(s.liveMs);
+        let hg = null; if (v.art !== 'woche') { try { if (s.hg) hg = await bild(s.hg); } catch (err) { hg = null; } }
+        const w = trailerWahl(st.clips, v.q, !!hg, []), basis = { farbe: TR_FARBEN[w.fi], serie, track: s.track || '', zeit: uhr, wann: dz(s.liveMs).toLocaleDateString('de-DE', { timeZone: 'Europe/Berlin', weekday: 'long', day: '2-digit', month: '2-digit' }) };
+        let x, titel, text, thumb = 3.4;
+        if (v.art === 'morgen') { x = { ...basis, art: w.art.id, wort: 'MORGEN', tz: Number(uhr.slice(0, 2)) >= 17 ? 'MORGEN ABEND' : 'MORGEN' }; thumb = w.art.thumb; titel = `MORGEN LIVE · ${GROSS(serie)}`;
+          text = `🔴 Morgen live: ${serie}${s.track ? ' · ' + s.track : ''} · ${uhr} Uhr\nSeid dabei!\n\n#simracing #iracing #live #kreids888`; }
+        else if (v.art === 'verpasst') { x = { ...basis, art: 'heute', modus: 'verpasst', wort: 'STREAM', wort2: 'VERPASST?', oben: 'REPLAY', unten: 'GANZER STREAM AUF YOUTUBE', tz: 'GESTERN LIVE' }; titel = `STREAM VERPASST? · ${GROSS(serie)}`;
+          text = `▶ Stream verpasst? ${serie}${s.track ? ' · ' + s.track : ''}\nDen ganzen Stream gibt es auf YouTube${s.yt ? ': https://youtu.be/' + s.yt : ' (@Kreids888).'}\n\n#simracing #iracing #kreids888`; }
+        else { const l = v.liste.slice(0, 5); x = { ...basis, art: 'heute', modus: 'woche', wort: 'DIESE WOCHE', wort2: 'LIVE', tz: 'DIESE WOCHE', liste: l.map(y => ({ tag: tagKurz(y.liveMs), zeit: uhrVon(y.liveMs) + ' UHR', serie: GROSS(y.serie || y.titel || 'Stream') })) }; titel = 'DIESE WOCHE LIVE';
+          text = `📅 Diese Woche live: ${v.liste.length} Streams\n${l.map(y => `${tagKurz(y.liveMs)} · ${uhrVon(y.liveMs)} Uhr · ${y.serie || y.titel}`).join('\n')}\n\n#simracing #iracing #live #kreids888`; }
+        arbeit('🎬 Video wird gebaut …');
+        const blob = await trailerBauen(x, m, hg, q => arbeit(`🎬 Video wird gebaut … ${Math.round(q * 100)} %`));
+        arbeit('⬆ Hochladen …');
+        const r = await UMG.igApi('POST', '/api/clip/neu', { vorlage: 'trailer' + x.art + w.fi, auto: true, frei: true, quelle: v.q, titel: titel.slice(0, 80), text, postMs: e.ms, insta: true,
+          tiktok: !!(st.tiktok && st.tiktok.verbunden), youtube: !!(st.youtube && st.youtube.verbunden), test: false, thumbMs: Math.round(thumb * 1000), dauer: TRAILER_T });
+        try { await hochladen(r.id, blob); } catch (err) { try { await UMG.igApi('POST', `/api/clip/${r.id}/weg`, {}); } catch (z) { /* egal */ } throw err; }
+        try { const cv = leinwand(B, H); trailerZeichnen(cv.getContext('2d'), thumb, x, m, hg); const k = leinwand(540, 960); k.getContext('2d').drawImage(cv, 0, 0, 540, 960); const vb = await new Promise(ok => k.toBlob(ok, 'image/jpeg', 0.85)); if (vb) await senden(`/api/clip/${r.id}/bild`, vb); } catch (err) { /* Vorschaubild ist nur schön */ }
       }
-      ARBEIT = ''; await UMG.laden();
-    } catch (e) { ARBEIT = ''; zeichnen(); if (erzwinge) UMG.meldung(e.message || String(e), 1); else console.warn('Karussell nicht gebaut:', e && e.message); }
+      ARBEIT = ''; UMG.meldung(`Eingeplant: ${zeit(e.ms)} 🎉`); await UMG.laden();
+    } catch (err) { ARBEIT = ''; zeichnen(); UMG.meldung(err.message || String(err), 1); }
     finally { KAR_LAEUFT = false; }
-  }
-
-  // ═══ 📅 Mehr Posts aus einem Clip (NEU 20.11.2026): Tag 2 = zweites Video (bei „Wer war schuld?“ die Auflösung), Tag 3 = Karussell aus Standbildern ═══
-  const TAG2_HOOKS = ['Nochmal ganz langsam', 'Schau genau hin', 'Hast du das gesehen?', 'Das Ganze nochmal in Ruhe', 'Achte auf dieses Detail', 'Der zweite Blick'], TAG2_UNTEN = ['Was fällt dir auf?', 'Siehst du es?', 'Wie siehst du das?', 'Was wäre besser gewesen?'];
-  const URTEILE = [['a', 'Auto A war schuld'], ['b', 'Auto B war schuld'], ['unfall', 'Für mich ein Rennunfall'], ['beide', 'Beide haben Schuld']];
-  function tag2Clip(c, v) {   // gleicher Clip, aber: andere Sprüche, anderer Stil, eigenes Schild
-    const schuld = v.id === 'schuld', urteil = (URTEILE.find(x => x[0] === c.urteil) || URTEILE[2])[1], n = folgeAn(c) ? ' #' + folgeVon(c) : '';
-    const hook = schuld ? 'Die Auflösung' : ziehen(TAG2_HOOKS, 'tag2hook'), unten = schuld ? urteil + '. Du auch?' : ziehen(TAG2_UNTEN, 'tag2unten');
-    const c2 = { ...c, hook, unten, zeitlupe: !!v.zl || !!c.zeitlupe, stil: stilNeu(c.stil), tagEigen: (schuld ? 'AUFLÖSUNG' : 'TEIL 2') + n, textEigen: true, tag2: false, tag3: false };
-    c2.text = schuld ? `Die Auflösung ⚖️ ${PFLICHT}\nGestern die Frage, heute meine Antwort: ${urteil}.\nSiehst du das auch so? 👇\n\n#racingincident #kreids888`
-      : `${hook} 🔍 ${PFLICHT}\nGestern der Clip, heute nochmal genau hingeschaut.\n${unten} 👇\n\n#simracer #kreids888`;
-    return c2;
-  }
-  async function tag2Bauen(c, v, hauptId, postMs) {
-    const c2 = tag2Clip(c, v), blob = await bauen(c2, MAT, x => arbeit(`🎬 Video für Tag 2 wird gebaut … ${Math.round(x * 100)} %`));
-    arbeit('⬆ Tag 2 hochladen …');
-    const r = await UMG.igApi('POST', '/api/clip/neu', { vorlage: c.vorlage, quelle: 'tag2:' + hauptId, titel: GROSS(c2.hook), text: postText(c2), postMs, insta: c.insta, tiktok: c.tiktok, youtube: !!c.youtube, thumbMs: 1300, dauer: blob.dauer });
-    try { await hochladen(r.id, blob); } catch (e) { try { await UMG.igApi('POST', `/api/clip/${r.id}/weg`, {}); } catch (x) { /* egal */ } throw e; }
-    await clipMerken(r.id, { ...c2, postMs });
-    try { const vb = await vorschaubild(c2, MAT); if (vb) await senden(`/api/clip/${r.id}/bild`, vb); } catch (e) { /* Vorschaubild ist nur schön */ }
-    return r;
-  }
-  async function tag3Seiten(c, v, m, strm) {   // 5 Standbilder aus dem Clip + Schluss-Seite
-    const vid = await videoElement(c.url), a = c.start || 0, b = c.ende || c.dauer || a + 5, n = 5, f = c.farbe || v.farbe, hook = GROSS(String(c.hook || v.name).trim()), seiten = [], ges = n + 1;
-    for (let i = 0; i < n; i++) {
-      await suchen(vid, a + (b - a) * (0.12 + 0.8 * i / (n - 1)));
-      const still = leinwand(960, 540), iw = vid.videoWidth || 16, ih = vid.videoHeight || 9, sk = Math.max(960 / iw, 540 / ih);
-      still.getContext('2d').drawImage(vid, (960 - iw * sk) / 2, (540 - ih * sk) / 2, iw * sk, ih * sk);
-      seiten.push(karSeite(m, f, i + 1, ges, g => {
-        kChrom(g, hook, 330, 120, f); kMitte(g, i ? `BILD ${i + 1} VON ${n}` : 'BILD FÜR BILD', 420, 60);
-        kBild(g, still, 60, 480, 960, 540, 22, f, m);
-        kNeon(g, i === n - 1 ? GROSS(String(c.unten || 'Was sagst du?').trim()) : i ? 'WEITER WISCHEN' : 'WISCH DURCH', 1130, 64, f);
-      }));
-    }
-    vid.removeAttribute('src'); vid.load();
-    seiten.push(streamSeite(m, f, ges, ges, strm));
-    return seiten;
-  }
-  async function tag3Bauen(c, v, hauptId, postMs) {
-    arbeit('🖼 Karussell aus Standbildern wird gebaut …');
-    const seiten = await tag3Seiten(c, v, MAT, (stand().streams || [])[0] || null), hook = String(c.hook || v.name).trim();
-    return karHochladen(seiten, { vorlage: 'karbilder', quelle: 'bilder:' + hauptId, postMs, titel: `BILD FÜR BILD · ${GROSS(hook)}`.slice(0, 80),
-      text: `Bild für Bild 🖼 ${hook}\nWisch durch und sag mir: ${String(c.unten || 'Was sagst du?').trim()} 👇\n\n#simracing #iracing #kreids888` });
   }
 
   // ═══ ✏️ Geplantes wieder bearbeiten (NEU 20.11.2026) ═══
@@ -2147,7 +2123,7 @@
     const auto = liste.filter(x => x.auto && !(x.gepostet || x.tt || x.yt) && x.postMs > jetzt - 86400000).sort((a, b) => (a.aus ? 1 : 0) - (b.aus ? 1 : 0) || a.postMs - b.postMs);
     const warten = auto.filter(x => !x.frei && !x.aus && x.postMs > jetzt).length;
     const karte = x => {
-      const v = trailerV(x.vorlage) || karV(x.vorlage) || { emoji: '🤖', name: 'Automatik' }, vorbei = x.postMs <= jetzt, fehlt = !x.video && !x.karussell;
+      const v = autoV(x) || { emoji: '🤖', name: 'Automatik' }, vorbei = x.postMs <= jetzt, fehlt = !x.video && !x.karussell;
       const status = x.aus ? ['Wird nicht gepostet', 'grau'] : fehlt ? [x.kar ? 'Bilder fehlen' : 'Video fehlt', 'rot'] : !noetig ? ['Geht von selbst raus', 'gruen'] : x.frei ? ['Freigegeben ✓', 'gruen'] : vorbei ? ['Zeit vorbei · nicht gepostet', 'rot'] : ['Wartet auf Freigabe', 'gelb'];
       const kn = x.aus ? '<button type="button" class="btn ki-k" data-c="auto-an">↩ Doch posten</button>'
         : `${noetig && !x.frei && !vorbei && !fehlt ? '<button type="button" class="btn ki-k kc-frei" data-c="auto-frei">✓ Freigeben</button>' : ''}${noetig && x.frei ? '<button type="button" class="btn ki-k" data-c="auto-zurueck">↩ Zurücknehmen</button>' : ''}<button type="button" class="btn ki-k" data-c="auto-aus">✕ Nicht posten</button>`;
@@ -2158,16 +2134,19 @@
           <span class="kc-auto-status ${status[1]}">${status[0]}</span>${x.fehler ? `<span class="kc-hinweis rot">⚠ ${esc(x.fehler)}</span>` : ''}
           <div class="kc-auto-kn">${kn}</div></div></div>`;
     };
+    const tage = lueckenPlan(stand(), jetzt), tagName = t => new Date(t + 'T12:00:00').toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit' });
+    const tagHtml = e => `<div class="kc-tagz ${e.n ? 'voll' : 'leer'}"><b>${esc(tagName(e.tag))}</b>${e.n ? `<span class="kc-tag-ok">✓ ${e.n} ${e.n === 1 ? 'Post' : 'Posts'}</span>`
+      : `<span class="kc-tag-leer">Lücke</span>${e.vorschlag ? `<span class="kc-vor">${esc(e.vorschlag.text)}</span><div class="kc-auto-kn"><button type="button" class="btn ki-k kc-frei" data-c="luecke-bauen" data-tag="${e.tag}" title="Bauen und für diesen Tag einplanen">✓ Bauen</button><button type="button" class="btn ki-k" data-c="luecke-nein" data-tag="${e.tag}" title="Diesen Vorschlag nicht mehr zeigen">✕</button></div>` : '<span class="kc-dim">Hier fehlt ein Clip.</span>'}`}</div>`;
     const sw = (k, an, text, tip) => `<label class="kc-check" title="${esc(tip)}"><input type="checkbox" data-c="cfg-${k}" ${an ? 'checked' : ''}> <span><b>${text}</b></span></label>`;
     return `<div class="kc-auto"><h3 class="kc-h">🤖 Automatik <span class="kc-dim">${warten ? `${warten} ${warten === 1 ? 'wartet' : 'warten'} auf deine Freigabe` : ''}</span></h3>
       <div class="kc-dim">Das baut das Dashboard von selbst. ${noetig ? 'Ohne Freigabe geht nichts raus.' : 'Es geht ohne Freigabe von selbst raus.'}</div>
-      ${auto.length ? `<div class="kc-auto-reihe">${auto.map(karte).join('')}</div>` : '<div class="kc-leer">Gerade nichts gebaut. Trailer kommen bis zu 4 Tage vor dem Stream, der Rennabend nach einem Ergebnis, die Top 5 am Wochenende.</div>'}
+      ${auto.length ? `<div class="kc-auto-reihe">${auto.map(karte).join('')}</div>` : '<div class="kc-leer">Gerade nichts gebaut. Trailer kommen bis zu 4 Tage vor dem Stream.</div>'}
+      <div class="kc-auto-h">📅 Die nächsten 7 Tage <span class="kc-dim">Ziel: jeden Tag ein Post</span></div>
+      <div class="kc-tage">${tage.map(tagHtml).join('')}</div>
       <div class="kc-auto-schalter">
         ${sw('trailer', cfg.trailer !== false, '🔴 Stream-Trailer', 'Für jeden Stream der nächsten 4 Tage ein kurzes Video „HEUTE LIVE“, 2,5 Stunden vor „Live ab“. 8 Vorlagen und 7 Farben wechseln von selbst.')}
-        ${sw('abend', cfg.abend !== false, '🏁 Rennabend', 'Nach jedem Rennen mit Ergebnis: Bilder zum Wischen mit Platz, Zahlen, Tabelle und nächstem Stream (nur Instagram).')}
-        ${sw('top5', cfg.top5 !== false, '🏆 Top 5 der Woche', 'Deine Clips der letzten 7 Tage mit den meisten Aufrufen. Baut sich am Samstag oder Sonntag, geht Sonntag um 18 Uhr raus (nur Instagram). Braucht mindestens 3 Clips mit Zahlen.')}
+        ${sw('luecken', cfg.luecken !== false, '📅 Vorschläge für Lücken', 'Für einen Tag ohne Post schlägt die Leiste einen Post vor, der keinen Clip braucht: „Stream verpasst?“, „Morgen live“, Top 5 der Woche oder Wochenvorschau. Gebaut wird erst, wenn du es anklickst.')}
         ${sw('freigabe', noetig, '✓ Freigabe nötig', 'An: Automatisches geht erst raus, wenn du „✓ Freigeben“ drückst. Aus: es geht von selbst raus.')}
-        <button type="button" class="btn ki-k" data-c="top5-jetzt">🏆 Top 5 jetzt bauen</button>
       </div></div>`;
   }
 
@@ -3065,9 +3044,6 @@
         </div>
         <div class="kc-mehrposts">
           <label class="kc-check"><input type="checkbox" data-c="folge-an" ${folgeAn(c) ? 'checked' : ''}> <span><b>🔢 Reihe mit Nummer:</b> ${esc(v.name)} # <input type="number" min="1" max="99999" value="${folgeVon(c)}" data-c="folge" class="kc-folge" ${folgeAn(c) ? '' : 'disabled'}>${tipp('Die Nummer steht im Video und im Text und zählt bei jedem Clip von selbst hoch. So erkennt man deine Reihe wieder.')}</span></label>
-          ${v.mehr ? '' : `<label class="kc-check"><input type="checkbox" data-c="tag2" ${c.tag2 ? 'checked' : ''}> <span><b>📅 Tag 2: ${v.id === 'schuld' ? 'Die Auflösung' : 'Nochmal genau hingeschaut'}</b> – zweites Video am Tag danach${tipp(v.id === 'schuld' ? 'Heute die Frage, morgen deine Antwort. Zwei Posts aus einem Clip.' : 'Derselbe Clip mit anderem Spruch und anderem Stil. Zwei Posts aus einem Clip.')}</span></label>
-          ${c.tag2 && v.id === 'schuld' ? `<label class="kc-feld">Dein Urteil<select data-c="urteil">${URTEILE.map(u => `<option value="${u[0]}" ${(c.urteil || 'unfall') === u[0] ? 'selected' : ''}>${esc(u[1])}</option>`).join('')}</select></label>` : ''}
-          <label class="kc-check"><input type="checkbox" data-c="tag3" ${c.tag3 ? 'checked' : ''}> <span><b>🖼 Tag 3: Karussell</b> – 5 Standbilder zum Wischen (nur Instagram)</span></label>`}
         </div>
         ${termineHtml(c)}
         ${tipp(tk.verbunden ? 'TikTok: Das Video landet als Entwurf in deiner TikTok-App. Dort nur noch einen Trend-Sound drauf und posten.' : 'TikTok ist nicht verbunden (Reiter „📡 YouTube · TikTok · Discord“). Für TikTok: „📥 Video laden“ und selbst hochladen.')}
@@ -3148,7 +3124,7 @@
         ${tipp(`Clip ist ${sek(c.dauer)} lang. Genommen werden ${sek(p.b - p.a)}${p.FD ? (v.ampel ? ' + Startampel' : v.analyse ? ' + Analyse' : v.zielflagge ? ' + Ziel-Standbild' : ' + Pause') : ''}${p.R ? ' + Zeitlupe' : ''}. Am besten 8 bis 20 Sekunden, die Action ans Ende.`)}`;
   }
   function zeile(x, raus) {
-    const v = trailerV(x.vorlage) || karV(x.vorlage) || VORLAGEN.find(y => y.id === x.vorlage) || VORLAGEN[0];
+    const v = autoV(x) || VORLAGEN.find(y => y.id === x.vorlage) || VORLAGEN[0];
     const chips = [];
     if (x.insta) chips.push(x.gepostet ? `<span class="ki-chip gruen">Instagram ✓${x.gepostet.test ? ' (Test-Reel)' : ''}</span>` : `<span class="ki-chip blau">Instagram${x.kar ? ' · Karussell' : ''}</span>`);
     if (x.tiktok) chips.push(x.tt ? '<span class="ki-chip gruen">TikTok-Entwurf ✓</span>' : '<span class="ki-chip blau">TikTok</span>');
@@ -3333,10 +3309,6 @@
       id = r.id;
       await hochladen(id, blob);
       try { const vb = await vorschaubild(c, MAT); if (vb) await senden(`/api/clip/${id}/bild`, vb); } catch (e) { /* Vorschaubild ist nur schön */ }
-      const mehr = [], basis = r.postMs || c.postMs || Date.now();   // 📅 mehr Posts aus diesem Clip: Tag 2 (Video) und Tag 3 (Karussell)
-      if (!vp.mehr && c.tag2) { try { await tag2Bauen(c, vp, id, basis + 86400000); mehr.push('Tag 2'); } catch (e) { UMG.meldung('Tag 2 ging nicht: ' + (e.message || e), 1); } }
-      if (!vp.mehr && c.tag3 && c.insta) { try { await tag3Bauen(c, vp, id, basis + 2 * 86400000); mehr.push('Karussell'); } catch (e) { UMG.meldung('Das Karussell ging nicht: ' + (e.message || e), 1); } }
-      if (mehr.length) UMG.meldung('Dazu eingeplant: ' + mehr.join(' und '));
       if (c.ersetzt) await altenErsetzen(c.ersetzt);   // ✏️ bearbeiteter Post: der alte kommt weg
       await clipMerken(id, c);                         // … und dieser lässt sich später wieder bearbeiten
       clipWeg(c);
@@ -3405,9 +3377,10 @@
       return;
     }
     if (a === 'marke-weg' && c) { c.marken = (c.marken || []).filter(x => x.id !== b.dataset.k); zeichnen(); return; }
-    if (a === 'top5-jetzt') { ev.preventDefault(); karPruefen('top5'); return; }
+    if (a === 'luecke-bauen') { lueckeBauen(b.dataset.tag); return; }
+    if (a === 'luecke-nein') { const e = lueckenPlan(stand(), Date.now()).find(y => y.tag === b.dataset.tag); if (e && e.vorschlag) { try { localStorage.setItem(NEIN_KEY, JSON.stringify([...neinListe().slice(-40), e.vorschlag.q])); } catch (err) { /* egal */ } } zeichnen(); return; }
     if (a === 'cfg-speichern') {
-      try { await UMG.igApi('POST', '/api/clips/einstellungen', { zeit: BOX.querySelector('[data-c="cfg-zeit"]').value, test: BOX.querySelector('[data-c="cfg-test"]').checked, trailer: BOX.querySelector('[data-c="cfg-trailer"]').checked, abend: BOX.querySelector('[data-c="cfg-abend"]').checked, top5: BOX.querySelector('[data-c="cfg-top5"]').checked, freigabe: BOX.querySelector('[data-c="cfg-freigabe"]').checked }); UMG.meldung('Gespeichert.'); await UMG.laden(); } catch (e) { UMG.meldung(e.message, 1); }
+      try { await UMG.igApi('POST', '/api/clips/einstellungen', { zeit: BOX.querySelector('[data-c="cfg-zeit"]').value, test: BOX.querySelector('[data-c="cfg-test"]').checked, trailer: BOX.querySelector('[data-c="cfg-trailer"]').checked, luecken: BOX.querySelector('[data-c="cfg-luecken"]').checked, freigabe: BOX.querySelector('[data-c="cfg-freigabe"]').checked }); UMG.meldung('Gespeichert.'); await UMG.laden(); } catch (e) { UMG.meldung(e.message, 1); }
       return;
     }
     if (a === 'bearbeiten-ab') { BEARBEITE = null; zeichnen(); return; }
@@ -3483,9 +3456,9 @@
     const t = ev.target, c = CLIPS[0]; if (!t.dataset || !BOX.contains(t)) return;
     const a = t.dataset.c;
     if (a === 'datei' && t.files && t.files.length) { dateienRein([...t.files]); t.value = ''; return; }
-    if (/^cfg-(trailer|abend|top5|freigabe)$/.test(a)) {   // 🤖 Automatik-Schalter: sofort speichern
+    if (/^cfg-(trailer|luecken|freigabe)$/.test(a)) {   // 🤖 Automatik-Schalter: sofort speichern
       const an = k => BOX.querySelector(`[data-c="cfg-${k}"]`).checked;
-      UMG.igApi('POST', '/api/clips/einstellungen', { trailer: an('trailer'), abend: an('abend'), top5: an('top5'), freigabe: an('freigabe') }).then(() => { UMG.meldung('Gespeichert.'); return UMG.laden(); }).catch(e => UMG.meldung(e.message || String(e), 1));
+      UMG.igApi('POST', '/api/clips/einstellungen', { trailer: an('trailer'), luecken: an('luecken'), freigabe: an('freigabe') }).then(() => { UMG.meldung('Gespeichert.'); return UMG.laden(); }).catch(e => UMG.meldung(e.message || String(e), 1));
       return;
     }
     if (!c) return;
@@ -3502,8 +3475,6 @@
     else if (a === 'insta' || a === 'tiktok' || a === 'youtube') c[a] = t.checked;
     else if (a === 'folge-an') { c.folgeAn = t.checked; try { localStorage.setItem('k888_reihe', t.checked ? '1' : '0'); } catch (e) { /* egal */ } if (!c.textEigen) mitText(c); zeichnen(); }
     else if (a === 'folge') { c.folge = Math.max(1, nr(t.value) || 1); c.folgeEigen = true; if (!c.textEigen) mitText(c); zeichnen(); }
-    else if (a === 'tag2' || a === 'tag3') { c[a] = t.checked; zeichnen(); }
-    else if (a === 'urteil') c.urteil = t.value;
     else if (a === 'postms') { c.postMs = t.value ? new Date(t.value).getTime() : 0; BOX.querySelectorAll('[data-c="termin"]').forEach(x => x.classList.toggle('an', +x.dataset.ms === c.postMs)); }
     else if (a === 'start' || a === 'ende' || a === 'halt' || a === 'linie') zeichnen();
   }
@@ -3546,8 +3517,8 @@
     quellenVon(c).forEach((src, i) => { const s2 = BOX.querySelector(`[data-c="slot-z"][data-i="${i}"]`), w2 = BOX.querySelector(`[data-c="slot-z-wert"][data-i="${i}"]`), z2 = tfVon(src).z || 1; if (s2) s2.value = z2; if (w2) w2.textContent = Math.round(z2 * 100) + ' %'; });
   }
   window.K888Clips = {
-    vorlageInfo: id => trailerV(id) || karV(id) || VORLAGEN.find(y => y.id === id) || null,
-    VORLAGEN, STILE, bauen, zeitplan, zeichne, material, schriften, vorschaubild, stichwoerter, trailerZeichnen, trailerBauen, trailerPruefen, trailerTon, trailerWahl, TR_ARTEN, TR_FARBEN, karPruefen, top5Seiten, abendSeiten, top5Liste, automatikHtml, tag2Clip, tag3Seiten, karSeite,
+    vorlageInfo: (id, c) => (c && autoV(c)) || trailerV(id) || karV(id) || VORLAGEN.find(y => y.id === id) || null,
+    VORLAGEN, STILE, bauen, zeitplan, zeichne, material, schriften, vorschaubild, stichwoerter, trailerZeichnen, trailerBauen, trailerPruefen, trailerTon, trailerWahl, TR_ARTEN, TR_FARBEN, top5Seiten, top5Liste, automatikHtml, karSeite, lueckenPlan, lueckeBauen,
     async start(box, umg) {
       UMG = umg;
       if (BOX !== box) {
@@ -3568,7 +3539,7 @@
       MAT = null;
       schriften();
       zeichnen();
-      setTimeout(async () => { await trailerPruefen(); await karPruefen(); await merkAufraeumen(); }, 1500);   // 🔴 Stream-Trailer und 🖼 Karussells von selbst bauen
+      setTimeout(async () => { await trailerPruefen(); await merkAufraeumen(); }, 1500);   // 🔴 Stream-Trailer und 🖼 Karussells von selbst bauen
     }
   };
 
@@ -3696,6 +3667,12 @@
 .kc-app .kc-auto-kn{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
 .kc-app .kc-auto-kn .btn,.kc-app .kc-auto-schalter .btn{padding:7px 12px;font-size:13px;min-height:0;line-height:1.2;white-space:nowrap}
 .kc-app .kc-auto-kn .kc-frei{background:#5cff1f;color:#06080a;border-color:#5cff1f;font-weight:800}
+.kc-app .kc-auto-h{margin-top:14px;font-weight:800;color:#fff;font-size:15px}
+.kc-app .kc-tage{display:grid;grid-template-columns:repeat(auto-fill,minmax(124px,1fr));gap:8px;margin-top:8px}
+.kc-app .kc-tagz .kc-auto-kn{margin-top:auto;padding-top:6px}.kc-app .kc-tagz .kc-auto-kn .btn{padding:6px 9px;font-size:12px}
+.kc-app .kc-tagz{display:flex;flex-direction:column;gap:4px;padding:8px 10px;background:#101218;border:1px solid #2a2f36;font-size:13px;min-width:0}
+.kc-app .kc-tagz.leer{border-color:rgba(245,197,24,.55)}.kc-app .kc-tagz>b{color:#fff;font-size:14px}
+.kc-app .kc-tag-ok{color:#8dff5c;font-weight:700}.kc-app .kc-tag-leer{color:#f5c518;font-weight:800}.kc-app .kc-vor{color:#e6e9ec;word-break:break-word}
 .kc-app .kc-auto-schalter{display:flex;flex-wrap:wrap;gap:8px 22px;align-items:center;margin-top:12px;padding-top:12px;border-top:1px solid rgba(255,255,255,.12)}
 .kc-app .kc-hinweis.kc-bearb{color:#bff4ff;border-color:rgba(24,232,255,.55);background:rgba(24,232,255,.07);font-size:14px;padding:10px 14px;margin:8px 0}
 .kc-app .kc-raus,.kc-app .kc-einst{background:#0d0e13;border:1px solid var(--line,#23262f);padding:10px 14px}

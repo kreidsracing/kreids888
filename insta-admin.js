@@ -614,7 +614,7 @@
   const uhrzeit = ms => new Date(ms).toLocaleTimeString('de-DE', { timeZone: 'Europe/Berlin', hour: '2-digit', minute: '2-digit' });
   const istFertig = p => p.status === 'gepostet' || p.status === 'uebersprungen';
   // Welcher Clip ist das? Name und Zeichen der Vorlage (auch Stream-Trailer und Karussells)
-  const clipInfo = c => (window.K888Clips && window.K888Clips.vorlageInfo && window.K888Clips.vorlageInfo(c.vorlage)) || { emoji: '🎬', name: 'Clip' };
+  const clipInfo = c => (window.K888Clips && window.K888Clips.vorlageInfo && window.K888Clips.vorlageInfo(c.vorlage, c)) || { emoji: '🎬', name: 'Clip' };
   const clipName = c => clipInfo(c).name || 'Clip';
   const clipWartet = c => !!c.auto && !c.frei && (STAND.clipcfg || {}).freigabe !== false;   // 🤖 Automatik wartet auf Freigabe (Reiter „🎬 Clips“)
 

@@ -486,7 +486,7 @@ async function ttSenden(env, s, post, cfg, design) {
 const CLIP_STANDARD = { zeit: '18:30', test: true };
 async function ladeClipCfg(s) {
   const c = (await s.lies('clipcfg')) || {};
-  return { zeit: istUhrzeit(c.zeit) ? c.zeit : CLIP_STANDARD.zeit, test: c.test !== false, trailer: c.trailer !== false, abend: c.abend !== false, top5: c.top5 !== false, freigabe: c.freigabe !== false, testFehler: c.testFehler || '', testFehlerZeit: c.testFehlerZeit || 0 };
+  return { zeit: istUhrzeit(c.zeit) ? c.zeit : CLIP_STANDARD.zeit, test: c.test !== false, trailer: c.trailer !== false, abend: c.abend !== false, top5: c.top5 !== false, freigabe: c.freigabe !== false, luecken: c.luecken !== false, testFehler: c.testFehler || '', testFehlerZeit: c.testFehlerZeit || 0 };
 }
 // Clip ist ganz draußen (Instagram und/oder TikTok, je nachdem was angehakt war)
 // 🤖 Automatik (NEU 20.11.2026): vom Dashboard von selbst gebaut (Stream-Trailer, Rennabend, Top 5). Geht nur mit Freigabe raus (abschaltbar).
@@ -988,13 +988,16 @@ async function stand(env, s) {
   }).filter(Boolean).sort((a, b) => b.wann - a.wann);
   const [clips, clipcfg, clipnr] = await Promise.all([clipsListe(env, s), ladeClipCfg(s), s.lies('clipnr')]);
   // 🔴 Streams der nächsten 5 Tage (für die Stream-Trailer in der Clip-Fabrik)
-  const streams = [...new Map(alleStreams.filter(p => p.liveMs > jetzt && p.liveMs < jetzt + 5 * 86400000).map(p => {
+  const alsStream = p => {
     const rk = rennKey(p.id), bgv = bgvs['bgv:' + rk] || 0;
-    return [rk, { rennKey: rk, liveMs: p.liveMs, serie: p.serie || '', titel: p.titel || '', track: p.track || '', nr: p.nr || 0,
+    return [rk, { rennKey: rk, liveMs: p.liveMs, serie: p.serie || '', titel: p.titel || '', track: p.track || '', nr: p.nr || 0, yt: (ytz['yt:' + rk] || {}).id || '',
       hg: bgv ? `${env.ORIGIN}/hintergrund/${rk}?v=${bgv}` : p.kalenderBild ? `${env.ORIGIN}/hintergrund/${rk}?k=${kurzHash(p.kalenderBild)}` : '' }];
-  })).values()].sort((a, b) => a.liveMs - b.liveMs);
+  };
+  const streams = [...new Map(alleStreams.filter(p => p.liveMs > jetzt && p.liveMs < jetzt + 9 * 86400000).map(alsStream)).values()].sort((a, b) => a.liveMs - b.liveMs);
+  // Streams der letzten 3 Tage (für den Vorschlag „Stream verpasst?“ an Tagen ohne Post)
+  const streamsAlt = [...new Map(planStreams(daten, cfg, jetzt - 4 * 86400000).filter(p => p.liveMs <= jetzt && p.liveMs > jetzt - 3 * 86400000).map(alsStream)).values()].sort((a, b) => b.liveMs - a.liveMs);
   return {
-    clips, clipcfg, streams, clipnr: clipnr || {},
+    clips, clipcfg, streams, streamsAlt, clipnr: clipnr || {},
     erledigt, vorlagen,
     videos: Object.entries(videosRoh).filter(([, v]) => v && v.fertig).map(([k, v]) => ({ id: k.slice(6), name: v.name || '', ton: !!v.ton, dauer: v.dauer || 0, url: `${env.ORIGIN}/video/${k.slice(6)}`, zeit: v.zeit || 0 })).sort((a, b) => b.zeit - a.zeit),
     ablage: Object.entries(ablageRoh).map(([k, a]) => ({ id: k.slice(11), name: a.name || '', url: `${env.ORIGIN}/ablage/${k.slice(11)}`, zeit: a.zeit || 0 })).sort((a, b) => b.zeit - a.zeit),
@@ -1061,7 +1064,7 @@ async function api(req, env, url) {
   if (pfad === '/api/clips/einstellungen' && req.method === 'POST') {
     const b = await json(), alt = await ladeClipCfg(s);
     const neuTest = b.test !== undefined ? b.test !== false : alt.test;
-    await s.schreib('clipcfg', { zeit: istUhrzeit(b.zeit) ? b.zeit : alt.zeit, test: neuTest, trailer: b.trailer !== undefined ? b.trailer !== false : alt.trailer, abend: b.abend !== undefined ? b.abend !== false : alt.abend, top5: b.top5 !== undefined ? b.top5 !== false : alt.top5, freigabe: b.freigabe !== undefined ? b.freigabe !== false : alt.freigabe, testFehler: neuTest && !alt.test ? '' : alt.testFehler, testFehlerZeit: neuTest && !alt.test ? 0 : alt.testFehlerZeit });
+    await s.schreib('clipcfg', { zeit: istUhrzeit(b.zeit) ? b.zeit : alt.zeit, test: neuTest, trailer: b.trailer !== undefined ? b.trailer !== false : alt.trailer, abend: b.abend !== undefined ? b.abend !== false : alt.abend, top5: b.top5 !== undefined ? b.top5 !== false : alt.top5, freigabe: b.freigabe !== undefined ? b.freigabe !== false : alt.freigabe, luecken: b.luecken !== undefined ? b.luecken !== false : alt.luecken, testFehler: neuTest && !alt.test ? '' : alt.testFehler, testFehlerZeit: neuTest && !alt.test ? 0 : alt.testFehlerZeit });
     return antwort({ ok: true, clipcfg: await ladeClipCfg(s) });
   }
   if (pfad === '/api/clip/neu' && req.method === 'POST') {
