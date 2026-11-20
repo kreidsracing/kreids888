@@ -613,7 +613,9 @@
   const spanne = (a, b) => a.slice(5, 7) === b.slice(5, 7) ? `${+a.slice(8, 10)}.–${+b.slice(8, 10)}. ${MON[+b.slice(5, 7) - 1]}` : `${+a.slice(8, 10)}. ${MON[+a.slice(5, 7) - 1]} – ${+b.slice(8, 10)}. ${MON[+b.slice(5, 7) - 1]}`;
   const uhrzeit = ms => new Date(ms).toLocaleTimeString('de-DE', { timeZone: 'Europe/Berlin', hour: '2-digit', minute: '2-digit' });
   const istFertig = p => p.status === 'gepostet' || p.status === 'uebersprungen';
-  const clipName = c => ((window.K888Clips && window.K888Clips.VORLAGEN || []).find(v => v.id === c.vorlage) || {}).name || 'Clip';
+  // Welcher Clip ist das? Name und Zeichen der Vorlage (auch Stream-Trailer und Karussells)
+  const clipInfo = c => (window.K888Clips && window.K888Clips.vorlageInfo && window.K888Clips.vorlageInfo(c.vorlage)) || { emoji: '🎬', name: 'Clip' };
+  const clipName = c => clipInfo(c).name || 'Clip';
 
   function planer(cfg) {
     const heute = bTag(Date.now()), mo0 = montagVon(heute), modus = cfg.modus;
@@ -696,7 +698,7 @@
     return `<div class="kp-zeile clip${c.gepostet ? ' fertig' : ''}" style="--f:${ART_FARBE.clip}">
       <div class="kp-zeit">${esc(uhrzeit(c.postMs))}</div>
       ${kpMini(c.bild, true, '🎬')}
-      <div class="kp-was"><b>🎬 Reel · ${esc(clipName(c))}</b><span>${esc(c.titel || '')}${wohin ? ' · ' + wohin : ''}</span></div>
+      <div class="kp-was"><b>${clipInfo(c).emoji || '🎬'} ${c.kar ? 'Karussell' : 'Reel'} · ${esc(clipName(c))}</b><span>${esc(c.titel || '')}${wohin ? ' · ' + wohin : ''}</span></div>
       <span class="ki-chip ${st[1]}">${st[0]}</span>
       <div class="kp-knoepfe"><button class="btn btn-ghost ki-k" data-aktion="reiter" data-wert="clips"><span>→ Clips</span></button></div>
     </div>`;
@@ -706,7 +708,7 @@
       const t = tagPlus(von, i), hier = liste.filter(e => e.tag === t);
       return `<div class="kp-kt${t === heute ? ' heute' : ''}${t < heute ? ' vorbei' : ''}"><div class="kp-ktkopf"><b>${wtag(t)}</b> ${tagMon(t)}</div>
         ${hier.map(e => {
-          if (e.c) return `<button type="button" class="kp-karte" style="--f:${ART_FARBE.clip}" data-aktion="reiter" data-wert="clips" title="Clip · ${esc(clipName(e.c))}"><span class="kp-kzeit">${esc(uhrzeit(e.ms))}</span><span class="kp-ktext">🎬 ${esc(clipName(e.c))}</span><span class="kp-kziel">${clipZiele(e.c)}</span><i class="kp-dot ${e.c.gepostet ? 'gruen' : 'blau'}"></i></button>`;
+          if (e.c) return `<button type="button" class="kp-karte" style="--f:${ART_FARBE.clip}" data-aktion="reiter" data-wert="clips" title="${esc(clipName(e.c) + (e.c.titel ? ' · ' + e.c.titel : ''))}">${e.c.bild ? `<img src="${esc(e.c.bild)}" alt="" loading="lazy" class="${e.c.kar ? '' : 'hoch'}">` : ''}<span class="kp-kzeit">${esc(uhrzeit(e.ms))}</span><span class="kp-ktext">${clipInfo(e.c).emoji || '🎬'} ${esc(clipName(e.c))}</span>${e.c.titel ? `<span class="kp-ktitel">${esc(e.c.titel)}</span>` : ''}<span class="kp-kziel">${clipZiele(e.c)}</span><i class="kp-dot ${e.c.gepostet ? 'gruen' : 'blau'}"></i></button>`;
           const p = e.p, [st, fa] = kpStatus(p);
           return `<button type="button" class="kp-karte${p.id === OFFEN_ID ? ' offen' : ''}${istFertig(p) ? ' fertig' : ''}" style="--f:${ART_FARBE[p.typ] || '#888'}" data-aktion="kp-auf" data-id="${esc(p.id)}" title="${esc((TYP[p.typ] || '') + ' · ' + st)}">
             ${p.bild ? `<img src="${esc(p.bild)}" alt="" loading="lazy" class="${istStoryArt(p.typ, p) ? 'hoch' : ''}">` : ''}
@@ -1480,6 +1482,7 @@
 #instaApp .kp-karte.fertig{opacity:.55}
 #instaApp .kp-karte img{width:100%;aspect-ratio:4/5;object-fit:cover;display:block;margin-bottom:3px}
 #instaApp .kp-karte img.hoch{aspect-ratio:9/16;width:62%}
+#instaApp .kp-karte .kp-ktitel{font-size:11px;line-height:1.25;color:#fff;opacity:.92;text-align:left;font-weight:600;word-break:break-word}
 #instaApp .kp-kzeit{font:800 13px var(--disp,inherit)}
 #instaApp .kp-ktext{font-size:12px;line-height:1.25;color:#e6e8ee}
 #instaApp .kp-dot{position:absolute;top:6px;right:6px;width:9px;height:9px;border-radius:50%;background:#7cb8f5}

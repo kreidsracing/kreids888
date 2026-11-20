@@ -2060,6 +2060,7 @@
     arbeit('⬆ Tag 2 hochladen …');
     const r = await UMG.igApi('POST', '/api/clip/neu', { vorlage: c.vorlage, quelle: 'tag2:' + hauptId, titel: GROSS(c2.hook), text: postText(c2), postMs, insta: c.insta, tiktok: c.tiktok, youtube: !!c.youtube, thumbMs: 1300, dauer: blob.dauer });
     try { await hochladen(r.id, blob); } catch (e) { try { await UMG.igApi('POST', `/api/clip/${r.id}/weg`, {}); } catch (x) { /* egal */ } throw e; }
+    await clipMerken(r.id, { ...c2, postMs });
     try { const vb = await vorschaubild(c2, MAT); if (vb) await senden(`/api/clip/${r.id}/bild`, vb); } catch (e) { /* Vorschaubild ist nur schön */ }
     return r;
   }
@@ -2084,6 +2085,60 @@
     const seiten = await tag3Seiten(c, v, MAT, (stand().streams || [])[0] || null), hook = String(c.hook || v.name).trim();
     return karHochladen(seiten, { vorlage: 'karbilder', quelle: 'bilder:' + hauptId, postMs, titel: `BILD FÜR BILD · ${GROSS(hook)}`.slice(0, 80),
       text: `Bild für Bild 🖼 ${hook}\nWisch durch und sag mir: ${String(c.unten || 'Was sagst du?').trim()} 👇\n\n#simracing #iracing #kreids888` });
+  }
+
+  // ═══ ✏️ Geplantes wieder bearbeiten (NEU 20.11.2026) ═══
+  // Beim Einplanen merkt sich der Browser die Einstellungen und die Videodatei (IndexedDB, nur auf diesem Gerät).
+  // „✏️ Bearbeiten“ öffnet den Clip wieder im Editor wie einen neuen; beim Einplanen wird der alte geplante Post ersetzt.
+  let MERK_DB = null, BEARBEITE = null;   // BEARBEITE = wartet auf die Videodatei (wenn sie auf diesem Gerät nicht gemerkt ist)
+  function merkDb() { if (!MERK_DB) MERK_DB = new Promise((ok, nein) => { try { const r = indexedDB.open('k888_clips', 1); r.onupgradeneeded = () => { r.result.createObjectStore('q'); r.result.createObjectStore('c'); }; r.onsuccess = () => ok(r.result); r.onerror = () => nein(r.error); } catch (e) { nein(e); } }); return MERK_DB; }
+  const merkTx = async (store, mode, fn) => { const db = await merkDb(); return new Promise((ok, nein) => { const tx = db.transaction(store, mode), r = fn(tx.objectStore(store)); tx.oncomplete = () => ok(r && r.result); tx.onerror = tx.onabort = () => nein(tx.error); }); };
+  const NICHT_MERKEN = ['datei', 'url', 'id', 'extra', 'ersetzt'];
+  const schlicht = (k, v) => (v && typeof v === 'object' && !Array.isArray(v) && Object.getPrototypeOf(v) !== Object.prototype ? undefined : v);   // nur einfache Werte (keine Tonspur, keine Datei)
+  const einstVon = c => { const e = {}; for (const [k, v] of Object.entries(c)) if (!NICHT_MERKEN.includes(k) && k[0] !== '_') e[k] = v; if (c.extra) e.extra = c.extra.map(x => einstVon(x)); return JSON.parse(JSON.stringify(e, schlicht)); };
+  const quellKey = d => `${d.name}|${d.size}|${d.lastModified || 0}`;
+  async function clipMerken(id, c) {   // nach dem Einplanen: Einstellungen + Videodatei(en) auf diesem Gerät behalten
+    try {
+      const keys = [];
+      for (const q of quellenVon(c)) { if (!q.datei) return; const k = quellKey(q.datei); keys.push(k); await merkTx('q', 'readwrite', st => st.put(q.datei, k)); }
+      await merkTx('c', 'readwrite', st => st.put({ einst: einstVon(c), quellen: keys, zeit: Date.now() }, id));
+    } catch (e) { /* ohne Merken geht es auch: dann die Datei beim Bearbeiten nochmal reinziehen */ }
+  }
+  async function merkAufraeumen() {   // Gepostetes und Gelöschtes vergessen, unbenutzte Videodateien wegwerfen
+    const st = stand(); if (!Array.isArray(st.clips)) return;
+    try {
+      const da = new Set(st.clips.filter(x => !(x.gepostet || x.tt || x.yt)).map(x => x.id)), brauch = new Set();
+      for (const id of await merkTx('c', 'readonly', o => o.getAllKeys())) {
+        const r = await merkTx('c', 'readonly', o => o.get(id));
+        if (!da.has(id) && (!r || Date.now() - (r.zeit || 0) > 10 * 60000)) await merkTx('c', 'readwrite', o => o.delete(id)); else for (const k of (r && r.quellen) || []) brauch.add(k);
+      }
+      for (const k of await merkTx('q', 'readonly', o => o.getAllKeys())) if (!brauch.has(k)) await merkTx('q', 'readwrite', o => o.delete(k));
+    } catch (e) { /* egal */ }
+  }
+  const nachOben = () => { try { BOX.scrollIntoView({ behavior: 'smooth', block: 'start' }); } catch (e) { /* egal */ } };
+  async function bearbeiten(id) {
+    const x = (stand().clips || []).find(y => y.id === id); if (!x || ARBEIT) return;
+    if (CLIPS.some(c => c.ersetzt === id)) { zeichnen(); nachOben(); return UMG.meldung('Dieser Post ist schon im Editor.'); }
+    let r = null; const dateien = [];
+    try { r = await merkTx('c', 'readonly', o => o.get(id)); for (const k of (r && r.quellen) || []) dateien.push(await merkTx('q', 'readonly', o => o.get(k))); } catch (e) { r = null; }
+    if (r && dateien.length && dateien.every(Boolean)) {   // auf diesem Gerät gemerkt: gleich mit allen Einstellungen öffnen
+      const e = r.einst, urls = {}, urlVon = i => (urls[r.quellen[i]] = urls[r.quellen[i]] || URL.createObjectURL(dateien[i]));
+      const c = { ...e, id: Math.random().toString(36).slice(2), datei: dateien[0], url: urlVon(0), ersetzt: id, postMs: x.postMs, insta: x.insta, tiktok: x.tiktok, youtube: x.youtube };
+      if (e.extra) c.extra = e.extra.map((q, i) => ({ ...q, datei: dateien[i + 1] || dateien[0], url: urlVon(dateien[i + 1] ? i + 1 : 0) }));
+      BEARBEITE = null; CLIPS.unshift(c); zeichnen(); nachOben();
+      UMG.meldung('Im Editor geöffnet. Ändern und neu einplanen, dann wird der alte Post ersetzt.');
+    } else {   // nicht gemerkt (anderes Gerät oder älterer Post): Datei nochmal reinziehen, dann wie ein neuer Clip
+      BEARBEITE = { id, postMs: x.postMs, insta: x.insta, tiktok: x.tiktok, youtube: x.youtube, vorlage: x.vorlage, titel: x.titel || '' };
+      zeichnen(); nachOben(); UMG.meldung('Zieh die Videodatei nochmal rein. Dann öffnet sie sich im Editor und ersetzt den geplanten Post.');
+    }
+  }
+  function bearbeiteAnwenden(c) {   // die reingezogene Datei gehört zum geplanten Post, der bearbeitet wird
+    const w = BEARBEITE; BEARBEITE = null; if (!w) return;
+    if (VORLAGEN.some(v => v.id === w.vorlage)) vorlageSetzen(c, w.vorlage);
+    Object.assign(c, { ersetzt: w.id, postMs: w.postMs, insta: w.insta, tiktok: w.tiktok, youtube: w.youtube });
+  }
+  async function altenErsetzen(alt) {   // der bearbeitete Post ist neu eingeplant: den alten (und was aus ihm gebaut war) wegnehmen
+    for (const y of stand().clips || []) if ((y.id === alt || (y.quelle && y.quelle.endsWith(':' + alt))) && !(y.gepostet || y.tt || y.yt)) { try { await UMG.igApi('POST', `/api/clip/${y.id}/weg`, {}); } catch (e) { /* bleibt in der Liste */ } }
   }
 
   // ═══ Look „📺 TV-Sendung“: Senderlogo, LIVE/REPLAY, Schlagzeile, Bildschirm, Bauchbinde, Laufschrift ═══
@@ -2912,6 +2967,8 @@
         <li><b>🚀 Einplanen</b> – das Video wird hier gebaut und geht zur geplanten Zeit raus: Instagram-Reel, YouTube-Short und TikTok-Entwurf. Ein Clip pro Tag. Der Abspann und der Text zeigen auf deinen YouTube-Kanal und den nächsten Stream.</li></ol>
         <div class="kc-dim">Tipp für Reichweite: 2 bis 3 Wochen lang jeden Tag einen Clip, immer zur gleichen Uhrzeit.</div></details>
       ${ARBEIT ? `<div class="kc-arbeit"><span class="kc-spin"></span>${esc(ARBEIT)}</div>` : ''}
+      ${c && c.ersetzt ? '<div class="kc-hinweis kc-bearb">✏️ Du bearbeitest einen geplanten Post. Beim Einplanen wird der alte ersetzt. Mit „✕ Clip entfernen“ brichst du ab, der alte bleibt dann.</div>' : ''}
+      ${BEARBEITE ? `<div class="kc-hinweis kc-bearb">✏️ Zieh jetzt die Videodatei für „${esc(BEARBEITE.titel || 'den geplanten Post')}“ rein. Sie öffnet sich im Editor und ersetzt den geplanten Post. <button type="button" class="btn ki-k" data-c="bearbeiten-ab">Abbrechen</button></div>` : ''}
       <label class="kc-drop${c ? ' klein' : ''}" data-c="drop"><input type="file" accept="video/*" multiple data-c="datei">
         <span class="kc-drop-gross">🎬 ${c ? 'Weitere Clips reinziehen' : 'Clip hier reinziehen'}</span><span class="kc-dim">oder antippen und auswählen · MP4 aus dem Kreids Clipper</span></label>
       ${c ? editor(c, tk) : ''}
@@ -2987,7 +3044,7 @@
         ${termineHtml(c)}
         ${tipp(tk.verbunden ? 'TikTok: Das Video landet als Entwurf in deiner TikTok-App. Dort nur noch einen Trend-Sound drauf und posten.' : 'TikTok ist nicht verbunden (Reiter „📡 YouTube · TikTok · Discord“). Für TikTok: „📥 Video laden“ und selbst hochladen.')}
         <div class="kc-knoepfe gross">
-          <button type="button" class="btn ki-k kc-los" data-c="einplanen" ${ARBEIT ? 'disabled' : ''}>🚀 Video bauen & einplanen</button>
+          <button type="button" class="btn ki-k kc-los" data-c="einplanen" ${ARBEIT ? 'disabled' : ''}>${c.ersetzt ? '🚀 Video bauen & ersetzen' : '🚀 Video bauen & einplanen'}</button>
           <button type="button" class="btn ki-k" data-c="laden" ${ARBEIT ? 'disabled' : ''}>📥 Nur Video laden</button>
           <button type="button" class="btn ki-k" data-c="weglegen">✕ Clip entfernen</button>
         </div>
@@ -3084,6 +3141,7 @@
           ${x.yt && x.yt.link ? `<a class="btn ki-k" href="${esc(x.yt.link)}" target="_blank" rel="noopener">↗ Auf YouTube</a>` : ''}
           ${!raus ? `<button type="button" class="btn ki-k" data-c="jetzt">🚀 Jetzt posten</button>
             <input type="datetime-local" value="${esc(lokal(x.postMs))}" data-c="zeitwert"><button type="button" class="btn ki-k" data-c="zeit">🕒 Zeit</button>` : ''}
+          ${!raus && !x.kar && !trailerV(x.vorlage) && !(x.gepostet || x.tt || x.yt) ? '<button type="button" class="btn ki-k" data-c="bearbeiten" title="Öffnet den Clip wieder im Editor. Beim Einplanen wird dieser Post ersetzt.">✏️ Bearbeiten</button>' : ''}
           ${x.video ? `<a class="btn ki-k" href="${esc(x.video)}" download>📥 Video</a>` : ''}
           <button type="button" class="btn ki-k" data-c="loeschen">🗑</button>
         </div>
@@ -3205,7 +3263,8 @@
     for (const d of dateien) {
       if (!/^video\//.test(d.type || '') && !/\.(mp4|mov|m4v|webm|mkv)$/i.test(d.name || '')) continue;
       const c = await neuerClip(d);
-      if (c) { CLIPS.push(c); n++; } else UMG.meldung(`„${d.name}“ kann der Browser nicht öffnen. Bitte als MP4 speichern.`, 1);
+      if (c && BEARBEITE) { bearbeiteAnwenden(c); CLIPS.unshift(c); n++; }
+      else if (c) { CLIPS.push(c); n++; } else UMG.meldung(`„${d.name}“ kann der Browser nicht öffnen. Bitte als MP4 speichern.`, 1);
     }
     if (n) { UMG.meldung(n === 1 ? 'Clip geladen. Jetzt Vorlage antippen.' : `${n} Clips geladen.`); zeichnen(); }
   }
@@ -3250,6 +3309,8 @@
       if (!vp.mehr && c.tag2) { try { await tag2Bauen(c, vp, id, basis + 86400000); mehr.push('Tag 2'); } catch (e) { UMG.meldung('Tag 2 ging nicht: ' + (e.message || e), 1); } }
       if (!vp.mehr && c.tag3 && c.insta) { try { await tag3Bauen(c, vp, id, basis + 2 * 86400000); mehr.push('Karussell'); } catch (e) { UMG.meldung('Das Karussell ging nicht: ' + (e.message || e), 1); } }
       if (mehr.length) UMG.meldung('Dazu eingeplant: ' + mehr.join(' und '));
+      if (c.ersetzt) await altenErsetzen(c.ersetzt);   // ✏️ bearbeiteter Post: der alte kommt weg
+      await clipMerken(id, c);                         // … und dieser lässt sich später wieder bearbeiten
       clipWeg(c);
       ARBEIT = '';
       UMG.meldung(`Eingeplant: ${zeit(r.postMs)} 🎉`);
@@ -3321,8 +3382,10 @@
       try { await UMG.igApi('POST', '/api/clips/einstellungen', { zeit: BOX.querySelector('[data-c="cfg-zeit"]').value, test: BOX.querySelector('[data-c="cfg-test"]').checked, trailer: BOX.querySelector('[data-c="cfg-trailer"]').checked, abend: BOX.querySelector('[data-c="cfg-abend"]').checked, top5: BOX.querySelector('[data-c="cfg-top5"]').checked }); UMG.meldung('Gespeichert.'); await UMG.laden(); } catch (e) { UMG.meldung(e.message, 1); }
       return;
     }
+    if (a === 'bearbeiten-ab') { BEARBEITE = null; zeichnen(); return; }
     if (!id) return;
     try {
+      if (a === 'bearbeiten') { await bearbeiten(id); return; }
       if (a === 'jetzt') {
         if (!confirm('Diesen Clip jetzt sofort posten?')) return;
         b.disabled = true; b.textContent = '⏳ …';
@@ -3446,6 +3509,7 @@
     quellenVon(c).forEach((src, i) => { const s2 = BOX.querySelector(`[data-c="slot-z"][data-i="${i}"]`), w2 = BOX.querySelector(`[data-c="slot-z-wert"][data-i="${i}"]`), z2 = tfVon(src).z || 1; if (s2) s2.value = z2; if (w2) w2.textContent = Math.round(z2 * 100) + ' %'; });
   }
   window.K888Clips = {
+    vorlageInfo: id => trailerV(id) || karV(id) || VORLAGEN.find(y => y.id === id) || null,
     VORLAGEN, STILE, bauen, zeitplan, zeichne, material, schriften, vorschaubild, stichwoerter, trailerZeichnen, trailerBauen, trailerPruefen, trailerTon, trailerWahl, TR_ARTEN, TR_FARBEN, karPruefen, top5Seiten, abendSeiten, top5Liste, tag2Clip, tag3Seiten, karSeite,
     async start(box, umg) {
       UMG = umg;
@@ -3467,7 +3531,7 @@
       MAT = null;
       schriften();
       zeichnen();
-      setTimeout(async () => { await trailerPruefen(); await karPruefen(); }, 1500);   // 🔴 Stream-Trailer und 🖼 Karussells von selbst bauen
+      setTimeout(async () => { await trailerPruefen(); await karPruefen(); await merkAufraeumen(); }, 1500);   // 🔴 Stream-Trailer und 🖼 Karussells von selbst bauen
     }
   };
 
@@ -3580,6 +3644,7 @@
 .kc-app .kc-stich .ki-chip{border-color:#5cff1f;color:#d9ffcc}
 .kc-app .kc-hinweis{font-size:13px;color:#f5c518;background:#0b0c10;border:1px solid rgba(245,197,24,.45);padding:6px 10px}
 .kc-app .kc-hinweis.rot{color:#ff6b75;border-color:rgba(225,19,36,.45)}
+.kc-app .kc-hinweis.kc-bearb{color:#bff4ff;border-color:rgba(24,232,255,.55);background:rgba(24,232,255,.07);font-size:14px;padding:10px 14px;margin:8px 0}
 .kc-app .kc-raus,.kc-app .kc-einst{background:#0d0e13;border:1px solid var(--line,#23262f);padding:10px 14px}
 .kc-app .kc-raus summary,.kc-app .kc-einst summary{cursor:pointer;font-weight:700;color:#fff}
 .kc-app .kc-raus .kc-post{margin-top:10px;background:#0b0c10}
