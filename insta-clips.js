@@ -1622,19 +1622,61 @@
   // Das Dashboard baut ihn von selbst für die Streams der nächsten 4 Tage und plant ihn 2,5 Stunden vor „Live ab“ ein
   // (als ganz normaler Clip: Instagram-Reel, YouTube-Short mit Link zum Stream, TikTok-Entwurf).
   const TRAILER_T = 8, TRAILER_VOR = 2.5 * 3600000, TRAILER_V = { id: 'trailer', name: 'Stream-Trailer', emoji: '🔴', farbe: '#ff2a2a' };
-  function trailerZeichnen(g, t, x, m, hg) {   // x = { serie, track, zeit, wann } · hg = Bild des Rennens (kann fehlen)
-    const f = TRAILER_V.farbe, gelb = '#ffd400', ein = (a, d) => eo(fp(t, a, a + (d || 0.35))), aus = (a, d) => 1 - fp(t, a, a + (d || 0.3));
+  // Vorlagen und Farben wechseln von selbst: es kommt immer dran, was am längsten nicht lief (trailerWahl)
+  const TR_ARTEN = [
+    { id: 'heute', name: 'Heute live', thumb: 3.4 }, { id: 'ampel', name: 'Startampel', thumb: 3.4 }, { id: 'eil', name: 'Eilmeldung', thumb: 3.4 },
+    { id: 'frage', name: 'Frage', thumb: 3.4 }, { id: 'count', name: '3 · 2 · 1', thumb: 3.4 }, { id: 'tacho', name: 'Schaltblitz', thumb: 3.4 },
+    { id: 'liste', name: 'Zeile für Zeile', thumb: 5.6 }, { id: 'plakat', name: 'Plakat', thumb: 5.6, bild: true }   // Plakat nur mit Bild vom Rennen
+  ];
+  const TR_FARBEN = ['#ff2a2a', '#18e8ff', '#5cff1f', '#ff4fd8', '#ff7a00', '#ffd400', '#b44dff'];
+  const TR_MUSTER = /^trailer([a-z]*)(\d*)$/;
+  const trailerV = v => { const mt = TR_MUSTER.exec(v || ''); if (!mt) return null; const a = TR_ARTEN.find(y => y.id === mt[1]) || TR_ARTEN[0]; return { ...TRAILER_V, name: 'Stream-Trailer · ' + a.name, farbe: TR_FARBEN[Number(mt[2] || 0) % TR_FARBEN.length], art: a }; };
+  function trailerWahl(clips, rk, hatBild, schon) {   // schon = in diesem Durchlauf gerade vergeben
+    const alt = (clips || []).map(c => ({ m: TR_MUSTER.exec(c.vorlage || ''), ms: c.postMs || 0 })).filter(y => y.m).sort((a, b) => b.ms - a.ms);
+    const letzteA = [...(schon || []).map(y => y.art.id), ...alt.map(y => y.m[1] || 'heute')], letzteF = [...(schon || []).map(y => y.fi), ...alt.map(y => Number(y.m[2] || 0))];
+    let h = 0; for (const ch of String(rk)) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
+    const rang = (liste, wert) => { const i = liste.indexOf(wert); return i < 0 ? 1e6 : i; }, arten = TR_ARTEN.filter(a => hatBild || !a.bild);
+    const beste = (werte, letzte, schluessel) => werte.map((w, i) => [rang(letzte, schluessel(w, i)), (i + h) % werte.length, w, i]).sort((p, q) => q[0] - p[0] || p[1] - q[1])[0];
+    return { art: beste(arten, letzteA, a => a.id)[2], fi: beste(TR_FARBEN, letzteF, (w, i) => i)[3] };
+  }
+  let TR_TMP = null;
+  function trailerZeichnen(g, t, x, m, hg) {   // x = { art, farbe, serie, track, zeit, wort, tz, wann } · hg = Bild des Rennens (kann fehlen)
+    const art = x.art || 'heute', f = x.farbe || TRAILER_V.farbe, zf = f === '#ffd400' || f === '#ff7a00' ? '#18e8ff' : '#ffd400', frei = art === 'liste' || art === 'plakat';
+    const ein = (a, d) => eo(fp(t, a, a + (d || 0.35))), aus = (a, d) => 1 - fp(t, a, a + (d || 0.3)), knall = (a, d) => 1 + 0.8 * (1 - eob(fp(t, a, a + (d || 0.4))));
+    const serie = GROSS(x.serie || 'SIMRACING'), strecke = GROSS(x.track || ''), wort = x.wort || 'HEUTE', tz = x.tz || 'HEUTE';
+    const iw = hg ? hg.naturalWidth || hg.width : 0, ih = hg ? hg.naturalHeight || hg.height : 0;
     const mitte = (text, y, px, w, farbe) => { g.save(); SA(g, px, w || 800); g.textAlign = 'center'; g.fillStyle = farbe || '#fff'; g.shadowColor = 'rgba(0,0,0,.85)'; g.shadowBlur = 12; g.fillText(text, B / 2, y); g.restore(); };
-    const chromMitte = (text, y, px, farbe, sc) => { const ch = chrom(text, px, farbe, 980); g.save(); g.translate(B / 2, y); g.scale(sc, sc); g.drawImage(ch.c, -ch.mitte, -ch.base); g.restore(); };
+    const chromM = (text, y, px, farbe, sc, dx) => { const ch = chrom(text, px, farbe, 980); g.save(); g.translate(B / 2 + (dx || 0), y); g.scale(sc || 1, sc || 1); g.drawImage(ch.c, -ch.mitte, -ch.base); g.restore(); };
+    const neonM = (text, y, px, dx) => { g.save(); const p = passt(g, text, 940, px, RU, 34); neonText(g, text, B / 2 + (dx || 0), y, p, f, RU, 'center'); g.restore(); };
+    const bildIn = (kx, ky, kw, kh, r, zoom) => { g.save(); g.beginPath(); g.roundRect(kx, ky, kw, kh, r); g.clip(); g.fillStyle = '#0b0c10'; g.fillRect(kx, ky, kw, kh);
+      if (hg) { const s = Math.max(kw / iw, kh / ih) * zoom; g.drawImage(hg, kx + (kw - iw * s) / 2, ky + (kh - ih * s) / 2, iw * s, ih * s); } else logoRing(g, kx + kw / 2, ky + kh / 2, Math.min(kw, kh) * 0.3, f, m.logo, t);
+      g.restore(); };
+    const rahmen = (kx, ky, kw, kh, r) => { g.save(); g.lineWidth = 6; g.strokeStyle = f; g.shadowColor = f; g.shadowBlur = 30; g.beginPath(); g.roundRect(kx, ky, kw, kh, r); g.stroke(); g.restore(); };
+    const linie = (y, a) => { if (a <= 0) return; g.save(); g.fillStyle = f; g.shadowColor = f; g.shadowBlur = 22; g.fillRect(B / 2 - 420 * a, y, 840 * a, 5); g.restore(); };
+    const lampe = (cx, cy, r, farbe, an) => { g.save(); g.beginPath(); g.arc(cx, cy, r, 0, Math.PI * 2); g.fillStyle = an ? farbe : '#1a1d22'; if (an) { g.shadowColor = farbe; g.shadowBlur = r * 0.9; } g.fill();
+      if (an) { g.shadowBlur = 0; g.fillStyle = 'rgba(255,255,255,.35)'; g.beginPath(); g.arc(cx - r * 0.28, cy - r * 0.32, r * 0.28, 0, Math.PI * 2); g.fill(); } g.restore(); };
+    // Grund
     g.drawImage(grund(f), 0, 0);
-    if (hg) {   // Bild des Rennens ganz leicht im Hintergrund
-      const iw = hg.naturalWidth || hg.width, ih = hg.naturalHeight || hg.height, s = Math.max(B / iw, H / ih) * (1.06 + 0.05 * t / TRAILER_T);
+    if (hg && art === 'plakat') {   // Plakat: das Bild groß oben, läuft nach unten aus
+      if (!TR_TMP) TR_TMP = leinwand(B, 1200);
+      const k = TR_TMP.getContext('2d'), s = Math.max(B / iw, 1200 / ih) * (1.03 + 0.08 * t / TRAILER_T);
+      k.globalCompositeOperation = 'source-over'; k.clearRect(0, 0, B, 1200); k.drawImage(hg, (B - iw * s) / 2, (1200 - ih * s) / 2, iw * s, ih * s);
+      k.globalCompositeOperation = 'destination-in'; const gr = k.createLinearGradient(0, 0, 0, 1200); gr.addColorStop(0, 'rgba(0,0,0,.6)'); gr.addColorStop(0.2, '#000'); gr.addColorStop(0.58, '#000'); gr.addColorStop(1, 'rgba(0,0,0,0)');
+      k.fillStyle = gr; k.fillRect(0, 0, B, 1200); k.globalCompositeOperation = 'source-over';
+      g.save(); g.globalAlpha = t < 6.2 ? 1 : 1 - fp(t, 6.2, 6.5); g.drawImage(TR_TMP, 0, 0); g.restore();
+    } else if (hg) {   // sonst: Bild ganz leicht im Hintergrund
+      const s = Math.max(B / iw, H / ih) * (1.06 + 0.05 * t / TRAILER_T);
       g.save(); g.globalAlpha = 0.2; g.drawImage(hg, (B - iw * s) / 2, (H - ih * s) / 2, iw * s, ih * s); g.restore();
       g.fillStyle = 'rgba(5,6,9,.5)'; g.fillRect(0, 0, B, H);
     }
-    if (t < 6.2) {   // roter Punkt „LIVE“ oben
+    if (t < 6.2 && art === 'eil') {   // Laufband oben
+      g.save(); g.globalAlpha = ein(0.05) * aus(5.95, 0.25); g.fillStyle = f; g.shadowColor = f; g.shadowBlur = 24; g.fillRect(0, 262, B, 84); g.shadowBlur = 0;
+      RU(g, 46); g.fillStyle = '#06080a'; g.textAlign = 'left'; const tx = `+++ ${wort} LIVE +++ ${serie} ${strecke ? '+++ ' + strecke + ' ' : ''}+++ ${x.zeit} UHR `, tw = g.measureText(tx).width;
+      g.beginPath(); g.rect(0, 262, B, 84); g.clip(); for (let xx = -((t * 260) % tw); xx < B; xx += tw) g.fillText(tx, xx, 321);
+      g.restore();
+    } else if (t < 6.2 && !frei) {   // roter Punkt „LIVE“ oben
       g.save(); g.globalAlpha = ein(0.1) * aus(5.95, 0.25); const an = Math.floor(t * 2) % 2 === 0;
-      g.fillStyle = an ? f : 'rgba(255,42,42,.35)'; g.shadowColor = f; g.shadowBlur = an ? 26 : 0; g.beginPath(); g.arc(B / 2 - 96, 318, 17, 0, Math.PI * 2); g.fill(); g.restore();
+      g.fillStyle = an ? '#ff2a2a' : 'rgba(255,42,42,.35)'; g.shadowColor = '#ff2a2a'; g.shadowBlur = an ? 26 : 0; g.beginPath(); g.arc(B / 2 - 96, 318, 17, 0, Math.PI * 2); g.fill(); g.restore();
       g.save(); g.globalAlpha = ein(0.1) * aus(5.95, 0.25); SA(g, 54, 900); g.fillStyle = '#fff'; g.fillText('LIVE', B / 2 - 62, 337); g.restore();
     }
     if (t < 6.2) {   // unten die ganze Zeit: wo es läuft
@@ -1644,47 +1686,122 @@
       g.restore();
     }
     const a1 = aus(1.45, 0.25);
-    if (a1 > 0) {   // 1 · Aufhänger
+    if (a1 > 0 && !frei) {   // 1 · Aufhänger (je Vorlage anders)
       g.save(); g.globalAlpha = a1;
-      chromMitte(x.wort || 'HEUTE', 900, 250, f, 1 + 0.9 * (1 - eob(fp(t, 0.05, 0.45))));
-      const p2 = fp(t, 0.38, 0.75); if (p2 > 0) { g.globalAlpha = a1 * Math.min(1, p2 * 2); neonText(g, 'LIVE', B / 2, 1170, 300 * (0.7 + 0.3 * eob(p2)), f, RU, 'center'); }
+      if (art === 'ampel') {   // Startampel: fünf rote Lichter gehen an, dann aus
+        g.save(); g.fillStyle = '#0a0c10'; g.strokeStyle = '#2a2f36'; g.lineWidth = 6; g.beginPath(); g.roundRect(70, 590, 940, 250, 40); g.fill(); g.stroke(); g.restore();
+        for (let i = 0; i < 5; i++) lampe(B / 2 + (i - 2) * 178, 715, 70, '#ff2a2a', t >= 0.15 + i * 0.25 && t < 1.4);
+        chromM(wort + ' LIVE', 1090, 180, f, knall(0.1));
+      } else if (art === 'eil') {
+        g.save(); g.translate(-(1 - ein(0.05)) * 700, 0); const tx = 'EILMELDUNG', bw = pillenBreite(g, tx, 70); pille(g, tx, (B - bw) / 2, 590, f, 70, true); g.restore();
+        if (t > 0.3) chromM(GROSS(m.name || 'KREIDS'), 930, 220, f, knall(0.3));
+        if (t > 0.65) { g.save(); g.globalAlpha = a1 * ein(0.65, 0.25); neonM('GEHT ' + (wort === 'HEUTE' ? 'HEUTE ' : '') + 'LIVE', 1110, 120); g.restore(); }
+      } else if (art === 'frage') {
+        g.save(); g.globalAlpha = a1 * ein(0.05); mitte('WAS MACHST DU', 780, 104, 800); g.restore();
+        if (t > 0.4) chromM(tz + '?', 1010, 210, f, knall(0.4));
+      } else if (art === 'count') {   // 3 · 2 · 1
+        mitte(wort + ' LIVE', 1300, 84, 800);
+        const i = Math.floor(t / 0.45);
+        if (i < 3) { const p = (t - i * 0.45) / 0.45; g.save(); g.globalAlpha = a1 * (1 - fp(p, 0.72, 1)); chromM(String(3 - i), 1090, 540, f, 1.6 - 0.6 * eo(Math.min(1, p * 3))); g.restore(); }
+      } else if (art === 'tacho') {   // Schaltblitz: Lichter laufen hoch, dann blinkt es blau
+        const n = Math.floor(12.99 * fp(t, 0.1, 1.2)), blau = t >= 1.2, blink = Math.floor(t * 14) % 2 === 0;
+        for (let i = 0; i < 12; i++) lampe(B / 2 + (i - 5.5) * 80, 720, 31, blau ? '#3d7bff' : i < 5 ? '#5cff1f' : i < 9 ? '#ffd400' : '#ff2a2a', blau ? blink : i < n);
+        chromM('BEREIT?', 1020, 220, f, knall(0.1)); mitte(wort + ' LIVE', 1150, 76, 800);
+      } else {
+        chromM(wort, 900, 250, f, 1 + 0.9 * (1 - eob(fp(t, 0.05, 0.45))));
+        const p2 = fp(t, 0.38, 0.75); if (p2 > 0) { g.globalAlpha = a1 * Math.min(1, p2 * 2); neonText(g, 'LIVE', B / 2, 1170, 300 * (0.7 + 0.3 * eob(p2)), f, RU, 'center'); }
+      }
       g.restore();
     }
     const a2 = ein(1.5) * aus(3.95);
-    if (a2 > 0) {   // 2 · Worum es geht: Bild, Serie, Strecke
-      g.save(); g.globalAlpha = a2; g.translate(0, (1 - ein(1.5)) * 60);
-      const kx = 100, ky = 470, kw = B - 200, kh = 560;
-      g.save(); g.beginPath(); g.roundRect(kx, ky, kw, kh, 26); g.clip(); g.fillStyle = '#0b0c10'; g.fillRect(kx, ky, kw, kh);
-      if (hg) { const iw = hg.naturalWidth || hg.width, ih = hg.naturalHeight || hg.height, s = Math.max(kw / iw, kh / ih) * (1.04 + 0.06 * fp(t, 1.5, 4)); g.drawImage(hg, kx + (kw - iw * s) / 2, ky + (kh - ih * s) / 2, iw * s, ih * s); }
-      else logoRing(g, B / 2, ky + kh / 2, 170, f, m.logo, t);
-      g.restore();
-      g.save(); g.lineWidth = 6; g.strokeStyle = f; g.shadowColor = f; g.shadowBlur = 30; g.beginPath(); g.roundRect(kx, ky, kw, kh, 26); g.stroke(); g.restore();
-      mitte(x.tz || 'HEUTE', 420, 56, 800);
-      chromMitte(GROSS(x.serie || 'SIMRACING'), 1210, 128, f, 1);
-      if (x.track) { g.save(); const px = passt(g, GROSS(x.track), 940, 76, RU, 34); neonText(g, GROSS(x.track), B / 2, 1330, px, f, RU, 'center'); g.restore(); }
+    if (a2 > 0 && !frei) {   // 2 · Worum es geht: Bild, Serie, Strecke (drei Aufteilungen)
+      const s2 = art === 'eil' || art === 'ampel' ? 'gross' : art === 'frage' || art === 'tacho' ? 'zeilen' : 'karte', zoom = 1.04 + 0.06 * fp(t, 1.5, 4);
+      g.save(); g.globalAlpha = a2;
+      if (s2 === 'karte') {
+        g.translate(0, (1 - ein(1.5)) * 60); bildIn(100, 470, 880, 560, 26, zoom); rahmen(100, 470, 880, 560, 26);
+        mitte(tz, 420, 56, 800); chromM(serie, 1210, 128, f); if (strecke) neonM(strecke, 1330, 76);
+      } else if (s2 === 'gross') {   // Bild über die ganze Breite
+        bildIn(0, 440, B, 640, 0, zoom);
+        const gr = g.createLinearGradient(0, 800, 0, 1080); gr.addColorStop(0, 'rgba(5,6,9,0)'); gr.addColorStop(1, 'rgba(5,6,9,.92)'); g.fillStyle = gr; g.fillRect(0, 800, B, 280);
+        g.save(); g.fillStyle = f; g.shadowColor = f; g.shadowBlur = 24; g.fillRect(0, 436, B, 6); g.fillRect(0, 1078, B, 6); g.restore();
+        pille(g, tz, 50, 472, f, 48, true);
+        const dx = (1 - ein(1.6, 0.4)) * 600; chromM(serie, 1222, 132, f, 1, -dx); if (strecke) neonM(strecke, 1335, 78, dx);
+      } else {   // große Zeilen, Bild als Streifen darunter
+        const dx = (1 - ein(1.55, 0.4)) * 600;
+        mitte(art === 'frage' ? 'ICH FAHRE' : 'AUF DEM PLAN', 520, 64, 800); chromM(serie, 700, 140, f, 1, -dx); linie(745, ein(1.7, 0.4));
+        if (strecke) { mitte('STRECKE', 850, 46, 700, 'rgba(255,255,255,.75)'); neonM(strecke, 955, 84, dx); }
+        bildIn(100, 1030, 880, 330, 22, zoom); rahmen(100, 1030, 880, 330, 22);
+      }
       g.restore();
     }
     const a3 = ein(4.0) * aus(6.0);
-    if (a3 > 0) {   // 3 · Wann
+    if (a3 > 0 && !frei) {   // 3 · Wann (große Uhr oder Tafel)
       g.save(); g.globalAlpha = a3;
-      mitte('LIVE AB', 720, 84, 800);
-      chromMitte(x.zeit, 1040, 340, gelb, 1 + 0.5 * (1 - eob(fp(t, 4.0, 4.4))));
-      mitte('UHR · ' + (x.tz || 'HEUTE'), 1180, 64, 800);
-      if (x.wann) mitte(GROSS(x.wann), 1270, 46, 700, 'rgba(255,255,255,.8)');
+      if (art === 'eil' || art === 'ampel' || art === 'count') {
+        [['TAG', GROSS(x.wann || tz)], ['LIVE AB', x.zeit + ' UHR'], ['RENNEN', serie]].forEach((z, i) => {
+          const p = ein(4.0 + i * 0.18, 0.35), y = 520 + i * 250, haupt = i === 1; if (p <= 0) return;
+          g.save(); g.globalAlpha = a3 * p; g.translate((1 - p) * (i % 2 ? 500 : -500), 0);
+          g.fillStyle = 'rgba(6,8,10,.82)'; g.beginPath(); g.roundRect(70, y, 940, 215, 22); g.fill(); g.lineWidth = haupt ? 6 : 3; g.strokeStyle = haupt ? zf : f; g.shadowColor = haupt ? zf : f; g.shadowBlur = haupt ? 34 : 14; g.stroke(); g.shadowBlur = 0;
+          SA(g, 40, 700); g.textAlign = 'left'; g.fillStyle = 'rgba(255,255,255,.7)'; g.fillText(z[0], 110, y + 58);
+          if (haupt) { const ch = chrom(z[1], 128, zf, 860); g.drawImage(ch.c, B / 2 - ch.mitte, y + 184 - ch.base); }
+          else { passt(g, z[1], 860, 92, RU, 36); g.textAlign = 'center'; g.fillStyle = '#fff'; g.fillText(z[1], B / 2, y + 162); }
+          g.restore();
+        });
+      } else {
+        mitte(art === 'frage' ? 'DANN KOMM VORBEI' : 'LIVE AB', 720, art === 'frage' ? 72 : 84, 800);
+        chromM(x.zeit, 1040, 340, zf, 1 + 0.5 * (1 - eob(fp(t, 4.0, 4.4))));
+        mitte('UHR · ' + tz, 1180, 64, 800);
+        if (x.wann) mitte(GROSS(x.wann), 1270, 46, 700, 'rgba(255,255,255,.8)');
+      }
       g.restore();
     }
+    if (art === 'liste' && t < 6.2) {   // Zeile für Zeile: alles baut sich untereinander auf und bleibt stehen
+      const al = aus(5.95, 0.25), rein = (a, links) => (1 - ein(a, 0.3)) * (links ? -1000 : 1000);
+      g.save(); g.globalAlpha = al;
+      if (t > 0.1) chromM(wort, 470, 230, f, 1, rein(0.1, true));
+      if (t > 0.55) neonText(g, 'LIVE', B / 2 + rein(0.55, false), 690, 220, f, RU, 'center');
+      if (t > 1.5) { linie(745, ein(1.5, 0.4)); chromM(serie, 910, 124, f, 1, rein(1.5, true)); }
+      if (t > 2.4 && strecke) neonM(strecke, 1020, 76, rein(2.4, false));
+      if (t > 4.0) { linie(1065, ein(4.0, 0.4)); chromM(x.zeit, 1290, 230, zf, 1 + 0.5 * (1 - eob(fp(t, 4.0, 4.4)))); g.save(); g.globalAlpha = al * ein(4.3); mitte('UHR · ' + GROSS(x.wann || tz), 1375, 50, 800); g.restore(); }
+      g.restore();
+    }
+    if (art === 'plakat' && t < 6.2) {   // Plakat: großes Bild, die Zeilen kommen nacheinander dazu
+      const al = aus(5.95, 0.25);
+      g.save(); g.globalAlpha = al;
+      g.save(); g.translate(0, -(1 - ein(0.15)) * 260); const tx = wort + ' LIVE', bw = pillenBreite(g, tx, 76); pille(g, tx, (B - bw) / 2, 230, f, 76, true); g.restore();
+      if (t > 0.8) { g.save(); g.globalAlpha = al * ein(0.8, 0.25); chromM(serie, 980, 150, f, knall(0.8)); g.restore(); }
+      if (t > 1.5 && strecke) { g.save(); g.globalAlpha = al * ein(1.5); neonM(strecke, 1085, 78); g.restore(); }
+      if (t > 2.6) { g.save(); g.globalAlpha = al * ein(2.6, 0.25); linie(1130, ein(2.6, 0.4)); chromM(x.zeit + ' UHR', 1300, 170, zf, t < 3.2 ? knall(2.6) : 1 + 0.025 * Math.sin((t - 3.2) * 6)); mitte(GROSS(x.wann || tz), 1370, 46, 700, 'rgba(255,255,255,.85)'); g.restore(); }
+      g.restore();
+    }
+    if (art === 'ampel' || art === 'count' || art === 'tacho') { const bl = fp(t, 1.38, 1.44) * (1 - fp(t, 1.44, 1.8)); if (bl > 0) { g.fillStyle = `rgba(255,255,255,${(0.5 * bl).toFixed(3)})`; g.fillRect(0, 0, B, H); } }   // Blitz beim Start
     if (t >= 6.2) outroZeichnen(g, t - 6.2, m, f);   // 4 · Wohin: Abspann wie bei den Clips (YouTube)
     g.fillStyle = f; g.fillRect(0, H - 14, B * kl(t / TRAILER_T, 0, 1), 14);
   }
-  async function trailerTon() {   // eigene Effekt-Töne: Schläge an den Schnitten, Zischer davor
+  async function trailerTon(art) {   // eigene Effekt-Töne: Schläge an den Schnitten, Zischer davor, je Vorlage ein eigener Anfang
     const ctx = new OfflineAudioContext(2, TON_RATE * TRAILER_T, TON_RATE), ziel = ctx.createDynamicsCompressor(); ziel.connect(ctx.destination);
     const rausch = (t, d, typ, f0, f1, v) => { const n = ctx.createBufferSource(), fl = ctx.createBiquadFilter(), gg = ctx.createGain(); n.buffer = rauschen(ctx); n.loop = true; fl.type = typ; fl.frequency.setValueAtTime(f0, t); fl.frequency.exponentialRampToValueAtTime(f1, t + d);
       gg.gain.setValueAtTime(0.0001, t); gg.gain.linearRampToValueAtTime(v, t + d * 0.85); gg.gain.linearRampToValueAtTime(0.0001, t + d); n.connect(fl); fl.connect(gg); gg.connect(ziel); n.start(t); n.stop(t + d + 0.05); };
     const schlag = (t, v) => { const o = ctx.createOscillator(), gg = ctx.createGain(); o.frequency.setValueAtTime(160, t); o.frequency.exponentialRampToValueAtTime(42, t + 0.22); gg.gain.setValueAtTime(0.0001, t); gg.gain.linearRampToValueAtTime(v, t + 0.008); gg.gain.exponentialRampToValueAtTime(0.0001, t + 0.55); o.connect(gg); gg.connect(ziel); o.start(t); o.stop(t + 0.6);
       const n = ctx.createBufferSource(), fl = ctx.createBiquadFilter(), g2 = ctx.createGain(); n.buffer = rauschen(ctx); n.loop = true; fl.type = 'bandpass'; fl.frequency.value = 1900; g2.gain.setValueAtTime(v * 0.45, t); g2.gain.exponentialRampToValueAtTime(0.0001, t + 0.16); n.connect(fl); fl.connect(g2); g2.connect(ziel); n.start(t); n.stop(t + 0.2); };
-    schlag(0.05, 0.9); schlag(0.38, 0.8); rausch(1.15, 0.35, 'bandpass', 500, 4200, 0.22); schlag(1.5, 0.6);
+    const piep = (t, hz, d, v, typ) => { const o = ctx.createOscillator(), gg = ctx.createGain(); o.type = typ || 'square'; o.frequency.value = hz; gg.gain.setValueAtTime(0.0001, t); gg.gain.linearRampToValueAtTime(v, t + 0.006); gg.gain.setValueAtTime(v, t + d * 0.7); gg.gain.exponentialRampToValueAtTime(0.0001, t + d); o.connect(gg); gg.connect(ziel); o.start(t); o.stop(t + d + 0.02); };
+    let schnitt = 0.6;
+    if (art === 'ampel') { for (let i = 0; i < 5; i++) piep(0.15 + i * 0.25, 440, 0.13, 0.14); piep(1.4, 880, 0.45, 0.16); schnitt = 0.9; }
+    else if (art === 'eil') { piep(0.05, 880, 0.35, 0.16, 'sine'); piep(0.22, 660, 0.5, 0.16, 'sine'); schlag(0.3, 0.8); schlag(0.65, 0.6); }
+    else if (art === 'frage') { schlag(0.05, 0.5); schlag(0.4, 0.9); }
+    else if (art === 'count') { for (let i = 0; i < 3; i++) { schlag(i * 0.45 + 0.02, 0.85); piep(i * 0.45 + 0.02, 520, 0.1, 0.08); } piep(1.36, 1040, 0.3, 0.14); schnitt = 0.9; }
+    else if (art === 'tacho') {   // Motor dreht hoch, dann piept der Schaltblitz
+      const o = ctx.createOscillator(), fl = ctx.createBiquadFilter(), gg = ctx.createGain(); o.type = 'sawtooth'; o.frequency.setValueAtTime(70, 0.1); o.frequency.exponentialRampToValueAtTime(330, 1.2); fl.type = 'lowpass'; fl.frequency.setValueAtTime(500, 0.1); fl.frequency.exponentialRampToValueAtTime(1800, 1.2);
+      gg.gain.setValueAtTime(0.0001, 0.1); gg.gain.linearRampToValueAtTime(0.2, 1.1); gg.gain.linearRampToValueAtTime(0.0001, 1.24); o.connect(fl); fl.connect(gg); gg.connect(ziel); o.start(0.1); o.stop(1.26);
+      for (let k = 0; k < 3; k++) piep(1.22 + k * 0.09, 1800, 0.05, 0.1); schnitt = 0.9;
+    }
+    else if (art === 'liste') { schlag(0.1, 0.9); schlag(0.55, 0.8); schlag(2.4, 0.6); }
+    else if (art === 'plakat') { schlag(0.15, 0.8); schlag(0.8, 0.9); schlag(2.6, 0.7); }
+    else { schlag(0.05, 0.9); schlag(0.38, 0.8); }
+    if (schnitt < 0.9) rausch(1.15, 0.35, 'bandpass', 500, 4200, 0.22);
+    schlag(1.5, schnitt);
     rausch(3.35, 0.65, 'bandpass', 400, 5000, 0.28); schlag(4.0, 0.95);
-    for (let z = 4.6; z < 5.9; z += 0.5) { const o = ctx.createOscillator(), gg = ctx.createGain(); o.type = 'square'; o.frequency.value = 1400; gg.gain.setValueAtTime(0.06, z); gg.gain.exponentialRampToValueAtTime(0.0001, z + 0.05); o.connect(gg); gg.connect(ziel); o.start(z); o.stop(z + 0.06); }
+    for (let z = 4.6; z < 5.9; z += 0.5) piep(z, 1400, 0.05, 0.06);
     rausch(5.8, 0.4, 'bandpass', 500, 4200, 0.22); schlag(6.2, 0.85);
     return ctx.startRendering();
   }
@@ -1721,7 +1838,7 @@
     await enc.flush(); enc.close();
     if (fehler) throw fehler;
     if (acfg) {
-      const ton = await trailerTon(), aenc = new AudioEncoder({ output: (ch, md) => muxer.addAudioChunk(ch, md), error: e => { fehler = e; } });
+      const ton = await trailerTon(x.art), aenc = new AudioEncoder({ output: (ch, md) => muxer.addAudioChunk(ch, md), error: e => { fehler = e; } });
       aenc.configure(acfg);
       const N = ton.length, li = ton.getChannelData(0), re = ton.getChannelData(1), BL = 4800;
       for (let i = 0; i < N; i += BL) {
@@ -1755,7 +1872,7 @@
     TRAILER_LAEUFT = true;
     try {
       for (const id of weg) { try { await UMG.igApi('POST', `/api/clip/${id}/weg`, {}); } catch (e) { /* bleibt als Fehler in der Liste */ } }
-      const m = MAT || await material(), dz = ms => new Date(ms);
+      const m = MAT || await material(), dz = ms => new Date(ms), schon = [];
       for (const o of offen.slice(0, 2)) {
         const p = o.p, serie = p.serie || p.titel || 'Simracing', uhr = dz(p.liveMs).toLocaleTimeString('de-DE', { timeZone: 'Europe/Berlin', hour: '2-digit', minute: '2-digit' });
         const tagVon = ms => dz(ms).toLocaleDateString('de-DE', { timeZone: 'Europe/Berlin' }), std = Number(uhr.slice(0, 2)), heute = tagVon(o.postMs) === tagVon(p.liveMs);
@@ -1763,13 +1880,14 @@
           wann: dz(p.liveMs).toLocaleDateString('de-DE', { timeZone: 'Europe/Berlin', weekday: 'long', day: '2-digit', month: '2-digit' }) };
         arbeit(`🔴 Trailer für ${serie} wird gebaut …`);
         let hg = null; try { if (p.hg) hg = await bild(p.hg); } catch (e) { hg = null; }
+        const w = trailerWahl(st.clips, o.rk, !!hg, schon); schon.unshift(w); x.art = w.art.id; x.farbe = TR_FARBEN[w.fi];   // Vorlage und Farbe wechseln von selbst
         const blob = await trailerBauen(x, m, hg, q => arbeit(`🔴 Trailer für ${serie} wird gebaut … ${Math.round(q * 100)} %`));
         arbeit('⬆ Trailer wird hochgeladen …');
-        const r = await UMG.igApi('POST', '/api/clip/neu', { vorlage: 'trailer', trailer: o.rk, trailerLive: p.liveMs, titel: `${x.wort} LIVE · ${GROSS(serie)}`.slice(0, 80),
+        const r = await UMG.igApi('POST', '/api/clip/neu', { vorlage: 'trailer' + w.art.id + w.fi, trailer: o.rk, trailerLive: p.liveMs, titel: `${x.wort} LIVE · ${GROSS(serie)}`.slice(0, 80),
           text: `🔴 ${heute ? 'Heute' : 'Gleich'} live: ${serie}${p.track ? ' · ' + p.track : ''} · ${uhr} Uhr\nSchaltet ein!\n\n#simracing #iracing #live #kreids888`, postMs: o.postMs, insta: true,
-          tiktok: !!(st.tiktok && st.tiktok.verbunden), youtube: !!(st.youtube && st.youtube.verbunden), test: false, thumbMs: 700, dauer: TRAILER_T });
+          tiktok: !!(st.tiktok && st.tiktok.verbunden), youtube: !!(st.youtube && st.youtube.verbunden), test: false, thumbMs: Math.round(w.art.thumb * 1000), dauer: TRAILER_T });
         await hochladen(r.id, blob);
-        try { const cv = leinwand(B, H); trailerZeichnen(cv.getContext('2d'), 0.95, x, m, hg); const k = leinwand(540, 960); k.getContext('2d').drawImage(cv, 0, 0, 540, 960); const vb = await new Promise(ok => k.toBlob(ok, 'image/jpeg', 0.85)); if (vb) await senden(`/api/clip/${r.id}/bild`, vb); } catch (e) { /* Vorschaubild ist nur schön */ }
+        try { const cv = leinwand(B, H); trailerZeichnen(cv.getContext('2d'), w.art.thumb, x, m, hg); const k = leinwand(540, 960); k.getContext('2d').drawImage(cv, 0, 0, 540, 960); const vb = await new Promise(ok => k.toBlob(ok, 'image/jpeg', 0.85)); if (vb) await senden(`/api/clip/${r.id}/bild`, vb); } catch (e) { /* Vorschaubild ist nur schön */ }
         TRAILER_FERTIG.add(o.rk + p.liveMs);
         UMG.meldung(`🔴 Trailer eingeplant: ${zeit(o.postMs)}`);
       }
@@ -2585,7 +2703,7 @@
     const mit = raus.filter(x => x.zahlen && (auf(x.zahlen) || lik(x.zahlen)));
     if (!mit.length) return '<div class="kc-leer">Noch keine Zahlen. Sie kommen ein paar Stunden nach dem Posten und werden dann laufend aktualisiert.</div>';
     for (const x of mit) { const e = m.get(x.vorlage) || { n: 0, a: 0, l: 0 }; e.n++; e.a += auf(x.zahlen); e.l += lik(x.zahlen); m.set(x.vorlage, e); }
-    const n = v => Math.round(v).toLocaleString('de-DE'), vor = id => (id === 'trailer' ? TRAILER_V : VORLAGEN.find(y => y.id === id) || { emoji: '🎬', name: id || 'Clip' });
+    const n = v => Math.round(v).toLocaleString('de-DE'), vor = id => trailerV(id) || VORLAGEN.find(y => y.id === id) || { emoji: '🎬', name: id || 'Clip' };
     const l = [...m.entries()].map(([id, e]) => ({ v: vor(id), n: e.n, a: e.a / e.n, l: e.l / e.n })).sort((p, q) => q.a - p.a || q.l - p.l);
     const top = mit.slice().sort((p, q) => auf(q.zahlen) - auf(p.zahlen) || lik(q.zahlen) - lik(p.zahlen)).slice(0, 3);
     return `<table class="kc-best"><tr><th>Vorlage</th><th>Clips</th><th>Ø Aufrufe</th><th>Ø Likes</th></tr>${l.slice(0, 8).map(e => `<tr><td>${e.v.emoji} ${esc(e.v.name)}</td><td>${e.n}</td><td><b>${n(e.a)}</b></td><td>${n(e.l)}</td></tr>`).join('')}</table>
@@ -2616,7 +2734,7 @@
         <div class="kc-felder">
           <label class="kc-feld">Uhrzeit für neue Clips<input type="time" value="${esc(cfg.zeit)}" data-c="cfg-zeit">${tipp('Jeder neue Clip kommt auf den nächsten freien Tag um diese Uhrzeit.')}</label>
           <label class="kc-check"><input type="checkbox" data-c="cfg-test" ${cfg.test ? 'checked' : ''}> <span><b>Test-Reels</b>${tipp('Instagram zeigt den Clip zuerst nur Leuten, die dir noch nicht folgen. Läuft er gut, sehen ihn auch deine Follower. Geht laut einem Planungstool erst ab 1.000 Followern – sonst wird ganz normal gepostet.')}</span></label>
-          <label class="kc-check"><input type="checkbox" data-c="cfg-trailer" ${cfg.trailer !== false ? 'checked' : ''}> <span><b>🔴 Stream-Trailer</b>${tipp('Baut für jeden Stream der nächsten 4 Tage von selbst ein kurzes Video „HEUTE LIVE“ und plant es 2,5 Stunden vor „Live ab“ ein. Dafür diesen Reiter vor dem Stream einmal öffnen.')}</span></label>
+          <label class="kc-check"><input type="checkbox" data-c="cfg-trailer" ${cfg.trailer !== false ? 'checked' : ''}> <span><b>🔴 Stream-Trailer</b>${tipp('Baut für jeden Stream der nächsten 4 Tage von selbst ein kurzes Video „HEUTE LIVE“ und plant es 2,5 Stunden vor „Live ab“ ein. 8 Vorlagen und 7 Farben wechseln von selbst. Dafür diesen Reiter vor dem Stream einmal öffnen.')}</span></label>
         </div>
         ${cfg.testFehler ? `<div class="kc-hinweis">Test-Reels gingen beim letzten Mal nicht, deshalb wurde normal gepostet. Instagram sagt: ${esc(cfg.testFehler)}</div>` : ''}
         <div class="kc-knoepfe"><button type="button" class="btn ki-k" data-c="cfg-speichern">💾 Speichern</button></div>
@@ -2747,7 +2865,7 @@
         ${tipp(`Clip ist ${sek(c.dauer)} lang. Genommen werden ${sek(p.b - p.a)}${p.FD ? (v.ampel ? ' + Startampel' : v.analyse ? ' + Analyse' : v.zielflagge ? ' + Ziel-Standbild' : ' + Pause') : ''}${p.R ? ' + Zeitlupe' : ''}. Am besten 8 bis 20 Sekunden, die Action ans Ende.`)}`;
   }
   function zeile(x, raus) {
-    const v = x.vorlage === 'trailer' ? TRAILER_V : VORLAGEN.find(y => y.id === x.vorlage) || VORLAGEN[0];
+    const v = trailerV(x.vorlage) || VORLAGEN.find(y => y.id === x.vorlage) || VORLAGEN[0];
     const chips = [];
     if (x.insta) chips.push(x.gepostet ? `<span class="ki-chip gruen">Instagram ✓${x.gepostet.test ? ' (Test-Reel)' : ''}</span>` : '<span class="ki-chip blau">Instagram</span>');
     if (x.tiktok) chips.push(x.tt ? '<span class="ki-chip gruen">TikTok-Entwurf ✓</span>' : '<span class="ki-chip blau">TikTok</span>');
@@ -3120,7 +3238,7 @@
     quellenVon(c).forEach((src, i) => { const s2 = BOX.querySelector(`[data-c="slot-z"][data-i="${i}"]`), w2 = BOX.querySelector(`[data-c="slot-z-wert"][data-i="${i}"]`), z2 = tfVon(src).z || 1; if (s2) s2.value = z2; if (w2) w2.textContent = Math.round(z2 * 100) + ' %'; });
   }
   window.K888Clips = {
-    VORLAGEN, STILE, bauen, zeitplan, zeichne, material, schriften, vorschaubild, stichwoerter, trailerZeichnen, trailerBauen, trailerPruefen, trailerTon,
+    VORLAGEN, STILE, bauen, zeitplan, zeichne, material, schriften, vorschaubild, stichwoerter, trailerZeichnen, trailerBauen, trailerPruefen, trailerTon, trailerWahl, TR_ARTEN, TR_FARBEN,
     async start(box, umg) {
       UMG = umg;
       if (BOX !== box) {
