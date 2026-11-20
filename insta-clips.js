@@ -213,13 +213,17 @@
   const ohnePflicht = t => String(t || '').replace(/(^|[^\p{L}\p{N}_#])#(simracing|iracing|gt3|crash)(?![\p{L}\p{N}_])/giu, '$1').replace(/[ \t]{2,}/g, ' ').trim();
   function textBauen(v, c) {
     const hook = String(c.hook || '').trim() || v.hooks[0], frage = String(c.unten || '').trim() || v.unten[0];
-    const info = (TEXT_INFO[v.id] ? TEXT_INFO[v.id](c) : []).map(x => String(x || '').trim()).filter(Boolean).join(' · ');
+    const info = [folgeAn(c) ? `${v.name} Nr. ${folgeVon(c)}` : '', ...(TEXT_INFO[v.id] ? TEXT_INFO[v.id](c) : [])].map(x => String(x || '').trim()).filter(Boolean).join(' · ');
     const rest = ohnePflicht(textTags(v));
     return [ohnePflicht(hook + ' ' + textEmoji(v) + ortZusatz(c, hook)) + ' ' + PFLICHT, info, frage + ' 👇'].filter(Boolean).join('\n') + (rest ? '\n\n' + rest : '');
   }
   const mitText = c => { c.text = textBauen(vorlage(c), c); return c; };
   const kw = () => { const d = new Date(); const t = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate())); const tag = t.getUTCDay() || 7; t.setUTCDate(t.getUTCDate() + 4 - tag); const j = new Date(Date.UTC(t.getUTCFullYear(), 0, 1)); return Math.ceil(((t - j) / 86400000 + 1) / 7); };
-  const tagText = v => v.tag.replace('{kw}', kw());
+  // 🔢 Reihe mit Nummer (NEU 20.11.2026): „CRASH #12“ im Schild, „Crash Nr. 12“ im Text. Zählt je Vorlage von selbst hoch (der Worker merkt die höchste Nummer).
+  const reiheStandard = () => { try { return localStorage.getItem('k888_reihe') !== '0'; } catch (e) { return true; } };
+  const folgeAn = c => (c.folgeAn !== undefined ? !!c.folgeAn : reiheStandard());
+  function folgeVon(c) { return c.folgeEigen ? Math.max(1, nr(c.folge)) : (((stand().clipnr || {})[c.vorlage]) || 0) + 1; }
+  const tagText = (v, c) => (c && c.tagEigen) || (v.tag.replace('{kw}', kw()) + (c && folgeAn(c) ? ' #' + folgeVon(c) : ''));
 
   // ═══ 🔎 Stichwörter aus dem Dateinamen (NEU 19.11.2026) ═══
   // „Spa_EauRouge_Crash.mp4“ oder „Monza Parabolica überholt.mp4“ → Strecke, Stelle (Kurve), was passiert, Auto.
@@ -1032,7 +1036,7 @@
       else if (halt && v.ampel) pille(g, 'START', fx + 6, sy0, '#ff2a2a', 30, true);
       else if (halt && v.zielflagge) pille(g, 'ZIEL', fx + 6, sy0, f, 30, true);
       else if (v.klassen) klassenSchilder(g, t, c, sy0 - 6);
-      else { const w0 = pille(g, tagText(v), fx + 6, sy0, f, 30, true); if (v.gruenStart && nr(c.startplatz)) pille(g, 'START P' + nr(c.startplatz), fx + 6 + w0 + 14, sy0, '#ffffff', 30, false); }
+      else { const w0 = pille(g, tagText(v, c), fx + 6, sy0, f, 30, true); if (v.gruenStart && nr(c.startplatz)) pille(g, 'START P' + nr(c.startplatz), fx + 6 + w0 + 14, sy0, '#ffffff', 30, false); }
       if (vid && !v.klassen && fw >= 640) { g.save(); OR(g, 34); g.textAlign = 'right'; g.shadowColor = f; g.shadowBlur = 14; g.fillStyle = '#fff'; g.fillText(uhr(p.quelle(t) || 0), fx + fw - 6, sy0 + 38); g.restore(); }
       // Fortschritt
       const pr = kl(t / (p.T - OUTRO), 0, 1), py = zoom ? 1270 : fy + fh + 18;
@@ -1361,7 +1365,7 @@
     const q0 = fp(t, 0.1, 0.4);
     if (q0 > 0) { g.save(); g.globalAlpha = q0; const h = GROSS(c.hook || v.hooks[0]); SA(g, 56, 800); neonText(g, h, B / 2, 300 - L0.hoch, passt(g, h, 960, 56, (gg, px) => SA(gg, px, 800)), f, (gg, px) => SA(gg, px, 800), 'center', 16); g.restore(); }
     spruchZeichnen(g, t, String(c.strecke || '').trim() || 'STRECKE', f, { y1: 490 - L0.hoch, y2: 430 - L0.hoch, px1: 170, px2: 140 });
-    pille(g, tagText(v), fx + 6, fy - 66, f, 30, true);
+    pille(g, tagText(v, c), fx + 6, fy - 66, f, 30, true);
     if (p.tempo >= 1.05) {   // nur zeigen, wenn wirklich schneller
       const tp = '×' + p.tempo.toFixed(1).replace('.', ',') + ' SPEED';
       g.save(); RU(g, 30); const tw = g.measureText(tp).width + 42; g.restore();
@@ -1402,7 +1406,7 @@
     const L0 = lage(c), fx = L0.fx, fy = L0.fy, fw = L0.fw, fh = L0.fh, dy = L0.dy, weg = p.marken.filter(x => t >= x.ot), n = weg.length, letzt = weg[n - 1];
     clipRahmen(g, b[0], fx, fy, fw, fh, f, t, 1, c.bild);
     spruchZeichnen(g, t, c.hook || v.hooks[0], f, L0.hoch ? { y1: 476 - L0.hoch, y2: 428 - L0.hoch } : undefined);
-    pille(g, tagText(v), fx + 6, fy - 66, f, 30, true);
+    pille(g, tagText(v, c), fx + 6, fy - 66, f, 30, true);
     let xr = fx + fw - 6;
     const eigen = GROSS(String(c.klasse || '').trim());
     if (eigen) { const w = pillenBreite(g, eigen, 30); pille(g, eigen, xr - w, fy - 66, klasseFarbe(eigen), 30, true); xr -= w + 14; }
@@ -1445,7 +1449,7 @@
     const L0 = lage(c), fx = L0.fx, fy = L0.fy, fw = L0.fw, fh = L0.fh, dy = L0.dy, start = startPlatz(c), weg = p.marken.filter(x => t >= x.ot).slice(0, start - 1), n = weg.length, letzt = weg[n - 1], gesamt = Math.min(p.marken.length, start - 1);
     clipRahmen(g, b[0], fx, fy, fw, fh, f, t, 1, c.bild);
     spruchZeichnen(g, t, c.hook || v.hooks[0], f, L0.hoch ? { y1: 476 - L0.hoch, y2: 428 - L0.hoch } : undefined);
-    pille(g, tagText(v), fx + 6, fy - 66, f, 30, true);
+    pille(g, tagText(v, c), fx + 6, fy - 66, f, 30, true);
     speedPille(g, p, fx + fw - 6, fy - 66);
     if (t < p.lauf) for (const x of weg) plusEins(g, t - x.ot, GROSS(String(x.text || '').trim()), '#5cff1f', fx + fw / 2 - 60, fy + fh / 2 + 40);
     platzKasten(g, fx + fw - 24 - 270, fy + 22, 270, 214, start - n, n, letzt ? t - letzt.ot : 9, f);
@@ -1500,7 +1504,7 @@
     const L0 = lage(c), fx = L0.fx, fy = L0.fy, fw = L0.fw, fh = L0.fh, dy = L0.dy, S = p.sektoren, src = p.x.a + Math.min(t, p.lauf) * p.tempo, t0 = p.lauf + 0.7;
     clipRahmen(g, b[0], fx, fy, fw, fh, f, t, 1, c.bild);
     spruchZeichnen(g, t, c.hook || v.hooks[0], f, L0.hoch ? { y1: 476 - L0.hoch, y2: 428 - L0.hoch } : undefined);
-    pille(g, tagText(v), fx + 6, fy - 66, f, 30, true);
+    pille(g, tagText(v, c), fx + 6, fy - 66, f, 30, true);
     let xr = fx + fw - 6; const st = GROSS(String(c.strecke || '').trim());
     if (st) { const w = pillenBreite(g, st, 30); pille(g, st, xr - w, fy - 66, '#ffffff', 30, false); xr -= w + 14; }
     speedPille(g, p, xr, fy - 66);
@@ -2040,6 +2044,48 @@
     finally { KAR_LAEUFT = false; }
   }
 
+  // ═══ 📅 Mehr Posts aus einem Clip (NEU 20.11.2026): Tag 2 = zweites Video (bei „Wer war schuld?“ die Auflösung), Tag 3 = Karussell aus Standbildern ═══
+  const TAG2_HOOKS = ['Nochmal ganz langsam', 'Schau genau hin', 'Hast du das gesehen?', 'Das Ganze nochmal in Ruhe', 'Achte auf dieses Detail', 'Der zweite Blick'], TAG2_UNTEN = ['Was fällt dir auf?', 'Siehst du es?', 'Wie siehst du das?', 'Was wäre besser gewesen?'];
+  const URTEILE = [['a', 'Auto A war schuld'], ['b', 'Auto B war schuld'], ['unfall', 'Für mich ein Rennunfall'], ['beide', 'Beide haben Schuld']];
+  function tag2Clip(c, v) {   // gleicher Clip, aber: andere Sprüche, anderer Stil, eigenes Schild
+    const schuld = v.id === 'schuld', urteil = (URTEILE.find(x => x[0] === c.urteil) || URTEILE[2])[1], n = folgeAn(c) ? ' #' + folgeVon(c) : '';
+    const hook = schuld ? 'Die Auflösung' : ziehen(TAG2_HOOKS, 'tag2hook'), unten = schuld ? urteil + '. Du auch?' : ziehen(TAG2_UNTEN, 'tag2unten');
+    const c2 = { ...c, hook, unten, zeitlupe: !!v.zl || !!c.zeitlupe, stil: stilNeu(c.stil), tagEigen: (schuld ? 'AUFLÖSUNG' : 'TEIL 2') + n, textEigen: true, tag2: false, tag3: false };
+    c2.text = schuld ? `Die Auflösung ⚖️ ${PFLICHT}\nGestern die Frage, heute meine Antwort: ${urteil}.\nSiehst du das auch so? 👇\n\n#racingincident #kreids888`
+      : `${hook} 🔍 ${PFLICHT}\nGestern der Clip, heute nochmal genau hingeschaut.\n${unten} 👇\n\n#simracer #kreids888`;
+    return c2;
+  }
+  async function tag2Bauen(c, v, hauptId, postMs) {
+    const c2 = tag2Clip(c, v), blob = await bauen(c2, MAT, x => arbeit(`🎬 Video für Tag 2 wird gebaut … ${Math.round(x * 100)} %`));
+    arbeit('⬆ Tag 2 hochladen …');
+    const r = await UMG.igApi('POST', '/api/clip/neu', { vorlage: c.vorlage, quelle: 'tag2:' + hauptId, titel: GROSS(c2.hook), text: postText(c2), postMs, insta: c.insta, tiktok: c.tiktok, youtube: !!c.youtube, thumbMs: 1300, dauer: blob.dauer });
+    try { await hochladen(r.id, blob); } catch (e) { try { await UMG.igApi('POST', `/api/clip/${r.id}/weg`, {}); } catch (x) { /* egal */ } throw e; }
+    try { const vb = await vorschaubild(c2, MAT); if (vb) await senden(`/api/clip/${r.id}/bild`, vb); } catch (e) { /* Vorschaubild ist nur schön */ }
+    return r;
+  }
+  async function tag3Seiten(c, v, m, strm) {   // 5 Standbilder aus dem Clip + Schluss-Seite
+    const vid = await videoElement(c.url), a = c.start || 0, b = c.ende || c.dauer || a + 5, n = 5, f = c.farbe || v.farbe, hook = GROSS(String(c.hook || v.name).trim()), seiten = [], ges = n + 1;
+    for (let i = 0; i < n; i++) {
+      await suchen(vid, a + (b - a) * (0.12 + 0.8 * i / (n - 1)));
+      const still = leinwand(960, 540), iw = vid.videoWidth || 16, ih = vid.videoHeight || 9, sk = Math.max(960 / iw, 540 / ih);
+      still.getContext('2d').drawImage(vid, (960 - iw * sk) / 2, (540 - ih * sk) / 2, iw * sk, ih * sk);
+      seiten.push(karSeite(m, f, i + 1, ges, g => {
+        kChrom(g, hook, 330, 120, f); kMitte(g, i ? `BILD ${i + 1} VON ${n}` : 'BILD FÜR BILD', 420, 60);
+        kBild(g, still, 60, 480, 960, 540, 22, f, m);
+        kNeon(g, i === n - 1 ? GROSS(String(c.unten || 'Was sagst du?').trim()) : i ? 'WEITER WISCHEN' : 'WISCH DURCH', 1130, 64, f);
+      }));
+    }
+    vid.removeAttribute('src'); vid.load();
+    seiten.push(streamSeite(m, f, ges, ges, strm));
+    return seiten;
+  }
+  async function tag3Bauen(c, v, hauptId, postMs) {
+    arbeit('🖼 Karussell aus Standbildern wird gebaut …');
+    const seiten = await tag3Seiten(c, v, MAT, (stand().streams || [])[0] || null), hook = String(c.hook || v.name).trim();
+    return karHochladen(seiten, { vorlage: 'karbilder', quelle: 'bilder:' + hauptId, postMs, titel: `BILD FÜR BILD · ${GROSS(hook)}`.slice(0, 80),
+      text: `Bild für Bild 🖼 ${hook}\nWisch durch und sag mir: ${String(c.unten || 'Was sagst du?').trim()} 👇\n\n#simracing #iracing #kreids888` });
+  }
+
   // ═══ Look „📺 TV-Sendung“: Senderlogo, LIVE/REPLAY, Schlagzeile, Bildschirm, Bauchbinde, Laufschrift ═══
   const SAx = w => (g, px) => SA(g, px, w);
   function studio(farbe) {   // Studio-Hintergrund: dunkel, Lichtkegel, feines Zeilenraster
@@ -2086,7 +2132,7 @@
     const q1 = eo(fp(t, 0.15, 0.4)), q2 = eo(fp(t, 0.28, 0.62));
     if (q1 > 0) {
       g.save(); g.beginPath(); g.rect(x0, y0, bw * q1, 56); g.clip();
-      const tx = v.kommentator ? (GROSS(String(c.serie || '').trim()) || tagText(v)) : tagText(v), ik = v.kommentator ? 34 : 0;
+      const tx = v.kommentator ? (GROSS(String(c.serie || '').trim()) || tagText(v, c)) : tagText(v, c), ik = v.kommentator ? 34 : 0;
       SA(g, passt(g, tx, 560, 37, SAx(900), 24), 900); const tw = g.measureText(tx).width + 46 + ik;
       g.fillStyle = f; g.shadowColor = f; g.shadowBlur = 16; g.fillRect(x0, y0, tw, 56); g.shadowBlur = 0; g.fillStyle = '#06080a'; g.fillText(tx, x0 + 23 + ik, y0 + 42);
       if (ik) { rr(g, x0 + 20, y0 + 12, 14, 22, 7); g.fill(); g.strokeStyle = '#06080a'; g.lineWidth = 3; g.beginPath(); g.arc(x0 + 27, y0 + 26, 11, 0.15 * Math.PI, 0.85 * Math.PI); g.stroke(); g.fillRect(x0 + 25, y0 + 37, 4, 8); }
@@ -2784,7 +2830,7 @@
   }
   function vorlageSetzen(c, id) {
     const v = VORLAGEN.find(x => x.id === id) || VORLAGEN[0], alt = vorlage(c);
-    c.vorlage = v.id; Object.assign(c, spruecheNeu(v)); c.zeitlupe = v.zl; c.farbe = v.farbe; c.textEigen = false; mitText(c);
+    c.vorlage = v.id; c.folgeEigen = false; Object.assign(c, spruecheNeu(v)); c.zeitlupe = v.zl; c.farbe = v.farbe; c.textEigen = false; mitText(c);
     if (alt.id !== v.id) c.stil = stilNeu(c.stil);   // andere Vorlage = auch ein anderer Stil (Darstellung)
     if (c.stich) { const l = ortSprueche(c); if (l.length) { c.hook = ziehen(l, 'ort-' + v.id, c.hook); mitText(c); } }   // Stichwörter da: Spruch mit Ort
     extraZurueck(c, platzZahl(v));
@@ -2931,6 +2977,12 @@
             <label class="kc-check${tk.verbunden ? '' : ' aus'}"><input type="checkbox" data-c="tiktok" ${c.tiktok && tk.verbunden ? 'checked' : ''} ${tk.verbunden ? '' : 'disabled'}> <span><b>TikTok</b> (Entwurf)</span></label>
             <label class="kc-check${yt.verbunden ? '' : ' aus'}"><input type="checkbox" data-c="youtube" ${c.youtube && yt.verbunden ? 'checked' : ''} ${yt.verbunden ? '' : 'disabled'}> <span><b>YouTube</b> (Short)</span></label>
           </div>
+        </div>
+        <div class="kc-mehrposts">
+          <label class="kc-check"><input type="checkbox" data-c="folge-an" ${folgeAn(c) ? 'checked' : ''}> <span><b>🔢 Reihe mit Nummer:</b> ${esc(v.name)} # <input type="number" min="1" max="99999" value="${folgeVon(c)}" data-c="folge" class="kc-folge" ${folgeAn(c) ? '' : 'disabled'}>${tipp('Die Nummer steht im Video und im Text und zählt bei jedem Clip von selbst hoch. So erkennt man deine Reihe wieder.')}</span></label>
+          ${v.mehr ? '' : `<label class="kc-check"><input type="checkbox" data-c="tag2" ${c.tag2 ? 'checked' : ''}> <span><b>📅 Tag 2: ${v.id === 'schuld' ? 'Die Auflösung' : 'Nochmal genau hingeschaut'}</b> – zweites Video am Tag danach${tipp(v.id === 'schuld' ? 'Heute die Frage, morgen deine Antwort. Zwei Posts aus einem Clip.' : 'Derselbe Clip mit anderem Spruch und anderem Stil. Zwei Posts aus einem Clip.')}</span></label>
+          ${c.tag2 && v.id === 'schuld' ? `<label class="kc-feld">Dein Urteil<select data-c="urteil">${URTEILE.map(u => `<option value="${u[0]}" ${(c.urteil || 'unfall') === u[0] ? 'selected' : ''}>${esc(u[1])}</option>`).join('')}</select></label>` : ''}
+          <label class="kc-check"><input type="checkbox" data-c="tag3" ${c.tag3 ? 'checked' : ''}> <span><b>🖼 Tag 3: Karussell</b> – 5 Standbilder zum Wischen (nur Instagram)</span></label>`}
         </div>
         ${termineHtml(c)}
         ${tipp(tk.verbunden ? 'TikTok: Das Video landet als Entwurf in deiner TikTok-App. Dort nur noch einen Trend-Sound drauf und posten.' : 'TikTok ist nicht verbunden (Reiter „📡 YouTube · TikTok · Discord“). Für TikTok: „📥 Video laden“ und selbst hochladen.')}
@@ -3180,6 +3232,7 @@
     if (pf && !String(c[pf[0]] || '').trim()) return UMG.meldung(`Bitte „${pf[1]}“ eintragen.`, 1);
     let id = '';
     try {
+      if (folgeAn(c)) { c.folge = folgeVon(c); c.folgeEigen = true; c.folgeAn = true; if (!c.textEigen) mitText(c); }   // 🔢 Nummer festhalten (Video, Text und Zähler gleich)
       arbeit('🎬 Video wird gebaut … 0 %');
       if (!MAT) await material();
       const blob = await bauen(c, MAT, x => arbeit(`🎬 Video wird gebaut … ${Math.round(x * 100)} %`));
@@ -3189,10 +3242,14 @@
         ARBEIT = ''; zeichnen(); return UMG.meldung('Video ist fertig und wird geladen.');
       }
       arbeit('⬆ Hochladen …');
-      const r = await UMG.igApi('POST', '/api/clip/neu', { vorlage: c.vorlage, titel: GROSS(c.hook), text: postText(c), postMs: c.postMs || undefined, insta: c.insta, tiktok: c.tiktok, youtube: !!c.youtube, thumbMs: 1300, dauer: blob.dauer });
+      const r = await UMG.igApi('POST', '/api/clip/neu', { vorlage: c.vorlage, titel: GROSS(c.hook), text: postText(c), postMs: c.postMs || undefined, insta: c.insta, tiktok: c.tiktok, youtube: !!c.youtube, thumbMs: 1300, dauer: blob.dauer, nr: folgeAn(c) ? c.folge : undefined });
       id = r.id;
       await hochladen(id, blob);
       try { const vb = await vorschaubild(c, MAT); if (vb) await senden(`/api/clip/${id}/bild`, vb); } catch (e) { /* Vorschaubild ist nur schön */ }
+      const mehr = [], basis = r.postMs || c.postMs || Date.now();   // 📅 mehr Posts aus diesem Clip: Tag 2 (Video) und Tag 3 (Karussell)
+      if (!vp.mehr && c.tag2) { try { await tag2Bauen(c, vp, id, basis + 86400000); mehr.push('Tag 2'); } catch (e) { UMG.meldung('Tag 2 ging nicht: ' + (e.message || e), 1); } }
+      if (!vp.mehr && c.tag3 && c.insta) { try { await tag3Bauen(c, vp, id, basis + 2 * 86400000); mehr.push('Karussell'); } catch (e) { UMG.meldung('Das Karussell ging nicht: ' + (e.message || e), 1); } }
+      if (mehr.length) UMG.meldung('Dazu eingeplant: ' + mehr.join(' und '));
       clipWeg(c);
       ARBEIT = '';
       UMG.meldung(`Eingeplant: ${zeit(r.postMs)} 🎉`);
@@ -3343,6 +3400,10 @@
     if (a === 'stich') { stichAnwenden(c, t.value); zeichnen(); return; }
     if (a === 'zeitlupe') { c.zeitlupe = t.checked; zeichnen(); }
     else if (a === 'insta' || a === 'tiktok' || a === 'youtube') c[a] = t.checked;
+    else if (a === 'folge-an') { c.folgeAn = t.checked; try { localStorage.setItem('k888_reihe', t.checked ? '1' : '0'); } catch (e) { /* egal */ } if (!c.textEigen) mitText(c); zeichnen(); }
+    else if (a === 'folge') { c.folge = Math.max(1, nr(t.value) || 1); c.folgeEigen = true; if (!c.textEigen) mitText(c); zeichnen(); }
+    else if (a === 'tag2' || a === 'tag3') { c[a] = t.checked; zeichnen(); }
+    else if (a === 'urteil') c.urteil = t.value;
     else if (a === 'postms') { c.postMs = t.value ? new Date(t.value).getTime() : 0; BOX.querySelectorAll('[data-c="termin"]').forEach(x => x.classList.toggle('an', +x.dataset.ms === c.postMs)); }
     else if (a === 'start' || a === 'ende' || a === 'halt' || a === 'linie') zeichnen();
   }
@@ -3385,7 +3446,7 @@
     quellenVon(c).forEach((src, i) => { const s2 = BOX.querySelector(`[data-c="slot-z"][data-i="${i}"]`), w2 = BOX.querySelector(`[data-c="slot-z-wert"][data-i="${i}"]`), z2 = tfVon(src).z || 1; if (s2) s2.value = z2; if (w2) w2.textContent = Math.round(z2 * 100) + ' %'; });
   }
   window.K888Clips = {
-    VORLAGEN, STILE, bauen, zeitplan, zeichne, material, schriften, vorschaubild, stichwoerter, trailerZeichnen, trailerBauen, trailerPruefen, trailerTon, trailerWahl, TR_ARTEN, TR_FARBEN, karPruefen, top5Seiten, abendSeiten, top5Liste,
+    VORLAGEN, STILE, bauen, zeitplan, zeichne, material, schriften, vorschaubild, stichwoerter, trailerZeichnen, trailerBauen, trailerPruefen, trailerTon, trailerWahl, TR_ARTEN, TR_FARBEN, karPruefen, top5Seiten, abendSeiten, top5Liste, tag2Clip, tag3Seiten, karSeite,
     async start(box, umg) {
       UMG = umg;
       if (BOX !== box) {
@@ -3478,6 +3539,8 @@
 .kc-app .kc-looks button{font-size:14px;padding:11px 16px}
 .kc-app .kc-check{display:flex;gap:8px;align-items:flex-start;font-size:14px;color:#fff;cursor:pointer}
 .kc-app .kc-check input{margin-top:3px;accent-color:#ff2d6f;width:18px;height:18px}
+.kc-app .kc-check input.kc-folge{width:5.2em;height:auto;margin:0 4px;padding:3px 6px;background:#0d0f12;color:#fff;border:1px solid #3a4048;border-radius:6px;font:inherit}
+.kc-app .kc-mehrposts{display:grid;gap:9px;margin:12px 0;padding:12px 14px;border:1px solid rgba(255,255,255,.12);border-radius:10px;background:rgba(255,255,255,.03)}
 .kc-app .kc-check.aus{opacity:.5;cursor:default}
 .kc-app .kc-schnitt{display:grid;grid-template-columns:1fr 1fr;gap:14px}
 .kc-app .kc-slot{display:flex;flex-direction:column;gap:8px;padding:10px 12px;background:#0b0c10;border:1px solid var(--line,#23262f);border-left:3px solid var(--f,#ffd400)}
