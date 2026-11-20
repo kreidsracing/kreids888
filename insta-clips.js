@@ -1924,7 +1924,7 @@
     const st = `${nr}/${n}`; pille(g, st, KB - 60 - pillenBreite(g, st, 40), 72, f, 40, false);
     mal(g);
     pille(g, letzte ? 'JETZT ABONNIEREN' : 'LIVE AUF YOUTUBE', 60, KH - 132, f, 44, true);
-    g.save(); SA(g, 46, 800); g.textAlign = 'right'; g.fillStyle = '#fff'; g.shadowColor = 'rgba(0,0,0,.85)'; g.shadowBlur = 10; g.fillText(letzte ? 'YOUTUBE · ' + (m.ytHandle || '@Kreids888') : 'WISCHEN »', KB - 60, KH - 82); g.restore();
+    g.save(); SA(g, 46, 800); g.textAlign = 'right'; g.fillStyle = '#fff'; g.shadowColor = 'rgba(0,0,0,.85)'; g.shadowBlur = 10; g.fillText(letzte ? (m.ytHandle || '@Kreids888') : 'WISCHEN »', KB - 60, KH - 82); g.restore();
     return c;
   }
   const zahlText = v => Number(v || 0).toLocaleString('de-DE');
