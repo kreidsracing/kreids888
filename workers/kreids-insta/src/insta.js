@@ -93,6 +93,24 @@ export async function pruefen(token, mediaId) {
   return { id: d.id, typ: d.media_product_type || d.media_type || '', link: d.permalink || '', zeit: d.timestamp || '' };
 }
 
+// 📈 Zahlen eines Reels: Likes und Kommentare immer. Aufrufe, Reichweite, Geteilt und Gespeichert nur,
+// wenn das Konto Insights freigibt (sonst bleiben sie leer und der Grund steht in ohneInsights).
+export async function zahlen(token, mediaId) {
+  const z = { aufrufe: null, reichweite: null, likes: 0, kommentare: 0, geteilt: null, gespeichert: null };
+  const d = await ig(`${host(token)}/${mediaId}?fields=like_count,comments_count&${q(token)}`);
+  z.likes = +d.like_count || 0; z.kommentare = +d.comments_count || 0;
+  const lesen = async metrik => {
+    const i = await ig(`${host(token)}/${mediaId}/insights?metric=${metrik}&${q(token)}`);
+    for (const x of i.data || []) {
+      const v = +(((x.values || [])[0] || {}).value ?? (x.total_value || {}).value) || 0;
+      if (x.name === 'views' || x.name === 'plays') z.aufrufe = v; else if (x.name === 'reach') z.reichweite = v; else if (x.name === 'shares') z.geteilt = v; else if (x.name === 'saved') z.gespeichert = v;
+    }
+  };
+  try { await lesen('views,reach,shares,saved'); }
+  catch (e) { try { await lesen('plays,reach,shares,saved'); } catch (e2) { z.ohneInsights = String((e2 && e2.message) || e2).slice(0, 140); } }
+  return z;
+}
+
 // Nur Instagram-Token (60 Tage) lassen sich verlängern. Systemnutzer-Token laufen nicht ab.
 export function verlaengerbar(token) { return istIg(token); }
 export function tokenVerlaengern(token) {

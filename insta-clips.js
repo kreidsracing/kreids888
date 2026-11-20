@@ -1609,12 +1609,13 @@
     const q = eob(fp(t, 0, 0.45)), q2 = eo(fp(t, 0.25, 0.6)), q3 = eo(fp(t, 0.45, 0.8));
     g.save(); g.translate(B / 2, 720); g.scale(q, q); logoRing(g, 0, 0, 170, f, m.logo, t); g.restore();
     if (q2 > 0) {
-      const ch = chrom('FOLG MIR', 170, f, 960), gq = (t - 0.75) / 0.6;
+      const ch = chrom('YOUTUBE', 170, f, 960), gq = (t - 0.75) / 0.6;
+      g.save(); g.globalAlpha = q2; SA(g, 58, 700); g.textAlign = 'center'; g.fillStyle = '#fff'; g.shadowColor = 'rgba(0,0,0,.8)'; g.shadowBlur = 10; g.fillText('LIVE AUF', B / 2, 948); g.restore();   // Ziel ist YouTube: der Abspann schickt die Leute zum Kanal
       g.save(); g.globalAlpha = q2; g.translate(B / 2, 1090); g.scale(0.8 + 0.2 * q2, 0.8 + 0.2 * q2); g.drawImage(ch.c, -ch.mitte, -ch.base);
       if (gq >= 0 && gq <= 1) glanz(g, ch, -ch.mitte, -ch.base, gq, 0.85);
       g.restore();
     }
-    if (q3 > 0) { g.save(); g.globalAlpha = q3; const hp = passt(g, m.handle, 960, 84, RU, 40); neonText(g, m.handle, B / 2, 1225, hp, f, RU, 'center'); SA(g, 44, 700); g.textAlign = 'center'; g.fillStyle = 'rgba(255,255,255,.85)'; g.fillText('SIMRACING-CLIPS · IRACING', B / 2, 1300); g.restore(); }
+    if (q3 > 0) { g.save(); g.globalAlpha = q3; const hp = passt(g, m.ytHandle || m.handle, 960, 84, RU, 40); neonText(g, m.ytHandle || m.handle, B / 2, 1225, hp, f, RU, 'center'); SA(g, 44, 700); g.textAlign = 'center'; g.fillStyle = 'rgba(255,255,255,.85)'; g.fillText('JETZT ABONNIEREN · SIMRACING LIVE', B / 2, 1300); g.restore(); }
   }
 
   // ═══ Look „📺 TV-Sendung“: Senderlogo, LIVE/REPLAY, Schlagzeile, Bildschirm, Bauchbinde, Laufschrift ═══
@@ -2302,7 +2303,7 @@
   // Oberfläche
   // ═══════════════════════════════════════════════════════════
   let BOX = null, UMG = null, MAT = null, ARBEIT = '', LETZTER_LOOK = 'neon';
-  const OFFEN = { 'kc-so': null, 'kc-raus': false, 'kc-einst': false };   // aufgeklappte Bereiche bleiben offen
+  const OFFEN = { 'kc-so': null, 'kc-raus': false, 'kc-einst': false, 'kc-best-box': true };   // aufgeklappte Bereiche bleiben offen
   const CLIPS = [];          // reingezogene Clips, der erste ist im Editor
   const VOR = { vid: null, url: '', canvas: null, lauf: 0, ton: false, c: null };   // Vorschau
   const stand = () => (UMG && UMG.stand()) || {};
@@ -2310,7 +2311,8 @@
     const st = stand(), d = st.design || {};
     const name = ((st.konto && st.konto.username) || 'kreids888');
     const logo = await bild(d.logoBild || '');
-    MAT = { logo, name: GROSS(name), handle: '@' + GROSS(name) };
+    const ytHandle = (String(d.liveText || (st.cfg || {}).liveText || '').match(/@[\w.\-]+/) || [])[0] || '@Kreids888';   // YouTube-Kanal für den Abspann
+    MAT = { logo, name: GROSS(name), handle: '@' + GROSS(name), ytHandle };
     return MAT;
   }
   function neuerClip(datei) {
@@ -2417,6 +2419,19 @@
   const sek = s => (Math.round(s * 10) / 10).toLocaleString('de-DE', { minimumFractionDigits: 1 }) + ' s';
   const tipp = t => `<div class="kc-tipp">${t}</div>`;
 
+  // 📈 Was läuft am besten (NEU 20.11.2026): Aufrufe und Likes je Vorlage, aus den Zahlen der geposteten Clips (Instagram + YouTube)
+  function bestenliste(raus) {
+    const m = new Map(), auf = z => ((z.ig && z.ig.aufrufe) || 0) + ((z.yt && z.yt.aufrufe) || 0), lik = z => ((z.ig && z.ig.likes) || 0) + ((z.yt && z.yt.likes) || 0);
+    const mit = raus.filter(x => x.zahlen && (auf(x.zahlen) || lik(x.zahlen)));
+    if (!mit.length) return '<div class="kc-leer">Noch keine Zahlen. Sie kommen ein paar Stunden nach dem Posten und werden dann laufend aktualisiert.</div>';
+    for (const x of mit) { const e = m.get(x.vorlage) || { n: 0, a: 0, l: 0 }; e.n++; e.a += auf(x.zahlen); e.l += lik(x.zahlen); m.set(x.vorlage, e); }
+    const n = v => Math.round(v).toLocaleString('de-DE'), vor = id => VORLAGEN.find(y => y.id === id) || { emoji: '🎬', name: id || 'Clip' };
+    const l = [...m.entries()].map(([id, e]) => ({ v: vor(id), n: e.n, a: e.a / e.n, l: e.l / e.n })).sort((p, q) => q.a - p.a || q.l - p.l);
+    const top = mit.slice().sort((p, q) => auf(q.zahlen) - auf(p.zahlen) || lik(q.zahlen) - lik(p.zahlen)).slice(0, 3);
+    return `<table class="kc-best"><tr><th>Vorlage</th><th>Clips</th><th>Ø Aufrufe</th><th>Ø Likes</th></tr>${l.slice(0, 8).map(e => `<tr><td>${e.v.emoji} ${esc(e.v.name)}</td><td>${e.n}</td><td><b>${n(e.a)}</b></td><td>${n(e.l)}</td></tr>`).join('')}</table>
+      <div class="kc-dim" style="margin-top:8px">Beste Clips: ${top.map(x => `${vor(x.vorlage).emoji} ${esc(x.titel || vor(x.vorlage).name)} (${n(auf(x.zahlen))} Aufrufe)`).join(' · ')}</div>
+      <div class="kc-dim">Aufrufe = Instagram + YouTube zusammen. TikTok liefert für Entwürfe keine Zahlen.</div>`;
+  }
   function html() {
     const st = stand(), c = CLIPS[0], liste = (st.clips || []), cfg = st.clipcfg || { zeit: '18:30', test: true };
     const draussen = x => (!x.insta || !!x.gepostet) && (!x.tiktok || !!x.tt) && (!x.youtube || !!x.yt);
@@ -2426,7 +2441,7 @@
       <details class="kc-so" ${(OFFEN['kc-so'] ?? !(CLIPS.length || liste.length)) ? 'open' : ''}><summary>💡 So geht’s (in 3 Schritten)</summary>
         <ol><li><b>Clip reinziehen</b> – einfach die MP4 aus dem Kreids Clipper hier reinziehen (auch mehrere auf einmal). Tipp: Datei so benennen wie <b>Spa_EauRouge_Crash</b>, dann kommen Vorlage, Spruch und Titel von selbst.</li>
         <li><b>Vorlage antippen</b> – z. B. „Wer war schuld?“. Spruch, Farbe und Text sind schon fertig, ändern geht immer.</li>
-        <li><b>🚀 Einplanen</b> – das Video wird hier gebaut und geht zur geplanten Zeit raus: Instagram-Reel und TikTok-Entwurf. Ein Clip pro Tag.</li></ol>
+        <li><b>🚀 Einplanen</b> – das Video wird hier gebaut und geht zur geplanten Zeit raus: Instagram-Reel, YouTube-Short und TikTok-Entwurf. Ein Clip pro Tag. Der Abspann und der Text zeigen auf deinen YouTube-Kanal und den nächsten Stream.</li></ol>
         <div class="kc-dim">Tipp für Reichweite: 2 bis 3 Wochen lang jeden Tag einen Clip, immer zur gleichen Uhrzeit.</div></details>
       ${ARBEIT ? `<div class="kc-arbeit"><span class="kc-spin"></span>${esc(ARBEIT)}</div>` : ''}
       <label class="kc-drop${c ? ' klein' : ''}" data-c="drop"><input type="file" accept="video/*" multiple data-c="datei">
@@ -2435,6 +2450,7 @@
       ${CLIPS.length > 1 ? `<div class="kc-reihe-info">⏭ Danach warten noch ${CLIPS.length - 1} Clip${CLIPS.length > 2 ? 's' : ''}: ${CLIPS.slice(1).map(x => esc(x.name)).join(' · ')}</div>` : ''}
       <h3 class="kc-h">📅 Geplant <span class="kc-dim">(${offen.length})</span></h3>
       ${offen.length ? offen.map(x => zeile(x, false)).join('') : '<div class="kc-leer">Noch nichts geplant. Zieh oben einen Clip rein.</div>'}
+      ${raus.length ? `<details class="kc-best-box kc-raus" ${OFFEN['kc-best-box'] ? 'open' : ''}><summary>📈 Was läuft am besten</summary>${bestenliste(raus)}</details>` : ''}
       ${raus.length ? `<details class="kc-raus" ${OFFEN['kc-raus'] ? 'open' : ''}><summary>✓ Schon draußen (${raus.length})</summary>${raus.map(x => zeile(x, true)).join('')}</details>` : ''}
       <details class="kc-einst" ${OFFEN['kc-einst'] ? 'open' : ''}><summary>⚙ Einstellungen</summary>
         <div class="kc-felder">
@@ -2577,12 +2593,14 @@
     if (x.youtube) chips.push(x.yt ? (x.yt.privat ? '<span class="ki-chip rot">YouTube: nur privat</span>' : '<span class="ki-chip gruen">YouTube ✓</span>') : '<span class="ki-chip blau">YouTube</span>');
     if (!x.video && !x.weg) chips.push('<span class="ki-chip rot">Video fehlt – löschen und neu einplanen</span>');
     if (x.fehler) chips.push('<span class="ki-chip rot">Fehler</span>');
+    const zz = x.zahlen || {}, zn = v => (v == null ? '–' : Number(v).toLocaleString('de-DE'));
+    const zahlenHtml = raus && (zz.ig || zz.yt) ? `<div class="kc-zahlen">${zz.ig ? `<span title="Instagram">📸 ${zz.ig.aufrufe != null ? `👁 <b>${zn(zz.ig.aufrufe)}</b> · ` : ''}❤ ${zn(zz.ig.likes)} · 💬 ${zn(zz.ig.kommentare)}${zz.ig.geteilt != null ? ` · ↗ ${zn(zz.ig.geteilt)}` : ''}</span>` : ''}${zz.yt ? `<span title="YouTube">▶ 👁 <b>${zn(zz.yt.aufrufe)}</b> · 👍 ${zn(zz.yt.likes)} · 💬 ${zn(zz.yt.kommentare)}</span>` : ''}</div>` : '';
     return `<div class="kc-post" data-id="${esc(x.id)}">
       <a class="kc-mini" href="${esc(x.video || (x.yt && x.yt.link) || (x.gepostet && x.gepostet.link) || '#')}" target="_blank" rel="noopener" title="Video ansehen">${x.bild ? `<img src="${esc(x.bild)}" alt="">` : '🎬'}</a>
       <div class="kc-info">
         <div class="kc-titel" style="--f:${v.farbe}">${v.emoji} ${esc(x.titel || v.name)}</div>
         <div class="kc-dim">${raus ? 'Gepostet' : 'Geht raus'}: <b>${esc(zeit(raus ? ((x.gepostet && x.gepostet.zeit) || (x.tt && x.tt.zeit) || x.postMs) : x.postMs))}</b>${x.dauer ? ' · ' + sek(x.dauer) : ''}</div>
-        <div class="kc-chips">${chips.join('')}</div>
+        <div class="kc-chips">${chips.join('')}</div>${zahlenHtml}
         ${x.fehler ? `<div class="kc-hinweis rot">⚠ ${esc(x.fehler)}</div>` : ''}${x.ttFehler && !x.tt ? `<div class="kc-hinweis rot">TikTok: ${esc(x.ttFehler)}</div>` : ''}${x.ytFehler && !x.yt ? `<div class="kc-hinweis rot">YouTube: ${esc(x.ytFehler)}</div>` : ''}
         <div class="kc-knoepfe">
           ${x.gepostet && x.gepostet.link ? `<a class="btn ki-k" href="${esc(x.gepostet.link)}" target="_blank" rel="noopener">↗ Auf Instagram</a>` : ''}
@@ -3064,6 +3082,10 @@
 .kc-app .kc-info{flex:1;min-width:0;display:flex;flex-direction:column;gap:6px}
 .kc-app .kc-titel{font-family:var(--disp,inherit);font-weight:800;font-size:17px;text-transform:uppercase;color:#fff;text-shadow:0 0 12px var(--f)}
 .kc-app .kc-chips{display:flex;flex-wrap:wrap;gap:6px}
+.kc-app .kc-zahlen{display:flex;flex-wrap:wrap;gap:4px 16px;margin-top:6px;font-size:.86rem}
+.kc-app .kc-best{width:100%;border-collapse:collapse;font-size:.88rem;margin-top:6px}
+.kc-app .kc-best th,.kc-app .kc-best td{text-align:left;padding:6px 8px;border-bottom:1px solid rgba(255,255,255,.1)}
+.kc-app .kc-best th{font-weight:700;opacity:.7}
 .kc-app .kc-stich{margin-top:6px}
 .kc-app .kc-stich .ki-chip{border-color:#5cff1f;color:#d9ffcc}
 .kc-app .kc-hinweis{font-size:13px;color:#f5c518;background:#0b0c10;border:1px solid rgba(245,197,24,.45);padding:6px 10px}

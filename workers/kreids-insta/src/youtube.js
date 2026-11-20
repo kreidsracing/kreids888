@@ -134,6 +134,16 @@ export async function ytInfos(zugang, ids) {
   return m;
 }
 
+// 📈 Aufrufe, Likes und Kommentare von Videos (Shorts). 1 Einheit je Abruf, bis 50 Videos auf einmal.
+export async function ytZahlen(zugang, ids) {
+  const m = {};
+  for (let i = 0; i < ids.length && i < 100; i += 50) {
+    const d = await yt(zugang, '/videos?part=statistics&maxResults=50&id=' + ids.slice(i, i + 50).map(encodeURIComponent).join(','));
+    for (const x of d.items || []) { const st = x.statistics || {}; m[x.id] = { aufrufe: +st.viewCount || 0, likes: +st.likeCount || 0, kommentare: +st.commentCount || 0 }; }
+  }
+  return m;
+}
+
 // Livestream anlegen bzw. ändern. Gibt die Broadcast-ID zurück.
 export async function ytPlanen(zugang, r, cfg, alteId, beschr) {
   const { titel, beschreibung } = ytTexte(r, cfg, beschr);

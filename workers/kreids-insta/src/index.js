@@ -14,9 +14,9 @@
 import { DurableObject } from 'cloudflare:workers';
 import { ADMIN, ERG_TAGE, LIVE_VOR, LOOKS, EDIT_FELDER, NEUE_ARTEN, ladeDaten, bauePlan, eigeneRennen, rennKey, inhaltSchluessel, kurzHash, bildtext, platzText } from './plan.js';
 import { kiBild, sprueche, STIMMUNGEN, KAMERAS, autos } from './ki.js';
-import { konto, posten, pruefen, tokenVerlaengern, verlaengerbar } from './insta.js';
+import { konto, posten, pruefen, tokenVerlaengern, verlaengerbar, zahlen } from './insta.js';
 import { istUhrzeit, berlin, berlinZuMs, tageZurueck } from './zeit.js';
-import { ytEingerichtet, ytAnmeldeLink, ytCodeTauschen, ytZugang, ytKanal, ytStreams, ytPlanen, ytThumbnail, ytTexte, ytLetzteBeschreibung, ytInfos, ytShortHochladen, ytTitelSetzen } from './youtube.js';
+import { ytEingerichtet, ytAnmeldeLink, ytCodeTauschen, ytZugang, ytKanal, ytStreams, ytPlanen, ytThumbnail, ytTexte, ytLetzteBeschreibung, ytInfos, ytShortHochladen, ytZahlen, ytTitelSetzen } from './youtube.js';
 import { ttEingerichtet, ttAnmeldeLink, ttCodeTauschen, ttZugang, ttKonto, ttEntwurf, ttVideoEntwurf } from './tiktok.js';
 import { discordEingerichtet, discordMelden, textTeile, ART_NAME, FARBE } from './discord.js';
 import { textMitTags, titelMitTags } from './tags.js';
@@ -529,6 +529,17 @@ async function clipStrom(env, s, c) {
   return (await strom(new Request('https://intern/'), s, `cvteil:${c.id}:${c.video.v}:`, c.video.teile, n, 'video/mp4')).body;
 }
 // Posten: Instagram-Reel (wahlweise als Test-Reel) und TikTok-Entwurf, jedes mit eigenen Versuchen
+// 🔴 Jeder Clip zeigt auf YouTube (NEU 20.11.2026): Kanal und nächster geplanter Stream, gerechnet beim Posten (also immer aktuell)
+const YT_KANAL = 'https://www.youtube.com/@Kreids888';
+async function streamHinweis(s) {
+  try {
+    const jetzt = Date.now(), plan = bauePlan(await datenLaden(s), await ladeCfg(s), jetzt);
+    const n = plan.filter(p => p.liveMs > jetzt && p.liveMs < jetzt + 14 * 86400000).sort((a, b) => a.liveMs - b.liveMs)[0];
+    if (!n) return null;
+    const b = berlin(n.liveMs), z = (await s.lies('yt:' + rennKey(n.id))) || {};
+    return { wann: `${b.wt} ${b.tag} ${b.zeit} Uhr`, link: z.id ? 'https://youtu.be/' + z.id : YT_KANAL + '/live' };
+  } catch (e) { return null; }
+}
 async function clipPosten(env, s, id, opt = {}) {
   let c = await s.lies('clip:' + id);
   if (!c) throw new Error('Clip nicht gefunden.');
@@ -538,6 +549,8 @@ async function clipPosten(env, s, id, opt = {}) {
   await s.schreib('clip:' + id, c);
   const videoUrl = `${env.ORIGIN}/cvideo/${id}/${c.video.v}.mp4`, cfg = await ladeClipCfg(s);
   const text = textMitTags(c.text || '');   // #simracing #iracing #gt3 #crash am Ende der ersten Zeile (auch bei schon angelegten Clips)
+  const strm = await streamHinweis(s);
+  const textIg = `${text.trim()}\n\n🔴 Mehr davon live auf YouTube: @Kreids888${strm ? `\nNächster Stream: ${strm.wann}` : ''}`;
   if (c.insta && !c.gepostet && opt.insta !== false) {
     try {
       const token = await aktuellerToken(env, s);
@@ -546,12 +559,12 @@ async function clipPosten(env, s, id, opt = {}) {
       if (!k.verbunden) throw new Error(k.fehler || 'Instagram nicht verbunden.');
       // Test-Reel ging zuletzt nicht → eine Woche lang gleich normal posten, dann wieder probieren
       let test = c.test !== false && cfg.test && !(cfg.testFehler && Date.now() - cfg.testFehlerZeit < 7 * 86400000), mediaId;
-      try { mediaId = await posten({ token, uid: k.user_id, videoUrl, typ: 'reel', text, thumbMs: c.thumbMs || 0, test }); }
+      try { mediaId = await posten({ token, uid: k.user_id, videoUrl, typ: 'reel', text: textIg, thumbMs: c.thumbMs || 0, test }); }
       catch (e) {
         const msg = String((e && e.message) || e);
         if (!test || /verarbeiten/.test(msg)) throw e;
         // Test-Reels gehen (noch) nicht bei diesem Konto → normal posten und merken
-        mediaId = await posten({ token, uid: k.user_id, videoUrl, typ: 'reel', text, thumbMs: c.thumbMs || 0 });
+        mediaId = await posten({ token, uid: k.user_id, videoUrl, typ: 'reel', text: textIg, thumbMs: c.thumbMs || 0 });
         test = false;
         await s.schreib('clipcfg', { ...cfg, testFehler: msg.slice(0, 200), testFehlerZeit: Date.now() });
       }
@@ -572,7 +585,7 @@ async function clipPosten(env, s, id, opt = {}) {
     try {
       const zugang = await ytZugang(env, s), t = textTeile(text);
       const tags = [...new Set((text.match(/#[\p{L}\d_]+/gu) || []).map(x => x.slice(1).toLowerCase()))];
-      const beschr = text.trim() + (/#shorts/i.test(text) ? '' : '\n\n#shorts');
+      const beschr = `${text.trim()}\n\n${strm ? `🔴 Nächster Stream: ${strm.wann} → ${strm.link}\n` : ''}▶ Kanal abonnieren: ${YT_KANAL}?sub_confirmation=1` + (/#shorts/i.test(text) ? '' : '\n\n#shorts');
       const v = await ytShortHochladen(zugang, { titel: titelMitTags(t.titel || c.titel || 'Simracing', 100), beschreibung: beschr, tags, body: await clipStrom(env, s, c), groesse: c.video.groesse });
       c.yt = { zeit: Date.now(), id: v.id, privat: v.sichtbar !== 'public', tags: true };
       c.ytFehler = '';
@@ -592,7 +605,8 @@ async function clipsListe(env, s) {
     video: c.video ? `${env.ORIGIN}/cvideo/${c.id}/${c.video.v}.mp4` : '', bild: c.bild ? `${env.ORIGIN}/cbild/${c.id}.jpg?v=${c.bild}` : '',
     gepostet: c.gepostet ? { zeit: c.gepostet.zeit || 0, link: c.gepostet.link || '', test: !!c.gepostet.test } : null,
     tt: c.tt ? { zeit: c.tt.zeit || 0 } : null, fehler: c.fehler || '', ttFehler: c.ttFehler || '', versuche: c.versuche || 0,
-    youtube: !!c.youtube, yt: c.yt ? { zeit: c.yt.zeit || 0, link: 'https://youtube.com/shorts/' + c.yt.id, privat: !!c.yt.privat } : null, ytFehler: c.ytFehler || '', weg: !!c.weg
+    youtube: !!c.youtube, yt: c.yt ? { zeit: c.yt.zeit || 0, link: 'https://youtube.com/shorts/' + c.yt.id, privat: !!c.yt.privat } : null, ytFehler: c.ytFehler || '', weg: !!c.weg,
+    zahlen: c.zahlen || null
   }));
 }
 
@@ -660,6 +674,27 @@ async function zyklus(env) {
       const yt = ytOk && c.youtube && !c.yt && (c.ytVersuche || 0) < 3 && ytFrei > 0;
       if (yt) ytFrei--;
       if (insta || tt || yt) await clipPosten(env, s, c.id, { insta, tiktok: tt, youtube: yt });
+    }
+  } catch (e) { /* nächster Lauf */ }
+  // 1b3. 📈 Zahlen der Clips (Aufrufe, Likes, Kommentare): in den ersten 3 Tagen alle 3 Std., danach einmal am Tag, nach 30 Tagen nicht mehr.
+  //       Höchstens 4 Clips pro Lauf (wenige Abrufe, bleibt im Gratis-Kontingent).
+  try {
+    const gepostet = Object.values(await s.liste('clip:')).filter(c => c && c.id && ((c.gepostet && c.gepostet.mediaId) || (c.yt && c.yt.id)));
+    const alter = c => jetzt - Math.max((c.gepostet && c.gepostet.zeit) || 0, (c.yt && c.yt.zeit) || 0);
+    const dran = gepostet.filter(c => alter(c) < 30 * 86400000 && jetzt - ((c.zahlen && c.zahlen.zeit) || 0) > (alter(c) < 3 * 86400000 ? 3 : 24) * 3600000)
+      .sort((a, b) => ((a.zahlen && a.zahlen.zeit) || 0) - ((b.zahlen && b.zahlen.zeit) || 0)).slice(0, 4);
+    if (dran.length) {
+      const ytIds = dran.filter(c => c.yt && c.yt.id).map(c => c.yt.id);
+      let ytM = {};
+      if (ytIds.length && ytEingerichtet(env) && await s.lies('yt:token')) { try { ytM = await ytZahlen(await ytZugang(env, s), ytIds); } catch (e) { /* nächster Lauf */ } }
+      let token = ''; try { token = await aktuellerToken(env, s); } catch (e) { /* ohne Instagram */ }
+      for (const c of dran) {
+        const z = { ...(c.zahlen || {}), zeit: jetzt };
+        if (c.yt && ytM[c.yt.id]) z.yt = ytM[c.yt.id];
+        if (token && c.gepostet && c.gepostet.mediaId) { try { z.ig = await zahlen(token, c.gepostet.mediaId); } catch (e) { /* alte Zahlen bleiben */ } }
+        const frisch = await s.lies('clip:' + c.id);
+        if (frisch) { frisch.zahlen = z; await s.schreib('clip:' + c.id, frisch); }
+      }
     }
   } catch (e) { /* nächster Lauf */ }
   // 1c. YouTube-Livestreams planen
