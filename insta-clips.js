@@ -1624,7 +1624,7 @@
 
   // ═══ 🔴 Stream-Trailer (NEU 20.11.2026): kurzes Hochkant-Video „HEUTE LIVE“ aus dem Streamkalender, ohne eigenen Clip ═══
   // Das Dashboard baut ihn von selbst für die Streams der nächsten 4 Tage und plant ihn 2,5 Stunden vor „Live ab“ ein
-  // (als ganz normaler Clip: Instagram-Reel, YouTube-Short mit Link zum Stream, TikTok-Entwurf).
+  // (als YouTube-Short mit Link zum Stream. Seit 20.11.2026 nur YouTube: Instagram und TikTok haben am Renntag schon den Raceday-Post).
   const TRAILER_T = 8, TRAILER_VOR = 2.5 * 3600000, TRAILER_V = { id: 'trailer', name: 'Stream-Trailer', emoji: '🔴', farbe: '#ff2a2a' };
   // Vorlagen und Farben wechseln von selbst: es kommt immer dran, was am längsten nicht lief (trailerWahl)
   const TR_ARTEN = [
@@ -1877,7 +1877,10 @@
   async function trailerPruefen() {
     const st = stand();
     if (TRAILER_LAEUFT || ARBEIT || CLIPS.length || !window.VideoEncoder || !Array.isArray(st.streams) || (st.clipcfg || {}).trailer === false) return;
+    if (!(st.youtube && st.youtube.verbunden)) return;   // der Trailer geht nur zu YouTube (Instagram und TikTok haben am Renntag schon den Raceday-Post)
     const jetzt = Date.now(), gesehen = new Set(), offen = [], weg = [], raus = c => !!(c.gepostet || c.tt || c.yt);
+    let umgestellt = false;   // schon gebaute Trailer: Instagram und TikTok abwählen, damit nichts doppelt kommt
+    for (const c of st.clips || []) if (c.trailer && c.youtube && (c.insta || c.tiktok) && !raus(c)) { try { await UMG.igApi('POST', `/api/clip/${c.id}/aendern`, { insta: false, tiktok: false }); umgestellt = true; } catch (e) { /* bleibt wie es ist */ } }
     for (const p of st.streams) {
       const rk = p.rennKey; if (!rk || gesehen.has(rk) || !p.liveMs) continue; gesehen.add(rk);
       const postMs = p.liveMs - TRAILER_VOR, da = (st.clips || []).filter(c => c.trailer === rk);
@@ -1886,7 +1889,7 @@
       if (postMs < jetzt + 10 * 60000 || p.liveMs > jetzt + 4 * 86400000 || passt2 || TRAILER_FERTIG.has(rk + p.liveMs)) continue;
       offen.push({ rk, p, postMs });
     }
-    if (!offen.length && !weg.length) return;
+    if (!offen.length && !weg.length) { if (umgestellt) await UMG.laden(); return; }
     TRAILER_LAEUFT = true;
     try {
       for (const id of weg) { try { await UMG.igApi('POST', `/api/clip/${id}/weg`, {}); } catch (e) { /* bleibt als Fehler in der Liste */ } }
@@ -1902,8 +1905,8 @@
         const blob = await trailerBauen(x, m, hg, q => arbeit(`🔴 Trailer für ${serie} wird gebaut … ${Math.round(q * 100)} %`));
         arbeit('⬆ Trailer wird hochgeladen …');
         const r = await UMG.igApi('POST', '/api/clip/neu', { vorlage: 'trailer' + w.art.id + w.fi, auto: true, trailer: o.rk, trailerLive: p.liveMs, titel: `${x.wort} LIVE · ${GROSS(serie)}`.slice(0, 80),
-          text: `🔴 ${heute ? 'Heute' : 'Gleich'} live: ${serie}${p.track ? ' · ' + p.track : ''} · ${uhr} Uhr\nSchaltet ein!\n\n#simracing #iracing #live #kreids888`, postMs: o.postMs, insta: true,
-          tiktok: !!(st.tiktok && st.tiktok.verbunden), youtube: !!(st.youtube && st.youtube.verbunden), test: false, thumbMs: Math.round(w.art.thumb * 1000), dauer: TRAILER_T });
+          text: `🔴 ${heute ? 'Heute' : 'Gleich'} live: ${serie}${p.track ? ' · ' + p.track : ''} · ${uhr} Uhr\nSchaltet ein!\n\n#simracing #iracing #live #kreids888`, postMs: o.postMs, insta: false,
+          tiktok: false, youtube: true, test: false, thumbMs: Math.round(w.art.thumb * 1000), dauer: TRAILER_T });
         await hochladen(r.id, blob);
         try { const cv = leinwand(B, H); trailerZeichnen(cv.getContext('2d'), w.art.thumb, x, m, hg); const k = leinwand(540, 960); k.getContext('2d').drawImage(cv, 0, 0, 540, 960); const vb = await new Promise(ok => k.toBlob(ok, 'image/jpeg', 0.85)); if (vb) await senden(`/api/clip/${r.id}/bild`, vb); } catch (e) { /* Vorschaubild ist nur schön */ }
         TRAILER_FERTIG.add(o.rk + p.liveMs);
@@ -2144,7 +2147,7 @@
       <div class="kc-auto-h">📅 Die nächsten 7 Tage <span class="kc-dim">Ziel: jeden Tag ein Post</span></div>
       <div class="kc-tage">${tage.map(tagHtml).join('')}</div>
       <div class="kc-auto-schalter">
-        ${sw('trailer', cfg.trailer !== false, '🔴 Stream-Trailer', 'Für jeden Stream der nächsten 4 Tage ein kurzes Video „HEUTE LIVE“, 2,5 Stunden vor „Live ab“. 8 Vorlagen und 7 Farben wechseln von selbst.')}
+        ${sw('trailer', cfg.trailer !== false, '🔴 Stream-Trailer', 'Für jeden Stream der nächsten 4 Tage ein kurzes Video „HEUTE LIVE“ als YouTube-Short, 2,5 Stunden vor „Live ab“. Nur YouTube, damit bei Instagram und TikTok nichts doppelt zum Raceday-Post kommt. 8 Vorlagen und 7 Farben wechseln von selbst.')}
         ${sw('luecken', cfg.luecken !== false, '📅 Vorschläge für Lücken', 'Für einen Tag ohne Post schlägt die Leiste einen Post vor, der keinen Clip braucht: „Stream verpasst?“, „Morgen live“, Top 5 der Woche oder Wochenvorschau. Gebaut wird erst, wenn du es anklickst.')}
         ${sw('freigabe', noetig, '✓ Freigabe nötig', 'An: Automatisches geht erst raus, wenn du „✓ Freigeben“ drückst. Aus: es geht von selbst raus.')}
       </div></div>`;
