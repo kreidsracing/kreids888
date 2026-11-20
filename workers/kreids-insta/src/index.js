@@ -486,9 +486,11 @@ async function ttSenden(env, s, post, cfg, design) {
 const CLIP_STANDARD = { zeit: '18:30', test: true };
 async function ladeClipCfg(s) {
   const c = (await s.lies('clipcfg')) || {};
-  return { zeit: istUhrzeit(c.zeit) ? c.zeit : CLIP_STANDARD.zeit, test: c.test !== false, trailer: c.trailer !== false, abend: c.abend !== false, top5: c.top5 !== false, testFehler: c.testFehler || '', testFehlerZeit: c.testFehlerZeit || 0 };
+  return { zeit: istUhrzeit(c.zeit) ? c.zeit : CLIP_STANDARD.zeit, test: c.test !== false, trailer: c.trailer !== false, abend: c.abend !== false, top5: c.top5 !== false, freigabe: c.freigabe !== false, testFehler: c.testFehler || '', testFehlerZeit: c.testFehlerZeit || 0 };
 }
 // Clip ist ganz draußen (Instagram und/oder TikTok, je nachdem was angehakt war)
+// 🤖 Automatik (NEU 20.11.2026): vom Dashboard von selbst gebaut (Stream-Trailer, Rennabend, Top 5). Geht nur mit Freigabe raus (abschaltbar).
+const istAuto = c => !!(c && (c.auto || c.trailer || /^kar(top5|abend)$/.test(c.vorlage || '')));
 const clipDraussen = c => (c.insta === false || !!c.gepostet) && (!c.tiktok || !!c.tt) && (!c.youtube || !!c.yt);
 function clipPruefen(c, b) {
   const n = { ...c };
@@ -505,6 +507,7 @@ function clipPruefen(c, b) {
   if (b.kar !== undefined) n.kar = b.kar === true;                                                           // 🖼 Karussell (Bilder statt Video, nur Instagram)
   if (b.nr !== undefined) n.nr = Math.max(0, Math.min(99999, Math.round(Number(b.nr) || 0)));                // 🔢 Folge in der Reihe
   if (n.kar) { n.tiktok = false; n.youtube = false; n.test = false; }
+  for (const k of ['auto', 'frei', 'aus']) if (b[k] !== undefined) n[k] = b[k] === true;                     // 🤖 von selbst gebaut · ✓ freigegeben · ✕ nicht posten
   return n;
 }
 // Nächster freier Tag zur eingestellten Uhrzeit (ein Clip pro Tag)
@@ -618,6 +621,7 @@ async function clipsListe(env, s) {
     tt: c.tt ? { zeit: c.tt.zeit || 0 } : null, fehler: c.fehler || '', ttFehler: c.ttFehler || '', versuche: c.versuche || 0,
     youtube: !!c.youtube, yt: c.yt ? { zeit: c.yt.zeit || 0, link: 'https://youtube.com/shorts/' + c.yt.id, privat: !!c.yt.privat } : null, ytFehler: c.ytFehler || '', weg: !!c.weg,
     zahlen: c.zahlen || null, trailer: c.trailer || '', trailerLive: c.trailerLive || 0, quelle: c.quelle || '', nr: c.nr || 0,
+    auto: istAuto(c), frei: !!c.frei, aus: !!c.aus,
     kar: !!c.kar, karussell: c.karussell ? c.karussell.n : 0, kbilder: c.karussell && !c.weg ? karUrls(env, c) : []
   }));
 }
@@ -678,8 +682,10 @@ async function zyklus(env) {
       }
     }
     let ytFrei = 2;
+    const freigabeNoetig = (await ladeClipCfg(s)).freigabe;
     for (const c of clips) {
       if ((!c.video && !c.karussell) || !c.postMs || c.postMs > jetzt || c.trailerWeg) continue;
+      if (c.aus || (istAuto(c) && freigabeNoetig && !c.frei)) continue;   // „Nicht posten“ · 🤖 Automatik wartet auf Freigabe
       if (c.trailer && !c.gepostet && !c.tt && !c.yt) {   // 🔴 Trailer nur, wenn der Stream noch zur selben Zeit im Kalender steht
         const pl = planStreams(daten, cfg, jetzt).find(p => rennKey(p.id) === c.trailer);
         if (!pl || jetzt >= pl.liveMs || Math.abs(pl.liveMs - (c.trailerLive || c.postMs + TRAILER_VOR)) > 60000) {
@@ -789,6 +795,11 @@ async function zyklus(env) {
       if (!frueher(Math.max((c.gepostet && c.gepostet.zeit) || 0, (c.tt && c.tt.zeit) || 0, (c.yt && c.yt.zeit) || 0))) continue;
       weg.push(...clipTeile(c));
       await s.schreib('clip:' + c.id, { ...c, video: null, karussell: null, weg: jetzt });   // das kleine Vorschaubild bleibt noch (für „Top 5 der Woche“)
+    }
+    for (const c of Object.values(await s.liste('clip:'))) {   // 🤖 Automatik, die nicht rausging (keine Freigabe / „Nicht posten“): Dateien nach 1 Tag, Eintrag nach 8 Tagen
+      if (!c || !istAuto(c) || c.gepostet || c.tt || c.yt || !c.postMs) continue;
+      if (c.postMs < jetzt - 8 * 86400000) { weg.push('clip:' + c.id, 'cbild:' + c.id, ...clipTeile(c)); continue; }
+      if (c.postMs < jetzt - 86400000 && (c.video || c.karussell)) { weg.push(...clipTeile(c)); await s.schreib('clip:' + c.id, { ...c, video: null, karussell: null, weg: jetzt }); }
     }
     for (const c of Object.values(await s.liste('clip:'))) {   // Vorschaubilder: 9 Tage nach dem Aufräumen
       if (!c || !c.weg || !c.bild || c.weg > jetzt - 9 * 86400000) continue;
@@ -1050,7 +1061,7 @@ async function api(req, env, url) {
   if (pfad === '/api/clips/einstellungen' && req.method === 'POST') {
     const b = await json(), alt = await ladeClipCfg(s);
     const neuTest = b.test !== undefined ? b.test !== false : alt.test;
-    await s.schreib('clipcfg', { zeit: istUhrzeit(b.zeit) ? b.zeit : alt.zeit, test: neuTest, trailer: b.trailer !== undefined ? b.trailer !== false : alt.trailer, abend: b.abend !== undefined ? b.abend !== false : alt.abend, top5: b.top5 !== undefined ? b.top5 !== false : alt.top5, testFehler: neuTest && !alt.test ? '' : alt.testFehler, testFehlerZeit: neuTest && !alt.test ? 0 : alt.testFehlerZeit });
+    await s.schreib('clipcfg', { zeit: istUhrzeit(b.zeit) ? b.zeit : alt.zeit, test: neuTest, trailer: b.trailer !== undefined ? b.trailer !== false : alt.trailer, abend: b.abend !== undefined ? b.abend !== false : alt.abend, top5: b.top5 !== undefined ? b.top5 !== false : alt.top5, freigabe: b.freigabe !== undefined ? b.freigabe !== false : alt.freigabe, testFehler: neuTest && !alt.test ? '' : alt.testFehler, testFehlerZeit: neuTest && !alt.test ? 0 : alt.testFehlerZeit });
     return antwort({ ok: true, clipcfg: await ladeClipCfg(s) });
   }
   if (pfad === '/api/clip/neu' && req.method === 'POST') {

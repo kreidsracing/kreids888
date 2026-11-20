@@ -1887,13 +1887,13 @@
         const w = trailerWahl(st.clips, o.rk, !!hg, schon); schon.unshift(w); x.art = w.art.id; x.farbe = TR_FARBEN[w.fi];   // Vorlage und Farbe wechseln von selbst
         const blob = await trailerBauen(x, m, hg, q => arbeit(`🔴 Trailer für ${serie} wird gebaut … ${Math.round(q * 100)} %`));
         arbeit('⬆ Trailer wird hochgeladen …');
-        const r = await UMG.igApi('POST', '/api/clip/neu', { vorlage: 'trailer' + w.art.id + w.fi, trailer: o.rk, trailerLive: p.liveMs, titel: `${x.wort} LIVE · ${GROSS(serie)}`.slice(0, 80),
+        const r = await UMG.igApi('POST', '/api/clip/neu', { vorlage: 'trailer' + w.art.id + w.fi, auto: true, trailer: o.rk, trailerLive: p.liveMs, titel: `${x.wort} LIVE · ${GROSS(serie)}`.slice(0, 80),
           text: `🔴 ${heute ? 'Heute' : 'Gleich'} live: ${serie}${p.track ? ' · ' + p.track : ''} · ${uhr} Uhr\nSchaltet ein!\n\n#simracing #iracing #live #kreids888`, postMs: o.postMs, insta: true,
           tiktok: !!(st.tiktok && st.tiktok.verbunden), youtube: !!(st.youtube && st.youtube.verbunden), test: false, thumbMs: Math.round(w.art.thumb * 1000), dauer: TRAILER_T });
         await hochladen(r.id, blob);
         try { const cv = leinwand(B, H); trailerZeichnen(cv.getContext('2d'), w.art.thumb, x, m, hg); const k = leinwand(540, 960); k.getContext('2d').drawImage(cv, 0, 0, 540, 960); const vb = await new Promise(ok => k.toBlob(ok, 'image/jpeg', 0.85)); if (vb) await senden(`/api/clip/${r.id}/bild`, vb); } catch (e) { /* Vorschaubild ist nur schön */ }
         TRAILER_FERTIG.add(o.rk + p.liveMs);
-        UMG.meldung(`🔴 Trailer eingeplant: ${zeit(o.postMs)}`);
+        UMG.meldung((st.clipcfg || {}).freigabe !== false ? '🔴 Trailer gebaut. Er wartet oben bei „🤖 Automatik“ auf deine Freigabe.' : `🔴 Trailer eingeplant: ${zeit(o.postMs)}`);
       }
       ARBEIT = ''; await UMG.laden();
     } catch (e) { ARBEIT = ''; zeichnen(); console.warn('Trailer nicht gebaut:', e && e.message); }
@@ -2026,18 +2026,18 @@
           const p = a.p, rk = p.rennKey || p.key, tabPost = (st.posts || []).find(x => x.typ === 'tab' && (x.rennKey || x.key) === rk), e = p.ergebnis, ziel = nr(e.ziel), start = nr(e.start);
           let hg = null; try { if (p.hg) hg = await bild(p.hg); } catch (x) { hg = null; }
           seiten = abendSeiten(m, p, tabPost && tabPost.tab, hg, f, strm);
-          koerper = { vorlage: 'karabend', quelle: a.q, postMs: a.postMs, titel: `RENNABEND · ${GROSS(p.serie || p.titel || 'Rennen')}`.slice(0, 80),
+          koerper = { vorlage: 'karabend', auto: true, quelle: a.q, postMs: a.postMs, titel: `RENNABEND · ${GROSS(p.serie || p.titel || 'Rennen')}`.slice(0, 80),
             text: `🏁 P${ziel}${p.track ? ' in ' + p.track : ''}${p.serie ? ' · ' + p.serie : ''}\n${start ? `Start P${start} → Ziel P${ziel}. ` : ''}Alle Zahlen zum Wischen 👉 Wie fandet ihr das Rennen? 👇\n\n#simracing #iracing #kreids888` };
         } else {
           arbeit(`🏆 Karussell „Top ${a.t.liste.length} der Woche“ wird gebaut …`);
           for (const x of a.t.liste) { try { x.bild = x.bildUrl ? await bild(x.bildUrl) : null; } catch (e) { x.bild = null; } }
           seiten = top5Seiten(m, a.t.liste, a.t.was, f, strm);
-          koerper = { vorlage: 'kartop5', quelle: a.q, postMs: a.postMs, titel: `TOP ${a.t.liste.length} DER WOCHE`,
+          koerper = { vorlage: 'kartop5', auto: true, quelle: a.q, postMs: a.postMs, titel: `TOP ${a.t.liste.length} DER WOCHE`,
             text: `🏆 Top ${a.t.liste.length} der Woche: Welcher Clip ist dein Favorit? Schreib die Nummer in die Kommentare 👇\n\n#simracing #iracing #kreids888` };
         }
         const r = await karHochladen(seiten, koerper);
         KAR_FERTIG.add(a.q);
-        UMG.meldung(`${a.art === 'abend' ? '🏁 Rennabend' : '🏆 Top der Woche'} eingeplant: ${zeit(r.postMs || a.postMs)}`);
+        UMG.meldung(`${a.art === 'abend' ? '🏁 Rennabend' : '🏆 Top der Woche'} ${cfg.freigabe !== false ? 'gebaut. Wartet oben bei „🤖 Automatik“ auf deine Freigabe.' : 'eingeplant: ' + zeit(r.postMs || a.postMs)}`);
       }
       ARBEIT = ''; await UMG.laden();
     } catch (e) { ARBEIT = ''; zeichnen(); if (erzwinge) UMG.meldung(e.message || String(e), 1); else console.warn('Karussell nicht gebaut:', e && e.message); }
@@ -2139,6 +2139,36 @@
   }
   async function altenErsetzen(alt) {   // der bearbeitete Post ist neu eingeplant: den alten (und was aus ihm gebaut war) wegnehmen
     for (const y of stand().clips || []) if ((y.id === alt || (y.quelle && y.quelle.endsWith(':' + alt))) && !(y.gepostet || y.tt || y.yt)) { try { await UMG.igApi('POST', `/api/clip/${y.id}/weg`, {}); } catch (e) { /* bleibt in der Liste */ } }
+  }
+
+  // ═══ 🤖 Automatik-Leiste (NEU 20.11.2026): zeigt, was das Dashboard von selbst gebaut hat. Raus geht es erst nach „✓ Freigeben“ (abschaltbar). ═══
+  function automatikHtml(liste, cfg) {
+    const jetzt = Date.now(), noetig = cfg.freigabe !== false;
+    const auto = liste.filter(x => x.auto && !(x.gepostet || x.tt || x.yt) && x.postMs > jetzt - 86400000).sort((a, b) => (a.aus ? 1 : 0) - (b.aus ? 1 : 0) || a.postMs - b.postMs);
+    const warten = auto.filter(x => !x.frei && !x.aus && x.postMs > jetzt).length;
+    const karte = x => {
+      const v = trailerV(x.vorlage) || karV(x.vorlage) || { emoji: '🤖', name: 'Automatik' }, vorbei = x.postMs <= jetzt, fehlt = !x.video && !x.karussell;
+      const status = x.aus ? ['Wird nicht gepostet', 'grau'] : fehlt ? [x.kar ? 'Bilder fehlen' : 'Video fehlt', 'rot'] : !noetig ? ['Geht von selbst raus', 'gruen'] : x.frei ? ['Freigegeben ✓', 'gruen'] : vorbei ? ['Zeit vorbei · nicht gepostet', 'rot'] : ['Wartet auf Freigabe', 'gelb'];
+      const kn = x.aus ? '<button type="button" class="btn ki-k" data-c="auto-an">↩ Doch posten</button>'
+        : `${noetig && !x.frei && !vorbei && !fehlt ? '<button type="button" class="btn ki-k kc-frei" data-c="auto-frei">✓ Freigeben</button>' : ''}${noetig && x.frei ? '<button type="button" class="btn ki-k" data-c="auto-zurueck">↩ Zurücknehmen</button>' : ''}<button type="button" class="btn ki-k" data-c="auto-aus">✕ Nicht posten</button>`;
+      return `<div class="kc-auto-karte ${status[1]}" data-id="${esc(x.id)}">
+        <a class="kc-auto-bild${x.kar ? '' : ' hoch'}" href="${esc(x.video || (x.kbilder && x.kbilder[0]) || '#')}" target="_blank" rel="noopener" title="Ansehen">${x.bild ? `<img src="${esc(x.bild)}" alt="">` : v.emoji}</a>
+        <div class="kc-auto-info"><b>${v.emoji} ${esc(v.name)}</b><span class="kc-auto-titel">${esc(x.titel || '')}${x.karussell ? ` · ${x.karussell} Bilder` : ''}</span>
+          <span class="kc-dim">Geht raus: <b>${esc(zeit(x.postMs))}</b></span><span class="kc-dim">${[x.insta ? 'Instagram' : '', x.tiktok ? 'TikTok' : '', x.youtube ? 'YouTube' : ''].filter(Boolean).join(' + ')}</span>
+          <span class="kc-auto-status ${status[1]}">${status[0]}</span>${x.fehler ? `<span class="kc-hinweis rot">⚠ ${esc(x.fehler)}</span>` : ''}
+          <div class="kc-auto-kn">${kn}</div></div></div>`;
+    };
+    const sw = (k, an, text, tip) => `<label class="kc-check" title="${esc(tip)}"><input type="checkbox" data-c="cfg-${k}" ${an ? 'checked' : ''}> <span><b>${text}</b></span></label>`;
+    return `<div class="kc-auto"><h3 class="kc-h">🤖 Automatik <span class="kc-dim">${warten ? `${warten} ${warten === 1 ? 'wartet' : 'warten'} auf deine Freigabe` : ''}</span></h3>
+      <div class="kc-dim">Das baut das Dashboard von selbst. ${noetig ? 'Ohne Freigabe geht nichts raus.' : 'Es geht ohne Freigabe von selbst raus.'}</div>
+      ${auto.length ? `<div class="kc-auto-reihe">${auto.map(karte).join('')}</div>` : '<div class="kc-leer">Gerade nichts gebaut. Trailer kommen bis zu 4 Tage vor dem Stream, der Rennabend nach einem Ergebnis, die Top 5 am Wochenende.</div>'}
+      <div class="kc-auto-schalter">
+        ${sw('trailer', cfg.trailer !== false, '🔴 Stream-Trailer', 'Für jeden Stream der nächsten 4 Tage ein kurzes Video „HEUTE LIVE“, 2,5 Stunden vor „Live ab“. 8 Vorlagen und 7 Farben wechseln von selbst.')}
+        ${sw('abend', cfg.abend !== false, '🏁 Rennabend', 'Nach jedem Rennen mit Ergebnis: Bilder zum Wischen mit Platz, Zahlen, Tabelle und nächstem Stream (nur Instagram).')}
+        ${sw('top5', cfg.top5 !== false, '🏆 Top 5 der Woche', 'Deine Clips der letzten 7 Tage mit den meisten Aufrufen. Baut sich am Samstag oder Sonntag, geht Sonntag um 18 Uhr raus (nur Instagram). Braucht mindestens 3 Clips mit Zahlen.')}
+        ${sw('freigabe', noetig, '✓ Freigabe nötig', 'An: Automatisches geht erst raus, wenn du „✓ Freigeben“ drückst. Aus: es geht von selbst raus.')}
+        <button type="button" class="btn ki-k" data-c="top5-jetzt">🏆 Top 5 jetzt bauen</button>
+      </div></div>`;
   }
 
   // ═══ Look „📺 TV-Sendung“: Senderlogo, LIVE/REPLAY, Schlagzeile, Bildschirm, Bauchbinde, Laufschrift ═══
@@ -2958,7 +2988,7 @@
   function html() {
     const st = stand(), c = CLIPS[0], liste = (st.clips || []), cfg = st.clipcfg || { zeit: '18:30', test: true };
     const draussen = x => (!x.insta || !!x.gepostet) && (!x.tiktok || !!x.tt) && (!x.youtube || !!x.yt);
-    const offen = liste.filter(x => !draussen(x)), raus = liste.filter(draussen).reverse();
+    const offen = liste.filter(x => !draussen(x) && !x.auto), raus = liste.filter(draussen).reverse();   // Automatisches steht oben in der Leiste „🤖 Automatik“
     const tk = st.tiktok || {};
     return `<div class="kc-app">
       <details class="kc-so" ${(OFFEN['kc-so'] ?? !(CLIPS.length || liste.length)) ? 'open' : ''}><summary>💡 So geht’s (in 3 Schritten)</summary>
@@ -2969,6 +2999,7 @@
       ${ARBEIT ? `<div class="kc-arbeit"><span class="kc-spin"></span>${esc(ARBEIT)}</div>` : ''}
       ${c && c.ersetzt ? '<div class="kc-hinweis kc-bearb">✏️ Du bearbeitest einen geplanten Post. Beim Einplanen wird der alte ersetzt. Mit „✕ Clip entfernen“ brichst du ab, der alte bleibt dann.</div>' : ''}
       ${BEARBEITE ? `<div class="kc-hinweis kc-bearb">✏️ Zieh jetzt die Videodatei für „${esc(BEARBEITE.titel || 'den geplanten Post')}“ rein. Sie öffnet sich im Editor und ersetzt den geplanten Post. <button type="button" class="btn ki-k" data-c="bearbeiten-ab">Abbrechen</button></div>` : ''}
+      ${automatikHtml(liste, cfg)}
       <label class="kc-drop${c ? ' klein' : ''}" data-c="drop"><input type="file" accept="video/*" multiple data-c="datei">
         <span class="kc-drop-gross">🎬 ${c ? 'Weitere Clips reinziehen' : 'Clip hier reinziehen'}</span><span class="kc-dim">oder antippen und auswählen · MP4 aus dem Kreids Clipper</span></label>
       ${c ? editor(c, tk) : ''}
@@ -2981,9 +3012,6 @@
         <div class="kc-felder">
           <label class="kc-feld">Uhrzeit für neue Clips<input type="time" value="${esc(cfg.zeit)}" data-c="cfg-zeit">${tipp('Jeder neue Clip kommt auf den nächsten freien Tag um diese Uhrzeit.')}</label>
           <label class="kc-check"><input type="checkbox" data-c="cfg-test" ${cfg.test ? 'checked' : ''}> <span><b>Test-Reels</b>${tipp('Instagram zeigt den Clip zuerst nur Leuten, die dir noch nicht folgen. Läuft er gut, sehen ihn auch deine Follower. Geht laut einem Planungstool erst ab 1.000 Followern – sonst wird ganz normal gepostet.')}</span></label>
-          <label class="kc-check"><input type="checkbox" data-c="cfg-trailer" ${cfg.trailer !== false ? 'checked' : ''}> <span><b>🔴 Stream-Trailer</b>${tipp('Baut für jeden Stream der nächsten 4 Tage von selbst ein kurzes Video „HEUTE LIVE“ und plant es 2,5 Stunden vor „Live ab“ ein. 8 Vorlagen und 7 Farben wechseln von selbst. Dafür diesen Reiter vor dem Stream einmal öffnen.')}</span></label>
-          <label class="kc-check"><input type="checkbox" data-c="cfg-abend" ${cfg.abend !== false ? 'checked' : ''}> <span><b>🏁 Karussell „Rennabend“</b>${tipp('Nach jedem Rennen mit Ergebnis: Bilder zum Wischen mit Platz, Zahlen, Tabelle und nächstem Stream. Geht 3 Stunden nach dem Ergebnis-Post raus (nur Instagram).')}</span></label>
-          <label class="kc-check"><input type="checkbox" data-c="cfg-top5" ${cfg.top5 !== false ? 'checked' : ''}> <span><b>🏆 Karussell „Top 5 der Woche“</b>${tipp('Deine Clips der letzten 7 Tage mit den meisten Aufrufen. Baut sich am Samstag oder Sonntag und geht Sonntag um 18 Uhr raus (nur Instagram). Braucht mindestens 3 Clips mit Zahlen.')} <button type="button" class="btn ki-k" data-c="top5-jetzt">Jetzt bauen</button></span></label>
         </div>
         ${cfg.testFehler ? `<div class="kc-hinweis">Test-Reels gingen beim letzten Mal nicht, deshalb wurde normal gepostet. Instagram sagt: ${esc(cfg.testFehler)}</div>` : ''}
         <div class="kc-knoepfe"><button type="button" class="btn ki-k" data-c="cfg-speichern">💾 Speichern</button></div>
@@ -3379,13 +3407,17 @@
     if (a === 'marke-weg' && c) { c.marken = (c.marken || []).filter(x => x.id !== b.dataset.k); zeichnen(); return; }
     if (a === 'top5-jetzt') { ev.preventDefault(); karPruefen('top5'); return; }
     if (a === 'cfg-speichern') {
-      try { await UMG.igApi('POST', '/api/clips/einstellungen', { zeit: BOX.querySelector('[data-c="cfg-zeit"]').value, test: BOX.querySelector('[data-c="cfg-test"]').checked, trailer: BOX.querySelector('[data-c="cfg-trailer"]').checked, abend: BOX.querySelector('[data-c="cfg-abend"]').checked, top5: BOX.querySelector('[data-c="cfg-top5"]').checked }); UMG.meldung('Gespeichert.'); await UMG.laden(); } catch (e) { UMG.meldung(e.message, 1); }
+      try { await UMG.igApi('POST', '/api/clips/einstellungen', { zeit: BOX.querySelector('[data-c="cfg-zeit"]').value, test: BOX.querySelector('[data-c="cfg-test"]').checked, trailer: BOX.querySelector('[data-c="cfg-trailer"]').checked, abend: BOX.querySelector('[data-c="cfg-abend"]').checked, top5: BOX.querySelector('[data-c="cfg-top5"]').checked, freigabe: BOX.querySelector('[data-c="cfg-freigabe"]').checked }); UMG.meldung('Gespeichert.'); await UMG.laden(); } catch (e) { UMG.meldung(e.message, 1); }
       return;
     }
     if (a === 'bearbeiten-ab') { BEARBEITE = null; zeichnen(); return; }
     if (!id) return;
     try {
       if (a === 'bearbeiten') { await bearbeiten(id); return; }
+      if (a === 'auto-frei' || a === 'auto-zurueck' || a === 'auto-aus' || a === 'auto-an') {   // 🤖 Automatik: freigeben · zurücknehmen · nicht posten · doch posten
+        await UMG.igApi('POST', `/api/clip/${id}/aendern`, a === 'auto-frei' ? { frei: true, aus: false } : a === 'auto-zurueck' ? { frei: false } : a === 'auto-aus' ? { aus: true, frei: false } : { aus: false });
+        UMG.meldung(a === 'auto-frei' ? 'Freigegeben. Geht zur geplanten Zeit raus.' : a === 'auto-aus' ? 'Wird nicht gepostet.' : 'Gespeichert.'); await UMG.laden(); return;
+      }
       if (a === 'jetzt') {
         if (!confirm('Diesen Clip jetzt sofort posten?')) return;
         b.disabled = true; b.textContent = '⏳ …';
@@ -3451,6 +3483,11 @@
     const t = ev.target, c = CLIPS[0]; if (!t.dataset || !BOX.contains(t)) return;
     const a = t.dataset.c;
     if (a === 'datei' && t.files && t.files.length) { dateienRein([...t.files]); t.value = ''; return; }
+    if (/^cfg-(trailer|abend|top5|freigabe)$/.test(a)) {   // 🤖 Automatik-Schalter: sofort speichern
+      const an = k => BOX.querySelector(`[data-c="cfg-${k}"]`).checked;
+      UMG.igApi('POST', '/api/clips/einstellungen', { trailer: an('trailer'), abend: an('abend'), top5: an('top5'), freigabe: an('freigabe') }).then(() => { UMG.meldung('Gespeichert.'); return UMG.laden(); }).catch(e => UMG.meldung(e.message || String(e), 1));
+      return;
+    }
     if (!c) return;
     if (a === 'slot-wahl') { const k = +t.value; if (k >= 1 && CLIPS[k]) { (c.extra = c.extra || []).push(quelleAusClip(CLIPS.splice(k, 1)[0])); zeichnen(); } return; }
     if (a === 'slot-datei' && t.files && t.files[0]) {
@@ -3510,7 +3547,7 @@
   }
   window.K888Clips = {
     vorlageInfo: id => trailerV(id) || karV(id) || VORLAGEN.find(y => y.id === id) || null,
-    VORLAGEN, STILE, bauen, zeitplan, zeichne, material, schriften, vorschaubild, stichwoerter, trailerZeichnen, trailerBauen, trailerPruefen, trailerTon, trailerWahl, TR_ARTEN, TR_FARBEN, karPruefen, top5Seiten, abendSeiten, top5Liste, tag2Clip, tag3Seiten, karSeite,
+    VORLAGEN, STILE, bauen, zeitplan, zeichne, material, schriften, vorschaubild, stichwoerter, trailerZeichnen, trailerBauen, trailerPruefen, trailerTon, trailerWahl, TR_ARTEN, TR_FARBEN, karPruefen, top5Seiten, abendSeiten, top5Liste, automatikHtml, tag2Clip, tag3Seiten, karSeite,
     async start(box, umg) {
       UMG = umg;
       if (BOX !== box) {
@@ -3644,6 +3681,22 @@
 .kc-app .kc-stich .ki-chip{border-color:#5cff1f;color:#d9ffcc}
 .kc-app .kc-hinweis{font-size:13px;color:#f5c518;background:#0b0c10;border:1px solid rgba(245,197,24,.45);padding:6px 10px}
 .kc-app .kc-hinweis.rot{color:#ff6b75;border-color:rgba(225,19,36,.45)}
+.kc-app .kc-auto{border:1px solid rgba(92,255,31,.5);background:rgba(92,255,31,.04);padding:14px 16px;margin:10px 0 16px}
+.kc-app .kc-auto .kc-h{margin-top:0}
+.kc-app .kc-auto-reihe{display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:12px;margin:12px 0}
+.kc-app .kc-auto-karte{display:flex;gap:12px;padding:10px;background:#101218;border:1px solid rgba(245,197,24,.55)}
+.kc-app .kc-auto-karte.gruen{border-color:rgba(92,255,31,.65)}.kc-app .kc-auto-karte.rot{border-color:rgba(225,19,36,.6)}.kc-app .kc-auto-karte.grau{border-color:#3a4048;opacity:.7}
+.kc-app .kc-auto-bild{flex:0 0 96px;width:96px;aspect-ratio:4/5;display:flex;align-items:center;justify-content:center;background:#0b0c10;border:1px solid #2a2f36;font-size:30px;text-decoration:none;align-self:flex-start;overflow:hidden}
+.kc-app .kc-auto-bild.hoch{aspect-ratio:9/16}.kc-app .kc-auto-bild img{width:100%;height:100%;object-fit:cover;display:block}
+.kc-app .kc-auto-info{display:flex;flex-direction:column;gap:3px;min-width:0;flex:1}.kc-app .kc-auto-info>b{font-size:16px;color:#fff}
+.kc-app .kc-auto-titel{font-size:13px;color:#e6e9ec;word-break:break-word}
+.kc-app .kc-auto-status{align-self:flex-start;margin-top:5px;padding:2px 8px;font-size:12px;font-weight:700;border:1px solid}
+.kc-app .kc-auto-status.gelb{color:#f5c518;border-color:rgba(245,197,24,.5);background:rgba(245,197,24,.12)}.kc-app .kc-auto-status.gruen{color:#8dff5c;border-color:rgba(92,255,31,.5);background:rgba(92,255,31,.1)}
+.kc-app .kc-auto-status.rot{color:#ff6b75;border-color:rgba(225,19,36,.5)}.kc-app .kc-auto-status.grau{color:#9aa3ad;border-color:#3a4048}
+.kc-app .kc-auto-kn{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.kc-app .kc-auto-kn .btn,.kc-app .kc-auto-schalter .btn{padding:7px 12px;font-size:13px;min-height:0;line-height:1.2;white-space:nowrap}
+.kc-app .kc-auto-kn .kc-frei{background:#5cff1f;color:#06080a;border-color:#5cff1f;font-weight:800}
+.kc-app .kc-auto-schalter{display:flex;flex-wrap:wrap;gap:8px 22px;align-items:center;margin-top:12px;padding-top:12px;border-top:1px solid rgba(255,255,255,.12)}
 .kc-app .kc-hinweis.kc-bearb{color:#bff4ff;border-color:rgba(24,232,255,.55);background:rgba(24,232,255,.07);font-size:14px;padding:10px 14px;margin:8px 0}
 .kc-app .kc-raus,.kc-app .kc-einst{background:#0d0e13;border:1px solid var(--line,#23262f);padding:10px 14px}
 .kc-app .kc-raus summary,.kc-app .kc-einst summary{cursor:pointer;font-weight:700;color:#fff}
