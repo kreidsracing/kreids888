@@ -2077,7 +2077,7 @@
   // ═══ 🖼 Karussells (NEU 20.11.2026): Bilder zum Wischen (nur Instagram). Bauen sich von selbst, wenn der Reiter „🎬 Clips“ offen ist ═══
   //   🏆 Top 5 der Woche: die Clips mit den meisten Aufrufen. (Rennabend und „Tag 2/Tag 3“ sind wieder raus: keine Wiederholungen.)
   const KB = 1080, KH = 1350, GOLD = '#ffd400';
-  const KAR_V = { kartop5: { emoji: '🏆', name: 'Top 5 der Woche', farbe: GOLD }, karabend: { emoji: '🏁', name: 'Rennabend', farbe: '#5cff1f' }, karbilder: { emoji: '🖼', name: 'Standbilder', farbe: '#18e8ff' } };
+  const KAR_V = { kartop5: { emoji: '🏆', name: 'Top 5 der Woche', farbe: GOLD }, karabend: { emoji: '🏁', name: 'Rennabend', farbe: '#5cff1f' }, karbilder: { emoji: '📸', name: 'Fotos', farbe: '#18e8ff' } };
   const karV = v => (KAR_V[v] ? { id: v, ...KAR_V[v] } : /^kar/.test(v || '') ? { id: v, emoji: '🖼', name: 'Karussell', farbe: '#18e8ff' } : null);
   const kMitte = (g, text, y, px, w, farbe) => { g.save(); SA(g, px, w || 800); g.textAlign = 'center'; g.fillStyle = farbe || '#fff'; g.shadowColor = 'rgba(0,0,0,.85)'; g.shadowBlur = 12; g.fillText(text, KB / 2, y); g.restore(); };
   const kChrom = (g, text, y, px, farbe, maxB) => { const ch = chrom(text, px, farbe, maxB || 960); g.drawImage(ch.c, KB / 2 - ch.mitte, y - ch.base); };
@@ -2112,6 +2112,18 @@
         kMitte(g, 'MEHR DAVON?', 400, 84); kChrom(g, 'LIVE AUF', 640, 190, f); kChrom(g, 'YOUTUBE', 850, 210, f); kNeon(g, m.ytHandle || '@Kreids888', 1010, 90, f);
       }
     });
+  }
+  function fotoSeite(m, f, nr, n, img) {   // 📸 ein Foto aus der Toolbox füllt die Seite: oben Logo, Kanal und Seite, unten YouTube
+    const c = leinwand(KB, KH), g = c.getContext('2d'), iw = img.naturalWidth || img.width, ih = img.naturalHeight || img.height, q = Math.max(KB / iw, KH / ih);
+    g.fillStyle = '#000'; g.fillRect(0, 0, KB, KH); g.drawImage(img, (KB - iw * q) / 2, (KH - ih * q) / 2, iw * q, ih * q);
+    let v = g.createLinearGradient(0, 0, 0, 250); v.addColorStop(0, 'rgba(0,0,0,.78)'); v.addColorStop(1, 'rgba(0,0,0,0)'); g.fillStyle = v; g.fillRect(0, 0, KB, 250);
+    v = g.createLinearGradient(0, KH - 250, 0, KH); v.addColorStop(0, 'rgba(0,0,0,0)'); v.addColorStop(1, 'rgba(0,0,0,.82)'); g.fillStyle = v; g.fillRect(0, KH - 250, KB, 250);
+    logoRing(g, 104, 104, 54, f, m.logo, 0);
+    g.save(); SA(g, 46, 800); g.fillStyle = '#fff'; g.textAlign = 'left'; g.shadowColor = 'rgba(0,0,0,.85)'; g.shadowBlur = 10; g.fillText(m.ytHandle || m.handle || '@Kreids888', 180, 120); g.restore();
+    const st = `${nr}/${n}`; pille(g, st, KB - 60 - pillenBreite(g, st, 40), 72, f, 40, false);
+    pille(g, 'LIVE AUF YOUTUBE', 60, KH - 132, f, 44, true);
+    if (nr < n) { g.save(); SA(g, 46, 800); g.textAlign = 'right'; g.fillStyle = '#fff'; g.shadowColor = 'rgba(0,0,0,.85)'; g.shadowBlur = 10; g.fillText('WISCHEN »', KB - 60, KH - 82); g.restore(); }
+    return c;
   }
   // 🏆 Top 5 der Woche · liste = [{ titel, wert, bild }] bester zuerst
   function top5Seiten(m, liste, was, f, strm) {
@@ -2158,7 +2170,7 @@
   // ═══ 📂 Insta-Ablage (NEU 21.11.2026): fertige Szenen aus der Toolbox (Reiter „Schnitt“) als Vorrat ═══
   // Der Browser liest den Ordner „insta-ablage“ direkt vom PC (Chrome/Edge am PC, nur lesen). Hochgeladen wird erst beim Einplanen.
   // Eine Szene öffnet sich im Editor wie ein reingezogener Clip, Vorlage und Spruch kommen aus der Infodatei (Strecke, Art).
-  const ABL = { ordner: null, liste: [], stand: '', laedt: false, bilder: new Map(), malt: false };   // stand: '' nie verbunden · 'fragen' Freigabe nötig · 'ok'
+  const ABL = { ordner: null, liste: [], stand: '', laedt: false, bilder: new Map(), malt: false, fotos: [], fotoWahl: [], fotoUrl: new Map(), kar: null };   // stand: '' nie verbunden · 'fragen' Freigabe nötig · 'ok'
   const ABL_BENUTZT = 'k888_ablage_benutzt';
   const ABL_ART = { 'Seite an Seite': 'duell', 'Zweikampf': 'duell', 'Überholt worden': 'ueberholt worden', 'Überholt': 'ueberholt', 'Einschlag': 'crash', 'Abflug': 'crash', 'Incident': 'kontakt', 'Dreher': 'dreher',
     'Zieleinlauf': 'ziel', 'Rennstart': 'start', 'Bestzeit': 'bestzeit', 'Allzeit-Bestzeit': 'bestzeit', 'Laut geworden': 'highlight' };
@@ -2169,6 +2181,7 @@
     const i = x.info, r = i.runde ? 'R' + i.runde : '', std = [i.strecke, i.art, r, String(i.datum || '').slice(0, 10)].filter(Boolean).join(' ');
     return std && x.name.startsWith(std) ? [i.art, i.strecke, r].filter(Boolean).join(' · ') + x.name.slice(std.length) : x.name;
   }
+  const ablZahl = () => [`${ABL.liste.length} ${ABL.liste.length === 1 ? 'Szene' : 'Szenen'}`, ABL.fotos.length ? `${ABL.fotos.length} ${ABL.fotos.length === 1 ? 'Foto' : 'Fotos'}` : ''].filter(Boolean).join(', ');
   const ablFrei = () => { if (ABL.stand !== 'ok') return []; const b = new Set(ablBenutzt()); return ABL.liste.filter(x => !b.has(x.name) && !CLIPS.some(c => c.ablage === x.name)); };
   let ABL_DB = null;
   const ablDb = () => ABL_DB || (ABL_DB = new Promise((ok, nein) => { const r = indexedDB.open('k888_ablage', 1); r.onupgradeneeded = () => r.result.createObjectStore('h'); r.onsuccess = () => ok(r.result); r.onerror = () => nein(r.error); }));
@@ -2184,6 +2197,54 @@
       liste.push({ name: basis, datei: e, cam: dateien.has(basis + ' Cam.mp4'), camDatei: dateien.get(basis + ' Cam.mp4') || null, info: (info && typeof info === 'object') ? info : {}, zeit: f.lastModified, groesse: f.size });
     }
     ABL.liste = liste.sort((a, b) => b.zeit - a.zeit);
+    const fotos = [];   // 📸 zugeschnittene Fotos aus der Toolbox (Reiter „Fotos“): Bilder fürs Karussell
+    for (const [name, e] of dateien) {
+      if (!/\.(jpe?g|png)$/i.test(name)) continue;
+      let f = null; try { f = await e.getFile(); } catch (err) { continue; }
+      fotos.push({ name, datei: e, zeit: f.lastModified, groesse: f.size, file: f });
+    }
+    fotos.sort((a, b) => b.zeit - a.zeit);
+    const alt = ABL.fotoUrl; ABL.fotoUrl = new Map();
+    for (const x of fotos.slice(0, 60)) { const k = x.name + '|' + x.zeit; ABL.fotoUrl.set(x.name, alt.has(k) ? alt.get(k) : URL.createObjectURL(x.file)); ABL.fotoUrl.set(k, ABL.fotoUrl.get(x.name)); alt.delete(k); x.file = null; }
+    for (const [k, u] of alt) if (k.includes('|')) URL.revokeObjectURL(u);
+    ABL.fotos = fotos.slice(0, 60); ABL.fotoWahl = ABL.fotoWahl.filter(n => ABL.fotos.some(x => x.name === n)); if (!ABL.fotoWahl.length) ABL.kar = null;
+  }
+  const fotoOrt = name => String(name).replace(/\.[a-z]+$/i, '').replace(/^\d{4}-\d{2}-\d{2} \d{2}-\d{2}-\d{2} ?/, '').replace(/ \(\d+\)$/, '').replace(/ ?Foto$/, '').trim();   // „2026-11-21 16-20-05 Long Beach Foto.jpg“ → „Long Beach“
+  const KAR_MAX = 10;
+  function ablKarStart() {   // Vorschlag für Titel, Text und Zeit, sobald das erste Foto angehakt ist
+    if (ABL.kar) return ABL.kar;
+    const ort = fotoOrt(ABL.fotoWahl[0] || ''), plan = lueckenPlan(stand(), Date.now()), frei = plan.find(e => !e.n && e.ms), cfg = stand().clipcfg || {};
+    ABL.kar = { titel: GROSS(ort ? `${ort} · Bilder vom Rennen` : 'Bilder vom Rennen'), schluss: true, postMs: frei ? frei.ms : new Date(`${tagVon(Date.now() + 86400000)}T${cfg.zeit || '18:30'}:00`).getTime(),
+      text: `📸 ${ort ? ort + ': ' : ''}Welches Bild ist dein Favorit? Schreib die Nummer in die Kommentare 👇\n\n#simracing #iracing #kreids888` };
+    return ABL.kar;
+  }
+  function ablKarEingabe(t) {   // Tippen ändert nur die Werte (kein Neuzeichnen, sonst springt der Cursor)
+    const K = ABL.kar, k = t.dataset.abk; if (!K) return;
+    if (k === 'schluss') { K.schluss = t.checked; zeichnen(); }
+    else if (k === 'postMs') { const ms = new Date(t.value).getTime(); if (isFinite(ms)) K.postMs = ms; }
+    else K[k] = t.value;
+  }
+  async function ablKarBauen() {   // 📸 Karussell aus den angehakten Fotos bauen, hochladen und einplanen (nur Instagram)
+    const K = ABL.kar, namen = ABL.fotoWahl.slice(0, K && K.schluss ? KAR_MAX - 1 : KAR_MAX);
+    if (!K || !namen.length || ARBEIT || TRAILER_LAEUFT || KAR_LAEUFT) return;
+    if (namen.length + (K.schluss ? 1 : 0) < 2) return UMG.meldung('Ein Karussell braucht mindestens zwei Seiten: noch ein Foto anhaken oder die letzte Seite „Live auf YouTube“ anlassen.', 1);
+    if (!(K.postMs > Date.now())) return UMG.meldung('Die Zeit liegt in der Vergangenheit. Bitte „Geht raus am“ ändern.', 1);
+    KAR_LAEUFT = true;
+    try {
+      await schriften(); const st = stand(), m = MAT || await material(), strm = (st.streams || [])[0] || null;
+      arbeit('🖼 Karussell wird gebaut …');
+      let h = 0; for (const ch of namen[0]) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
+      const f = TR_FARBEN[h % TR_FARBEN.length], ges = namen.length + (K.schluss ? 1 : 0), seiten = [];
+      for (let i = 0; i < namen.length; i++) {
+        const img = await bild(ABL.fotoUrl.get(namen[i])); if (!img) throw new Error(`„${namen[i]}“ lässt sich nicht lesen. Bitte „↻ Neu lesen“ drücken.`);
+        seiten.push(fotoSeite(m, f, i + 1, ges, img));
+      }
+      if (K.schluss) seiten.push(streamSeite(m, f, ges, ges, strm));
+      await karHochladen(seiten, { vorlage: 'karbilder', frei: true, quelle: 'fotos:' + namen[0], postMs: K.postMs, titel: String(K.titel || 'Bilder vom Rennen').slice(0, 80), text: K.text });
+      namen.forEach(n => ablMerken('foto:' + n)); ABL.fotoWahl = []; ABL.kar = null;
+      ARBEIT = ''; UMG.meldung(`Eingeplant: ${zeit(K.postMs)} 🎉`); await UMG.laden();
+    } catch (err) { ARBEIT = ''; zeichnen(); UMG.meldung(err.message || String(err), 1); }
+    finally { KAR_LAEUFT = false; }
   }
   async function ablStart() {   // beim Öffnen des Reiters: den gemerkten Ordner wieder lesen, wenn der Browser es noch erlaubt
     if (!ablKann() || ABL.laedt) return;
@@ -2201,7 +2262,7 @@
       if (ABL.ordner && !anderer) { if ((await ABL.ordner.requestPermission({ mode: 'read' })) !== 'granted') return UMG.meldung('Ohne Freigabe kann der Ordner nicht gelesen werden.', 1); }
       else { const h = await window.showDirectoryPicker({ id: 'k888-ablage', mode: 'read' }); ABL.ordner = h; try { await ablTx('readwrite', o => o.put(h, 'ordner')); } catch (e) { /* dann nur bis zum Neuladen */ } }
       await ablLesen(); ABL.stand = 'ok'; zeichnen();
-      UMG.meldung(ABL.liste.length ? `${ABL.liste.length} ${ABL.liste.length === 1 ? 'Szene' : 'Szenen'} im Vorrat.` : 'Verbunden. Im Ordner liegt noch keine Szene.');
+      UMG.meldung(ABL.liste.length || ABL.fotos.length ? `Im Vorrat: ${ablZahl()}.` : 'Verbunden. Im Ordner liegt noch nichts.');
     } catch (e) {
       if (e && e.name === 'AbortError') return;
       ABL.stand = ABL.ordner ? 'fragen' : ''; zeichnen(); UMG.meldung('Der Ordner lässt sich nicht lesen. Bitte neu verbinden.', 1);
@@ -2261,8 +2322,21 @@
         ${benutzt ? '<span class="kc-tag-ok">✓ verwendet</span>' : ''}
         <button type="button" class="btn ki-k${benutzt || drin ? '' : ' kc-frei'}" data-c="abl-auf" data-name="${esc(x.name)}" ${drin ? 'disabled' : ''}>${drin ? 'Ist im Editor' : benutzt ? '↩ Nochmal' : '✏️ In den Editor'}</button></div>`;
     };
-    return `<details class="kc-abl" ${(OFFEN['kc-abl'] ?? offenStandard) ? 'open' : ''}><summary>${kopf} <span class="kc-dim">${frei.length} neu${ABL.liste.length > frei.length ? ` · ${ABL.liste.length - frei.length} verwendet` : ''} · Ordner „${esc(ABL.ordner.name)}“</span></summary>
+    const K = ABL.kar, wahl = ABL.fotoWahl, seiten = wahl.length + (K && K.schluss ? 1 : 0);
+    const foto = x => { const nr = wahl.indexOf(x.name) + 1, benutzt = b.has('foto:' + x.name);
+      return `<button type="button" class="kc-foto${nr ? ' an' : ''}${benutzt ? ' benutzt' : ''}" data-c="abl-foto" data-name="${esc(x.name)}" title="${esc(x.name)}${nr ? ' · anklicken = wieder raus' : ' · anklicken = ins Karussell'}"><img src="${ABL.fotoUrl.get(x.name) || ''}" alt=""><i>${nr || '+'}</i>${benutzt ? '<span class="kc-tag-ok">✓ verwendet</span>' : ''}</button>`; };
+    const fotosHtml = !ABL.fotos.length ? '' : `<div class="kc-abl-fotos"><b>📸 Fotos <span class="kc-dim">${ABL.fotos.length} · für ein Karussell anhaken (nur Instagram). Die Zahl ist die Reihenfolge.</span></b>
+        <div class="kc-foto-reihe">${[...ABL.fotos.filter(x => !b.has('foto:' + x.name)), ...ABL.fotos.filter(x => b.has('foto:' + x.name))].map(foto).join('')}</div>
+        ${K && wahl.length ? `<div class="kc-foto-form">
+          <div class="kc-felder"><label class="kc-feld">Titel<input type="text" maxlength="80" value="${esc(K.titel)}" data-abk="titel"></label>
+            <label class="kc-feld">Geht raus am<input type="datetime-local" value="${esc(lokal(K.postMs))}" data-abk="postMs"></label></div>
+          <label class="kc-feld">Text zum Post<textarea rows="3" data-abk="text">${esc(K.text)}</textarea></label>
+          <label class="kc-check"><input type="checkbox" data-abk="schluss" ${K.schluss ? 'checked' : ''}> <span>Letzte Seite „Live auf YouTube“ anhängen</span></label>
+          <div class="kc-auto-kn"><button type="button" class="btn kc-frei" data-c="abl-kar" ${seiten < 2 || ARBEIT ? 'disabled' : ''}>🖼 Karussell bauen & einplanen (${seiten} ${seiten === 1 ? 'Seite' : 'Seiten'})</button>
+            <button type="button" class="btn ki-k" data-c="abl-foto-leer">Auswahl leeren</button></div></div>` : ''}</div>`;
+    return `<details class="kc-abl" ${(OFFEN['kc-abl'] ?? offenStandard) ? 'open' : ''}><summary>${kopf} <span class="kc-dim">${frei.length} neu${ABL.liste.length > frei.length ? ` · ${ABL.liste.length - frei.length} verwendet` : ''}${ABL.fotos.length ? ` · ${ABL.fotos.length} ${ABL.fotos.length === 1 ? 'Foto' : 'Fotos'}` : ''} · Ordner „${esc(ABL.ordner.name)}“</span></summary>
       ${ABL.liste.length ? `<div class="kc-abl-reihe">${[...frei, ...ABL.liste.filter(x => b.has(x.name))].map(kachel).join('')}</div>` : '<div class="kc-leer">Noch keine Szene. In der Toolbox auf „Schnitt“ eine Szene fertig machen.</div>'}
+      ${fotosHtml}
       <div class="kc-auto-kn"><button type="button" class="btn ki-k" data-c="abl-neu">↻ Neu lesen</button><button type="button" class="btn ki-k" data-c="abl-wechseln">Anderer Ordner</button></div></details>`;
   }
 
@@ -3924,7 +3998,15 @@
     if (a === 'luecke-bauen') { lueckeBauen(b.dataset.tag); return; }
     if (a === 'abl-verbinden') { ablVerbinden(false); return; }
     if (a === 'abl-wechseln') { ablVerbinden(true); return; }
-    if (a === 'abl-neu') { try { await ablLesen(); UMG.meldung(`${ABL.liste.length} ${ABL.liste.length === 1 ? 'Szene' : 'Szenen'} im Ordner.`); } catch (e) { ABL.stand = 'fragen'; } zeichnen(); return; }
+    if (a === 'abl-neu') { try { await ablLesen(); UMG.meldung(`Im Ordner: ${ablZahl()}.`); } catch (e) { ABL.stand = 'fragen'; } zeichnen(); return; }
+    if (a === 'abl-foto') {   // 📸 Foto für ein Karussell an- oder abhaken (die Zahl ist die Reihenfolge)
+      const n = b.dataset.name, i = ABL.fotoWahl.indexOf(n);
+      if (i >= 0) ABL.fotoWahl.splice(i, 1); else if (ABL.fotoWahl.length >= KAR_MAX) return UMG.meldung(`Mehr als ${KAR_MAX} Bilder gehen nicht in ein Karussell.`, 1); else ABL.fotoWahl.push(n);
+      if (ABL.fotoWahl.length) ablKarStart(); else ABL.kar = null;
+      zeichnen(); return;
+    }
+    if (a === 'abl-foto-leer') { ABL.fotoWahl = []; ABL.kar = null; zeichnen(); return; }
+    if (a === 'abl-kar') { ablKarBauen(); return; }
     if (a === 'abl-auf') { ablOeffnen(b.dataset.name, 0); return; }
     if (a === 'luecke-bearb') { autoEdAuf('', b.dataset.tag); return; }
     if (a === 'auto-bearb' && id) { autoEdAuf(id); return; }
@@ -3969,6 +4051,7 @@
     if (p.sektoren) { const el = BOX.querySelector('.kc-marke .kc-fuell'); if (el) el.textContent = zeitText(p.sektoren[p.sektoren.length - 1].zeit); }
   }
   function eingabe(ev) {
+    if (ev.target && ev.target.dataset && ev.target.dataset.abk && BOX.contains(ev.target)) { if (ev.target.type !== 'checkbox') ablKarEingabe(ev.target); return; }   // 📸 Karussell aus Fotos
     if (ev.target && ev.target.dataset && ev.target.dataset.ce && BOX.contains(ev.target)) { clipEdEingabe(ev.target); return; }   // ✏️ Schnell-Editor für geplante Clips
     if (ev.target && ev.target.dataset && ev.target.dataset.ae && BOX.contains(ev.target)) { autoEdEingabe(ev.target); return; }   // ✏️ Editor für Automatisches
     const t = ev.target, c = CLIPS[0]; if (!c || !t.dataset || !BOX.contains(t)) return;
@@ -4016,6 +4099,7 @@
     }
   }
   function aenderung(ev) {
+    if (ev.target && ev.target.dataset && ev.target.dataset.abk && BOX.contains(ev.target)) { ablKarEingabe(ev.target); return; }
     if (ev.target && ev.target.dataset && ev.target.dataset.ce && BOX.contains(ev.target)) { clipEdEingabe(ev.target); return; }
     if (ev.target && ev.target.dataset && ev.target.dataset.ae && BOX.contains(ev.target)) { autoEdEingabe(ev.target); if (ev.target.dataset.ae === 'hgAn') { if (AUTO_ED && !AUTO_ED.hgAn && AUTO_ED.art === 'plakat') AUTO_ED.art = 'heute'; zeichnen(); } return; }
     const t = ev.target, c = CLIPS[0]; if (!t.dataset || !BOX.contains(t)) return;
@@ -4106,7 +4190,7 @@
   window.K888Clips = {
     oeffnen(id) { OEFFNE = String(id || ''); },   // der Wochenplan ruft das vor dem Wechsel in den Reiter „🎬 Clips“
     vorlageInfo: (id, c) => (c && autoV(c)) || trailerV(id) || karV(id) || VORLAGEN.find(y => y.id === id) || null,
-    VORLAGEN, STILE, bauen, zeitplan, zeichne, material, schriften, vorschaubild, stichwoerter, trailerZeichnen, trailerBauen, trailerPruefen, trailerTon, trailerWahl, TR_ARTEN, TR_FARBEN, top5Seiten, top5Liste, automatikHtml, karSeite, lueckenPlan, lueckeBauen, autoEdAuf, ablage: ABL, camRahmen, camPlatz, lage, CAM_PLAETZE, _clips: CLIPS, _zoomTf: zoomTf, _bildRechteck: bildRechteck,
+    VORLAGEN, STILE, bauen, zeitplan, zeichne, material, schriften, vorschaubild, stichwoerter, trailerZeichnen, trailerBauen, trailerPruefen, trailerTon, trailerWahl, TR_ARTEN, TR_FARBEN, top5Seiten, top5Liste, automatikHtml, karSeite, lueckenPlan, lueckeBauen, autoEdAuf, ablage: ABL, fotoSeite, camRahmen, camPlatz, lage, CAM_PLAETZE, _clips: CLIPS, _zoomTf: zoomTf, _bildRechteck: bildRechteck,
     async start(box, umg) {
       UMG = umg;
       if (BOX !== box) {
@@ -4282,6 +4366,14 @@
 .kc-app .kc-abl-k.benutzt{opacity:.6}
 .kc-app .kc-abl-bild{aspect-ratio:16/9;background:#07080b;display:flex;align-items:center;justify-content:center;font-size:26px;overflow:hidden}
 .kc-app .kc-abl-bild img{width:100%;height:100%;object-fit:cover;display:block}
+.kc-app .kc-abl-fotos{margin-top:14px;padding-top:12px;border-top:1px solid rgba(24,232,255,.25)}.kc-app .kc-abl-fotos>b{display:block;color:#fff}.kc-app .kc-abl-fotos>b .kc-dim{font-weight:400}
+.kc-app .kc-foto-reihe{display:grid;grid-template-columns:repeat(auto-fill,minmax(112px,1fr));gap:8px;margin-top:10px}
+.kc-app .kc-foto{position:relative;aspect-ratio:4/5;padding:0;border:2px solid #2a2f36;background:#07080b;cursor:pointer;overflow:hidden}
+.kc-app .kc-foto img{width:100%;height:100%;object-fit:cover;display:block}
+.kc-app .kc-foto i{position:absolute;left:6px;top:6px;width:28px;height:28px;border-radius:50%;border:2px solid #fff;background:rgba(0,0,0,.65);color:#fff;font:800 15px/24px var(--body,inherit);font-style:normal;text-align:center}
+.kc-app .kc-foto.an{border-color:#8dff5c;box-shadow:0 0 0 2px #8dff5c}.kc-app .kc-foto.an i{background:#8dff5c;border-color:#8dff5c;color:#000}
+.kc-app .kc-foto.benutzt{opacity:.55}.kc-app .kc-foto .kc-tag-ok{position:absolute;left:0;right:0;bottom:0;padding:3px 4px;background:rgba(0,0,0,.75);font-size:11px}
+.kc-app .kc-foto-form{display:flex;flex-direction:column;gap:10px;margin-top:12px;padding:12px;background:#101218;border:1px solid #2a2f36}
 .kc-app .kc-tage{display:grid;grid-template-columns:repeat(auto-fill,minmax(124px,1fr));gap:8px;margin-top:8px}
 .kc-app .kc-tagz .kc-auto-kn{margin-top:auto;padding-top:6px}.kc-app .kc-tagz .kc-auto-kn .btn{padding:6px 9px;font-size:12px}
 .kc-app .kc-tagz{display:flex;flex-direction:column;gap:4px;padding:8px 10px;background:#101218;border:1px solid #2a2f36;font-size:13px;min-width:0}
