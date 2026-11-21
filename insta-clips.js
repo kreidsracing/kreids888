@@ -854,8 +854,21 @@
     g.restore();
   }
   // Fläche, in der der Clip gezeichnet wird (Rahmen oder ganzes Bild bei „Zoom“) – für Analyse-Kreis und Tippen in die Vorschau
-  function flaeche(c, p, t) {
-    if (c.modus === 'zoom' && c.look !== 'tv') return { x: -40, y: -40, w: B + 80, h: H + 80, zoom: 1.02 + 0.03 * fp(t, 0, p.D), versatz: c.versatz || 0, tf: c.bild, kx: 0, ky: 0, kw: B, kh: H };
+  // 📐 Hochkant-Lage aus der Toolbox (NEU 21.11.2026): c.hochkant = [{ ab, bis, x, y, z }], je Stück der Szene eine Lage.
+  // In der Toolbox (Reiter „Schnitt“) stellt man am Rahmen ein, welcher Teil des Bildes hochkant zu sehen ist. Bei „▯ Zoom“ sitzt das Bild
+  // hier genau so. Was man im Editor noch verschiebt oder vergrößert (c.bild), kommt obendrauf.
+  function zoomTf(c, vid, qt, zoom) {
+    const teile = c.hochkant, eigen = c.bild;
+    if (!Array.isArray(teile) || !teile.length || qt == null) return eigen;
+    const k = teile.find(x => qt >= x.ab - 0.001 && qt < x.bis) || teile[teile.length - 1];
+    const vw = (vid && (vid.videoWidth || vid.displayWidth)) || 1920, vh = (vid && (vid.videoHeight || vid.displayHeight)) || 1080;
+    const f = Math.max(B / vw, H / vh) * kl(+k.z || 1, 1, 3), sw = B / f, sh = H / f;   // sichtbarer Teil in Bildpunkten der Szene, wie in der Toolbox
+    const mx = ((vw - sw) / 2 * (1 + kl(+k.x || 0, -1, 1)) + sw / 2) / vw, my = ((vh - sh) / 2 * (1 + kl(+k.y || 0, -1, 1)) + sh / 2) / vh;   // seine Mitte (0 … 1)
+    const w = B + 80, h = H + 80, s0 = Math.max(w / vw, h / vh), z = f / s0, zm = zoom || 1, ez = eigen ? kl(eigen.z || 1, 0.3, 5) : 1;
+    return { z: z * ez, x: (0.5 - mx) * vw * s0 * zm * z * ez / w + ((eigen && eigen.x) || 0), y: (0.5 - my) * vh * s0 * zm * z * ez / h + ((eigen && eigen.y) || 0) };
+  }
+  function flaeche(c, p, t, vid) {
+    if (c.modus === 'zoom' && c.look !== 'tv') { const zoom = 1.02 + 0.03 * fp(t, 0, p.D); return { x: -40, y: -40, w: B + 80, h: H + 80, zoom, versatz: c.versatz || 0, tf: zoomTf(c, vid, p.quelle ? p.quelle(t) : null, zoom), kx: 0, ky: 0, kw: B, kh: H }; }
     const L = lage(c, c.look === 'tv');
     return { x: L.fx, y: L.fy, w: L.fw, h: L.fh, zoom: 1, versatz: 0, tf: c.bild, kx: L.fx, ky: L.fy, kw: L.fw, kh: L.fh };
   }
@@ -1032,14 +1045,14 @@
     if (c.look === 'tv') return zeichneTV(g, t, c, p, m, vid, cam);
     const v = vorlage(c), f = c.farbe || v.farbe, zoom = c.modus === 'zoom', st = stilVon(c), neon = st === 'neon';
     const outro = t >= p.T - OUTRO, rz = !outro && t >= p.D && t < p.D + p.R, imClip = !outro;
-    const halt = imClip && angehalten(v, p, t), ana = halt && v.analyse && vid, R = flaeche(c, p, t);
+    const halt = imClip && angehalten(v, p, t), ana = halt && v.analyse && vid, R = flaeche(c, p, t, vid);
     const [sx, sy] = rz && v.stempel ? schuetteln(t - p.D) : [0, 0];
     g.save(); g.translate(sx, sy);
     // Hintergrund
     if (imClip && vid) {
       if (zoom) {
         if (ana) analyseBild(g, t, c, p, vid, R);
-        else quellBild(g, vid, -40, -40, B + 80, H + 80, rz ? 1.12 : R.zoom, c.versatz, c.bild);
+        else quellBild(g, vid, -40, -40, B + 80, H + 80, rz ? 1.12 : R.zoom, c.versatz, rz ? zoomTf(c, vid, p.quelle(t), 1.12) : R.tf);
         const v1 = g.createLinearGradient(0, 0, 0, 840); v1.addColorStop(0, 'rgba(3,4,6,.92)'); v1.addColorStop(0.45, 'rgba(3,4,6,.8)'); v1.addColorStop(1, 'rgba(3,4,6,0)'); g.fillStyle = v1; g.fillRect(0, 0, B, 840);
         const v2 = g.createLinearGradient(0, 1100, 0, H); v2.addColorStop(0, 'rgba(3,4,6,0)'); v2.addColorStop(0.4, 'rgba(3,4,6,.88)'); g.fillStyle = v2; g.fillRect(0, 1100, B, H - 1100);
         if (!neon) stilZoomUeber(g, st, t, f);
@@ -2202,7 +2215,13 @@
     const c = await neuerClip(stich ? new File([datei], stich + '.mp4', { type: datei.type || 'video/mp4', lastModified: datei.lastModified }) : datei);
     if (!c) return UMG.meldung(`„${name}“ kann der Browser nicht öffnen.`, 1);
     c.datei = datei; c.name = datei.name; c.ablage = name; if (ms) c.postMs = ms;
+    c.start = 0; c.ende = c.dauer;   // die Szene ist in der Toolbox schon zugeschnitten: ganz nehmen (auch der Hook am Anfang)
     if (e.camDatei) { try { camSetzen(c, await e.camDatei.getFile()); } catch (err) { /* dann ohne Cam */ } }   // 📷 die passend geschnittene Cam
+    const i = e.info, v0 = vorlage(c);
+    if (i.hochkant && Array.isArray(i.teile) && i.teile.length && !v0.mehr && !v0.nurTV) {   // 📐 Lage je Stück, wie am Rahmen in der Toolbox eingestellt
+      c.hochkant = i.teile.map(t => ({ ab: +t.ab || 0, bis: +t.bis || 0, x: +t.x || 0, y: +t.y || 0, z: +t.z || 1 })); c.modus = 'zoom'; c.look = 'neon';
+    }
+    if (c.cam && i.cam_lage && ['aus', 'ecke', 'rund'].includes(i.cam_lage.platz)) { c.camPlatz = i.cam_lage.platz; c.camBox = { x: +i.cam_lage.x || 0, y: +i.cam_lage.y || 0, s: 1 }; }   // 📷 Platz der Cam aus der Toolbox
     CLIPS.push(c); zeichnen(); if (CLIPS.length === 1) nachOben();
     UMG.meldung(CLIPS.length > 1 ? 'Szene wartet hinter dem Clip, der gerade im Editor ist.' : 'Szene ist im Editor. Vorlage und Spruch passen schon, ändern geht immer.');
   }
@@ -2238,7 +2257,7 @@
       const benutzt = b.has(x.name), drin = CLIPS.some(c => c.ablage === x.name), k = x.name + '|' + x.zeit, src = ABL.bilder.get(k);
       return `<div class="kc-abl-k${benutzt ? ' benutzt' : ''}"><div class="kc-abl-bild" data-k="${esc(k)}">${src ? `<img src="${src}" alt="">` : '🎬'}</div>
         <b title="${esc(x.name)}">${esc(ablTitel(x))}</b>
-        <span class="kc-dim">${[x.info.dauer ? sek(x.info.dauer) : '', x.info.ansichten > 1 ? x.info.ansichten + ' Ansichten' : '', x.cam ? 'mit Cam' : '', datum(x.zeit)].filter(Boolean).join(' · ')}</span>
+        <span class="kc-dim">${[x.info.dauer ? sek(x.info.dauer) : '', x.info.ansichten > 1 ? x.info.ansichten + ' Ansichten' : '', x.info.hook ? 'mit Hook' : '', x.cam ? 'mit Cam' : '', datum(x.zeit)].filter(Boolean).join(' · ')}</span>
         ${benutzt ? '<span class="kc-tag-ok">✓ verwendet</span>' : ''}
         <button type="button" class="btn ki-k${benutzt || drin ? '' : ' kc-frei'}" data-c="abl-auf" data-name="${esc(x.name)}" ${drin ? 'disabled' : ''}>${drin ? 'Ist im Editor' : benutzt ? '↩ Nochmal' : '✏️ In den Editor'}</button></div>`;
     };
@@ -3875,7 +3894,7 @@
     if (a === 'cam-weg' && c) { camWeg(c); zeichnen(); return; }
     if (a === 'vorschau' && c && vorlage(c).analyse && VOR.vid) {   // Replay-Analyse: Stelle für den Kreis antippen
       if (performance.now() - (VOR.gezogen || 0) < 400) return;   // war Ziehen, kein Tippen
-      const r = b.getBoundingClientRect(), p = zeitplan(c), R = flaeche(c, p, p.h);
+      const r = b.getBoundingClientRect(), p = zeitplan(c), R = flaeche(c, p, p.h, VOR.vid);
       let x = (ev.clientX - r.left) * B / r.width, y = (ev.clientY - r.top) * H / r.height;
       if (x < R.kx || x > R.kx + R.kw || y < R.ky || y > R.ky + R.kh) return UMG.meldung('Bitte direkt ins Clip-Bild tippen.', 1);
       if (VOR.t != null && angehalten(vorlage(c), p, VOR.t)) {   // gerade herangezoomt → zurückrechnen
@@ -4087,7 +4106,7 @@
   window.K888Clips = {
     oeffnen(id) { OEFFNE = String(id || ''); },   // der Wochenplan ruft das vor dem Wechsel in den Reiter „🎬 Clips“
     vorlageInfo: (id, c) => (c && autoV(c)) || trailerV(id) || karV(id) || VORLAGEN.find(y => y.id === id) || null,
-    VORLAGEN, STILE, bauen, zeitplan, zeichne, material, schriften, vorschaubild, stichwoerter, trailerZeichnen, trailerBauen, trailerPruefen, trailerTon, trailerWahl, TR_ARTEN, TR_FARBEN, top5Seiten, top5Liste, automatikHtml, karSeite, lueckenPlan, lueckeBauen, autoEdAuf, ablage: ABL, camRahmen, camPlatz, lage, CAM_PLAETZE, _clips: CLIPS,
+    VORLAGEN, STILE, bauen, zeitplan, zeichne, material, schriften, vorschaubild, stichwoerter, trailerZeichnen, trailerBauen, trailerPruefen, trailerTon, trailerWahl, TR_ARTEN, TR_FARBEN, top5Seiten, top5Liste, automatikHtml, karSeite, lueckenPlan, lueckeBauen, autoEdAuf, ablage: ABL, camRahmen, camPlatz, lage, CAM_PLAETZE, _clips: CLIPS, _zoomTf: zoomTf, _bildRechteck: bildRechteck,
     async start(box, umg) {
       UMG = umg;
       if (BOX !== box) {
