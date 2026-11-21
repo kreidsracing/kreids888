@@ -280,9 +280,9 @@
     ['dreher', 'fail', 'Dreher', '🌀', 'dreher spin gedreht dreht pirouette'],
     ['fehler', 'fail', 'Fehler', '🤡', 'fehler fail peinlich verbremst verpasst bremspunktverpasst abgekuerzt offtrack'],
     ['ueberholt', 'ueberholer', 'Überholt', '🚀', 'ueberholen ueberholt ueberholmanoever ueberholmanover overtake pass passed vorbei spaetbremser sendit divebomb aussenrum'],
-    ['duell', 'duell', 'Duell', '⚔️', 'duell zweikampf kampf battle fight radanrad tuerantuer'],
+    ['duell', 'duell', 'Duell', '⚔️', 'duell zweikampf kampf battle fight radanrad tuerantuer seiteanseite'],
     ['save', 'save', 'Save', '😮‍💨', 'save gerettet rettung gehalten glueck fastweg'],
-    ['kontakt', 'schuld', 'Kontakt', '⚖️', 'kontakt rempler schuld touch punt abgeschossen umgedreht torpedo bumper gerammt rammen'],
+    ['kontakt', 'schuld', 'Kontakt', '⚖️', 'kontakt rempler schuld touch punt abgeschossen umgedreht torpedo bumper gerammt rammen incident'],
     ['ampel', 'ampel', 'Lights Out', '🚥', 'ampel lightsout lichteraus'],
     ['start', 'start', 'Start', '🚦', 'start rennstart startchaos ersterunde lap1 runde1'],
     ['finish', 'finish', 'Fotofinish', '📸', 'finish fotofinish zielfoto photofinish knappesziel'],
@@ -298,7 +298,7 @@
     ['Corvette', 'corvette'], ['Aston Martin', 'astonmartin aston'], ['Ford Mustang', 'mustang'], ['Lexus', 'lexus'], ['Acura', 'acura'], ['Honda', 'honda'], ['Toyota', 'toyota supra'], ['Cadillac', 'cadillac'],
     ['Dallara', 'dallara'], ['Ligier', 'ligier'], ['Oreca', 'oreca']];
   const ST_KLASSEN = { gt3: 'GT3', gt4: 'GT4', gte: 'GTE', gtp: 'GTP', lmp2: 'LMP2', lmp3: 'LMP3', tcr: 'TCR', mx5: 'MX-5', cup: 'Cup' };
-  const ST_RAUSCH = new Set('replay clip clips iracing racing simracing sim obs video final cut neu new edit kreids kreids888 kreidsclipper clipper mp4 mov teil part und and mit der die das den dem im in am beim vom von zu bei ich mir mich wird wurde ist hat runde lap rennen race session test training practice liga league season saison woche week'.split(' '));
+  const ST_RAUSCH = new Set('replay markiert cam clip clips iracing racing simracing sim obs video final cut neu new edit kreids kreids888 kreidsclipper clipper mp4 mov teil part und and mit der die das den dem im in am beim vom von zu bei ich mir mich wird wurde ist hat runde lap rennen race session test training practice liga league season saison woche week'.split(' '));
   const ST_MAP = new Map();
   ST_STRECKEN.forEach(([n, a]) => a.split(' ').forEach(k => ST_MAP.set(k, { art: 'strecke', n })));
   ST_STELLEN.forEach(([n, a, s]) => a.split(' ').forEach(k => ST_MAP.set(k, { art: 'stelle', n, s })));
@@ -326,7 +326,7 @@
       } else if (/^(t|turn|kurve|k)(\d{1,2})$/.test(wn)) { if (!r.stelle) r.stelle = 'Kurve ' + wn.replace(/\D/g, ''); }
       else if (ST_KLASSEN[wn]) { if (!r.klasse) r.klasse = ST_KLASSEN[wn]; }
       else if (wn === 'worden' || wn === 'kassiert' || wn === 'verloren') situs.push('worden');
-      else if (wn && !/^\d+$/.test(wn) && wn.length > 1 && !ST_RAUSCH.has(wn)) r.fremd.push(w);
+      else if (wn && !/^\d+$/.test(wn) && !/^r\d{1,3}$/.test(wn) && wn.length > 1 && !ST_RAUSCH.has(wn)) r.fremd.push(w);   // „R59“ = Runde aus der Toolbox, kein Ort
       i += n;
     }
     if (!r.strecke && r.streckeVonStelle) r.strecke = r.streckeVonStelle;
@@ -605,10 +605,61 @@
   }
   // Fenster (Rahmen um den Clip): Breite/Höhe einstellbar. Wird es höher, rückt es etwas nach oben und alles darunter nach unten (dy)
   const FENSTER_MAX = { neon: 820, tv: 620 };
+  // ═══ 📷 Cam im Clip (NEU 21.11.2026): die Renn-Cam bekommt einen festen Platz im Bild ═══
+  // c.cam = { datei, url, name } · c.camPlatz = aus | unten | ecke | rund | geteilt · c.camBox = { x, y, s } (Rahmen: Lage, Größe) · c.camTf = { x, y, z } (Ausschnitt)
+  // „Cam unten“ und „Geteilt“ sind ein eigenes Fenster unter dem Rennbild (nur „Ganzes Bild“ im Neon-Look), „Ecke“ und „Rund“ liegen im Rennbild.
+  const CAM_PLAETZE = [['aus', 'Aus'], ['unten', 'Cam unten'], ['ecke', 'In der Ecke'], ['rund', 'Rund'], ['geteilt', 'Geteilt']], CAM_LUECKE = 22;
+  const camStapel = c => c.look !== 'tv' && c.modus !== 'zoom';
+  function camPlatz(c) {   // der Platz, der gerade wirkt
+    if (!c || !c.cam || vorlage(c).mehr) return 'aus';
+    const pl = CAM_PLAETZE.some(x => x[0] === c.camPlatz) ? c.camPlatz : 'aus';
+    return (pl === 'unten' || pl === 'geteilt') && !camStapel(c) ? 'ecke' : pl;
+  }
+  const camBox = c => ({ x: 0, y: 0, s: 1, ...(c.camBox || {}) });
+  const camBild = c => ({ x: 0, y: 0, z: 1, ...(c.camTf || {}) });
   function lage(c, tv) {
-    const fe = c.fenster || {}, fw = kl(Math.round(fe.w || 1000), 360, 1040), fh = kl(Math.round(fe.h || 562), 280, tv ? FENSTER_MAX.tv : FENSTER_MAX.neon);
-    const hoch = tv ? 0 : Math.min(70, Math.max(0, fh - 562) / 2), fy = (tv ? 730 : 690) - hoch, unten = fy + fh;
-    return { fx: Math.round((B - fw) / 2), fy, fw, fh, hoch, dy: unten - ((tv ? 730 : 690) + 562) };
+    const fe = c.fenster || {}, max = tv ? FENSTER_MAX.tv : FENSTER_MAX.neon, basis = tv ? 730 : 690, fw = kl(Math.round(fe.w || 1000), 360, 1040);
+    let fh = kl(Math.round(fe.h || 562), 280, max), extra = 0, camW = 0, camH = 0;
+    const pl = !tv && camStapel(c) ? camPlatz(c) : 'aus', s = kl(camBox(c).s, 0.6, 1.8);   // 📷 Cam unter dem Rennbild: das Rennbild wird so flach, dass beides passt
+    if (pl === 'unten') { camW = Math.round(kl(fw * 0.5 * s, 260, fw) / 2) * 2; camH = Math.round(camW * 9 / 16); extra = CAM_LUECKE + camH; fh = Math.max(280, Math.min(fh, max - extra)); }
+    else if (pl === 'geteilt') { fh = Math.min(fh, Math.floor((max - CAM_LUECKE) / 2)); camW = fw; camH = fh; extra = CAM_LUECKE + camH; }
+    else if (pl === 'rund') { camW = camH = Math.round(kl(fw * 0.3 * s, 170, 460)); extra = Math.round(camH / 2) + 6; fh = Math.max(280, Math.min(fh, max - extra)); }
+    const ges = fh + extra, hoch = tv ? 0 : Math.min(70, Math.max(0, ges - 562) / 2), fy = basis - hoch, unten = fy + ges;
+    return { fx: Math.round((B - fw) / 2), fy, fw, fh, hoch, dy: unten - (basis + 562), ges, camW, camH };
+  }
+  function camGeo(c) {   // Bereich des Rennbilds: Fenster, ganzes Bild bei „Zoom“, Bildschirm im TV-Look
+    const tv = c.look === 'tv', L = lage(c, tv);
+    return !tv && c.modus === 'zoom' ? { fx: 34, fy: 690, fw: B - 68, fh: 600, L, stapel: false } : { fx: L.fx, fy: L.fy, fw: L.fw, fh: L.fh, L, stapel: !tv };
+  }
+  function camRahmen(c, G0) {   // wo die Cam sitzt → { x, y, w, h, rund, x0, y0 (Platz ohne Verschieben) }
+    const pl = camPlatz(c); if (pl === 'aus') return null;
+    const G = G0 || camGeo(c), { fx, fy, fw, fh, L } = G, b = camBox(c), s = kl(b.s, 0.6, 1.8);
+    if (pl === 'unten') return { x: fx + (fw - L.camW) / 2, y: fy + fh + CAM_LUECKE, w: L.camW, h: L.camH };
+    if (pl === 'geteilt') return { x: fx, y: fy + fh + CAM_LUECKE, w: fw, h: L.camH };
+    if (pl === 'rund') {
+      const d = G.stapel ? L.camW : Math.round(kl(fw * 0.3 * s, 170, 460)), x0 = fx + fw / 2, y0 = G.stapel ? fy + fh : fy + fh - d / 2 - 26;
+      const cx = kl(x0 + b.x * fw, fx + d / 2, fx + fw - d / 2), cy = G.stapel ? y0 : kl(y0 + b.y * fh, fy + d / 2 + 8, fy + fh - d / 2 - 8);
+      return { x: cx - d / 2, y: cy - d / 2, w: d, h: d, rund: true, x0: x0 - d / 2, y0: y0 - d / 2 };
+    }
+    const w = Math.round(kl(fw * 0.34 * s, 180, fw * 0.7)), h = Math.round(w * 3 / 4), x0 = fx + fw - w - 22, y0 = fy + fh - h - 22;
+    return { x: kl(x0 + b.x * fw, fx + 8, fx + fw - w - 8), y: kl(y0 + b.y * fh, fy + 8, fy + fh - h - 8), w, h, x0, y0 };
+  }
+  function camZeichnen(g, t, c, cam, f, G, stil) {   // Cam in ihrem Rahmen (Neon in der Farbe der Vorlage), ploppt am Anfang auf
+    const r = camRahmen(c, G); if (!r) return;
+    const q = fp(t, 0.3, 0.6); if (q <= 0) return;
+    const k = eob(q), mx = r.x + r.w / 2, my = r.y + r.h / 2, weg = () => { if (r.rund) { g.beginPath(); g.arc(mx, my, r.w / 2, 0, Math.PI * 2); } else rr(g, r.x, r.y, r.w, r.h, 14); };
+    g.save(); g.translate(mx, my); g.scale(k, k); g.translate(-mx, -my);
+    g.save(); weg(); g.clip(); g.fillStyle = '#000'; g.fillRect(r.x, r.y, r.w, r.h);
+    if (cam) { const tf = camBild(c); quellBild(g, cam, r.x, r.y, r.w, r.h, 1, 0, { ...tf, z: Math.max(1, tf.z) }); }
+    g.restore();
+    if (stil === 'comic') { weg(); g.lineWidth = 14; g.strokeStyle = '#000'; g.stroke(); weg(); g.lineWidth = 6; g.strokeStyle = '#fff'; g.stroke(); }
+    else if (stil === 'clean') { weg(); g.lineWidth = 4; g.strokeStyle = '#fff'; g.stroke(); }
+    else {
+      weg(); g.lineWidth = stil === 'tv' ? 10 : 9; g.strokeStyle = 'rgba(0,0,0,.6)'; g.stroke();
+      g.save(); weg(); g.lineWidth = 5; g.strokeStyle = f; g.shadowColor = f; g.shadowBlur = 26; g.stroke(); g.restore();
+      weg(); g.lineWidth = 1.5; g.strokeStyle = 'rgba(255,255,255,.9)'; g.stroke();
+    }
+    g.restore();
   }
   const markeY = (y, dy) => (y + dy <= 1600 ? y + dy : null);   // Logo unten nur, wenn noch Platz ist
   function ecken(g, x, y, w, h, farbe, l) {   // Neon-Ecken (HUD)
@@ -976,9 +1027,9 @@
     g.restore();
     if (zusatz) { g.save(); SA(g, 40, 900); g.textAlign = 'center'; g.fillStyle = zusatz.farbe; g.shadowColor = zusatz.farbe; g.shadowBlur = 14; g.fillText(zusatz.text, x + w / 2, y + h - 22); g.restore(); }
   }
-  function zeichne(g, t, c, p, m, vid) {
+  function zeichne(g, t, c, p, m, vid, cam) {   // cam = Bild der Renn-Cam zur selben Stelle (oder nichts)
     if (p.mehr) return zeichneMehr(g, t, c, p, m, vid);
-    if (c.look === 'tv') return zeichneTV(g, t, c, p, m, vid);
+    if (c.look === 'tv') return zeichneTV(g, t, c, p, m, vid, cam);
     const v = vorlage(c), f = c.farbe || v.farbe, zoom = c.modus === 'zoom', st = stilVon(c), neon = st === 'neon';
     const outro = t >= p.T - OUTRO, rz = !outro && t >= p.D && t < p.D + p.R, imClip = !outro;
     const halt = imClip && angehalten(v, p, t), ana = halt && v.analyse && vid, R = flaeche(c, p, t);
@@ -1009,12 +1060,14 @@
       }
       if (halt && !v.analyse) { g.fillStyle = v.ampel ? 'rgba(0,0,0,.55)' : v.zielflagge ? 'rgba(0,0,0,.15)' : 'rgba(0,0,0,.42)'; if (zoom) g.fillRect(0, 0, B, H); else { g.save(); rr(g, fx, fy, fw, fh, 14); g.clip(); g.fillRect(fx, fy, fw, fh); g.restore(); } }
       if (v.regen) { g.fillStyle = 'rgba(40,90,170,.14)'; g.fillRect(zoom ? 0 : fx, zoom ? 0 : fy, zoom ? B : fw, zoom ? H : fh); regen(g, t, p); }
+      const camPl = camPlatz(c);
       if (neon) {
         g.save(); g.globalAlpha = fl;
-        if (!zoom) ecken(g, fx - 10, fy - 10, fw + 20, fh + 20, f, 74);
+        if (!zoom) ecken(g, fx - 10, fy - 10, fw + 20, (camPl === 'unten' || camPl === 'geteilt' ? L0.ges : fh) + 20, f, 74);   // Rennbild und Cam-Fenster gehören zusammen
         else ecken(g, 34, 296, B - 68, 1258, f, 90);
         g.restore();
       }
+      if (camPl !== 'aus') camZeichnen(g, t, c, cam, f, zoom ? { fx: 34, fy: 690, fw: B - 68, fh: 600, L: L0, stapel: false } : { fx, fy, fw, fh, L: L0, stapel: true }, st);
       const mx = B / 2, my = zoom ? 1000 : fy + fh / 2;   // Mitte des Clips
       if (v.ampel) ampelZeichnen(g, t, p, mx, my, Math.min(fw, 1000));
       if (ana) analyseOben(g, t, c, p, vid, R, f);
@@ -1039,7 +1092,7 @@
       else { const w0 = pille(g, tagText(v, c), fx + 6, sy0, f, 30, true); if (v.gruenStart && nr(c.startplatz)) pille(g, 'START P' + nr(c.startplatz), fx + 6 + w0 + 14, sy0, '#ffffff', 30, false); }
       if (vid && !v.klassen && fw >= 640) { g.save(); OR(g, 34); g.textAlign = 'right'; g.shadowColor = f; g.shadowBlur = 14; g.fillStyle = '#fff'; g.fillText(uhr(p.quelle(t) || 0), fx + fw - 6, sy0 + 38); g.restore(); }
       // Fortschritt
-      const pr = kl(t / (p.T - OUTRO), 0, 1), py = zoom ? 1270 : fy + fh + 18;
+      const pr = kl(t / (p.T - OUTRO), 0, 1), py = zoom ? 1270 : fy + L0.ges + 18;
       g.fillStyle = 'rgba(255,255,255,.12)'; g.fillRect(fx, py, fw, 8);
       g.save(); g.fillStyle = f; g.shadowColor = f; g.shadowBlur = 16; g.fillRect(fx, py, fw * pr, 8); g.restore();
       (neon ? spruchZeichnen : (gg, tt, tx, ff, oo) => stilSpruch(gg, st, tt, tx, ff, oo))(g, t, c.hook || v.hooks[0], f, !zoom && L0.hoch ? { y1: 476 - L0.hoch, y2: 428 - L0.hoch } : undefined);
@@ -2115,7 +2168,7 @@
       const basis = name.slice(0, -4), j = dateien.get(basis + '.json'); let info = null, f = null;
       try { f = await e.getFile(); } catch (err) { continue; }
       try { if (j) info = JSON.parse(await (await j.getFile()).text()); } catch (err) { info = null; }
-      liste.push({ name: basis, datei: e, cam: dateien.has(basis + ' Cam.mp4'), info: (info && typeof info === 'object') ? info : {}, zeit: f.lastModified, groesse: f.size });
+      liste.push({ name: basis, datei: e, cam: dateien.has(basis + ' Cam.mp4'), camDatei: dateien.get(basis + ' Cam.mp4') || null, info: (info && typeof info === 'object') ? info : {}, zeit: f.lastModified, groesse: f.size });
     }
     ABL.liste = liste.sort((a, b) => b.zeit - a.zeit);
   }
@@ -2149,6 +2202,7 @@
     const c = await neuerClip(stich ? new File([datei], stich + '.mp4', { type: datei.type || 'video/mp4', lastModified: datei.lastModified }) : datei);
     if (!c) return UMG.meldung(`„${name}“ kann der Browser nicht öffnen.`, 1);
     c.datei = datei; c.name = datei.name; c.ablage = name; if (ms) c.postMs = ms;
+    if (e.camDatei) { try { camSetzen(c, await e.camDatei.getFile()); } catch (err) { /* dann ohne Cam */ } }   // 📷 die passend geschnittene Cam
     CLIPS.push(c); zeichnen(); if (CLIPS.length === 1) nachOben();
     UMG.meldung(CLIPS.length > 1 ? 'Szene wartet hinter dem Clip, der gerade im Editor ist.' : 'Szene ist im Editor. Vorlage und Spruch passen schon, ändern geht immer.');
   }
@@ -2293,7 +2347,7 @@
   let MERK_DB = null, BEARBEITE = null;   // BEARBEITE = wartet auf die Videodatei (wenn sie auf diesem Gerät nicht gemerkt ist)
   function merkDb() { if (!MERK_DB) MERK_DB = new Promise((ok, nein) => { try { const r = indexedDB.open('k888_clips', 1); r.onupgradeneeded = () => { r.result.createObjectStore('q'); r.result.createObjectStore('c'); }; r.onsuccess = () => ok(r.result); r.onerror = () => nein(r.error); } catch (e) { nein(e); } }); return MERK_DB; }
   const merkTx = async (store, mode, fn) => { const db = await merkDb(); return new Promise((ok, nein) => { const tx = db.transaction(store, mode), r = fn(tx.objectStore(store)); tx.oncomplete = () => ok(r && r.result); tx.onerror = tx.onabort = () => nein(tx.error); }); };
-  const NICHT_MERKEN = ['datei', 'url', 'id', 'extra', 'ersetzt'];
+  const NICHT_MERKEN = ['datei', 'url', 'id', 'extra', 'ersetzt', 'cam'];
   const schlicht = (k, v) => (v && typeof v === 'object' && !Array.isArray(v) && Object.getPrototypeOf(v) !== Object.prototype ? undefined : v);   // nur einfache Werte (keine Tonspur, keine Datei)
   const einstVon = c => { const e = {}; for (const [k, v] of Object.entries(c)) if (!NICHT_MERKEN.includes(k) && k[0] !== '_') e[k] = v; if (c.extra) e.extra = c.extra.map(x => einstVon(x)); return JSON.parse(JSON.stringify(e, schlicht)); };
   const quellKey = d => `${d.name}|${d.size}|${d.lastModified || 0}`;
@@ -2301,7 +2355,9 @@
     try {
       const keys = [];
       for (const q of quellenVon(c)) { if (!q.datei) return; const k = quellKey(q.datei); keys.push(k); await merkTx('q', 'readwrite', st => st.put(q.datei, k)); }
-      await merkTx('c', 'readwrite', st => st.put({ einst: einstVon(c), quellen: keys, zeit: Date.now() }, id));
+      let cam = '';
+      if (c.cam && c.cam.datei && camPlatz(c) !== 'aus') { cam = quellKey(c.cam.datei); await merkTx('q', 'readwrite', st => st.put(c.cam.datei, cam)); }   // 📷 Cam-Datei gleich mit merken
+      await merkTx('c', 'readwrite', st => st.put({ einst: einstVon(c), quellen: keys, cam, zeit: Date.now() }, id));
     } catch (e) { /* ohne Merken geht es auch: dann die Datei beim Bearbeiten nochmal reinziehen */ }
   }
   async function merkAufraeumen() {   // Gepostetes und Gelöschtes vergessen, unbenutzte Videodateien wegwerfen
@@ -2312,7 +2368,7 @@
       const da = new Set(st.clips.filter(x => !rausZeit(x) || rausZeit(x) > Date.now() - 8 * 86400000).map(x => x.id)), brauch = new Set(), bleibt = new Set();
       for (const id of await merkTx('c', 'readonly', o => o.getAllKeys())) {
         const r = await merkTx('c', 'readonly', o => o.get(id));
-        if (!da.has(id) && (!r || Date.now() - (r.zeit || 0) > 10 * 60000)) await merkTx('c', 'readwrite', o => o.delete(id)); else { bleibt.add(id); for (const k of (r && r.quellen) || []) brauch.add(k); }
+        if (!da.has(id) && (!r || Date.now() - (r.zeit || 0) > 10 * 60000)) await merkTx('c', 'readwrite', o => o.delete(id)); else { bleibt.add(id); for (const k of (r && r.quellen) || []) brauch.add(k); if (r && r.cam) brauch.add(r.cam); }
       }
       const neu = [...bleibt].sort().join('|') !== [...MERK_IDS].sort().join('|'); MERK_IDS = bleibt;
       if (neu && !AUTO_ED && !CLIP_ED && !CLIPS.length && !ARBEIT) zeichnen();   // Vorschläge können sich ändern (Top 3 als Video)
@@ -2357,6 +2413,7 @@
       const e = r.einst, urls = {}, urlVon = i => (urls[r.quellen[i]] = urls[r.quellen[i]] || URL.createObjectURL(dateien[i]));
       const c = { ...e, id: Math.random().toString(36).slice(2), datei: dateien[0], url: urlVon(0), ersetzt: id, postMs: x.postMs, insta: x.insta, tiktok: x.tiktok, youtube: x.youtube };
       if (e.extra) c.extra = e.extra.map((q, i) => ({ ...q, datei: dateien[i + 1] || dateien[0], url: urlVon(dateien[i + 1] ? i + 1 : 0) }));
+      if (r.cam) { try { const d = await merkTx('q', 'readonly', o => o.get(r.cam)); if (d) c.cam = { datei: d, url: URL.createObjectURL(d), name: d.name || 'Cam' }; } catch (err) { /* dann ohne Cam */ } }
       BEARBEITE = null; CLIP_ED = null; CLIPS.unshift(c); zeichnen(); nachOben();
       UMG.meldung('Im Editor geöffnet. Ändern und neu einplanen, dann wird der alte Post ersetzt.');
     } else {   // nicht gemerkt (anderes Gerät oder älterer Post): Datei nochmal reinziehen, dann wie ein neuer Clip
@@ -2717,7 +2774,7 @@
       g.save(); g.globalAlpha = q3; g.translate(B / 2, 1236); g.scale(puls, puls); pille(g, '+ FOLGEN', -116, -30, f, 36, true); g.restore();
     }
   }
-  function zeichneTV(g, t, c, p, m, vid) {
+  function zeichneTV(g, t, c, p, m, vid, cam) {
     const v = vorlage(c), f = c.farbe || v.farbe;
     if (t >= p.T - OUTRO) return tvAbspann(g, t - (p.T - OUTRO), m, f);
     const rz = t >= p.D && t < p.D + p.R, [sx, sy] = rz && v.stempel ? schuetteln(t - p.D) : [0, 0];
@@ -2729,6 +2786,7 @@
     tvBildschirm(g, t, p, f, vid, rz, L, c.bild);
     if (halt) { g.fillStyle = v.zielflagge ? 'rgba(0,0,0,.2)' : 'rgba(0,0,0,.45)'; g.fillRect(L.fx, L.fy, L.fw, L.fh); }
     if (v.regen) { g.fillStyle = 'rgba(40,90,170,.14)'; g.fillRect(L.fx, L.fy, L.fw, L.fh); regen(g, t, p); }
+    if (camPlatz(c) !== 'aus') camZeichnen(g, t, c, cam, f, { fx: L.fx, fy: L.fy, fw: L.fw, fh: L.fh, L, stapel: false }, 'tv');   // 📷 Cam im Fernsehbild
     if (v.gruenStart) flaggeZeichnen(g, L.fx + 46 - (1 - eo(fp(t, 0.15, 0.45))) * 300, L.fy + 34, Math.min(200, L.fw * 0.3), Math.min(200, L.fw * 0.3) * 0.66, t, 'gruen', fp(t, 0.15, 0.4) * (1 - fp(t, 2.6, 3.0)));
     if (v.zielflagge && halt) flaggeZeichnen(g, L.fx + 46 - (1 - eo(fp(t - p.h, 0, 0.45))) * 400, L.fy + 34, Math.min(240, L.fw * 0.32), Math.min(240, L.fw * 0.32) * 0.66, t, 'kariert', 1);
     if (v.bestzeit) bestzeitZeichnen(g, t, c, p, m, f, L.fx, L.fy, L.fw, L.fh);
@@ -3165,8 +3223,10 @@
     const p = zeitplan(c), q = quellenVon(c);
     const quelle = p.mehr ? await Promise.all(p.slots.map(i => quellTon(q[i]))) : await quellTon(c), ton = await tonMischen(c, p, quelle);
     const lesers = [];
+    let camL = null;
     try {
     for (const i of (p.mehr ? p.slots : [0])) lesers.push(await leser(q[i]));
+    if (!p.mehr && camPlatz(c) !== 'aus') camL = await leser(c.cam);   // 📷 Cam läuft Bild für Bild mit (gleiche Stelle wie der Clip)
     let vcfg = null;
     for (const hw of ['prefer-software', 'no-preference']) {   // erst ohne Grafikkarte (hängt nicht), sonst mit
       for (const codec of ['avc1.640028', 'avc1.640032', 'avc1.4d0028', 'avc1.42e028']) {
@@ -3189,10 +3249,10 @@
     for (let i = 0; i < n; i++) {
       if (fehler) throw fehler;
       const t = i / FPS;
-      let bild = null;
+      let bild = null, kam = null;
       if (p.mehr) { bild = []; for (const sp of p.spur(t)) bild[sp.s] = await lesers[sp.s].bei(sp.t); }
-      else { const qt = p.quelle(t); bild = qt != null ? await lesers[0].bei(qt) : null; }
-      g.clearRect(0, 0, B, H); zeichne(g, t, c, p, m, bild);
+      else { const qt = p.quelle(t); bild = qt != null ? await lesers[0].bei(qt) : null; if (camL && qt != null) { try { kam = await camL.bei(qt); } catch (e) { kam = null; } } }
+      g.clearRect(0, 0, B, H); zeichne(g, t, c, p, m, bild, kam);
       if (i === 0) { erstes = leinwand(B, H); erstes.getContext('2d').drawImage(cv, 0, 0); }
       else loopUebergang(g, t, p, erstes);
       zuI420(g.getImageData(0, 0, B, H).data, B, H, puffer);
@@ -3223,7 +3283,7 @@
     const blob = new Blob([muxer.target.buffer], { type: 'video/mp4' });
     blob.mitTon = !!acfg; blob.dauer = p.T; blob.leser = lesers.map(l => l.art).join(',');
     return blob;
-    } finally { for (const l of lesers) l.zu(); }
+    } finally { for (const l of lesers) l.zu(); if (camL) camL.zu(); }
   }
   // Vorschaubild (für die Liste): Spruch steht, Clip läuft
   async function vorschaubild(c, m) {
@@ -3232,7 +3292,9 @@
     let bild;
     if (p.mehr) { bild = []; for (const sp of p.spur(t)) { const v = await videoElement(q[p.slots[sp.s]].url); await suchen(v, sp.t); bild[sp.s] = v; vids.push(v); } }
     else { bild = await videoElement(c.url); await suchen(bild, p.quelle(t)); vids.push(bild); }
-    const cv = leinwand(B, H), g = cv.getContext('2d'); zeichne(g, t, c, p, m, bild);
+    let kam = null;
+    if (!p.mehr && camPlatz(c) !== 'aus') { try { kam = await videoElement(c.cam.url); await suchen(kam, Math.min(p.quelle(t), Math.max(0, (kam.duration || 1e9) - 0.1))); vids.push(kam); } catch (e) { kam = null; } }
+    const cv = leinwand(B, H), g = cv.getContext('2d'); zeichne(g, t, c, p, m, bild, kam);
     const k = leinwand(540, 960); k.getContext('2d').drawImage(cv, 0, 0, 540, 960);
     for (const v of vids) { v.removeAttribute('src'); v.load(); }
     return new Promise(ok => k.toBlob(ok, 'image/jpeg', 0.85));
@@ -3244,7 +3306,7 @@
   let BOX = null, UMG = null, MAT = null, ARBEIT = '', LETZTER_LOOK = 'neon';
   const OFFEN = { 'kc-so': null, 'kc-raus': false, 'kc-einst': false, 'kc-best-box': true, 'kc-abl': null };   // aufgeklappte Bereiche bleiben offen
   const CLIPS = [];          // reingezogene Clips, der erste ist im Editor
-  const VOR = { vid: null, url: '', canvas: null, lauf: 0, ton: false, c: null };   // Vorschau
+  const VOR = { vid: null, url: '', canvas: null, lauf: 0, ton: false, c: null, cam: null, camUrl: '' };   // Vorschau (cam = Video der Renn-Cam, läuft mit)
   const stand = () => (UMG && UMG.stand()) || {};
   async function material() {
     const st = stand(), d = st.design || {};
@@ -3271,6 +3333,32 @@
   // Bild im Fenster: Video verschieben/vergrößern (je Clip), Fenster-Größe (je Video)
   const tfVon = x => (x && x.bild) || { x: 0, y: 0, z: 1 };
   const fensterGeht = v => !v.mehr || v.mehr === 'top3' || !!MARKEN[v.mehr];   // Vorher/Nachher und Erwartung: zwei feste Fenster
+  const camStandard = () => { try { const pl = localStorage.getItem('k888_cam_platz'); return CAM_PLAETZE.some(x => x[0] === pl) && pl !== 'aus' ? pl : 'ecke'; } catch (e) { return 'ecke'; } };
+  function camWeg(c) {   // Cam vom Clip nehmen (Datei bleibt, wo sie ist)
+    if (!c.cam) return;
+    if (VOR.cam && VOR.camUrl === c.cam.url) { VOR.cam.pause(); VOR.cam.removeAttribute('src'); VOR.cam.load(); VOR.cam = null; VOR.camUrl = ''; }
+    URL.revokeObjectURL(c.cam.url); c.cam = null;
+  }
+  function camSetzen(c, datei) {   // Cam-Datei an den Clip hängen · Platz wie beim letzten Mal
+    camWeg(c);
+    c.cam = { datei, url: URL.createObjectURL(datei), name: datei.name };
+    if (!c.camPlatz || c.camPlatz === 'aus') c.camPlatz = camStandard();
+  }
+  function camPanel(c, v) {
+    if (v.mehr) return '';
+    if (!c.cam) return `<div class="kc-bildpanel kc-cam"><div class="kc-bildkopf">📷 Cam</div>
+      <label class="btn ki-k kc-cam-datei">📷 Cam-Datei dazu<input type="file" accept="video/*" data-c="cam-datei"></label>
+      ${tipp('Deine Renn-Cam zum Clip („… Cam.mp4“ aus der Toolbox). Bei Szenen aus dem Vorrat kommt sie von selbst.')}</div>`;
+    const pl = camPlatz(c), stapel = camStapel(c), b = camBox(c), z = Math.max(1, camBild(c).z), frei = pl === 'ecke' || (pl === 'rund'), zug = c.camZug === 'bild' ? 'bild' : 'rahmen';
+    return `<div class="kc-bildpanel kc-cam"><div class="kc-bildkopf">📷 Cam <span class="kc-dim">${esc(c.cam.name)}</span></div>
+      <div class="kc-stile">${CAM_PLAETZE.filter(x => stapel || (x[0] !== 'unten' && x[0] !== 'geteilt')).map(([k, n]) => `<button type="button" class="${pl === k ? 'an' : ''}" data-c="cam-platz" data-wert="${k}">${n}</button>`).join('')}</div>
+      ${pl === 'aus' ? '' : `${pl === 'geteilt' ? '' : `<label class="kc-feld">Cam-Größe <b data-c="cam-s-wert">${Math.round(b.s * 100)} %</b><input type="range" min="0.6" max="1.8" step="0.01" value="${b.s}" data-c="cam-s"></label>`}
+      <label class="kc-feld">Cam-Ausschnitt <b data-c="cam-z-wert">${Math.round(z * 100)} %</b><input type="range" min="1" max="3" step="0.01" value="${z}" data-c="cam-z"></label>
+      ${frei ? `<div class="kc-feld">🖐 Cam in der Vorschau ziehen<div class="kc-umschalt"><button type="button" class="${zug === 'rahmen' ? 'an' : ''}" data-c="cam-zug" data-wert="rahmen">verschiebt die Cam</button><button type="button" class="${zug === 'bild' ? 'an' : ''}" data-c="cam-zug" data-wert="bild">verschiebt den Ausschnitt</button></div></div>` : '<div class="kc-dim">🖐 Cam in der Vorschau ziehen = Ausschnitt verschieben</div>'}`}
+      <div class="kc-knoepfe">${pl === 'aus' ? '' : '<button type="button" class="btn ki-k" data-c="cam-reset">↺ Zurücksetzen</button>'}<button type="button" class="btn ki-k" data-c="cam-weg">✕ Cam entfernen</button></div>
+      ${stapel ? '' : tipp('„Cam unten“ und „Geteilt“ gibt es bei „▭ Ganzes Bild“ im Neon-Look.')}
+    </div>`;
+  }
   function bildPanel(c, v) {
     const tv = c.look === 'tv', zoomModus = c.modus === 'zoom' && !tv && !v.mehr, L = lage(c, tv), z = tfVon(c).z || 1, jeClip = v.mehr && !MARKEN[v.mehr], fenster = fensterGeht(v) && !zoomModus;
     return `<div class="kc-bildpanel">
@@ -3418,6 +3506,7 @@
         <div class="kc-dim kc-mitte">Effekt-Sounds hörst du im fertigen Video.</div>
         ${v.analyse ? '<div class="kc-hinweis kc-mitte">🎯 Tipp ins Bild auf die Stelle, die eingekreist werden soll.</div>' : ''}
         ${bildPanel(c, v)}
+        ${camPanel(c, v)}
       </div>
       <div class="kc-rechts">
         <div class="kc-schritt">1 · Vorlage</div>
@@ -3574,12 +3663,18 @@
       await new Promise(ok => { VOR.vid.onloadeddata = ok; VOR.vid.onerror = ok; setTimeout(ok, 4000); });
     }
     VOR.vid.muted = !VOR.ton;
+    const camUrl = c.cam ? c.cam.url : '';
+    if (VOR.camUrl !== camUrl) {   // 📷 Cam als zweites Video, wird unten an den Clip gekoppelt
+      if (VOR.cam) { VOR.cam.pause(); VOR.cam.removeAttribute('src'); VOR.cam.load(); }
+      VOR.cam = null; VOR.camUrl = camUrl;
+      if (camUrl) { const k = document.createElement('video'); k.muted = true; k.playsInline = true; k.preload = 'auto'; k.src = camUrl; VOR.cam = k; }
+    }
     VOR.canvas = cv; const g = cv.getContext('2d'), mein = ++VOR.lauf, vid = VOR.vid;
     let phase = '', outroStart = 0, haltStart = 0, gehalten = false, erstes = null;
     const schritt = () => {
       if (VOR.lauf !== mein) return;
       const cl = CLIPS[0];
-      if (!cv.isConnected || !cl || cl.url !== VOR.url || vorlage(cl).mehr) { vid.pause(); return; }   // Reiter gewechselt oder Clip weg → Video anhalten
+      if (!cv.isConnected || !cl || cl.url !== VOR.url || vorlage(cl).mehr) { vid.pause(); if (VOR.cam) VOR.cam.pause(); return; }   // Reiter gewechselt oder Clip weg → Video anhalten
       if (phase === '' || phase === 'neu') erstes = null;
       const p = zeitplan(cl);
       let t;
@@ -3592,7 +3687,14 @@
       if (phase === 'outro') { t = p.T - OUTRO + (performance.now() - outroStart) / 1000; if (t >= p.T) { phase = 'neu'; t = p.T - 0.01; } }
       g.setTransform(cv.width / B, 0, 0, cv.height / H, 0, 0); g.clearRect(0, 0, B, H);
       const tt = kl(t || 0, 0, p.T - 0.001); VOR.t = tt;
-      zeichne(g, tt, cl, p, MAT, vid);
+      const kam = VOR.cam && camPlatz(cl) !== 'aus' ? VOR.cam : null;
+      if (kam && kam.readyState >= 1) {   // 📷 Cam auf dieselbe Stelle wie den Clip ziehen, gleiche Geschwindigkeit, Pause mitmachen
+        const ziel = Math.min(vid.currentTime, Math.max(0, (kam.duration || 1e9) - 0.1));
+        if (kam.playbackRate !== vid.playbackRate) kam.playbackRate = vid.playbackRate;
+        if (!kam.seeking && Math.abs(kam.currentTime - ziel) > (vid.paused ? 0.05 : 0.3)) kam.currentTime = ziel;
+        if (vid.paused && !kam.paused) kam.pause(); else if (!vid.paused && kam.paused && ziel < (kam.duration || 1e9) - 0.15) kam.play().catch(() => {});
+      } else if (VOR.cam && !VOR.cam.paused) VOR.cam.pause();
+      zeichne(g, tt, cl, p, MAT, vid, kam && kam.readyState >= 2 ? kam : null);
       if (!erstes && tt < 0.25 && !vid.seeking && vid.readyState >= 2) { erstes = leinwand(cv.width, cv.height); erstes.getContext('2d').drawImage(cv, 0, 0); }
       else loopUebergang(g, tt, p, erstes);
       requestAnimationFrame(schritt);
@@ -3673,19 +3775,27 @@
     ablBilder();
   }
   async function dateienRein(dateien) {
-    let n = 0;
+    let n = 0, mitCam = 0;
+    // 📷 „Name Cam.mp4“ neben „Name.mp4“ (so legt die Toolbox sie ab): die Cam gehört zum Clip und wird kein eigener Clip
+    const END = /\.(mp4|mov|m4v|webm|mkv)$/i, CAM = /\sCam\.(mp4|mov|m4v|webm|mkv)$/i, ohne = x => String(x || '').replace(END, ''), cams = new Map();
+    for (const d of dateien) if (CAM.test(d.name || '')) { const k = d.name.replace(CAM, ''); if (dateien.some(x => x !== d && ohne(x.name) === k) || CLIPS.some(x => ohne(x.name) === k && !x.cam)) cams.set(k, d); }
+    const camDateien = new Set(cams.values());
     for (const d of dateien) {
-      if (!/^video\//.test(d.type || '') && !/\.(mp4|mov|m4v|webm|mkv)$/i.test(d.name || '')) continue;
+      if (!/^video\//.test(d.type || '') && !END.test(d.name || '')) continue;
+      if (camDateien.has(d)) continue;
       const c = await neuerClip(d);
+      if (c && cams.has(ohne(d.name))) { camSetzen(c, cams.get(ohne(d.name))); cams.delete(ohne(d.name)); mitCam++; }
       if (c && BEARBEITE) { bearbeiteAnwenden(c); CLIPS.unshift(c); n++; }
       else if (c) { CLIPS.push(c); n++; } else UMG.meldung(`„${d.name}“ kann der Browser nicht öffnen. Bitte als MP4 speichern.`, 1);
     }
+    for (const [k, d] of cams) { const c = CLIPS.find(x => ohne(x.name) === k && !x.cam); if (c) { camSetzen(c, d); mitCam++; if (!n) { UMG.meldung('Cam ist beim Clip dabei.'); zeichnen(); } } }
     if (n) { UMG.meldung(n === 1 ? 'Clip geladen. Jetzt Vorlage antippen.' : `${n} Clips geladen.`); zeichnen(); }
   }
   async function senden(pfad, blob) { return UMG.senden(pfad, blob); }
   function clipWeg(c) {
     if (VOR.vid && VOR.url === c.url) { VOR.vid.pause(); VOR.vid.removeAttribute('src'); VOR.vid.load(); VOR.vid = null; VOR.url = ''; }
     vidsWeg(quellenVon(c).map(x => x.url));
+    camWeg(c);
     for (const x of c.extra || []) if (x.url !== c.url) URL.revokeObjectURL(x.url);
     URL.revokeObjectURL(c.url);
     const i = CLIPS.indexOf(c); if (i >= 0) CLIPS.splice(i, 1);
@@ -3759,6 +3869,10 @@
       return;
     }
     if (a === 'bild-reset' && c) { c.fenster = null; for (const x of quellenVon(c)) x.bild = null; zeichnen(); return; }
+    if (a === 'cam-platz' && c) { c.camPlatz = b.dataset.wert; c.camBox = { ...camBox(c), x: 0, y: 0 }; if (c.camPlatz !== 'aus') { try { localStorage.setItem('k888_cam_platz', c.camPlatz); } catch (e) { /* egal */ } } zeichnen(); return; }
+    if (a === 'cam-zug' && c) { c.camZug = b.dataset.wert; zeichnen(); return; }
+    if (a === 'cam-reset' && c) { c.camBox = null; c.camTf = null; zeichnen(); return; }
+    if (a === 'cam-weg' && c) { camWeg(c); zeichnen(); return; }
     if (a === 'vorschau' && c && vorlage(c).analyse && VOR.vid) {   // Replay-Analyse: Stelle für den Kreis antippen
       if (performance.now() - (VOR.gezogen || 0) < 400) return;   // war Ziehen, kein Tippen
       const r = b.getBoundingClientRect(), p = zeitplan(c), R = flaeche(c, p, p.h);
@@ -3864,6 +3978,8 @@
       const p = zeitplan(c), w = BOX.querySelector('[data-c="stelle-wert"]'); if (w) w.textContent = sek(Math.max(0, VOR.stelle - p.a));
     }
     else if (a === 'marke-text') { const mk = (c.marken || []).find(x => x.id === t.dataset.k); if (mk) mk.text = t.value; schritt3Auffrischen(c); }
+    else if (a === 'cam-s') { c.camBox = { ...camBox(c), s: +t.value }; const w = BOX.querySelector('[data-c="cam-s-wert"]'); if (w) w.textContent = Math.round(+t.value * 100) + ' %'; }
+    else if (a === 'cam-z') { c.camTf = { ...camBild(c), z: +t.value }; const w = BOX.querySelector('[data-c="cam-z-wert"]'); if (w) w.textContent = Math.round(+t.value * 100) + ' %'; }
     else if (a === 'bild-z') { c.bild = { ...tfVon(c), z: +t.value }; const w = BOX.querySelector('[data-c="bild-z-wert"]'); if (w) w.textContent = Math.round(+t.value * 100) + ' %'; }
     else if (a === 'slot-z') { const src = quellenVon(c)[+t.dataset.i]; if (src) { src.bild = { ...tfVon(src), z: +t.value }; const w = BOX.querySelector(`[data-c="slot-z-wert"][data-i="${t.dataset.i}"]`); if (w) w.textContent = Math.round(+t.value * 100) + ' %'; } }
     else if (a === 'fenster-w' || a === 'fenster-h') { const L = lage(c, c.look === 'tv'); c.fenster = { w: L.fw, h: L.fh, [a === 'fenster-w' ? 'w' : 'h']: +t.value }; const w = BOX.querySelector(`[data-c="${a}-wert"]`); if (w) w.textContent = t.value; }
@@ -3898,6 +4014,8 @@
       return;
     }
     if (a === 'slot-a' || a === 'slot-b') { zeichnen(); return; }
+    if (a === 'cam-datei' && t.files && t.files[0]) { camSetzen(c, t.files[0]); zeichnen(); return; }
+    if (a === 'cam-s') { zeichnen(); return; }   // Fenster-Höhe kann sich mit der Cam-Größe ändern
     if (a === 'marke-farbe') { const mk = (c.marken || []).find(x => x.id === t.dataset.k); if (mk) mk.farbe = t.value; return; }
     if (a === 'sektor-letzt') { c.sektorLetzt = t.value; return; }
     if (a === 'stich') { stichAnwenden(c, t.value); zeichnen(); return; }
@@ -3921,7 +4039,11 @@
   }
   function ziehenStart(ev) {
     const cv = ev.target.closest && ev.target.closest('canvas[data-c="vorschau"]'), c = CLIPS[0]; if (!cv || !c || ev.button > 0) return;
-    const pt = vorschauPunkt(cv, ev), u = quelleUnter(c, pt.x, pt.y);
+    const pt = vorschauPunkt(cv, ev), u = quelleUnter(c, pt.x, pt.y), kr = camRahmen(c);
+    if (kr && pt.x >= kr.x && pt.x <= kr.x + kr.w && pt.y >= kr.y && pt.y <= kr.y + kr.h) {   // 📷 auf der Cam: Rahmen (Ecke, Rund) oder Ausschnitt verschieben
+      const pl = camPlatz(c), G = camGeo(c);
+      ZUG = { cv, id: ev.pointerId, x0: ev.clientX, y0: ev.clientY, s: pt.s, cam: (pl === 'ecke' || pl === 'rund') && c.camZug !== 'bild' ? 'rahmen' : 'bild', G, kr, box0: camBox(c), tf0: camBild(c), bewegt: false };
+    } else
     ZUG = { cv, id: ev.pointerId, x0: ev.clientX, y0: ev.clientY, s: pt.s, u, tf0: { ...tfVon(u.src) }, bewegt: false };
     try { cv.setPointerCapture(ev.pointerId); } catch (e) { /* egal */ }
   }
@@ -3930,16 +4052,32 @@
     const dx = (ev.clientX - ZUG.x0) * ZUG.s, dy = (ev.clientY - ZUG.y0) * ZUG.s;
     if (!ZUG.bewegt && Math.hypot(dx, dy) < 14) return;
     ZUG.bewegt = true; ZUG.cv.classList.add('zieht');
+    if (ZUG.cam) {
+      const c = CLIPS[0]; if (!c) return;
+      if (ZUG.cam === 'rahmen') c.camBox = { ...ZUG.box0, x: kl(ZUG.box0.x + dx / ZUG.G.fw, -1.5, 1.5), y: kl(ZUG.box0.y + dy / ZUG.G.fh, -1.5, 1.5) };
+      else c.camTf = { ...ZUG.tf0, x: kl(ZUG.tf0.x + dx / ZUG.kr.w, -2, 2), y: kl(ZUG.tf0.y + dy / ZUG.kr.h, -2, 2) };
+      return;
+    }
     ZUG.u.src.bild = { ...ZUG.tf0, x: kl(ZUG.tf0.x + dx / ZUG.u.w, -2, 2), y: kl(ZUG.tf0.y + dy / ZUG.u.h, -2, 2) };
   }
   function ziehenEnde(ev) {
     if (!ZUG || ev.pointerId !== ZUG.id) return;
     if (ZUG.bewegt) VOR.gezogen = performance.now();
+    if (ZUG.bewegt && ZUG.cam === 'rahmen' && CLIPS[0]) {   // über den Rand gezogen: Lage auf das zurückstellen, was man sieht
+      const c = CLIPS[0], G = camGeo(c), r = camRahmen(c, G);
+      if (r && r.x0 != null) c.camBox = { ...camBox(c), x: (r.x - r.x0) / G.fw, y: (r.y - r.y0) / G.fh };
+    }
     ZUG.cv.classList.remove('zieht'); ZUG = null;
   }
   function radZoom(ev) {
     const cv = ev.target.closest && ev.target.closest('canvas[data-c="vorschau"]'), c = CLIPS[0]; if (!cv || !c) return;
     ev.preventDefault();
+    const kr = camRahmen(c), pk = vorschauPunkt(cv, ev);
+    if (kr && pk.x >= kr.x && pk.x <= kr.x + kr.w && pk.y >= kr.y && pk.y <= kr.y + kr.h) {   // 📷 Mausrad auf der Cam: Ausschnitt größer/kleiner
+      const z = kl(Math.max(1, camBild(c).z) * Math.exp(-ev.deltaY * 0.0012), 1, 3); c.camTf = { ...camBild(c), z };
+      const el = BOX.querySelector('[data-c="cam-z"]'), w = BOX.querySelector('[data-c="cam-z-wert"]'); if (el) el.value = z; if (w) w.textContent = Math.round(z * 100) + ' %';
+      return;
+    }
     const pt = vorschauPunkt(cv, ev), u = quelleUnter(c, pt.x, pt.y), tf = { ...tfVon(u.src) };
     tf.z = kl((tf.z || 1) * Math.exp(-ev.deltaY * 0.0012), 0.5, 3); u.src.bild = tf;
     const z = tfVon(c).z || 1, el = BOX.querySelector('[data-c="bild-z"]'), w = BOX.querySelector('[data-c="bild-z-wert"]');   // Regler nachziehen
@@ -3949,7 +4087,7 @@
   window.K888Clips = {
     oeffnen(id) { OEFFNE = String(id || ''); },   // der Wochenplan ruft das vor dem Wechsel in den Reiter „🎬 Clips“
     vorlageInfo: (id, c) => (c && autoV(c)) || trailerV(id) || karV(id) || VORLAGEN.find(y => y.id === id) || null,
-    VORLAGEN, STILE, bauen, zeitplan, zeichne, material, schriften, vorschaubild, stichwoerter, trailerZeichnen, trailerBauen, trailerPruefen, trailerTon, trailerWahl, TR_ARTEN, TR_FARBEN, top5Seiten, top5Liste, automatikHtml, karSeite, lueckenPlan, lueckeBauen, autoEdAuf, ablage: ABL,
+    VORLAGEN, STILE, bauen, zeitplan, zeichne, material, schriften, vorschaubild, stichwoerter, trailerZeichnen, trailerBauen, trailerPruefen, trailerTon, trailerWahl, TR_ARTEN, TR_FARBEN, top5Seiten, top5Liste, automatikHtml, karSeite, lueckenPlan, lueckeBauen, autoEdAuf, ablage: ABL, camRahmen, camPlatz, lage, CAM_PLAETZE, _clips: CLIPS,
     async start(box, umg) {
       UMG = umg;
       if (BOX !== box) {
@@ -4012,6 +4150,9 @@
 .kc-app .kc-vorschau.ziel{cursor:crosshair}
 .kc-app .kc-bildpanel{display:flex;flex-direction:column;gap:8px;margin-top:4px;padding:10px 12px;background:#0b0c10;border:1px solid var(--line,#23262f)}
 .kc-app .kc-bildkopf{font-size:13px;color:#fff;font-weight:600;line-height:1.35}
+.kc-app .kc-cam{border-color:rgba(24,232,255,.45)}.kc-app .kc-cam .kc-bildkopf .kc-dim{font-weight:400;word-break:break-all}
+.kc-app .kc-cam-datei{align-self:flex-start;cursor:pointer}.kc-app .kc-cam-datei input{position:absolute;inset:0;opacity:0;cursor:pointer}
+.kc-app .kc-cam .kc-umschalt{margin-top:4px}.kc-app .kc-cam .kc-umschalt button{flex:1;padding:8px 6px;font-size:12px}
 .kc-app .kc-bildpanel .kc-knoepfe .btn{font-size:13px;padding:7px 10px}
 .kc-app .kc-termine{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
 .kc-app .kc-termin{display:flex;flex-direction:column;align-items:flex-start;gap:2px;background:#0b0c10;border:1px solid var(--line,#23262f);color:#fff;font:700 13px var(--body,inherit);padding:7px 11px;cursor:pointer;text-align:left}
