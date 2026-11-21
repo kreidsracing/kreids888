@@ -1880,7 +1880,7 @@
     if (!(st.youtube && st.youtube.verbunden)) return;   // der Trailer geht nur zu YouTube (Instagram und TikTok haben am Renntag schon den Raceday-Post)
     const jetzt = Date.now(), gesehen = new Set(), offen = [], weg = [], raus = c => !!(c.gepostet || c.tt || c.yt);
     let umgestellt = false;   // schon gebaute Trailer: Instagram und TikTok abwählen, damit nichts doppelt kommt
-    for (const c of st.clips || []) if (c.trailer && c.youtube && (c.insta || c.tiktok) && !raus(c)) { try { await UMG.igApi('POST', `/api/clip/${c.id}/aendern`, { insta: false, tiktok: false }); umgestellt = true; } catch (e) { /* bleibt wie es ist */ } }
+    for (const c of st.clips || []) if (c.trailer && !c.einst && c.youtube && (c.insta || c.tiktok) && !raus(c)) { try { await UMG.igApi('POST', `/api/clip/${c.id}/aendern`, { insta: false, tiktok: false }); umgestellt = true; } catch (e) { /* bleibt wie es ist */ } }
     for (const p of st.streams) {
       const rk = p.rennKey; if (!rk || gesehen.has(rk) || !p.liveMs) continue; gesehen.add(rk);
       const postMs = p.liveMs - TRAILER_VOR, da = (st.clips || []).filter(c => c.trailer === rk);
@@ -2094,7 +2094,7 @@
       for (const k of await merkTx('q', 'readonly', o => o.getAllKeys())) if (!brauch.has(k)) await merkTx('q', 'readwrite', o => o.delete(k));
     } catch (e) { /* egal */ }
   }
-  const nachOben = () => { try { BOX.scrollIntoView({ behavior: 'smooth', block: 'start' }); } catch (e) { /* egal */ } };
+  const nachOben = () => { try { (BOX.querySelector(CLIPS.length ? '.kc-drop' : '.kc-bearb') || BOX).scrollIntoView({ behavior: 'smooth', block: 'start' }); } catch (e) { /* egal */ } };   // zum Editor bzw. zum Hinweis
   async function bearbeiten(id) {
     const x = (stand().clips || []).find(y => y.id === id); if (!x || ARBEIT) return;
     if (CLIPS.some(c => c.ersetzt === id)) { zeichnen(); nachOben(); return UMG.meldung('Dieser Post ist schon im Editor.'); }
@@ -2120,6 +2120,135 @@
     for (const y of stand().clips || []) if ((y.id === alt || (y.quelle && y.quelle.endsWith(':' + alt))) && !(y.gepostet || y.tt || y.yt)) { try { await UMG.igApi('POST', `/api/clip/${y.id}/weg`, {}); } catch (e) { /* bleibt in der Liste */ } }
   }
 
+  // ═══ ✏️ Automatisches bearbeiten (NEU 21.11.2026): Trailer und Vorschläge wie einen eigenen Post ändern ═══
+  // Vorlage, Farbe, Wörter, Text, Zeit und Ziele. Sieht es danach anders aus, wird das Video neu gebaut und ersetzt das alte.
+  let AUTO_ED = null, AE_LAUF = 0, OEFFNE = '';   // OEFFNE = Clip, der gleich nach dem Wechsel in den Reiter „🎬 Clips“ zum Bearbeiten aufgehen soll
+  function oeffneJetzt() {
+    const id = OEFFNE; OEFFNE = ''; if (!id || !BOX) return;
+    const x = (stand().clips || []).find(y => y.id === id); if (!x) return;
+    if (x.gepostet || x.tt || x.yt) { const z = BOX.querySelector(`.kc-post[data-id="${id}"]`); if (z) { const d = z.closest('details'); if (d) d.open = true; z.scrollIntoView({ behavior: 'smooth', block: 'center' }); } return; }   // schon draußen: nur hinspringen
+    if (x.auto) autoEdAuf(id); else if (!x.kar) bearbeiten(id);
+  }
+  const AE_NAME = { trailer: '🔴 Stream-Trailer', morgen: '🔴 Morgen live', verpasst: '▶ Stream verpasst?', woche: '📅 Wochenvorschau', top5: '🏆 Top der Woche' };
+  function autoX(typ, s, st, postMs) {   // Wörter und Zahlen fürs Bild, frisch aus dem Streamkalender
+    const dz = ms => new Date(ms), uhrVon = ms => dz(ms).toLocaleTimeString('de-DE', { timeZone: 'Europe/Berlin', hour: '2-digit', minute: '2-digit' });
+    const tagKurz = ms => GROSS(dz(ms).toLocaleDateString('de-DE', { timeZone: 'Europe/Berlin', weekday: 'short', day: '2-digit', month: '2-digit' }));
+    if (typ === 'top5') return { top: true };
+    if (typ === 'woche') return { serie: '', track: '', zeit: '', wann: '', modus: 'woche', wort: 'DIESE WOCHE', wort2: 'LIVE', tz: 'DIESE WOCHE',
+      liste: (st.streams || []).filter(y => y.liveMs > postMs && y.liveMs < postMs + 7 * 86400000).slice(0, 5).map(y => ({ tag: tagKurz(y.liveMs), zeit: uhrVon(y.liveMs) + ' UHR', serie: GROSS(y.serie || y.titel || 'Stream') })) };
+    if (!s) return null;
+    const uhr = uhrVon(s.liveMs), std = Number(uhr.slice(0, 2)), basis = { serie: s.serie || s.titel || 'Simracing', track: s.track || '', zeit: uhr, wann: dz(s.liveMs).toLocaleDateString('de-DE', { timeZone: 'Europe/Berlin', weekday: 'long', day: '2-digit', month: '2-digit' }) };
+    if (typ === 'morgen') return { ...basis, wort: 'MORGEN', tz: std >= 17 ? 'MORGEN ABEND' : 'MORGEN' };
+    if (typ === 'verpasst') return { ...basis, modus: 'verpasst', wort: 'STREAM', wort2: 'VERPASST?', oben: 'REPLAY', unten: 'GANZER STREAM AUF YOUTUBE', tz: 'GESTERN LIVE' };
+    const heute = tagVon(postMs) === tagVon(s.liveMs);
+    return { ...basis, wort: heute ? 'HEUTE' : 'GLEICH', tz: !heute ? 'GLEICH' : std >= 17 ? 'HEUTE ABEND' : std >= 12 ? 'HEUTE NACHMITTAG' : 'HEUTE' };
+  }
+  function autoTexte(typ, x, s, n) {   // Titel und Text für einen neuen Vorschlag
+    const ort = `${x.serie}${x.track ? ' · ' + x.track : ''}`;
+    if (typ === 'morgen') return { titel: `MORGEN LIVE · ${GROSS(x.serie)}`, text: `🔴 Morgen live: ${ort} · ${x.zeit} Uhr\nSeid dabei!\n\n#simracing #iracing #live #kreids888` };
+    if (typ === 'verpasst') return { titel: `STREAM VERPASST? · ${GROSS(x.serie)}`, text: `▶ Stream verpasst? ${ort}\nDen ganzen Stream gibt es auf YouTube${s && s.yt ? ': https://youtu.be/' + s.yt : ' (@Kreids888).'}\n\n#simracing #iracing #kreids888` };
+    if (typ === 'woche') return { titel: 'DIESE WOCHE LIVE', text: `📅 Diese Woche live: ${x.liste.length} Streams\n${x.liste.map(z => `${z.tag} · ${z.zeit} · ${z.serie}`).join('\n')}\n\n#simracing #iracing #live #kreids888` };
+    return { titel: `TOP ${n} DER WOCHE`, text: `🏆 Top ${n} der Woche: Welcher Clip ist dein Favorit? Schreib die Nummer in die Kommentare 👇\n\n#simracing #iracing #kreids888` };
+  }
+  async function autoEdAuf(id, tag) {   // id = schon gebauter Post · tag = Vorschlag für eine Lücke
+    if (ARBEIT || TRAILER_LAEUFT || KAR_LAEUFT) return;
+    const st = stand(); let E = null;
+    if (id) {
+      const c = (st.clips || []).find(y => y.id === id); if (!c) return;
+      let e = null; try { e = c.einst ? JSON.parse(c.einst) : null; } catch (err) { e = null; }
+      const q = String(c.quelle || ''), mt = TR_MUSTER.exec(c.vorlage || '');
+      const typ = (e && e.typ) || (c.trailer ? 'trailer' : /^morgen:/.test(q) ? 'morgen' : /^verpasst:/.test(q) ? 'verpasst' : /^woche:/.test(q) ? 'woche' : c.vorlage === 'kartop5' ? 'top5' : '');
+      const rk = c.trailer || q.split(':').slice(1).join(':'), s = [...(st.streams || []), ...(st.streamsAlt || [])].find(y => y.rennKey === rk) || null;
+      E = { id, typ, art: e ? e.art : (mt && mt[1]) || 'heute', fi: e ? e.fi : mt ? Number(mt[2] || 0) % TR_FARBEN.length : 0, x: e ? e.x : typ ? autoX(typ, s, st, c.postMs) : null, hgUrl: e ? e.hgUrl : (s && s.hg) || '', hgAn: e ? e.hgAn : undefined,
+        titel: c.titel || '', text: c.text || '', postMs: c.postMs, insta: !!c.insta, tiktok: !!c.tiktok, youtube: !!c.youtube, trailer: c.trailer || '', trailerLive: c.trailerLive || 0, quelle: q };
+    } else {
+      const e = lueckenPlan(st, Date.now()).find(y => y.tag === tag), v = e && e.vorschlag; if (!v) return;
+      const s = v.s || null, x = autoX(v.art, s, st, e.ms), w = trailerWahl(st.clips, v.q, !!(s && s.hg), []);
+      if (x) E = { id: '', typ: v.art, art: v.art === 'morgen' ? w.art.id : 'heute', fi: w.fi, x, hgUrl: (s && s.hg) || '', ...autoTexte(v.art, x, s, v.top ? v.top.liste.length : 0), postMs: e.ms,
+        insta: true, tiktok: v.art !== 'top5' && !!(st.tiktok && st.tiktok.verbunden), youtube: v.art !== 'top5' && !!(st.youtube && st.youtube.verbunden), trailer: '', trailerLive: 0, quelle: v.q };
+    }
+    if (!E || !E.typ || !E.x) return UMG.meldung('Dieser Post lässt sich hier nicht bearbeiten (der Stream steht nicht mehr im Kalender).', 1);
+    if (!MAT) await material();
+    E.hg = null; try { if (E.hgUrl && E.typ !== 'woche' && E.typ !== 'top5') E.hg = await bild(E.hgUrl); } catch (err) { E.hg = null; }
+    if (E.hgAn === undefined) E.hgAn = !!E.hg;
+    if (!E.hg && E.art === 'plakat') E.art = 'heute';
+    if (E.typ === 'top5') { const t = top5Liste(st.clips, Date.now()); for (const y of t.liste) { try { y.bild = y.bildUrl ? await bild(y.bildUrl) : null; } catch (err) { y.bild = null; } } E.topListe = t.liste; E.topWas = t.was;
+      if (t.liste.length < 3) return UMG.meldung('Für die Top der Woche braucht es mindestens 3 gepostete Clips mit Zahlen.', 1); }
+    E.name = AE_NAME[E.typ] || 'Post'; E.sicht0 = JSON.stringify([E.art, E.fi, E.x, E.hgAn]);
+    AUTO_ED = E; zeichnen(); autoEdLauf();
+    try { BOX.querySelector('.kc-ae').scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch (err) { /* egal */ }
+  }
+  function autoEdLauf() {   // Vorschau: das Video läuft im Kreis, das Karussell zeigt die erste Seite
+    cancelAnimationFrame(AE_LAUF); const t0 = performance.now(); let letzte = 0;
+    const lauf = jetzt => {
+      const E = AUTO_ED; if (!E) return; AE_LAUF = requestAnimationFrame(lauf);
+      if (!MAT) { if (!autoEdLauf.laedt) { autoEdLauf.laedt = true; material().catch(() => {}).then(() => { autoEdLauf.laedt = false; }); } return; }   // nach „Neu laden“ ist das Logo weg: neu holen
+      const cv = BOX && BOX.querySelector('.kc-ae-vorschau'); if (!cv) return;
+      if (E.typ === 'top5') { if (cv.dataset.fertig) return; cv.getContext('2d').drawImage(top5Seiten(MAT, E.topListe, E.topWas, TR_FARBEN[E.fi], null)[0], 0, 0, cv.width, cv.height); cv.dataset.fertig = '1'; return; }
+      if (jetzt - letzte < 66) return; letzte = jetzt;
+      const g = cv.getContext('2d'); g.save(); g.scale(cv.width / B, cv.height / H);
+      try { trailerZeichnen(g, ((jetzt - t0) / 1000) % TRAILER_T, { ...E.x, art: E.art, farbe: TR_FARBEN[E.fi] }, MAT, E.hgAn ? E.hg : null); } catch (err) { /* nächstes Bild */ }
+      g.restore();
+    };
+    AE_LAUF = requestAnimationFrame(lauf);
+  }
+  function autoEdEingabe(t) {   // Tippen ändert nur die Werte, die Vorschau zieht von selbst nach (kein Neuzeichnen, sonst springt der Cursor)
+    const E = AUTO_ED, k = t.dataset.ae; if (!E) return;
+    if (k === 'hgAn' || k === 'insta' || k === 'tiktok' || k === 'youtube') E[k] = t.checked;
+    else if (k === 'titel' || k === 'text') E[k] = t.value;
+    else if (k === 'postMs') { const ms = new Date(t.value).getTime(); if (isFinite(ms)) E.postMs = ms; }
+    else if (k === 'liste') E.x.liste = t.value.split('\n').map(z => z.split('|').map(y => y.trim())).filter(z => z.some(Boolean)).slice(0, 5).map(z => ({ tag: GROSS(z[0] || ''), zeit: GROSS(z[1] || ''), serie: GROSS(z[2] || '') }));
+    else E.x[k] = k === 'wort' || k === 'tz' ? GROSS(t.value) : t.value;
+  }
+  function autoEdHtml() {
+    const E = AUTO_ED; if (!E) return '';
+    const video = E.typ !== 'top5', woche = E.x.modus === 'woche', feld = (k, label, wert, extra) => `<label class="kc-feld">${label}<input type="text" value="${esc(wert || '')}" data-ae="${k}" ${extra || ''}></label>`;
+    return `<div class="kc-ae"><div class="kc-ae-kopf">✏️ ${esc(E.name)} bearbeiten</div>
+      <div class="kc-ae-innen"><canvas class="kc-ae-vorschau" width="270" height="${video ? 480 : 338}"></canvas>
+      <div class="kc-ae-felder">
+        ${E.typ === 'trailer' || E.typ === 'morgen' ? `<div class="kc-ae-zeile"><span>Vorlage</span>${TR_ARTEN.filter(a => !a.bild || (E.hg && E.hgAn)).map(a => `<button type="button" class="kc-ae-chip${a.id === E.art ? ' an' : ''}" data-c="ae-art" data-wert="${a.id}">${esc(a.name)}</button>`).join('')}</div>` : ''}
+        <div class="kc-ae-zeile"><span>Farbe</span>${TR_FARBEN.map((f, i) => `<button type="button" class="kc-ae-farbe${i === E.fi ? ' an' : ''}" style="--f:${f}" data-c="ae-farbe" data-wert="${i}" title="Farbe ${i + 1}"></button>`).join('')}</div>
+        ${video && !woche ? `<div class="kc-felder">${feld('wort', 'Wort groß', E.x.wort)}${feld('tz', 'Zeile klein', E.x.tz)}${feld('serie', 'Serie', E.x.serie)}${feld('track', 'Strecke', E.x.track)}${E.x.modus === 'verpasst' ? '' : feld('zeit', 'Uhrzeit', E.x.zeit) + feld('wann', 'Tag', E.x.wann)}</div>` : ''}
+        ${woche ? `<label class="kc-feld">Streams – eine Zeile pro Stream: Tag | Uhrzeit | Serie<textarea rows="5" data-ae="liste">${esc(E.x.liste.map(z => [z.tag, z.zeit, z.serie].join(' | ')).join('\n'))}</textarea></label>` : ''}
+        ${video && E.hg ? `<label class="kc-check"><input type="checkbox" data-ae="hgAn" data-c="ae-neu" ${E.hgAn ? 'checked' : ''}> <span><b>Bild vom Rennen zeigen</b></span></label>` : ''}
+        ${feld('titel', 'Titel', E.titel, 'maxlength="80"')}
+        <label class="kc-feld">Text unter dem Post<textarea rows="4" maxlength="2200" data-ae="text">${esc(E.text)}</textarea></label>
+        <div class="kc-felder"><label class="kc-feld">Geht raus am<input type="datetime-local" value="${esc(lokal(E.postMs))}" data-ae="postMs"></label>
+          ${video ? `<div class="kc-ziele">${[['youtube', 'YouTube'], ['insta', 'Instagram'], ['tiktok', 'TikTok']].map(z => `<label class="kc-check"><input type="checkbox" data-ae="${z[0]}" ${E[z[0]] ? 'checked' : ''}> <span><b>${z[1]}</b></span></label>`).join('')}</div>` : '<span class="kc-dim">Karussell: geht nur zu Instagram.</span>'}</div>
+        <div class="kc-knoepfe"><button type="button" class="btn ki-k kc-frei" data-c="ae-speichern" ${ARBEIT ? 'disabled' : ''}>✓ Speichern & freigeben</button><button type="button" class="btn ki-k" data-c="ae-ab">Abbrechen</button></div>
+      </div></div></div>`;
+  }
+  async function autoEdSpeichern() {
+    const E = AUTO_ED; if (!E || ARBEIT || KAR_LAEUFT) return;
+    const st = stand(), video = E.typ !== 'top5';
+    if (video && !E.insta && !E.tiktok && !E.youtube) return UMG.meldung('Bitte YouTube, Instagram oder TikTok anhaken.', 1);
+    if (!(E.postMs > Date.now())) return UMG.meldung('Die Zeit liegt in der Vergangenheit. Bitte „Geht raus am“ ändern.', 1);
+    const nurText = !!E.id && JSON.stringify([E.art, E.fi, E.x, E.hgAn]) === E.sicht0;   // Bild bleibt gleich: nur Text, Zeit und Ziele speichern
+    const kopf = { titel: String(E.titel || '').slice(0, 80), text: E.text, postMs: E.postMs, frei: true, aus: false, einst: JSON.stringify({ typ: E.typ, art: E.art, fi: E.fi, x: E.x, hgUrl: E.hgUrl, hgAn: E.hgAn }),
+      ...(video ? { insta: E.insta, tiktok: E.tiktok, youtube: E.youtube } : {}) };
+    KAR_LAEUFT = true;
+    try {
+      if (nurText) await UMG.igApi('POST', `/api/clip/${E.id}/aendern`, kopf);
+      else {
+        const m = MAT || await material();
+        if (!video) { arbeit('🏆 Karussell wird gebaut …'); await karHochladen(top5Seiten(m, E.topListe, E.topWas, TR_FARBEN[E.fi], (st.streams || [])[0] || null), { ...kopf, vorlage: 'kartop5', auto: true, quelle: E.quelle }); }
+        else {
+          const x = { ...E.x, art: E.art, farbe: TR_FARBEN[E.fi] }, hg = E.hgAn ? E.hg : null, thumb = E.typ === 'trailer' || E.typ === 'morgen' ? (TR_ARTEN.find(a => a.id === E.art) || TR_ARTEN[0]).thumb : 3.4;
+          arbeit('🎬 Video wird gebaut …');
+          const blob = await trailerBauen(x, m, hg, q => arbeit(`🎬 Video wird gebaut … ${Math.round(q * 100)} %`));
+          arbeit('⬆ Hochladen …');
+          const r = await UMG.igApi('POST', '/api/clip/neu', { ...kopf, vorlage: 'trailer' + E.art + E.fi, auto: true, quelle: E.quelle || undefined, trailer: E.trailer || undefined, trailerLive: E.trailerLive || undefined, test: false, thumbMs: Math.round(thumb * 1000), dauer: TRAILER_T });
+          try { await hochladen(r.id, blob); } catch (err) { try { await UMG.igApi('POST', `/api/clip/${r.id}/weg`, {}); } catch (z) { /* egal */ } throw err; }
+          try { const cv = leinwand(B, H); trailerZeichnen(cv.getContext('2d'), thumb, x, m, hg); const k = leinwand(540, 960); k.getContext('2d').drawImage(cv, 0, 0, 540, 960); const vb = await new Promise(ok => k.toBlob(ok, 'image/jpeg', 0.85)); if (vb) await senden(`/api/clip/${r.id}/bild`, vb); } catch (err) { /* Vorschaubild ist nur schön */ }
+        }
+        if (E.id) { try { await UMG.igApi('POST', `/api/clip/${E.id}/weg`, {}); } catch (err) { /* der alte bleibt dann in der Liste */ } }   // das alte Video ist ersetzt
+      }
+      AUTO_ED = null; cancelAnimationFrame(AE_LAUF); ARBEIT = '';
+      UMG.meldung(`Gespeichert und freigegeben: ${zeit(E.postMs)}`); await UMG.laden();
+    } catch (err) { ARBEIT = ''; zeichnen(); UMG.meldung(err.message || String(err), 1); }
+    finally { KAR_LAEUFT = false; }
+  }
+
   // ═══ 🤖 Automatik-Leiste (NEU 20.11.2026): zeigt, was das Dashboard von selbst gebaut hat. Raus geht es erst nach „✓ Freigeben“ (abschaltbar). ═══
   function automatikHtml(liste, cfg) {
     const jetzt = Date.now(), noetig = cfg.freigabe !== false;
@@ -2129,7 +2258,7 @@
       const v = autoV(x) || { emoji: '🤖', name: 'Automatik' }, vorbei = x.postMs <= jetzt, fehlt = !x.video && !x.karussell;
       const status = x.aus ? ['Wird nicht gepostet', 'grau'] : fehlt ? [x.kar ? 'Bilder fehlen' : 'Video fehlt', 'rot'] : !noetig ? ['Geht von selbst raus', 'gruen'] : x.frei ? ['Freigegeben ✓', 'gruen'] : vorbei ? ['Zeit vorbei · nicht gepostet', 'rot'] : ['Wartet auf Freigabe', 'gelb'];
       const kn = x.aus ? '<button type="button" class="btn ki-k" data-c="auto-an">↩ Doch posten</button>'
-        : `${noetig && !x.frei && !vorbei && !fehlt ? '<button type="button" class="btn ki-k kc-frei" data-c="auto-frei">✓ Freigeben</button>' : ''}${noetig && x.frei ? '<button type="button" class="btn ki-k" data-c="auto-zurueck">↩ Zurücknehmen</button>' : ''}<button type="button" class="btn ki-k" data-c="auto-aus">✕ Nicht posten</button>`;
+        : `${noetig && !x.frei && !vorbei && !fehlt ? '<button type="button" class="btn ki-k kc-frei" data-c="auto-frei">✓ Freigeben</button>' : ''}<button type="button" class="btn ki-k" data-c="auto-bearb">✏️ Bearbeiten</button>${noetig && x.frei ? '<button type="button" class="btn ki-k" data-c="auto-zurueck">↩ Zurücknehmen</button>' : ''}<button type="button" class="btn ki-k" data-c="auto-aus">✕ Nicht posten</button>`;
       return `<div class="kc-auto-karte ${status[1]}" data-id="${esc(x.id)}">
         <a class="kc-auto-bild${x.kar ? '' : ' hoch'}" href="${esc(x.video || (x.kbilder && x.kbilder[0]) || '#')}" target="_blank" rel="noopener" title="Ansehen">${x.bild ? `<img src="${esc(x.bild)}" alt="">` : v.emoji}</a>
         <div class="kc-auto-info"><b>${v.emoji} ${esc(v.name)}</b><span class="kc-auto-titel">${esc(x.titel || '')}${x.karussell ? ` · ${x.karussell} Bilder` : ''}</span>
@@ -2139,11 +2268,12 @@
     };
     const tage = lueckenPlan(stand(), jetzt), tagName = t => new Date(t + 'T12:00:00').toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit' });
     const tagHtml = e => `<div class="kc-tagz ${e.n ? 'voll' : 'leer'}"><b>${esc(tagName(e.tag))}</b>${e.n ? `<span class="kc-tag-ok">✓ ${e.n} ${e.n === 1 ? 'Post' : 'Posts'}</span>`
-      : `<span class="kc-tag-leer">Lücke</span>${e.vorschlag ? `<span class="kc-vor">${esc(e.vorschlag.text)}</span><div class="kc-auto-kn"><button type="button" class="btn ki-k kc-frei" data-c="luecke-bauen" data-tag="${e.tag}" title="Bauen und für diesen Tag einplanen">✓ Bauen</button><button type="button" class="btn ki-k" data-c="luecke-nein" data-tag="${e.tag}" title="Diesen Vorschlag nicht mehr zeigen">✕</button></div>` : '<span class="kc-dim">Hier fehlt ein Clip.</span>'}`}</div>`;
+      : `<span class="kc-tag-leer">Lücke</span>${e.vorschlag ? `<span class="kc-vor">${esc(e.vorschlag.text)}</span><div class="kc-auto-kn"><button type="button" class="btn ki-k kc-frei" data-c="luecke-bauen" data-tag="${e.tag}" title="Bauen und für diesen Tag einplanen">✓ Bauen</button><button type="button" class="btn ki-k" data-c="luecke-bearb" data-tag="${e.tag}" title="Vorher ansehen und ändern">✏️</button><button type="button" class="btn ki-k" data-c="luecke-nein" data-tag="${e.tag}" title="Diesen Vorschlag nicht mehr zeigen">✕</button></div>` : '<span class="kc-dim">Hier fehlt ein Clip.</span>'}`}</div>`;
     const sw = (k, an, text, tip) => `<label class="kc-check" title="${esc(tip)}"><input type="checkbox" data-c="cfg-${k}" ${an ? 'checked' : ''}> <span><b>${text}</b></span></label>`;
     return `<div class="kc-auto"><h3 class="kc-h">🤖 Automatik <span class="kc-dim">${warten ? `${warten} ${warten === 1 ? 'wartet' : 'warten'} auf deine Freigabe` : ''}</span></h3>
       <div class="kc-dim">Das baut das Dashboard von selbst. ${noetig ? 'Ohne Freigabe geht nichts raus.' : 'Es geht ohne Freigabe von selbst raus.'}</div>
       ${auto.length ? `<div class="kc-auto-reihe">${auto.map(karte).join('')}</div>` : '<div class="kc-leer">Gerade nichts gebaut. Trailer kommen bis zu 4 Tage vor dem Stream.</div>'}
+      ${autoEdHtml()}
       <div class="kc-auto-h">📅 Die nächsten 7 Tage <span class="kc-dim">Ziel: jeden Tag ein Post</span></div>
       <div class="kc-tage">${tage.map(tagHtml).join('')}</div>
       <div class="kc-auto-schalter">
@@ -3381,6 +3511,13 @@
     }
     if (a === 'marke-weg' && c) { c.marken = (c.marken || []).filter(x => x.id !== b.dataset.k); zeichnen(); return; }
     if (a === 'luecke-bauen') { lueckeBauen(b.dataset.tag); return; }
+    if (a === 'luecke-bearb') { autoEdAuf('', b.dataset.tag); return; }
+    if (a === 'auto-bearb' && id) { autoEdAuf(id); return; }
+    if (a === 'ae-art' && AUTO_ED) { AUTO_ED.art = b.dataset.wert; zeichnen(); return; }
+    if (a === 'ae-farbe' && AUTO_ED) { AUTO_ED.fi = Number(b.dataset.wert) || 0; zeichnen(); return; }
+    if (a === 'ae-speichern') { autoEdSpeichern(); return; }
+    if (a === 'ae-ab') { AUTO_ED = null; cancelAnimationFrame(AE_LAUF); zeichnen(); return; }
+    if (a === 'ae-neu') return;   // Haken im Editor: regelt „aenderung“
     if (a === 'luecke-nein') { const e = lueckenPlan(stand(), Date.now()).find(y => y.tag === b.dataset.tag); if (e && e.vorschlag) { try { localStorage.setItem(NEIN_KEY, JSON.stringify([...neinListe().slice(-40), e.vorschlag.q])); } catch (err) { /* egal */ } } zeichnen(); return; }
     if (a === 'cfg-speichern') {
       try { await UMG.igApi('POST', '/api/clips/einstellungen', { zeit: BOX.querySelector('[data-c="cfg-zeit"]').value, test: BOX.querySelector('[data-c="cfg-test"]').checked, trailer: BOX.querySelector('[data-c="cfg-trailer"]').checked, luecken: BOX.querySelector('[data-c="cfg-luecken"]').checked, freigabe: BOX.querySelector('[data-c="cfg-freigabe"]').checked }); UMG.meldung('Gespeichert.'); await UMG.laden(); } catch (e) { UMG.meldung(e.message, 1); }
@@ -3413,6 +3550,7 @@
     if (p.sektoren) { const el = BOX.querySelector('.kc-marke .kc-fuell'); if (el) el.textContent = zeitText(p.sektoren[p.sektoren.length - 1].zeit); }
   }
   function eingabe(ev) {
+    if (ev.target && ev.target.dataset && ev.target.dataset.ae && BOX.contains(ev.target)) { autoEdEingabe(ev.target); return; }   // ✏️ Editor für Automatisches
     const t = ev.target, c = CLIPS[0]; if (!c || !t.dataset || !BOX.contains(t)) return;
     const a = t.dataset.c;
     const textMit = () => { if (c.textEigen) return; mitText(c); const ta = BOX.querySelector('[data-c="text"]'); if (ta) ta.value = c.text; };
@@ -3456,6 +3594,7 @@
     }
   }
   function aenderung(ev) {
+    if (ev.target && ev.target.dataset && ev.target.dataset.ae && BOX.contains(ev.target)) { autoEdEingabe(ev.target); if (ev.target.dataset.ae === 'hgAn') { if (AUTO_ED && !AUTO_ED.hgAn && AUTO_ED.art === 'plakat') AUTO_ED.art = 'heute'; zeichnen(); } return; }
     const t = ev.target, c = CLIPS[0]; if (!t.dataset || !BOX.contains(t)) return;
     const a = t.dataset.c;
     if (a === 'datei' && t.files && t.files.length) { dateienRein([...t.files]); t.value = ''; return; }
@@ -3520,8 +3659,9 @@
     quellenVon(c).forEach((src, i) => { const s2 = BOX.querySelector(`[data-c="slot-z"][data-i="${i}"]`), w2 = BOX.querySelector(`[data-c="slot-z-wert"][data-i="${i}"]`), z2 = tfVon(src).z || 1; if (s2) s2.value = z2; if (w2) w2.textContent = Math.round(z2 * 100) + ' %'; });
   }
   window.K888Clips = {
+    oeffnen(id) { OEFFNE = String(id || ''); },   // der Wochenplan ruft das vor dem Wechsel in den Reiter „🎬 Clips“
     vorlageInfo: (id, c) => (c && autoV(c)) || trailerV(id) || karV(id) || VORLAGEN.find(y => y.id === id) || null,
-    VORLAGEN, STILE, bauen, zeitplan, zeichne, material, schriften, vorschaubild, stichwoerter, trailerZeichnen, trailerBauen, trailerPruefen, trailerTon, trailerWahl, TR_ARTEN, TR_FARBEN, top5Seiten, top5Liste, automatikHtml, karSeite, lueckenPlan, lueckeBauen,
+    VORLAGEN, STILE, bauen, zeitplan, zeichne, material, schriften, vorschaubild, stichwoerter, trailerZeichnen, trailerBauen, trailerPruefen, trailerTon, trailerWahl, TR_ARTEN, TR_FARBEN, top5Seiten, top5Liste, automatikHtml, karSeite, lueckenPlan, lueckeBauen, autoEdAuf,
     async start(box, umg) {
       UMG = umg;
       if (BOX !== box) {
@@ -3542,6 +3682,7 @@
       MAT = null;
       schriften();
       zeichnen();
+      if (OEFFNE) setTimeout(oeffneJetzt, 60);   // aus dem Wochenplan angeklickt
       setTimeout(async () => { await trailerPruefen(); await merkAufraeumen(); }, 1500);   // 🔴 Stream-Trailer und 🖼 Karussells von selbst bauen
     }
   };
@@ -3670,6 +3811,16 @@
 .kc-app .kc-auto-kn{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
 .kc-app .kc-auto-kn .btn,.kc-app .kc-auto-schalter .btn{padding:7px 12px;font-size:13px;min-height:0;line-height:1.2;white-space:nowrap}
 .kc-app .kc-auto-kn .kc-frei{background:#5cff1f;color:#06080a;border-color:#5cff1f;font-weight:800}
+.kc-app .kc-ae{margin:12px 0;padding:12px 14px;background:#0d0f13;border:1px solid rgba(24,232,255,.6);box-shadow:0 0 18px rgba(24,232,255,.12)}
+.kc-app .kc-ae-kopf{font-weight:800;font-size:16px;color:#fff;margin-bottom:10px}
+.kc-app .kc-ae-innen{display:flex;gap:16px;flex-wrap:wrap;align-items:flex-start}
+.kc-app .kc-ae-vorschau{flex:0 0 auto;width:216px;height:auto;background:#000;border:1px solid #2a2f36}
+.kc-app .kc-ae-felder{flex:1 1 320px;min-width:0;display:flex;flex-direction:column;gap:10px}
+.kc-app .kc-ae-zeile{display:flex;flex-wrap:wrap;gap:6px;align-items:center}.kc-app .kc-ae-zeile>span{flex:0 0 62px;font-size:13px;color:#9aa3ad}
+.kc-app .kc-ae-chip{font:inherit;font-size:13px;font-weight:700;padding:5px 10px;background:#161a20;color:#fff;border:1px solid #3a4048;cursor:pointer}
+.kc-app .kc-ae-chip.an{background:#18e8ff;color:#06080a;border-color:#18e8ff}
+.kc-app .kc-ae-farbe{width:30px;height:30px;border-radius:50%;background:var(--f);border:2px solid transparent;cursor:pointer;padding:0}
+.kc-app .kc-ae-farbe.an{border-color:#fff;box-shadow:0 0 12px var(--f)}
 .kc-app .kc-auto-h{margin-top:14px;font-weight:800;color:#fff;font-size:15px}
 .kc-app .kc-tage{display:grid;grid-template-columns:repeat(auto-fill,minmax(124px,1fr));gap:8px;margin-top:8px}
 .kc-app .kc-tagz .kc-auto-kn{margin-top:auto;padding-top:6px}.kc-app .kc-tagz .kc-auto-kn .btn{padding:6px 9px;font-size:12px}

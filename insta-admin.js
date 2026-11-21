@@ -701,7 +701,7 @@
       ${kpMini(c.bild, true, '🎬')}
       <div class="kp-was"><b>${clipInfo(c).emoji || '🎬'} ${c.kar ? 'Karussell' : 'Reel'} · ${esc(clipName(c))}</b><span>${esc(c.titel || '')}${wohin ? ' · ' + wohin : ''}</span></div>
       <span class="ki-chip ${st[1]}">${st[0]}</span>
-      <div class="kp-knoepfe"><button class="btn btn-ghost ki-k" data-aktion="reiter" data-wert="clips"><span>→ Clips</span></button></div>
+      <div class="kp-knoepfe"><button class="btn btn-ghost ki-k" data-aktion="reiter" data-wert="clips" data-clip="${esc(c.id)}"><span>${c.gepostet ? '→ Clips' : '✎ Bearbeiten'}</span></button></div>
     </div>`;
   }
   function kpKalender(von, liste, heute) {
@@ -709,7 +709,7 @@
       const t = tagPlus(von, i), hier = liste.filter(e => e.tag === t);
       return `<div class="kp-kt${t === heute ? ' heute' : ''}${t < heute ? ' vorbei' : ''}"><div class="kp-ktkopf"><b>${wtag(t)}</b> ${tagMon(t)}</div>
         ${hier.map(e => {
-          if (e.c) return `<button type="button" class="kp-karte" style="--f:${ART_FARBE.clip}" data-aktion="reiter" data-wert="clips" title="${esc(clipName(e.c) + (e.c.titel ? ' · ' + e.c.titel : ''))}">${e.c.bild ? `<img src="${esc(e.c.bild)}" alt="" loading="lazy" class="${e.c.kar ? '' : 'hoch'}">` : ''}<span class="kp-kzeit">${esc(uhrzeit(e.ms))}</span><span class="kp-ktext">${clipInfo(e.c).emoji || '🎬'} ${esc(clipName(e.c))}</span>${e.c.titel ? `<span class="kp-ktitel">${esc(e.c.titel)}</span>` : ''}<span class="kp-kziel">${clipZiele(e.c)}</span><i class="kp-dot ${e.c.gepostet ? 'gruen' : clipWartet(e.c) ? 'gelb' : 'blau'}"${clipWartet(e.c) ? ' title="Wartet auf Freigabe"' : ''}></i></button>`;
+          if (e.c) return `<button type="button" class="kp-karte" style="--f:${ART_FARBE.clip}" data-aktion="reiter" data-wert="clips" data-clip="${esc(e.c.id)}" title="${esc(clipName(e.c) + (e.c.titel ? ' · ' + e.c.titel : ''))}">${e.c.bild ? `<img src="${esc(e.c.bild)}" alt="" loading="lazy" class="${e.c.kar ? '' : 'hoch'}">` : ''}<span class="kp-kzeit">${esc(uhrzeit(e.ms))}</span><span class="kp-ktext">${clipInfo(e.c).emoji || '🎬'} ${esc(clipName(e.c))}</span>${e.c.titel ? `<span class="kp-ktitel">${esc(e.c.titel)}</span>` : ''}<span class="kp-kziel">${clipZiele(e.c)}</span><i class="kp-dot ${e.c.gepostet ? 'gruen' : clipWartet(e.c) ? 'gelb' : 'blau'}"${clipWartet(e.c) ? ' title="Wartet auf Freigabe"' : ''}></i></button>`;
           const p = e.p, [st, fa] = kpStatus(p);
           return `<button type="button" class="kp-karte${p.id === OFFEN_ID ? ' offen' : ''}${istFertig(p) ? ' fertig' : ''}" style="--f:${ART_FARBE[p.typ] || '#888'}" data-aktion="kp-auf" data-id="${esc(p.id)}" title="${esc((TYP[p.typ] || '') + ' · ' + st)}">
             ${p.bild ? `<img src="${esc(p.bild)}" alt="" loading="lazy" class="${istStoryArt(p.typ, p) ? 'hoch' : ''}">` : ''}
@@ -1176,6 +1176,7 @@
     if (a === 'neulogin') { try { localStorage.removeItem('k888_token'); } catch (e) { /* egal */ } location.reload(); return; }
     if (a === 'reiter') {
       REITER = b.dataset.wert; if (!DAENDERUNG) { DTEAM = null; DLAYOUT = null; }
+      if (REITER === 'clips' && b.dataset.clip && window.K888Clips && window.K888Clips.oeffnen) window.K888Clips.oeffnen(b.dataset.clip);   // Klick auf einen Clip im Plan: gleich zum Bearbeiten
       if (REITER === 'posts' && SPRUCH_NEU) { SPRUCH_NEU = false; return laden(); }
       return zeichnen();
     }

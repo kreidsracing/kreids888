@@ -507,7 +507,8 @@ function clipPruefen(c, b) {
   if (b.kar !== undefined) n.kar = b.kar === true;                                                           // 🖼 Karussell (Bilder statt Video, nur Instagram)
   if (b.nr !== undefined) n.nr = Math.max(0, Math.min(99999, Math.round(Number(b.nr) || 0)));                // 🔢 Folge in der Reihe
   if (n.kar) { n.tiktok = false; n.youtube = false; n.test = false; }
-  for (const k of ['auto', 'frei', 'aus']) if (b[k] !== undefined) n[k] = b[k] === true;                     // 🤖 von selbst gebaut · ✓ freigegeben · ✕ nicht posten
+  for (const k of ['auto', 'frei', 'aus']) if (b[k] !== undefined) n[k] = b[k] === true;
+  if (typeof b.einst === 'string') n.einst = b.einst.slice(0, 6000);                                         // ✏️ Einstellungen eines automatischen Posts (zum Bearbeiten)                     // 🤖 von selbst gebaut · ✓ freigegeben · ✕ nicht posten
   return n;
 }
 // Nächster freier Tag zur eingestellten Uhrzeit (ein Clip pro Tag)
@@ -547,7 +548,7 @@ const TRAILER_VOR = 2.5 * 3600000;   // 🔴 Stream-Trailer gehen 2,5 Stunden vo
 const planStreams = (daten, cfg, jetzt) => bauePlan(daten, { ...cfg, story: { ...(cfg.story || {}), aktiv: true, zeit: (cfg.story && cfg.story.zeit) || '12:00' } }, jetzt).filter(p => ['ank', 'story', 'live'].includes(p.typ));
 async function streamHinweis(s) {
   try {
-    const jetzt = Date.now(), plan = bauePlan(await datenLaden(s), await ladeCfg(s), jetzt);
+    const jetzt = Date.now(), plan = planStreams(await datenLaden(s), await ladeCfg(s), jetzt);   // nur echte Streams (der Wochenplan-Post hat Montag 00:00 als Zeit und ist kein Stream)
     const n = plan.filter(p => p.liveMs > jetzt && p.liveMs < jetzt + 14 * 86400000).sort((a, b) => a.liveMs - b.liveMs)[0];
     if (!n) return null;
     const b = berlin(n.liveMs), z = (await s.lies('yt:' + rennKey(n.id))) || {};
@@ -621,7 +622,7 @@ async function clipsListe(env, s) {
     tt: c.tt ? { zeit: c.tt.zeit || 0 } : null, fehler: c.fehler || '', ttFehler: c.ttFehler || '', versuche: c.versuche || 0,
     youtube: !!c.youtube, yt: c.yt ? { zeit: c.yt.zeit || 0, link: 'https://youtube.com/shorts/' + c.yt.id, privat: !!c.yt.privat } : null, ytFehler: c.ytFehler || '', weg: !!c.weg,
     zahlen: c.zahlen || null, trailer: c.trailer || '', trailerLive: c.trailerLive || 0, quelle: c.quelle || '', nr: c.nr || 0,
-    auto: istAuto(c), frei: !!c.frei, aus: !!c.aus,
+    auto: istAuto(c), frei: !!c.frei, aus: !!c.aus, einst: c.einst || '',
     kar: !!c.kar, karussell: c.karussell ? c.karussell.n : 0, kbilder: c.karussell && !c.weg ? karUrls(env, c) : []
   }));
 }
