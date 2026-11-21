@@ -256,9 +256,9 @@
     const yt = STAND.youtube || {};
     if (mitThumb && p.yt && yt.verbunden && p.startMs > Date.now()) k.push(`<button class="btn btn-ghost ki-k" data-aktion="yt-planen" data-rk="${esc(p.rennKey)}"><span>▶ ${p.yt.id ? 'YouTube aktualisieren' : 'Jetzt auf YouTube planen'}</span></button>`);
     const h = [];
-    if (p.status !== 'gepostet' && (STAND.videos || []).length && p.typ !== 'woche' && !NEUE_ARTEN.includes(p.typ)) {
+    if (p.status !== 'gepostet' && p.typ !== 'woche' && !NEUE_ARTEN.includes(p.typ)) {
       const rv = (p.thumb && p.thumb.video) || '';
-      h.push(`<div class="ki-vwahl">🎬 Video für dieses Rennen: <select data-rvideo="${esc(p.rennKey)}" data-start="${esc(p.startMs)}"><option value="">– keins –</option>${STAND.videos.map(x => `<option value="${esc(x.id)}" ${rv === x.id ? 'selected' : ''}>${esc(x.name)}</option>`).join('')}</select></div>`);
+      h.push(rennVideoHtml(p, rv));
       if (rv && p.vorlage === 'kreids') h.push('<div class="ki-hinweis">Das Video braucht eine eigene Vorlage – oben bei „🧩 Vorlage“ eine wählen (z. B. „Video Raceday“).</div>');
     }
     if (p.istVideo && !p.video && p.status !== 'gepostet') h.push('<div class="ki-dim">🎬 Video wird beim Öffnen gezeichnet …</div>');
@@ -662,6 +662,34 @@
       <div class="kp-tagposts">${liste.filter(e => e.tag === t).map(e => e.p ? kpZeile(e.p, modus) + (e.p.id === OFFEN_ID ? kpEditor(e.p, modus) : '') : kpClipZeile(e.c)).join('')}</div>
     </div>`).join('');
   }
+  // 🎬 Video für dieses Rennen (NEU 21.11.2026): wählen, gleich hier hochladen, 📸 ein Bild aus dem Video als Hintergrund nehmen
+  let VBILD = '';   // Post, bei dem „Bild aus dem Video“ gerade offen ist
+  function rennVideoHtml(p, rv) {
+    const vids = STAND.videos || [], v = vids.find(x => x.id === rv), rk = esc(p.rennKey), st = esc(p.startMs), id = esc(p.id);
+    return `<div class="ki-vwahl">🎬 Video für dieses Rennen: <select data-rvideo="${rk}" data-start="${st}"><option value="">– keins –</option>${vids.map(x => `<option value="${esc(x.id)}" ${rv === x.id ? 'selected' : ''}>${esc(x.name)}</option>`).join('')}</select>
+      <label class="btn btn-ghost ki-k ki-datei" title="Video von deinem PC hochladen und gleich für dieses Rennen nehmen (MP4, höchstens 60 MB)"><span>📤 Video hochladen</span><input type="file" accept="video/*" data-rvideohoch="${rk}" data-start="${st}" hidden></label>
+      ${v ? `<button type="button" class="btn btn-ghost ki-k" data-aktion="vbild-auf" data-id="${id}" title="Eine Stelle im Video aussuchen und als Hintergrundbild nehmen (auch fürs YouTube-Thumbnail)"><span>📸 Bild aus dem Video</span></button>` : ''}</div>
+      ${v && VBILD === p.id ? `<div class="ki-vbild"><video src="${esc(v.url)}" crossorigin="anonymous" controls muted playsinline preload="auto"></video>
+        <div class="ki-vbild-kn"><span>Stelle im Video aussuchen, dann:</span><button type="button" class="btn ki-k" data-aktion="vbild-nehmen" data-id="${id}"><span>✓ Dieses Bild nehmen</span></button><button type="button" class="btn btn-ghost ki-k" data-aktion="vbild-zu"><span>Schließen</span></button></div>
+        <div class="ki-hinweis">Das Bild wird der Hintergrund für alle Posts dieses Rennens, auch für das YouTube-Thumbnail.</div></div>` : ''}`;
+  }
+  async function videoBildNehmen(b, id) {   // aktuelles Bild aus dem Video → Hintergrund des Rennens (JPG bis 1,9 MB)
+    const v = b.closest('.ki-vbild').querySelector('video');
+    if (!v || !v.videoWidth) return meldung('Das Video ist noch nicht geladen. Kurz warten und nochmal.', 1);
+    try {
+      v.pause(); let blob = null;
+      for (const [breite, q] of [[1920, 0.9], [1920, 0.8], [1600, 0.8], [1280, 0.75]]) {
+        const f = Math.min(1, breite / v.videoWidth), c = document.createElement('canvas'); c.width = Math.round(v.videoWidth * f); c.height = Math.round(v.videoHeight * f);
+        c.getContext('2d').drawImage(v, 0, 0, c.width, c.height);
+        blob = await new Promise(ok => c.toBlob(ok, 'image/jpeg', q));
+        if (blob && blob.size <= 1.85e6) break;
+      }
+      if (!blob) throw new Error('Aus dem Video ließ sich kein Bild machen.');
+      meldung('Bild wird hochgeladen …');
+      await bildSenden(`/api/post/${encodeURIComponent(id)}/eigenesbild`, blob);
+      VBILD = ''; meldung('Bild aus dem Video übernommen (alle Posts dieses Rennens und das YouTube-Thumbnail).'); await laden();
+    } catch (e) { meldung(/tainted|insecure|SecurityError/i.test(String(e && (e.name + e.message))) ? 'Der Browser gibt das Bild aus diesem Video nicht frei. Bitte das Video neu hochladen.' : (e.message || String(e)), 1); }
+  }
   const kpMini = (bild, hoch, leer) => bild ? `<span class="kp-mini${hoch ? ' hoch' : ''}"><img src="${esc(bild)}" alt="" loading="lazy"></span>` : `<span class="kp-mini${hoch ? ' hoch' : ''} leer">${leer || ''}</span>`;
   function kpStatus(p) {
     if (p.status === 'gepostet') return ['Gepostet', 'gruen'];
@@ -747,7 +775,7 @@
       <div class="kp-looks">${looks.map(([v, n]) => `<button type="button" class="kp-look${p.vorlage === v ? ' an' : ''}" data-aktion="kp-look" data-id="${id}" data-wert="${esc(v)}">${esc(n)}</button>`).join('')}
         <button type="button" class="btn btn-ghost ki-k" data-aktion="vwuerfeln" data-id="${id}" title="Ein anderes Design"><span>🎲</span></button>
         ${p.vorlageFest ? `<button type="button" class="ki-link" data-aktion="vauto" data-id="${id}">↺ wieder automatisch</button>` : ''}</div>
-      ${!neu && (STAND.videos || []).length && p.typ !== 'woche' ? `<div class="ki-vwahl">🎬 Video für dieses Rennen: <select data-rvideo="${esc(p.rennKey)}" data-start="${esc(p.startMs)}"><option value="">– keins –</option>${STAND.videos.map(x => `<option value="${esc(x.id)}" ${((p.thumb && p.thumb.video) || '') === x.id ? 'selected' : ''}>${esc(x.name)}</option>`).join('')}</select></div>` : ''}`;
+      ${!neu && p.typ !== 'woche' ? rennVideoHtml(p, (p.thumb && p.thumb.video) || '') : ''}`;
     // 2 · Texte im Bild
     const texte = felder.length ? `<div class="kp-schritt">${nr()} · Texte im Bild <em>leer = automatisch</em></div><div class="kp-felder">${felder.map(x => feld(x, 'feld')).join('')}</div>` : '';
     // 3 · Zahlen / Tabelle
@@ -1173,6 +1201,9 @@
     const b = ev.target.closest('[data-aktion]'); if (!b || !BOX.contains(b)) return;
     const a = b.dataset.aktion, id = b.dataset.id;
     if (a === 'laden') return laden();
+    if (a === 'vbild-auf') { VBILD = VBILD === id ? '' : id; return zeichnen(); }
+    if (a === 'vbild-zu') { VBILD = ''; return zeichnen(); }
+    if (a === 'vbild-nehmen') return videoBildNehmen(b, id);
     if (a === 'neulogin') { try { localStorage.removeItem('k888_token'); } catch (e) { /* egal */ } location.reload(); return; }
     if (a === 'reiter') {
       REITER = b.dataset.wert; if (!DAENDERUNG) { DTEAM = null; DLAYOUT = null; }
@@ -1322,6 +1353,16 @@
   async function aenderung(ev) {
     const t = ev.target;
     if (t.id === 'ki-yt-bq') { const x = BOX.querySelector('.ki-ytbeschr'); if (x) x.innerHTML = ytBeschrHtml(); return; }
+    if (t.dataset.rvideohoch !== undefined && t.files && t.files[0]) {   // 📤 Video hochladen und gleich für dieses Rennen setzen
+      const f = t.files[0], rk = t.dataset.rvideohoch, start = Number(t.dataset.start) || Date.now(); t.value = '';
+      try {
+        meldung('Video wird hochgeladen …'); let letzte = 0;
+        const d = await VORLAGEN_UMG.videoHoch(f, true, x => { const pz = Math.floor(x * 4); if (pz > letzte && x < 1) { letzte = pz; meldung(`Video wird hochgeladen … ${Math.round(x * 100)} %`); } });
+        await igApi('POST', `/api/thumb/${encodeURIComponent(rk)}`, { video: d.id, startMs: start });
+        meldung('Video hochgeladen und für dieses Rennen gesetzt.'); await laden();
+      } catch (e) { meldung(e.message || String(e), 1); }
+      return;
+    }
     if (t.dataset.rvideo !== undefined) {
       try { await igApi('POST', `/api/thumb/${encodeURIComponent(t.dataset.rvideo)}`, { video: t.value, startMs: Number(t.dataset.start) || Date.now() }); meldung(t.value ? 'Video gesetzt – die Posts dieses Rennens werden als Video gezeichnet.' : 'Video entfernt.'); await laden(); }
       catch (e) { meldung(e.message, 1); }
@@ -1355,6 +1396,9 @@
 #instaApp .ki-vwahl{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:6px 0;font-size:14px}
 #instaApp .ki-vwahl select{width:auto;min-width:180px;padding:6px 8px}
 #instaApp .ki-vwahl .ki-k{padding:6px 10px}
+#instaApp .ki-vbild{margin:8px 0 12px;padding:10px;border:1px solid rgba(24,232,255,.5);background:rgba(24,232,255,.05);max-width:640px}
+#instaApp .ki-vbild video{display:block;width:100%;max-height:360px;background:#000}
+#instaApp .ki-vbild-kn{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:8px 0;font-size:14px}
 #instaApp .ki-erledigt summary{cursor:pointer;list-style:none}
 #instaApp .ki-erledigt summary::-webkit-details-marker{display:none}
 #instaApp .ki-erledigt summary h3{display:inline-block;margin:0}
