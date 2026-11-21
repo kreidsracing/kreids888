@@ -2089,6 +2089,110 @@
   // Die Leiste „🤖 Automatik“ zeigt die nächsten 7 Tage. Für einen Tag ohne Post schlägt sie genau einen Post vor, der keinen Clip braucht:
   // „Stream verpasst?“ (Tag nach dem Stream), „Morgen live“ (Tag davor), Top 5 der Woche, Wochenvorschau. Gebaut wird erst auf Knopfdruck.
   const tagVon = ms => new Date(ms).toLocaleDateString('sv-SE', { timeZone: 'Europe/Berlin' });   // 2026-11-20
+  // ═══ 📂 Insta-Ablage (NEU 21.11.2026): fertige Szenen aus der Toolbox (Reiter „Schnitt“) als Vorrat ═══
+  // Der Browser liest den Ordner „insta-ablage“ direkt vom PC (Chrome/Edge am PC, nur lesen). Hochgeladen wird erst beim Einplanen.
+  // Eine Szene öffnet sich im Editor wie ein reingezogener Clip, Vorlage und Spruch kommen aus der Infodatei (Strecke, Art).
+  const ABL = { ordner: null, liste: [], stand: '', laedt: false, bilder: new Map(), malt: false };   // stand: '' nie verbunden · 'fragen' Freigabe nötig · 'ok'
+  const ABL_BENUTZT = 'k888_ablage_benutzt';
+  const ABL_ART = { 'Seite an Seite': 'duell', 'Zweikampf': 'duell', 'Überholt worden': 'ueberholt worden', 'Überholt': 'ueberholt', 'Einschlag': 'crash', 'Abflug': 'crash', 'Incident': 'kontakt', 'Dreher': 'dreher',
+    'Zieleinlauf': 'ziel', 'Rennstart': 'start', 'Bestzeit': 'bestzeit', 'Allzeit-Bestzeit': 'bestzeit', 'Laut geworden': 'highlight' };
+  const ablKann = () => typeof window.showDirectoryPicker === 'function' && !!window.indexedDB;
+  const ablBenutzt = () => { try { return JSON.parse(localStorage.getItem(ABL_BENUTZT) || '[]'); } catch (e) { return []; } };
+  const ablMerken = name => { try { localStorage.setItem(ABL_BENUTZT, JSON.stringify([...ablBenutzt().filter(x => x !== name).slice(-300), name])); } catch (e) { /* egal */ } };
+  function ablTitel(x) {   // „Seite an Seite · Long Beach · R59“ · ein selbst vergebener Name bleibt, wie er ist
+    const i = x.info, r = i.runde ? 'R' + i.runde : '', std = [i.strecke, i.art, r, String(i.datum || '').slice(0, 10)].filter(Boolean).join(' ');
+    return std && x.name.startsWith(std) ? [i.art, i.strecke, r].filter(Boolean).join(' · ') + x.name.slice(std.length) : x.name;
+  }
+  const ablFrei = () => { if (ABL.stand !== 'ok') return []; const b = new Set(ablBenutzt()); return ABL.liste.filter(x => !b.has(x.name) && !CLIPS.some(c => c.ablage === x.name)); };
+  let ABL_DB = null;
+  const ablDb = () => ABL_DB || (ABL_DB = new Promise((ok, nein) => { const r = indexedDB.open('k888_ablage', 1); r.onupgradeneeded = () => r.result.createObjectStore('h'); r.onsuccess = () => ok(r.result); r.onerror = () => nein(r.error); }));
+  const ablTx = async (modus, fn) => { const db = await ablDb(); return new Promise((ok, nein) => { const t = db.transaction('h', modus), q = fn(t.objectStore('h')); t.oncomplete = () => ok(q && q.result); t.onerror = t.onabort = () => nein(t.error); }); };
+  async function ablLesen() {   // Ordner lesen: jede MP4 ist eine Szene, „… Cam.mp4“ und „….json“ gehören dazu
+    const dateien = new Map(), liste = [];
+    for await (const [name, e] of ABL.ordner.entries()) if (e.kind === 'file') dateien.set(name, e);
+    for (const [name, e] of dateien) {
+      if (!/\.mp4$/i.test(name) || / Cam\.mp4$/i.test(name)) continue;
+      const basis = name.slice(0, -4), j = dateien.get(basis + '.json'); let info = null, f = null;
+      try { f = await e.getFile(); } catch (err) { continue; }
+      try { if (j) info = JSON.parse(await (await j.getFile()).text()); } catch (err) { info = null; }
+      liste.push({ name: basis, datei: e, cam: dateien.has(basis + ' Cam.mp4'), info: (info && typeof info === 'object') ? info : {}, zeit: f.lastModified, groesse: f.size });
+    }
+    ABL.liste = liste.sort((a, b) => b.zeit - a.zeit);
+  }
+  async function ablStart() {   // beim Öffnen des Reiters: den gemerkten Ordner wieder lesen, wenn der Browser es noch erlaubt
+    if (!ablKann() || ABL.laedt) return;
+    ABL.laedt = true;
+    try {
+      if (!ABL.ordner) ABL.ordner = (await ablTx('readonly', o => o.get('ordner'))) || null;
+      if (ABL.ordner) { if ((await ABL.ordner.queryPermission({ mode: 'read' })) === 'granted') { await ablLesen(); ABL.stand = 'ok'; } else ABL.stand = 'fragen'; }
+    } catch (e) { ABL.stand = ABL.ordner ? 'fragen' : ''; }
+    ABL.laedt = false;
+    if (ABL.ordner) zeichnen();
+  }
+  async function ablVerbinden(anderer) {   // Klick: Ordner wählen oder die Freigabe erneuern (der Browser fragt selbst)
+    if (!ablKann()) return UMG.meldung('Das geht nur in Chrome oder Edge am PC.', 1);
+    try {
+      if (ABL.ordner && !anderer) { if ((await ABL.ordner.requestPermission({ mode: 'read' })) !== 'granted') return UMG.meldung('Ohne Freigabe kann der Ordner nicht gelesen werden.', 1); }
+      else { const h = await window.showDirectoryPicker({ id: 'k888-ablage', mode: 'read' }); ABL.ordner = h; try { await ablTx('readwrite', o => o.put(h, 'ordner')); } catch (e) { /* dann nur bis zum Neuladen */ } }
+      await ablLesen(); ABL.stand = 'ok'; zeichnen();
+      UMG.meldung(ABL.liste.length ? `${ABL.liste.length} ${ABL.liste.length === 1 ? 'Szene' : 'Szenen'} im Vorrat.` : 'Verbunden. Im Ordner liegt noch keine Szene.');
+    } catch (e) {
+      if (e && e.name === 'AbortError') return;
+      ABL.stand = ABL.ordner ? 'fragen' : ''; zeichnen(); UMG.meldung('Der Ordner lässt sich nicht lesen. Bitte neu verbinden.', 1);
+    }
+  }
+  async function ablOeffnen(name, ms) {   // Szene in den Editor · ms = Post-Zeit, wenn sie für eine Lücke gedacht ist
+    const e = ABL.liste.find(x => x.name === name); if (!e) return;
+    if (CLIPS.some(c => c.ablage === name)) { nachOben(); return UMG.meldung('Die Szene ist schon im Editor.'); }
+    let datei; try { datei = await e.datei.getFile(); } catch (err) { ABL.stand = 'fragen'; zeichnen(); return UMG.meldung('Der Ordner ist nicht mehr freigegeben. Bitte „📂 Ordner wieder freigeben“ drücken.', 1); }
+    const stich = [e.info.strecke, ABL_ART[e.info.art]].filter(Boolean).join(' ');   // daraus kommen Vorlage, Spruch und Titel
+    const c = await neuerClip(stich ? new File([datei], stich + '.mp4', { type: datei.type || 'video/mp4', lastModified: datei.lastModified }) : datei);
+    if (!c) return UMG.meldung(`„${name}“ kann der Browser nicht öffnen.`, 1);
+    c.datei = datei; c.name = datei.name; c.ablage = name; if (ms) c.postMs = ms;
+    CLIPS.push(c); zeichnen(); if (CLIPS.length === 1) nachOben();
+    UMG.meldung(CLIPS.length > 1 ? 'Szene wartet hinter dem Clip, der gerade im Editor ist.' : 'Szene ist im Editor. Vorlage und Spruch passen schon, ändern geht immer.');
+  }
+  async function ablBilder() {   // kleine Standbilder für die Kacheln, eins nach dem anderen (nur im Speicher)
+    if (ABL.malt || ABL.stand !== 'ok') return;
+    ABL.malt = true;
+    try {
+      for (const x of ABL.liste.slice(0, 24)) {
+        const k = x.name + '|' + x.zeit; if (ABL.bilder.has(k)) continue;
+        let url = '', src = '';
+        try {
+          url = URL.createObjectURL(await x.datei.getFile());
+          const v = document.createElement('video'); v.muted = true; v.preload = 'auto'; v.playsInline = true;
+          await new Promise((ok, nein) => { v.onloadeddata = ok; v.onerror = nein; setTimeout(nein, 8000); v.src = url; });
+          await new Promise(ok => { v.onseeked = ok; setTimeout(ok, 3000); v.currentTime = Math.min((v.duration || 2) / 2, 3); });
+          const cv = leinwand(240, 135), q = Math.max(240 / (v.videoWidth || 240), 135 / (v.videoHeight || 135)), w = (v.videoWidth || 240) * q, h = (v.videoHeight || 135) * q;
+          cv.getContext('2d').drawImage(v, (240 - w) / 2, (135 - h) / 2, w, h); src = cv.toDataURL('image/jpeg', 0.7);
+          v.removeAttribute('src'); v.load();
+        } catch (err) { src = ''; }
+        if (url) URL.revokeObjectURL(url);
+        ABL.bilder.set(k, src);
+        const img = BOX && [...BOX.querySelectorAll('.kc-abl-bild')].find(y => y.dataset.k === k); if (img && src) img.innerHTML = `<img src="${src}" alt="">`;
+      }
+    } finally { ABL.malt = false; }
+  }
+  function ablHtml(offenStandard) {
+    if (!ablKann()) return '';
+    const kopf = '📂 Vorrat aus der Toolbox';
+    if (ABL.stand !== 'ok') return `<div class="kc-abl zu"><b>${kopf}</b><button type="button" class="btn ki-k" data-c="abl-verbinden">${ABL.stand === 'fragen' ? '📂 Ordner wieder freigeben' : '📂 Ablage verbinden'}</button>
+      <span class="kc-dim">${ABL.stand === 'fragen' ? 'Der Browser fragt nach einem Neustart einmal nach.' : 'Einmal den Ordner „insta-ablage“ in der Toolbox wählen. Dann stehen deine fertigen Szenen hier.'}</span></div>`;
+    const b = new Set(ablBenutzt()), frei = ABL.liste.filter(x => !b.has(x.name)), datum = ms => new Date(ms).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' });
+    const kachel = x => {
+      const benutzt = b.has(x.name), drin = CLIPS.some(c => c.ablage === x.name), k = x.name + '|' + x.zeit, src = ABL.bilder.get(k);
+      return `<div class="kc-abl-k${benutzt ? ' benutzt' : ''}"><div class="kc-abl-bild" data-k="${esc(k)}">${src ? `<img src="${src}" alt="">` : '🎬'}</div>
+        <b title="${esc(x.name)}">${esc(ablTitel(x))}</b>
+        <span class="kc-dim">${[x.info.dauer ? sek(x.info.dauer) : '', x.info.ansichten > 1 ? x.info.ansichten + ' Ansichten' : '', x.cam ? 'mit Cam' : '', datum(x.zeit)].filter(Boolean).join(' · ')}</span>
+        ${benutzt ? '<span class="kc-tag-ok">✓ verwendet</span>' : ''}
+        <button type="button" class="btn ki-k${benutzt || drin ? '' : ' kc-frei'}" data-c="abl-auf" data-name="${esc(x.name)}" ${drin ? 'disabled' : ''}>${drin ? 'Ist im Editor' : benutzt ? '↩ Nochmal' : '✏️ In den Editor'}</button></div>`;
+    };
+    return `<details class="kc-abl" ${(OFFEN['kc-abl'] ?? offenStandard) ? 'open' : ''}><summary>${kopf} <span class="kc-dim">${frei.length} neu${ABL.liste.length > frei.length ? ` · ${ABL.liste.length - frei.length} verwendet` : ''} · Ordner „${esc(ABL.ordner.name)}“</span></summary>
+      ${ABL.liste.length ? `<div class="kc-abl-reihe">${[...frei, ...ABL.liste.filter(x => b.has(x.name))].map(kachel).join('')}</div>` : '<div class="kc-leer">Noch keine Szene. In der Toolbox auf „Schnitt“ eine Szene fertig machen.</div>'}
+      <div class="kc-auto-kn"><button type="button" class="btn ki-k" data-c="abl-neu">↻ Neu lesen</button><button type="button" class="btn ki-k" data-c="abl-wechseln">Anderer Ordner</button></div></details>`;
+  }
+
   const NEIN_KEY = 'k888_vorschlag_nein', neinListe = () => { try { return JSON.parse(localStorage.getItem(NEIN_KEY) || '[]'); } catch (e) { return []; } };
   const autoV = x => {   // Name und Zeichen eines automatischen Posts (auch für die Wochenansicht)
     const q = String((x && x.quelle) || '');
@@ -2105,18 +2209,21 @@
     const neu = c => Math.max(c.postMs || 0, (c.gepostet && c.gepostet.zeit) || 0) > jetzt - 6 * 86400000, top = top5Liste(st.clips, jetzt);
     let topFrei = top.liste.length >= 3 && !(st.clips || []).some(c => /^top5:/.test(c.quelle || '') && neu(c));
     let wocheFrei = !(st.posts || []).some(p => p.typ === 'woche') && !(st.clips || []).some(c => /^woche:/.test(c.quelle || '') && neu(c));
+    const vorrat = ablFrei().filter(x => !nein.has('vorrat:' + x.name));   // 📂 fertige Szenen aus der Toolbox, je Lücke eine andere
     for (let i = 0; i < 7; i++) {
       const mitte = jetzt + i * 86400000, tag = tagVon(mitte), n = belegt[tag] || 0;
       let ms = new Date(`${tag}T${cfg.zeit || '18:30'}:00`).getTime(); if (ms < jetzt + 20 * 60000) ms = i === 0 && new Date(jetzt).getHours() < 22 ? jetzt + 20 * 60000 : 0;
       const e = { tag, n, ms, vorschlag: null };
       if (!n && ms && cfg.luecken !== false) {
         const gestern = alt.find(s => tagVon(s.liveMs) === tagVon(mitte - 86400000)), morgen = streams.find(s => tagVon(s.liveMs) === tagVon(mitte + 86400000)), woche = streams.filter(s => s.liveMs > ms && s.liveMs < ms + 7 * 86400000);
-        e.vorschlag = [gestern && { art: 'verpasst', q: 'verpasst:' + gestern.rennKey, s: gestern, text: `▶ „Stream verpasst?“ · ${gestern.serie || gestern.titel}` },
+        e.vorschlag = [vorrat.length && { art: 'vorrat', q: 'vorrat:' + vorrat[0].name, name: vorrat[0].name, text: `🎬 Aus dem Vorrat · ${ablTitel(vorrat[0])}` },
+          gestern && { art: 'verpasst', q: 'verpasst:' + gestern.rennKey, s: gestern, text: `▶ „Stream verpasst?“ · ${gestern.serie || gestern.titel}` },
           morgen && { art: 'morgen', q: 'morgen:' + morgen.rennKey, s: morgen, text: `🔴 „Morgen live“ · ${morgen.serie || morgen.titel}` },
           topFrei && (top.liste.slice(0, 3).every(y => MERK_IDS.has(y.id)) ? { art: 'top3v', q: 'top5:' + tag, top, text: '🏆 Top 3 der Woche (Video)' } : { art: 'top5', q: 'top5:' + tag, top, text: `🏆 Top ${top.liste.length} der Woche` }),
           wocheFrei && woche.length >= 2 && { art: 'woche', q: 'woche:' + tag, liste: woche, text: `📅 Wochenvorschau · ${woche.length} Streams` }].filter(k => k && !nein.has(k.q) && !benutzt.has(k.q))[0] || null;
         if (e.vorschlag && (e.vorschlag.art === 'top5' || e.vorschlag.art === 'top3v')) topFrei = false;
         if (e.vorschlag && e.vorschlag.art === 'woche') wocheFrei = false;
+        if (e.vorschlag && e.vorschlag.art === 'vorrat') vorrat.shift();
       }
       tage.push(e);
     }
@@ -2124,6 +2231,7 @@
   }
   async function lueckeBauen(tag) {   // Vorschlag bauen und gleich freigegeben einplanen (der Klick ist die Freigabe)
     const st = stand(), e = lueckenPlan(st, Date.now()).find(y => y.tag === tag), v = e && e.vorschlag;
+    if (v && v.art === 'vorrat') return ablOeffnen(v.name, e.ms);   // 📂 Szene aus dem Vorrat: öffnet sich im Editor, Zeit steht schon
     if (!v || ARBEIT || TRAILER_LAEUFT || KAR_LAEUFT) return;
     KAR_LAEUFT = true;
     try {
@@ -2434,7 +2542,7 @@
     };
     const tage = lueckenPlan(stand(), jetzt), tagName = t => new Date(t + 'T12:00:00').toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit' });
     const tagHtml = e => `<div class="kc-tagz ${e.n ? 'voll' : 'leer'}"><b>${esc(tagName(e.tag))}</b>${e.n ? `<span class="kc-tag-ok">✓ ${e.n} ${e.n === 1 ? 'Post' : 'Posts'}</span>`
-      : `<span class="kc-tag-leer">Lücke</span>${e.vorschlag ? `<span class="kc-vor">${esc(e.vorschlag.text)}</span><div class="kc-auto-kn"><button type="button" class="btn ki-k kc-frei" data-c="luecke-bauen" data-tag="${e.tag}" title="Bauen und für diesen Tag einplanen">✓ Bauen</button>${e.vorschlag.art === 'top3v' ? '' : `<button type="button" class="btn ki-k" data-c="luecke-bearb" data-tag="${e.tag}" title="Vorher ansehen und ändern">✏️</button>`}<button type="button" class="btn ki-k" data-c="luecke-nein" data-tag="${e.tag}" title="Diesen Vorschlag nicht mehr zeigen">✕</button></div>` : '<span class="kc-dim">Hier fehlt ein Clip.</span>'}`}</div>`;
+      : `<span class="kc-tag-leer">Lücke</span>${e.vorschlag ? `<span class="kc-vor">${esc(e.vorschlag.text)}</span><div class="kc-auto-kn">${e.vorschlag.art === 'vorrat' ? `<button type="button" class="btn ki-k kc-frei" data-c="luecke-bauen" data-tag="${e.tag}" title="Szene im Editor öffnen, der Tag ist schon eingestellt">✏️ Öffnen</button>` : `<button type="button" class="btn ki-k kc-frei" data-c="luecke-bauen" data-tag="${e.tag}" title="Bauen und für diesen Tag einplanen">✓ Bauen</button>`}${e.vorschlag.art === 'top3v' || e.vorschlag.art === 'vorrat' ? '' : `<button type="button" class="btn ki-k" data-c="luecke-bearb" data-tag="${e.tag}" title="Vorher ansehen und ändern">✏️</button>`}<button type="button" class="btn ki-k" data-c="luecke-nein" data-tag="${e.tag}" title="Diesen Vorschlag nicht mehr zeigen">✕</button></div>` : '<span class="kc-dim">Hier fehlt ein Clip.</span>'}`}</div>`;
     const sw = (k, an, text, tip) => `<label class="kc-check" title="${esc(tip)}"><input type="checkbox" data-c="cfg-${k}" ${an ? 'checked' : ''}> <span><b>${text}</b></span></label>`;
     return `<div class="kc-auto"><h3 class="kc-h">🤖 Automatik <span class="kc-dim">${warten ? `${warten} ${warten === 1 ? 'wartet' : 'warten'} auf deine Freigabe` : ''}</span></h3>
       <div class="kc-dim">Das baut das Dashboard von selbst. ${noetig ? 'Ohne Freigabe geht nichts raus.' : 'Es geht ohne Freigabe von selbst raus.'}</div>
@@ -2444,7 +2552,7 @@
       <div class="kc-tage">${tage.map(tagHtml).join('')}</div>
       <div class="kc-auto-schalter">
         ${sw('trailer', cfg.trailer !== false, '🔴 Stream-Trailer', 'Für jeden Stream der nächsten 4 Tage ein kurzes Video „HEUTE LIVE“ als YouTube-Short, 2,5 Stunden vor „Live ab“. Nur YouTube, damit bei Instagram und TikTok nichts doppelt zum Raceday-Post kommt. 8 Vorlagen und 7 Farben wechseln von selbst.')}
-        ${sw('luecken', cfg.luecken !== false, '📅 Vorschläge für Lücken', 'Für einen Tag ohne Post schlägt die Leiste einen Post vor, der keinen Clip braucht: „Stream verpasst?“, „Morgen live“, Top 5 der Woche oder Wochenvorschau. Gebaut wird erst, wenn du es anklickst.')}
+        ${sw('luecken', cfg.luecken !== false, '📅 Vorschläge für Lücken', 'Für einen Tag ohne Post schlägt die Leiste etwas vor: zuerst eine Szene aus dem Vorrat (Toolbox), sonst einen Post, der keinen Clip braucht: „Stream verpasst?“, „Morgen live“, Top 5 der Woche oder Wochenvorschau. Gebaut wird erst, wenn du es anklickst.')}
         ${sw('freigabe', noetig, '✓ Freigabe nötig', 'An: Automatisches geht erst raus, wenn du „✓ Freigeben“ drückst. Aus: es geht von selbst raus.')}
       </div></div>`;
   }
@@ -3134,7 +3242,7 @@
   // Oberfläche
   // ═══════════════════════════════════════════════════════════
   let BOX = null, UMG = null, MAT = null, ARBEIT = '', LETZTER_LOOK = 'neon';
-  const OFFEN = { 'kc-so': null, 'kc-raus': false, 'kc-einst': false, 'kc-best-box': true };   // aufgeklappte Bereiche bleiben offen
+  const OFFEN = { 'kc-so': null, 'kc-raus': false, 'kc-einst': false, 'kc-best-box': true, 'kc-abl': null };   // aufgeklappte Bereiche bleiben offen
   const CLIPS = [];          // reingezogene Clips, der erste ist im Editor
   const VOR = { vid: null, url: '', canvas: null, lauf: 0, ton: false, c: null };   // Vorschau
   const stand = () => (UMG && UMG.stand()) || {};
@@ -3270,7 +3378,7 @@
     const tk = st.tiktok || {};
     return `<div class="kc-app">
       <details class="kc-so" ${(OFFEN['kc-so'] ?? !(CLIPS.length || liste.length)) ? 'open' : ''}><summary>💡 So geht’s (in 3 Schritten)</summary>
-        <ol><li><b>Clip reinziehen</b> – einfach die MP4 aus dem Kreids Clipper hier reinziehen (auch mehrere auf einmal). Tipp: Datei so benennen wie <b>Spa_EauRouge_Crash</b>, dann kommen Vorlage, Spruch und Titel von selbst.</li>
+        <ol><li><b>Clip reinziehen</b> – einfach die MP4 aus dem Kreids Clipper hier reinziehen (auch mehrere auf einmal). Tipp: Datei so benennen wie <b>Spa_EauRouge_Crash</b>, dann kommen Vorlage, Spruch und Titel von selbst. Oder unter „📂 Vorrat aus der Toolbox“ eine fertige Szene öffnen.</li>
         <li><b>Vorlage antippen</b> – z. B. „Wer war schuld?“. Spruch, Farbe und Text sind schon fertig, ändern geht immer.</li>
         <li><b>🚀 Einplanen</b> – das Video wird hier gebaut und geht zur geplanten Zeit raus: Instagram-Reel, YouTube-Short und TikTok-Entwurf. Ein Clip pro Tag. Der Abspann und der Text zeigen auf deinen YouTube-Kanal und den nächsten Stream.</li></ol>
         <div class="kc-dim">Tipp für Reichweite: 2 bis 3 Wochen lang jeden Tag einen Clip, immer zur gleichen Uhrzeit.</div></details>
@@ -3279,6 +3387,7 @@
       ${clipEdHtml()}
       ${BEARBEITE && !CLIP_ED ? `<div class="kc-hinweis kc-bearb">✏️ Zieh jetzt die Videodatei für „${esc(BEARBEITE.titel || 'den geplanten Post')}“ rein. Sie öffnet sich im Editor und ersetzt den geplanten Post. <button type="button" class="btn ki-k" data-c="bearbeiten-ab">Abbrechen</button></div>` : ''}
       ${automatikHtml(liste, cfg)}
+      ${ablHtml(!c)}
       <label class="kc-drop${c ? ' klein' : ''}" data-c="drop"><input type="file" accept="video/*" multiple data-c="datei">
         <span class="kc-drop-gross">🎬 ${c ? 'Weitere Clips reinziehen' : 'Clip hier reinziehen'}</span><span class="kc-dim">oder antippen und auswählen · MP4 aus dem Kreids Clipper</span></label>
       ${c ? editor(c, tk) : ''}
@@ -3561,6 +3670,7 @@
     if (!BOX) return;
     BOX.innerHTML = html();
     vorschauStarten();
+    ablBilder();
   }
   async function dateienRein(dateien) {
     let n = 0;
@@ -3611,6 +3721,7 @@
       try { const vb = await vorschaubild(c, MAT); if (vb) await senden(`/api/clip/${id}/bild`, vb); } catch (e) { /* Vorschaubild ist nur schön */ }
       if (c.ersetzt) await altenErsetzen(c.ersetzt);   // ✏️ bearbeiteter Post: der alte kommt weg
       await clipMerken(id, c);                         // … und dieser lässt sich später wieder bearbeiten
+      if (c.ablage) ablMerken(c.ablage);               // 📂 Szene aus dem Vorrat ist verwendet
       clipWeg(c);
       ARBEIT = '';
       UMG.meldung(`Eingeplant: ${zeit(r.postMs)} 🎉`);
@@ -3678,6 +3789,10 @@
     }
     if (a === 'marke-weg' && c) { c.marken = (c.marken || []).filter(x => x.id !== b.dataset.k); zeichnen(); return; }
     if (a === 'luecke-bauen') { lueckeBauen(b.dataset.tag); return; }
+    if (a === 'abl-verbinden') { ablVerbinden(false); return; }
+    if (a === 'abl-wechseln') { ablVerbinden(true); return; }
+    if (a === 'abl-neu') { try { await ablLesen(); UMG.meldung(`${ABL.liste.length} ${ABL.liste.length === 1 ? 'Szene' : 'Szenen'} im Ordner.`); } catch (e) { ABL.stand = 'fragen'; } zeichnen(); return; }
+    if (a === 'abl-auf') { ablOeffnen(b.dataset.name, 0); return; }
     if (a === 'luecke-bearb') { autoEdAuf('', b.dataset.tag); return; }
     if (a === 'auto-bearb' && id) { autoEdAuf(id); return; }
     if (a === 'ae-art' && AUTO_ED) { AUTO_ED.art = b.dataset.wert; zeichnen(); return; }
@@ -3834,7 +3949,7 @@
   window.K888Clips = {
     oeffnen(id) { OEFFNE = String(id || ''); },   // der Wochenplan ruft das vor dem Wechsel in den Reiter „🎬 Clips“
     vorlageInfo: (id, c) => (c && autoV(c)) || trailerV(id) || karV(id) || VORLAGEN.find(y => y.id === id) || null,
-    VORLAGEN, STILE, bauen, zeitplan, zeichne, material, schriften, vorschaubild, stichwoerter, trailerZeichnen, trailerBauen, trailerPruefen, trailerTon, trailerWahl, TR_ARTEN, TR_FARBEN, top5Seiten, top5Liste, automatikHtml, karSeite, lueckenPlan, lueckeBauen, autoEdAuf,
+    VORLAGEN, STILE, bauen, zeitplan, zeichne, material, schriften, vorschaubild, stichwoerter, trailerZeichnen, trailerBauen, trailerPruefen, trailerTon, trailerWahl, TR_ARTEN, TR_FARBEN, top5Seiten, top5Liste, automatikHtml, karSeite, lueckenPlan, lueckeBauen, autoEdAuf, ablage: ABL,
     async start(box, umg) {
       UMG = umg;
       if (BOX !== box) {
@@ -3856,6 +3971,7 @@
       schriften();
       zeichnen();
       if (OEFFNE) setTimeout(oeffneJetzt, 60);   // aus dem Wochenplan angeklickt
+      ablStart();                                // 📂 Vorrat aus der Toolbox lesen (wenn der Ordner schon verbunden ist)
       setTimeout(async () => { await trailerPruefen(); await merkAufraeumen(); }, 1500);   // 🔴 Stream-Trailer und 🖼 Karussells von selbst bauen
     }
   };
@@ -3996,6 +4112,16 @@
 .kc-app .kc-ae-farbe{width:30px;height:30px;border-radius:50%;background:var(--f);border:2px solid transparent;cursor:pointer;padding:0}
 .kc-app .kc-ae-farbe.an{border-color:#fff;box-shadow:0 0 12px var(--f)}
 .kc-app .kc-auto-h{margin-top:14px;font-weight:800;color:#fff;font-size:15px}
+.kc-app .kc-abl{border:1px solid rgba(24,232,255,.45);background:rgba(24,232,255,.04);padding:10px 14px}
+.kc-app .kc-abl.zu{display:flex;flex-wrap:wrap;align-items:center;gap:10px}.kc-app .kc-abl.zu>b{color:#fff}
+.kc-app .kc-abl summary{cursor:pointer;font-weight:800;color:#fff}
+.kc-app .kc-abl-reihe{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:10px;margin-top:10px}
+.kc-app .kc-abl-k{display:flex;flex-direction:column;gap:4px;padding:8px;background:#101218;border:1px solid #2a2f36;font-size:13px;min-width:0}
+.kc-app .kc-abl-k>b{color:#fff;font-size:14px;line-height:1.25;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;word-break:break-word}
+.kc-app .kc-abl-k .btn{margin-top:auto;padding:7px 9px;font-size:12px}
+.kc-app .kc-abl-k.benutzt{opacity:.6}
+.kc-app .kc-abl-bild{aspect-ratio:16/9;background:#07080b;display:flex;align-items:center;justify-content:center;font-size:26px;overflow:hidden}
+.kc-app .kc-abl-bild img{width:100%;height:100%;object-fit:cover;display:block}
 .kc-app .kc-tage{display:grid;grid-template-columns:repeat(auto-fill,minmax(124px,1fr));gap:8px;margin-top:8px}
 .kc-app .kc-tagz .kc-auto-kn{margin-top:auto;padding-top:6px}.kc-app .kc-tagz .kc-auto-kn .btn{padding:6px 9px;font-size:12px}
 .kc-app .kc-tagz{display:flex;flex-direction:column;gap:4px;padding:8px 10px;background:#101218;border:1px solid #2a2f36;font-size:13px;min-width:0}
