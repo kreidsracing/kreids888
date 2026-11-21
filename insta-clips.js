@@ -2215,6 +2215,7 @@
   const nachOben = () => { try { (BOX.querySelector(CLIP_ED ? '.kc-ce' : CLIPS.length ? '.kc-drop' : '.kc-bearb') || BOX).scrollIntoView({ behavior: 'smooth', block: 'start' }); } catch (e) { /* egal */ } };   // zum Editor bzw. zum Hinweis
   async function bearbeiten(id) {
     const x = (stand().clips || []).find(y => y.id === id); if (!x || ARBEIT) return;
+    if (AUTO_ED) { autoEdStill(); AUTO_ED = null; cancelAnimationFrame(AE_LAUF); }   // immer nur ein Editor offen
     if (CLIPS.some(c => c.ersetzt === id)) { zeichnen(); nachOben(); return UMG.meldung('Dieser Post ist schon im Editor.'); }
     let r = null; const dateien = [];
     if (!x.kar) { try { r = await merkTx('c', 'readonly', o => o.get(id)); for (const k of (r && r.quellen) || []) dateien.push(await merkTx('q', 'readonly', o => o.get(k))); } catch (e) { r = null; } }
@@ -2307,6 +2308,7 @@
     if (E.typ === 'top5') { const t = top5Liste(st.clips, Date.now()); for (const y of t.liste) { try { y.bild = y.bildUrl ? await bild(y.bildUrl) : null; } catch (err) { y.bild = null; } } E.topListe = t.liste; E.topWas = t.was;
       if (t.liste.length < 3) return UMG.meldung('Für die Top der Woche braucht es mindestens 3 gepostete Clips mit Zahlen.', 1); }
     E.name = AE_NAME[E.typ] || 'Post'; E.sicht0 = JSON.stringify([E.art, E.fi, E.x, E.hgAn, E.ton]);
+    CLIP_ED = null; BEARBEITE = null;   // immer nur ein Editor offen
     AUTO_ED = E; zeichnen(); autoEdLauf();
     try { BOX.querySelector('.kc-ae').scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch (err) { /* egal */ }
   }
@@ -2315,7 +2317,7 @@
     const lauf = jetzt => {
       const E = AUTO_ED; if (!E) return; AE_LAUF = requestAnimationFrame(lauf);
       if (!MAT) { if (!autoEdLauf.laedt) { autoEdLauf.laedt = true; material().catch(() => {}).then(() => { autoEdLauf.laedt = false; }); } return; }   // nach „Neu laden“ ist das Logo weg: neu holen
-      const cv = BOX && BOX.querySelector('.kc-ae-vorschau'); if (!cv) return;
+      const cv = BOX && BOX.querySelector('canvas.kc-ae-vorschau'); if (!cv) return;   // nur die Leinwand (der Schnell-Editor hat an der Stelle ein Video)
       if (E.typ === 'top5') { if (cv.dataset.fertig) return; cv.getContext('2d').drawImage(top5Seiten(MAT, E.topListe, E.topWas, TR_FARBEN[E.fi], null)[0], 0, 0, cv.width, cv.height); cv.dataset.fertig = '1'; return; }
       if (jetzt - letzte < 66) return; letzte = jetzt;
       const g = cv.getContext('2d'); g.save(); g.scale(cv.width / B, cv.height / H);
