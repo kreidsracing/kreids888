@@ -1796,8 +1796,99 @@
     if (t >= 6.2) outroZeichnen(g, t - 6.2, m, f);   // 4 · Wohin: Abspann wie bei den Clips (YouTube)
     g.fillStyle = f; g.fillRect(0, H - 14, B * kl(t / TRAILER_T, 0, 1), 14);
   }
-  async function trailerTon(art) {   // eigene Effekt-Töne: Schläge an den Schnitten, Zischer davor, je Vorlage ein eigener Anfang
-    const ctx = new OfflineAudioContext(2, TON_RATE * TRAILER_T, TON_RATE), ziel = ctx.createDynamicsCompressor(); ziel.connect(ctx.destination);
+  // 🎵 Musik und 🔊 Effekt-Töne für Trailer (NEU 21.11.2026): im Editor ein- und ausschaltbar. Standard: Effekte an, Musik aus.
+  const TR_MUSIK = [['ohne', 'Ohne'], ['drive', 'Synthwave'], ['house', 'House'], ['trap', 'Trap'], ['kino', 'Kino'], ['chill', 'Lo-Fi'], ['chip', '8-Bit']];
+  const TR_MUSIK_CACHE = new Map(), notenHz = n => 440 * Math.pow(2, (n - 69) / 12);
+  const tonStandard = () => { try { const t = JSON.parse(localStorage.getItem('k888_trailer_ton') || 'null'); if (t && typeof t === 'object') return { effekte: t.effekte !== false, musik: TR_MUSIK.some(y => y[0] === t.musik) ? t.musik : 'ohne' }; } catch (e) { /* Standard */ } return { effekte: true, musik: 'ohne' }; };
+  function trMusik(art, D) {   // 🎵 Musik für Trailer (wie bei SPR Insta), je Stil einmal gerechnet · [links, rechts]
+    const mk = art + '|' + D;
+    if (!TR_MUSIK_CACHE.has(mk)) TR_MUSIK_CACHE.set(mk, (async () => {
+      const c = new OfflineAudioContext(2, TON_RATE * D, TON_RATE), komp = c.createDynamicsCompressor(), bus = c.createGain(), zr = zufallR(1234);
+      const S = { r: zr, rausch: (t, d) => { const q = c.createBufferSource(); q.buffer = rauschen(c); q.loop = true; q.start(Math.max(0, t), zr() * 1.5); q.stop(t + d + 0.05); return q; } };
+      komp.threshold.value = -18; komp.knee.value = 10; komp.ratio.value = 3.5; komp.attack.value = 0.005; komp.release.value = 0.18; bus.connect(komp); komp.connect(c.destination);
+      const raus = (k, pan) => { if (pan) { const p = c.createStereoPanner(); p.pan.value = kl(pan, -1, 1); k.connect(p); p.connect(bus); } else k.connect(bus); };
+      const env = (g, t, a, d, v) => { g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(v, t + a); g.gain.exponentialRampToValueAtTime(Math.max(0.0002, v * 0.3), t + a + d * 0.75); g.gain.linearRampToValueAtTime(0.0001, t + a + d); };
+      const ton = (t, f, d, typ, v, cut, pan) => { if (t >= D) return; const o = c.createOscillator(), g = c.createGain(); o.type = typ; o.frequency.value = f; env(g, t, 0.004, d, v); let e = o; if (cut) { const lp = c.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = cut; o.connect(lp); e = lp; } e.connect(g); raus(g, pan); o.start(t); o.stop(t + d + 0.06); };
+      const lang = (t, f, d, typ, v, cut, pan) => { const o = c.createOscillator(), g = c.createGain(), lp = c.createBiquadFilter(), e = Math.min(D, t + d); o.type = typ; o.frequency.value = f; lp.type = 'lowpass'; lp.frequency.value = cut || 8000; g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(v, t + Math.min(0.35, d * 0.3)); g.gain.setValueAtTime(v, Math.max(t + d * 0.3, e - 0.3)); g.gain.linearRampToValueAtTime(0.0001, e); o.connect(lp); lp.connect(g); raus(g, pan); o.start(t); o.stop(e + 0.05); };
+      const flaeche = (t, noten, d, v, cut) => noten.forEach(n => { lang(t, notenHz(n) * 0.997, d, 'sawtooth', v / noten.length / 2, cut, -0.35); lang(t, notenHz(n) * 1.004, d, 'sawtooth', v / noten.length / 2, cut, 0.35); });
+      const kick = (t, v = 1, tief) => { if (t >= D) return; const o = c.createOscillator(), g = c.createGain(); o.frequency.setValueAtTime(tief ? 110 : 165, t); o.frequency.exponentialRampToValueAtTime(tief ? 38 : 46, t + 0.11); env(g, t, 0.002, tief ? 0.45 : 0.24, 0.45 * v); o.connect(g); raus(g); o.start(t); o.stop(t + 0.7); rsch(t, 0.02, 'bandpass', 2800, 0.3 * v, 0.8); ton(t, tief ? 150 : 210, 0.07, 'triangle', 0.3 * v); };
+      const rsch = (t, d, typ, f, v, q, pan) => { if (t >= D) return; const n = S.rausch(t, d), fl = c.createBiquadFilter(), g = c.createGain(); fl.type = typ; fl.frequency.value = f; fl.Q.value = q || 0.7; env(g, t, 0.001, d, v); n.connect(fl); fl.connect(g); raus(g, pan); };
+      const snare = (t, v = 1) => { rsch(t, 0.17, 'bandpass', 1900, 0.8 * v, 0.7); rsch(t, 0.1, 'highpass', 5000, 0.3 * v); ton(t, 185, 0.09, 'triangle', 0.3 * v); };
+      const clap = (t, v = 1) => { for (const dt of [0, 0.011, 0.024]) rsch(t + dt, 0.11, 'bandpass', 1350, 0.6 * v, 1.1); };
+      const hat = (t, v = 1, offen) => rsch(t, offen ? 0.2 : 0.04, 'highpass', 7000, 0.34 * v, 0.7, offen ? 0.2 : -0.15);
+      const akkord = (t, noten, d, typ, v, cut) => noten.forEach((n, i) => ton(t, notenHz(n) * (i % 2 ? 1.003 : 0.997), d, typ, v / noten.length, cut, (i - (noten.length - 1) / 2) * 0.25));
+      const takte = (bpm, fn) => { const s = 60 / bpm / 4, n = Math.ceil(D / (s * 16) - 0.01); for (let b = 0; b < n; b++) fn(b, b * s * 16, s, n); };
+      const pat = (m, t0, s, fn) => { for (let i = 0; i < m.length; i++) if (m[i] !== '.') fn(t0 + i * s, m[i] === 'X' ? 1 : 0.55, i); };
+      const dur = (r, moll) => [r, r + (moll ? 3 : 4), r + 7];
+      if (art === 'drive') takte(96, (b, t0, s) => {   // Synthwave: 4 Takte Am · F · C · G
+        const [r, moll] = [[45, 1], [41, 0], [48, 0], [43, 0]][b % 4], ak = dur(r + 12, moll);
+        pat('X...X...X...X...', t0, s, t => kick(t));
+        pat('....X.......X...', t0, s, t => snare(t, 0.9));
+        pat('..X...X...X...X.', t0, s, t => hat(t, 1.2, true));
+        pat('x.x.x.x.x.x.x.x.', t0, s, t => hat(t, 0.6));
+        pat('X.xxX.xxX.xxX.xx', t0, s, (t, v) => { ton(t, notenHz(r), s * 1.1, 'sawtooth', 0.2 * v, 900); ton(t, notenHz(r + 12), s * 1.1, 'square', 0.1 * v, 1400); });
+        for (let i = 0; i < 16; i++) ton(t0 + i * s, notenHz(ak[i % 3] + 12 + (i % 6 > 2 ? 12 : 0)), s * 1.8, 'square', 0.15, 3200, i % 2 ? 0.45 : -0.45);
+        flaeche(t0, ak, s * 16, 0.5, 1500);
+      });
+      else if (art === 'house') takte(120, (b, t0, s) => {   // House: 5 Takte Cm · As · Es · B · Cm
+        const [r, moll] = [[48, 1], [44, 0], [51, 0], [46, 0], [48, 1]][b % 5], ak = [...dur(r + 12, moll), r + 12 + (moll ? 10 : 11)];
+        pat('X...X...X...X...', t0, s, t => kick(t));
+        pat('....X.......X...', t0, s, t => clap(t));
+        pat('..X...X...X...X.', t0, s, t => hat(t, 1.3, true));
+        pat('x.xxx.xxx.xxx.xx', t0, s, t => hat(t, 0.5));
+        pat('..X..x.X..X..x.X', t0, s, (t, v) => { ton(t, notenHz(r - 12), s * 1.3, 'square', 0.1 * v, 700); ton(t, notenHz(r), s * 1.3, 'sawtooth', 0.14 * v, 1400); });
+        pat('X..X..X...X..X..', t0, s, (t, v) => akkord(t, ak, s * 1.8, 'sawtooth', 0.75 * v, 3000));
+        flaeche(t0, ak.slice(0, 3), s * 16, 0.3, 1600);
+      });
+      else if (art === 'trap') takte(144, (b, t0, s) => {   // Trap (halbes Tempo): tiefer Bass, schnelle Hi-Hats
+        const r = [33, 33, 29, 29, 31, 31][b % 6], zwei = b % 2;
+        pat(zwei ? '..X...X.....X...' : 'X.....X...X.....', t0, s, t => { kick(t, 1, true); ton(t, notenHz(r + 12), 0.55, 'sine', 0.2); ton(t, notenHz(r + 24), 0.45, 'triangle', 0.24); ton(t, notenHz(r + 36), 0.3, 'sawtooth', 0.08, 1200); });
+        if (zwei) pat('X...............', t0, s, t => { snare(t); clap(t, 0.7); });
+        pat(zwei ? 'x.x.x.x.x.x.x...' : 'x.x.x.x.x.x.x.x.', t0, s, t => hat(t, 0.9));
+        if (zwei) for (let k = 0; k < 6; k++) hat(t0 + 13 * s + k * s / 2, 0.5 + k * 0.1);
+        pat(zwei ? 'X.....x...X.....' : 'X..x..X.....x...', t0, s, (t, v, i) => ton(t, notenHz([69, 72, 76, 74, 67][(b * 3 + i) % 5] + 12), 0.7, 'triangle', 0.42 * v, 0, i % 2 ? 0.4 : -0.4));
+        if (!zwei) flaeche(t0, [r + 24, r + 27, r + 31], s * 32, 0.3, 1400);
+      });
+      else if (art === 'kino') {   // Kino: Bordun, Streicher-Ostinato, Trommeln, wird lauter
+        lang(0, notenHz(38), D, 'sawtooth', 0.1, 500); lang(0, notenHz(50), D, 'sawtooth', 0.1, 800);
+        takte(96, (b, t0, s, n) => {
+          const [r, moll] = [[50, 1], [46, 0], [53, 0], [48, 0]][b % 4], laut = 0.6 + 0.4 * b / Math.max(1, n - 1), m = moll ? [0, 0, 3, 0, 7, 0, 3, 2] : [0, 0, 4, 0, 7, 0, 4, 2];
+          for (let i = 0; i < 8; i++) { ton(t0 + i * 2 * s, notenHz(r + m[i]), s * 1.7, 'sawtooth', 0.42 * laut, 2400, -0.3); ton(t0 + i * 2 * s, notenHz(r + m[i] + 12), s * 1.7, 'sawtooth', 0.24 * laut, 3400, 0.3); }
+          pat(b % 2 ? 'X.....x.X.x.X.xx' : 'X.....x.X...x.x.', t0, s, (t, v) => { kick(t, v * laut, true); rsch(t, 0.25, 'lowpass', 300, 0.3 * v * laut); });
+          pat('x.x.x.x.x.x.x.x.', t0, s, t => hat(t, 0.35 * laut));
+          flaeche(t0, dur(r + 12, moll), s * 16, 0.4 * laut, 1800);
+        });
+      } else if (art === 'chill') takte(72, (b, t0, s) => {   // Lo-Fi: 3 Takte Fmaj7 · Em7 · Dm7, weiche Tasten, Knistern
+        const [r, moll] = [[53, 0], [52, 1], [50, 1]][b % 3], ak = [r, r + (moll ? 3 : 4), r + 7, r + (moll ? 10 : 11)];
+        pat('X.....x...X.....', t0, s, (t, v) => kick(t, 0.75 * v));
+        pat('....X.......X...', t0, s, t => { rsch(t, 0.09, 'bandpass', 2600, 0.3, 1.5); ton(t, 320, 0.05, 'triangle', 0.14); });
+        for (let i = 0; i < 8; i++) hat(t0 + i * 2 * s + (i % 2 ? s * 0.28 : 0), 0.55);
+        [0, 6, 10].forEach((i, k) => ak.forEach((n, j) => { ton(t0 + i * s + j * 0.012, notenHz(n + 12), k ? 0.9 : 1.8, 'sine', 0.2, 0, (j - 1.5) * 0.2); ton(t0 + i * s + j * 0.012, notenHz(n + 12), k ? 0.6 : 1.2, 'triangle', 0.14, 2600, (j - 1.5) * 0.2); }));
+        pat('X.........x.X...', t0, s, (t, v) => ton(t, notenHz(r - 12), 0.7, 'triangle', 0.24 * v, 900));
+        for (let k = 0; k < 14; k++) rsch(t0 + S.r() * s * 16, 0.008, 'highpass', 4500, 0.05 + S.r() * 0.05);
+      });
+      else if (art === 'chip') takte(144, (b, t0, s) => {   // 8-Bit: Rechteck-Arpeggios, Rausch-Trommel
+        const [r, moll] = [[60, 0], [55, 0], [57, 1], [53, 0], [60, 0], [55, 0]][b % 6], ar = moll ? [0, 3, 7, 12] : [0, 4, 7, 12];
+        for (let i = 0; i < 16; i++) ton(t0 + i * s, notenHz(r + ar[i % 4] + (i % 8 > 3 ? 12 : 0)), s * 1.1, 'square', 0.11, 0, i % 2 ? 0.3 : -0.3);
+        pat('X.X.X.X.X.X.X.X.', t0, s, (t, v, i) => ton(t, notenHz(r - 12 + (i % 4 === 2 ? 12 : 0)), s * 1.8, 'triangle', 0.3));
+        pat('X...X...X...X...', t0, s, t => { const o = c.createOscillator(), g = c.createGain(); o.type = 'square'; o.frequency.setValueAtTime(220, t); o.frequency.exponentialRampToValueAtTime(50, t + 0.08); env(g, t, 0.001, 0.1, 0.3); o.connect(g); raus(g); o.start(t); o.stop(t + 0.15); });
+        pat('....X.......X..x', t0, s, (t, v) => rsch(t, 0.07, 'highpass', 3000, 0.3 * v));
+        pat(b % 2 ? 'X..X..X.X...X...' : 'X...X..X..X.X.X.', t0, s, (t, v, i) => ton(t, notenHz(r + 24 + ar[(i * 5 + b) % 4]), s * 2.6, 'square', 0.14));
+      });
+      const buf = await c.startRendering();
+      let summe = 0, spitze = 0;
+      for (let k = 0; k < 2; k++) { const d = buf.getChannelData(k); for (let i = 0; i < d.length; i++) { const v = Math.abs(d[i]); if (v > spitze) spitze = v; summe += v * v; } }
+      const rms = Math.sqrt(summe / (buf.length * 2)) || 1e-6, fak = Math.min(0.55 / (spitze || 1), 0.1 / rms), ein = TON_RATE * 0.02, aus = TON_RATE * 0.25;
+      return [0, 1].map(k => { const d = buf.getChannelData(k), o = new Float32Array(d.length), n = d.length; for (let i = 0; i < n; i++) o[i] = d[i] * fak * Math.min(1, i / ein, (n - i) / aus); return o; });
+    })());
+    return TR_MUSIK_CACHE.get(mk);
+  }
+
+  async function trailerTon(art, opt) {   // Effekt-Töne (Schläge an den Schnitten, Zischer davor, je Vorlage ein eigener Anfang) + auf Wunsch Musik
+    const ton = opt || tonStandard(), mitMusik = !!ton.musik && ton.musik !== 'ohne';
+    const ctx = new OfflineAudioContext(2, TON_RATE * TRAILER_T, TON_RATE), komp = ctx.createDynamicsCompressor(), ziel = ctx.createGain(); komp.connect(ctx.destination);
+    ziel.gain.value = ton.effekte === false ? 0 : mitMusik ? 0.7 : 1; ziel.connect(komp);   // mit Musik die Effekte etwas leiser, damit nichts übersteuert
+    if (mitMusik) { const [li, re] = await trMusik(ton.musik, TRAILER_T), b = ctx.createBuffer(2, li.length, TON_RATE), q = ctx.createBufferSource(); b.copyToChannel(li, 0); b.copyToChannel(re, 1); const mg = ctx.createGain(); mg.gain.value = 0.85; q.buffer = b; q.connect(mg); mg.connect(ctx.destination); q.start(0); }
     const rausch = (t, d, typ, f0, f1, v) => { const n = ctx.createBufferSource(), fl = ctx.createBiquadFilter(), gg = ctx.createGain(); n.buffer = rauschen(ctx); n.loop = true; fl.type = typ; fl.frequency.setValueAtTime(f0, t); fl.frequency.exponentialRampToValueAtTime(f1, t + d);
       gg.gain.setValueAtTime(0.0001, t); gg.gain.linearRampToValueAtTime(v, t + d * 0.85); gg.gain.linearRampToValueAtTime(0.0001, t + d); n.connect(fl); fl.connect(gg); gg.connect(ziel); n.start(t); n.stop(t + d + 0.05); };
     const schlag = (t, v) => { const o = ctx.createOscillator(), gg = ctx.createGain(); o.frequency.setValueAtTime(160, t); o.frequency.exponentialRampToValueAtTime(42, t + 0.22); gg.gain.setValueAtTime(0.0001, t); gg.gain.linearRampToValueAtTime(v, t + 0.008); gg.gain.exponentialRampToValueAtTime(0.0001, t + 0.55); o.connect(gg); gg.connect(ziel); o.start(t); o.stop(t + 0.6);
@@ -1856,7 +1947,7 @@
     await enc.flush(); enc.close();
     if (fehler) throw fehler;
     if (acfg) {
-      const ton = await trailerTon(x.art), aenc = new AudioEncoder({ output: (ch, md) => muxer.addAudioChunk(ch, md), error: e => { fehler = e; } });
+      const ton = await trailerTon(x.art, x.ton), aenc = new AudioEncoder({ output: (ch, md) => muxer.addAudioChunk(ch, md), error: e => { fehler = e; } });
       aenc.configure(acfg);
       const N = ton.length, li = ton.getChannelData(0), re = ton.getChannelData(1), BL = 4800;
       for (let i = 0; i < N; i += BL) {
@@ -2094,25 +2185,54 @@
       for (const k of await merkTx('q', 'readonly', o => o.getAllKeys())) if (!brauch.has(k)) await merkTx('q', 'readwrite', o => o.delete(k));
     } catch (e) { /* egal */ }
   }
-  const nachOben = () => { try { (BOX.querySelector(CLIPS.length ? '.kc-drop' : '.kc-bearb') || BOX).scrollIntoView({ behavior: 'smooth', block: 'start' }); } catch (e) { /* egal */ } };   // zum Editor bzw. zum Hinweis
+  let CLIP_ED = null;   // geplanter Clip im Schnell-Editor: { id, titel, text, postMs, insta, tiktok, youtube, gemerkt }
+  function clipEdHtml() {
+    const E = CLIP_ED, x = E && (stand().clips || []).find(y => y.id === E.id); if (!x) return '';
+    const v = autoV(x) || karV(x.vorlage) || VORLAGEN.find(y => y.id === x.vorlage) || VORLAGEN[0], tk = stand().tiktok || {}, yt = stand().youtube || {};
+    const haken = (k, name, geht) => `<label class="kc-check${geht ? '' : ' aus'}"><input type="checkbox" data-ce="${k}" ${E[k] && geht ? 'checked' : ''} ${geht ? '' : 'disabled'}> <span><b>${name}</b></span></label>`;
+    return `<div class="kc-ae kc-ce"><div class="kc-ae-kopf">✏️ ${v.emoji} ${esc(v.name)} bearbeiten</div>
+      <div class="kc-ae-innen">${x.video ? `<video class="kc-ae-vorschau" src="${esc(x.video)}" controls playsinline preload="metadata" ${x.bild ? `poster="${esc(x.bild)}"` : ''}></video>` : x.bild ? `<img class="kc-ae-vorschau" src="${esc(x.bild)}" alt="">` : ''}
+      <div class="kc-ae-felder">
+        <label class="kc-feld">Titel<input type="text" maxlength="80" value="${esc(E.titel)}" data-ce="titel"></label>
+        <label class="kc-feld">Text unter dem Post<textarea rows="5" maxlength="2200" data-ce="text">${esc(E.text)}</textarea></label>
+        <div class="kc-felder"><label class="kc-feld">Geht raus am<input type="datetime-local" value="${esc(lokal(E.postMs))}" data-ce="postMs"></label>
+          ${x.kar ? '<span class="kc-dim">Karussell: geht nur zu Instagram.</span>' : `<div class="kc-ziele">${haken('insta', 'Instagram', true)}${haken('tiktok', 'TikTok', !!tk.verbunden)}${haken('youtube', 'YouTube', !!yt.verbunden)}</div>`}</div>
+        <div class="kc-knoepfe"><button type="button" class="btn ki-k kc-frei" data-c="ce-speichern">✓ Speichern</button><button type="button" class="btn ki-k" data-c="ce-ab">Abbrechen</button></div>
+        ${x.kar ? '' : '<div class="kc-hinweis kc-bearb">🎬 Auch das Video ändern (Vorlage, Spruch, Schnitt)? Zieh die Videodatei unten bei „Clip hier reinziehen“ rein. Sie öffnet sich im großen Editor und ersetzt diesen Post.</div>'}
+      </div></div></div>`;
+  }
+  function clipEdEingabe(t) { const E = CLIP_ED, k = t.dataset.ce; if (!E) return; if (k === 'insta' || k === 'tiktok' || k === 'youtube') E[k] = t.checked; else if (k === 'postMs') { const ms = new Date(t.value).getTime(); if (isFinite(ms)) E.postMs = ms; } else E[k] = t.value; }
+  async function clipEdSpeichern() {
+    const E = CLIP_ED; if (!E) return;
+    const x = (stand().clips || []).find(y => y.id === E.id);
+    if (x && !x.kar && !E.insta && !E.tiktok && !E.youtube) return UMG.meldung('Bitte Instagram, TikTok oder YouTube anhaken.', 1);
+    if (!(E.postMs > Date.now())) return UMG.meldung('Die Zeit liegt in der Vergangenheit. Bitte „Geht raus am“ ändern.', 1);
+    try {
+      await UMG.igApi('POST', `/api/clip/${E.id}/aendern`, { titel: String(E.titel || '').slice(0, 80), text: E.text, postMs: E.postMs, ...(x && x.kar ? {} : { insta: E.insta, tiktok: E.tiktok, youtube: E.youtube }) });
+      CLIP_ED = null; BEARBEITE = null; UMG.meldung(`Gespeichert: ${zeit(E.postMs)}`); await UMG.laden();
+    } catch (e) { UMG.meldung(e.message || String(e), 1); }
+  }
+  const nachOben = () => { try { (BOX.querySelector(CLIP_ED ? '.kc-ce' : CLIPS.length ? '.kc-drop' : '.kc-bearb') || BOX).scrollIntoView({ behavior: 'smooth', block: 'start' }); } catch (e) { /* egal */ } };   // zum Editor bzw. zum Hinweis
   async function bearbeiten(id) {
     const x = (stand().clips || []).find(y => y.id === id); if (!x || ARBEIT) return;
     if (CLIPS.some(c => c.ersetzt === id)) { zeichnen(); nachOben(); return UMG.meldung('Dieser Post ist schon im Editor.'); }
     let r = null; const dateien = [];
-    try { r = await merkTx('c', 'readonly', o => o.get(id)); for (const k of (r && r.quellen) || []) dateien.push(await merkTx('q', 'readonly', o => o.get(k))); } catch (e) { r = null; }
+    if (!x.kar) { try { r = await merkTx('c', 'readonly', o => o.get(id)); for (const k of (r && r.quellen) || []) dateien.push(await merkTx('q', 'readonly', o => o.get(k))); } catch (e) { r = null; } }
     if (r && dateien.length && dateien.every(Boolean)) {   // auf diesem Gerät gemerkt: gleich mit allen Einstellungen öffnen
       const e = r.einst, urls = {}, urlVon = i => (urls[r.quellen[i]] = urls[r.quellen[i]] || URL.createObjectURL(dateien[i]));
       const c = { ...e, id: Math.random().toString(36).slice(2), datei: dateien[0], url: urlVon(0), ersetzt: id, postMs: x.postMs, insta: x.insta, tiktok: x.tiktok, youtube: x.youtube };
       if (e.extra) c.extra = e.extra.map((q, i) => ({ ...q, datei: dateien[i + 1] || dateien[0], url: urlVon(dateien[i + 1] ? i + 1 : 0) }));
-      BEARBEITE = null; CLIPS.unshift(c); zeichnen(); nachOben();
+      BEARBEITE = null; CLIP_ED = null; CLIPS.unshift(c); zeichnen(); nachOben();
       UMG.meldung('Im Editor geöffnet. Ändern und neu einplanen, dann wird der alte Post ersetzt.');
     } else {   // nicht gemerkt (anderes Gerät oder älterer Post): Datei nochmal reinziehen, dann wie ein neuer Clip
-      BEARBEITE = { id, postMs: x.postMs, insta: x.insta, tiktok: x.tiktok, youtube: x.youtube, vorlage: x.vorlage, titel: x.titel || '' };
-      zeichnen(); nachOben(); UMG.meldung('Zieh die Videodatei nochmal rein. Dann öffnet sie sich im Editor und ersetzt den geplanten Post.');
+      // Titel, Text, Zeit und Ziele gehen sofort (Schnell-Editor). Fürs Video selbst die Datei nochmal reinziehen.
+      BEARBEITE = x.kar ? null : { id, postMs: x.postMs, insta: x.insta, tiktok: x.tiktok, youtube: x.youtube, vorlage: x.vorlage, titel: x.titel || '' };
+      CLIP_ED = { id, titel: x.titel || '', text: x.text || '', postMs: x.postMs, insta: !!x.insta, tiktok: !!x.tiktok, youtube: !!x.youtube };
+      zeichnen(); nachOben();
     }
   }
   function bearbeiteAnwenden(c) {   // die reingezogene Datei gehört zum geplanten Post, der bearbeitet wird
-    const w = BEARBEITE; BEARBEITE = null; if (!w) return;
+    const w = BEARBEITE; BEARBEITE = null; CLIP_ED = null; if (!w) return;
     if (VORLAGEN.some(v => v.id === w.vorlage)) vorlageSetzen(c, w.vorlage);
     Object.assign(c, { ersetzt: w.id, postMs: w.postMs, insta: w.insta, tiktok: w.tiktok, youtube: w.youtube });
   }
@@ -2122,12 +2242,24 @@
 
   // ═══ ✏️ Automatisches bearbeiten (NEU 21.11.2026): Trailer und Vorschläge wie einen eigenen Post ändern ═══
   // Vorlage, Farbe, Wörter, Text, Zeit und Ziele. Sieht es danach anders aus, wird das Video neu gebaut und ersetzt das alte.
+  let AE_TON = null;   // läuft gerade „▶ Anhören“?
+  function autoEdStill() { if (AE_TON) { try { AE_TON.q.onended = null; AE_TON.q.stop(); AE_TON.ac.close(); } catch (e) { /* egal */ } AE_TON = null; } }
+  async function autoEdHoeren() {   // Ton des Trailers vorspielen (Vorschau fängt dazu von vorn an)
+    if (AE_TON) { autoEdStill(); return zeichnen(); }
+    const E = AUTO_ED; if (!E) return;
+    try {
+      const buf = await trailerTon(E.art, E.ton), ac = new (window.AudioContext || window.webkitAudioContext)(), q = ac.createBufferSource();
+      q.buffer = buf; q.connect(ac.destination); q.start(); AE_TON = { ac, q };
+      q.onended = () => { if (AE_TON && AE_TON.q === q) { AE_TON = null; try { ac.close(); } catch (e) { /* egal */ } zeichnen(); } };
+      zeichnen(); autoEdLauf();
+    } catch (e) { UMG.meldung('Der Ton ließ sich nicht abspielen.', 1); }
+  }
   let AUTO_ED = null, AE_LAUF = 0, OEFFNE = '';   // OEFFNE = Clip, der gleich nach dem Wechsel in den Reiter „🎬 Clips“ zum Bearbeiten aufgehen soll
   function oeffneJetzt() {
     const id = OEFFNE; OEFFNE = ''; if (!id || !BOX) return;
     const x = (stand().clips || []).find(y => y.id === id); if (!x) return;
     if (x.gepostet || x.tt || x.yt) { const z = BOX.querySelector(`.kc-post[data-id="${id}"]`); if (z) { const d = z.closest('details'); if (d) d.open = true; z.scrollIntoView({ behavior: 'smooth', block: 'center' }); } return; }   // schon draußen: nur hinspringen
-    if (x.auto) autoEdAuf(id); else if (!x.kar) bearbeiten(id);
+    if (x.auto) autoEdAuf(id); else bearbeiten(id);
   }
   const AE_NAME = { trailer: '🔴 Stream-Trailer', morgen: '🔴 Morgen live', verpasst: '▶ Stream verpasst?', woche: '📅 Wochenvorschau', top5: '🏆 Top der Woche' };
   function autoX(typ, s, st, postMs) {   // Wörter und Zahlen fürs Bild, frisch aus dem Streamkalender
@@ -2159,12 +2291,12 @@
       const q = String(c.quelle || ''), mt = TR_MUSTER.exec(c.vorlage || '');
       const typ = (e && e.typ) || (c.trailer ? 'trailer' : /^morgen:/.test(q) ? 'morgen' : /^verpasst:/.test(q) ? 'verpasst' : /^woche:/.test(q) ? 'woche' : c.vorlage === 'kartop5' ? 'top5' : '');
       const rk = c.trailer || q.split(':').slice(1).join(':'), s = [...(st.streams || []), ...(st.streamsAlt || [])].find(y => y.rennKey === rk) || null;
-      E = { id, typ, art: e ? e.art : (mt && mt[1]) || 'heute', fi: e ? e.fi : mt ? Number(mt[2] || 0) % TR_FARBEN.length : 0, x: e ? e.x : typ ? autoX(typ, s, st, c.postMs) : null, hgUrl: e ? e.hgUrl : (s && s.hg) || '', hgAn: e ? e.hgAn : undefined,
+      E = { id, typ, art: e ? e.art : (mt && mt[1]) || 'heute', fi: e ? e.fi : mt ? Number(mt[2] || 0) % TR_FARBEN.length : 0, x: e ? e.x : typ ? autoX(typ, s, st, c.postMs) : null, hgUrl: e ? e.hgUrl : (s && s.hg) || '', hgAn: e ? e.hgAn : undefined, ton: e && e.ton ? e.ton : tonStandard(),
         titel: c.titel || '', text: c.text || '', postMs: c.postMs, insta: !!c.insta, tiktok: !!c.tiktok, youtube: !!c.youtube, trailer: c.trailer || '', trailerLive: c.trailerLive || 0, quelle: q };
     } else {
       const e = lueckenPlan(st, Date.now()).find(y => y.tag === tag), v = e && e.vorschlag; if (!v) return;
       const s = v.s || null, x = autoX(v.art, s, st, e.ms), w = trailerWahl(st.clips, v.q, !!(s && s.hg), []);
-      if (x) E = { id: '', typ: v.art, art: v.art === 'morgen' ? w.art.id : 'heute', fi: w.fi, x, hgUrl: (s && s.hg) || '', ...autoTexte(v.art, x, s, v.top ? v.top.liste.length : 0), postMs: e.ms,
+      if (x) E = { id: '', typ: v.art, art: v.art === 'morgen' ? w.art.id : 'heute', fi: w.fi, x, ton: tonStandard(), hgUrl: (s && s.hg) || '', ...autoTexte(v.art, x, s, v.top ? v.top.liste.length : 0), postMs: e.ms,
         insta: true, tiktok: v.art !== 'top5' && !!(st.tiktok && st.tiktok.verbunden), youtube: v.art !== 'top5' && !!(st.youtube && st.youtube.verbunden), trailer: '', trailerLive: 0, quelle: v.q };
     }
     if (!E || !E.typ || !E.x) return UMG.meldung('Dieser Post lässt sich hier nicht bearbeiten (der Stream steht nicht mehr im Kalender).', 1);
@@ -2174,7 +2306,7 @@
     if (!E.hg && E.art === 'plakat') E.art = 'heute';
     if (E.typ === 'top5') { const t = top5Liste(st.clips, Date.now()); for (const y of t.liste) { try { y.bild = y.bildUrl ? await bild(y.bildUrl) : null; } catch (err) { y.bild = null; } } E.topListe = t.liste; E.topWas = t.was;
       if (t.liste.length < 3) return UMG.meldung('Für die Top der Woche braucht es mindestens 3 gepostete Clips mit Zahlen.', 1); }
-    E.name = AE_NAME[E.typ] || 'Post'; E.sicht0 = JSON.stringify([E.art, E.fi, E.x, E.hgAn]);
+    E.name = AE_NAME[E.typ] || 'Post'; E.sicht0 = JSON.stringify([E.art, E.fi, E.x, E.hgAn, E.ton]);
     AUTO_ED = E; zeichnen(); autoEdLauf();
     try { BOX.querySelector('.kc-ae').scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch (err) { /* egal */ }
   }
@@ -2194,7 +2326,8 @@
   }
   function autoEdEingabe(t) {   // Tippen ändert nur die Werte, die Vorschau zieht von selbst nach (kein Neuzeichnen, sonst springt der Cursor)
     const E = AUTO_ED, k = t.dataset.ae; if (!E) return;
-    if (k === 'hgAn' || k === 'insta' || k === 'tiktok' || k === 'youtube') E[k] = t.checked;
+    if (k === 'effekte') { E.ton.effekte = t.checked; autoEdStill(); }
+    else if (k === 'hgAn' || k === 'insta' || k === 'tiktok' || k === 'youtube') E[k] = t.checked;
     else if (k === 'titel' || k === 'text') E[k] = t.value;
     else if (k === 'postMs') { const ms = new Date(t.value).getTime(); if (isFinite(ms)) E.postMs = ms; }
     else if (k === 'liste') E.x.liste = t.value.split('\n').map(z => z.split('|').map(y => y.trim())).filter(z => z.some(Boolean)).slice(0, 5).map(z => ({ tag: GROSS(z[0] || ''), zeit: GROSS(z[1] || ''), serie: GROSS(z[2] || '') }));
@@ -2208,6 +2341,8 @@
       <div class="kc-ae-felder">
         ${E.typ === 'trailer' || E.typ === 'morgen' ? `<div class="kc-ae-zeile"><span>Vorlage</span>${TR_ARTEN.filter(a => !a.bild || (E.hg && E.hgAn)).map(a => `<button type="button" class="kc-ae-chip${a.id === E.art ? ' an' : ''}" data-c="ae-art" data-wert="${a.id}">${esc(a.name)}</button>`).join('')}</div>` : ''}
         <div class="kc-ae-zeile"><span>Farbe</span>${TR_FARBEN.map((f, i) => `<button type="button" class="kc-ae-farbe${i === E.fi ? ' an' : ''}" style="--f:${f}" data-c="ae-farbe" data-wert="${i}" title="Farbe ${i + 1}"></button>`).join('')}</div>
+        ${video ? `<div class="kc-ae-zeile"><span>Ton</span><label class="kc-check"><input type="checkbox" data-ae="effekte" ${E.ton.effekte !== false ? 'checked' : ''}> <span><b>🔊 Effekt-Töne</b></span></label><button type="button" class="kc-ae-chip" data-c="ae-hoeren">${AE_TON ? '⏹ Stopp' : '▶ Anhören'}</button></div>
+        <div class="kc-ae-zeile"><span>Musik</span>${TR_MUSIK.map(y => `<button type="button" class="kc-ae-chip${y[0] === (E.ton.musik || 'ohne') ? ' an' : ''}" data-c="ae-musik" data-wert="${y[0]}">🎵 ${y[1]}</button>`).join('')}</div>` : ''}
         ${video && !woche ? `<div class="kc-felder">${feld('wort', 'Wort groß', E.x.wort)}${feld('tz', 'Zeile klein', E.x.tz)}${feld('serie', 'Serie', E.x.serie)}${feld('track', 'Strecke', E.x.track)}${E.x.modus === 'verpasst' ? '' : feld('zeit', 'Uhrzeit', E.x.zeit) + feld('wann', 'Tag', E.x.wann)}</div>` : ''}
         ${woche ? `<label class="kc-feld">Streams – eine Zeile pro Stream: Tag | Uhrzeit | Serie<textarea rows="5" data-ae="liste">${esc(E.x.liste.map(z => [z.tag, z.zeit, z.serie].join(' | ')).join('\n'))}</textarea></label>` : ''}
         ${video && E.hg ? `<label class="kc-check"><input type="checkbox" data-ae="hgAn" data-c="ae-neu" ${E.hgAn ? 'checked' : ''}> <span><b>Bild vom Rennen zeigen</b></span></label>` : ''}
@@ -2223,8 +2358,9 @@
     const st = stand(), video = E.typ !== 'top5';
     if (video && !E.insta && !E.tiktok && !E.youtube) return UMG.meldung('Bitte YouTube, Instagram oder TikTok anhaken.', 1);
     if (!(E.postMs > Date.now())) return UMG.meldung('Die Zeit liegt in der Vergangenheit. Bitte „Geht raus am“ ändern.', 1);
-    const nurText = !!E.id && JSON.stringify([E.art, E.fi, E.x, E.hgAn]) === E.sicht0;   // Bild bleibt gleich: nur Text, Zeit und Ziele speichern
-    const kopf = { titel: String(E.titel || '').slice(0, 80), text: E.text, postMs: E.postMs, frei: true, aus: false, einst: JSON.stringify({ typ: E.typ, art: E.art, fi: E.fi, x: E.x, hgUrl: E.hgUrl, hgAn: E.hgAn }),
+    autoEdStill();
+    const nurText = !!E.id && JSON.stringify([E.art, E.fi, E.x, E.hgAn, E.ton]) === E.sicht0;   // Bild bleibt gleich: nur Text, Zeit und Ziele speichern
+    const kopf = { titel: String(E.titel || '').slice(0, 80), text: E.text, postMs: E.postMs, frei: true, aus: false, einst: JSON.stringify({ typ: E.typ, art: E.art, fi: E.fi, x: E.x, hgUrl: E.hgUrl, hgAn: E.hgAn, ton: E.ton }),
       ...(video ? { insta: E.insta, tiktok: E.tiktok, youtube: E.youtube } : {}) };
     KAR_LAEUFT = true;
     try {
@@ -2233,7 +2369,8 @@
         const m = MAT || await material();
         if (!video) { arbeit('🏆 Karussell wird gebaut …'); await karHochladen(top5Seiten(m, E.topListe, E.topWas, TR_FARBEN[E.fi], (st.streams || [])[0] || null), { ...kopf, vorlage: 'kartop5', auto: true, quelle: E.quelle }); }
         else {
-          const x = { ...E.x, art: E.art, farbe: TR_FARBEN[E.fi] }, hg = E.hgAn ? E.hg : null, thumb = E.typ === 'trailer' || E.typ === 'morgen' ? (TR_ARTEN.find(a => a.id === E.art) || TR_ARTEN[0]).thumb : 3.4;
+          try { localStorage.setItem('k888_trailer_ton', JSON.stringify(E.ton)); } catch (err) { /* egal */ }   // gilt ab jetzt auch für neue Trailer
+          const x = { ...E.x, art: E.art, farbe: TR_FARBEN[E.fi], ton: E.ton }, hg = E.hgAn ? E.hg : null, thumb = E.typ === 'trailer' || E.typ === 'morgen' ? (TR_ARTEN.find(a => a.id === E.art) || TR_ARTEN[0]).thumb : 3.4;
           arbeit('🎬 Video wird gebaut …');
           const blob = await trailerBauen(x, m, hg, q => arbeit(`🎬 Video wird gebaut … ${Math.round(q * 100)} %`));
           arbeit('⬆ Hochladen …');
@@ -3110,7 +3247,8 @@
         <div class="kc-dim">Tipp für Reichweite: 2 bis 3 Wochen lang jeden Tag einen Clip, immer zur gleichen Uhrzeit.</div></details>
       ${ARBEIT ? `<div class="kc-arbeit"><span class="kc-spin"></span>${esc(ARBEIT)}</div>` : ''}
       ${c && c.ersetzt ? '<div class="kc-hinweis kc-bearb">✏️ Du bearbeitest einen geplanten Post. Beim Einplanen wird der alte ersetzt. Mit „✕ Clip entfernen“ brichst du ab, der alte bleibt dann.</div>' : ''}
-      ${BEARBEITE ? `<div class="kc-hinweis kc-bearb">✏️ Zieh jetzt die Videodatei für „${esc(BEARBEITE.titel || 'den geplanten Post')}“ rein. Sie öffnet sich im Editor und ersetzt den geplanten Post. <button type="button" class="btn ki-k" data-c="bearbeiten-ab">Abbrechen</button></div>` : ''}
+      ${clipEdHtml()}
+      ${BEARBEITE && !CLIP_ED ? `<div class="kc-hinweis kc-bearb">✏️ Zieh jetzt die Videodatei für „${esc(BEARBEITE.titel || 'den geplanten Post')}“ rein. Sie öffnet sich im Editor und ersetzt den geplanten Post. <button type="button" class="btn ki-k" data-c="bearbeiten-ab">Abbrechen</button></div>` : ''}
       ${automatikHtml(liste, cfg)}
       <label class="kc-drop${c ? ' klein' : ''}" data-c="drop"><input type="file" accept="video/*" multiple data-c="datei">
         <span class="kc-drop-gross">🎬 ${c ? 'Weitere Clips reinziehen' : 'Clip hier reinziehen'}</span><span class="kc-dim">oder antippen und auswählen · MP4 aus dem Kreids Clipper</span></label>
@@ -3278,7 +3416,7 @@
           ${x.yt && x.yt.link ? `<a class="btn ki-k" href="${esc(x.yt.link)}" target="_blank" rel="noopener">↗ Auf YouTube</a>` : ''}
           ${!raus ? `<button type="button" class="btn ki-k" data-c="jetzt">🚀 Jetzt posten</button>
             <input type="datetime-local" value="${esc(lokal(x.postMs))}" data-c="zeitwert"><button type="button" class="btn ki-k" data-c="zeit">🕒 Zeit</button>` : ''}
-          ${!raus && !x.kar && !trailerV(x.vorlage) && !(x.gepostet || x.tt || x.yt) ? '<button type="button" class="btn ki-k" data-c="bearbeiten" title="Öffnet den Clip wieder im Editor. Beim Einplanen wird dieser Post ersetzt.">✏️ Bearbeiten</button>' : ''}
+          ${!raus && !(x.gepostet || x.tt || x.yt) ? '<button type="button" class="btn ki-k" data-c="bearbeiten" title="Titel, Text, Zeit und Ziele ändern. Mit der Videodatei auch das Video selbst.">✏️ Bearbeiten</button>' : ''}
           ${x.video ? `<a class="btn ki-k" href="${esc(x.video)}" download>📥 Video</a>` : ''}
           <button type="button" class="btn ki-k" data-c="loeschen">🗑</button>
         </div>
@@ -3516,7 +3654,9 @@
     if (a === 'ae-art' && AUTO_ED) { AUTO_ED.art = b.dataset.wert; zeichnen(); return; }
     if (a === 'ae-farbe' && AUTO_ED) { AUTO_ED.fi = Number(b.dataset.wert) || 0; zeichnen(); return; }
     if (a === 'ae-speichern') { autoEdSpeichern(); return; }
-    if (a === 'ae-ab') { AUTO_ED = null; cancelAnimationFrame(AE_LAUF); zeichnen(); return; }
+    if (a === 'ae-musik' && AUTO_ED) { AUTO_ED.ton.musik = b.dataset.wert; autoEdStill(); zeichnen(); return; }
+    if (a === 'ae-hoeren') { autoEdHoeren(); return; }
+    if (a === 'ae-ab') { autoEdStill(); AUTO_ED = null; cancelAnimationFrame(AE_LAUF); zeichnen(); return; }
     if (a === 'ae-neu') return;   // Haken im Editor: regelt „aenderung“
     if (a === 'luecke-nein') { const e = lueckenPlan(stand(), Date.now()).find(y => y.tag === b.dataset.tag); if (e && e.vorschlag) { try { localStorage.setItem(NEIN_KEY, JSON.stringify([...neinListe().slice(-40), e.vorschlag.q])); } catch (err) { /* egal */ } } zeichnen(); return; }
     if (a === 'cfg-speichern') {
@@ -3524,6 +3664,8 @@
       return;
     }
     if (a === 'bearbeiten-ab') { BEARBEITE = null; zeichnen(); return; }
+    if (a === 'ce-speichern') { clipEdSpeichern(); return; }
+    if (a === 'ce-ab') { CLIP_ED = null; BEARBEITE = null; zeichnen(); return; }
     if (!id) return;
     try {
       if (a === 'bearbeiten') { await bearbeiten(id); return; }
@@ -3550,6 +3692,7 @@
     if (p.sektoren) { const el = BOX.querySelector('.kc-marke .kc-fuell'); if (el) el.textContent = zeitText(p.sektoren[p.sektoren.length - 1].zeit); }
   }
   function eingabe(ev) {
+    if (ev.target && ev.target.dataset && ev.target.dataset.ce && BOX.contains(ev.target)) { clipEdEingabe(ev.target); return; }   // ✏️ Schnell-Editor für geplante Clips
     if (ev.target && ev.target.dataset && ev.target.dataset.ae && BOX.contains(ev.target)) { autoEdEingabe(ev.target); return; }   // ✏️ Editor für Automatisches
     const t = ev.target, c = CLIPS[0]; if (!c || !t.dataset || !BOX.contains(t)) return;
     const a = t.dataset.c;
@@ -3594,6 +3737,7 @@
     }
   }
   function aenderung(ev) {
+    if (ev.target && ev.target.dataset && ev.target.dataset.ce && BOX.contains(ev.target)) { clipEdEingabe(ev.target); return; }
     if (ev.target && ev.target.dataset && ev.target.dataset.ae && BOX.contains(ev.target)) { autoEdEingabe(ev.target); if (ev.target.dataset.ae === 'hgAn') { if (AUTO_ED && !AUTO_ED.hgAn && AUTO_ED.art === 'plakat') AUTO_ED.art = 'heute'; zeichnen(); } return; }
     const t = ev.target, c = CLIPS[0]; if (!t.dataset || !BOX.contains(t)) return;
     const a = t.dataset.c;
@@ -3815,6 +3959,7 @@
 .kc-app .kc-ae-kopf{font-weight:800;font-size:16px;color:#fff;margin-bottom:10px}
 .kc-app .kc-ae-innen{display:flex;gap:16px;flex-wrap:wrap;align-items:flex-start}
 .kc-app .kc-ae-vorschau{flex:0 0 auto;width:216px;height:auto;background:#000;border:1px solid #2a2f36}
+.kc-app .kc-ce{border-color:rgba(255,45,111,.65);box-shadow:0 0 18px rgba(255,45,111,.14)}
 .kc-app .kc-ae-felder{flex:1 1 320px;min-width:0;display:flex;flex-direction:column;gap:10px}
 .kc-app .kc-ae-zeile{display:flex;flex-wrap:wrap;gap:6px;align-items:center}.kc-app .kc-ae-zeile>span{flex:0 0 62px;font-size:13px;color:#9aa3ad}
 .kc-app .kc-ae-chip{font:inherit;font-size:13px;font-weight:700;padding:5px 10px;background:#161a20;color:#fff;border:1px solid #3a4048;cursor:pointer}
