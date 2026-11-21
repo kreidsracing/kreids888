@@ -2082,7 +2082,7 @@
     const raus = c => Math.max((c.gepostet && c.gepostet.zeit) || 0, (c.yt && c.yt.zeit) || 0);
     const alle = (clips || []).filter(c => !/^(trailer|kar)/.test(c.vorlage || '') && raus(c) > jetzt - 7 * 86400000 && c.zahlen).map(c => ({ c, ...clipWert(c) }));
     const was = alle.some(x => x.aufrufe > 0) ? 'aufrufe' : 'likes';
-    return { was: was === 'aufrufe' ? 'AUFRUFE' : 'LIKES', liste: alle.filter(x => x[was] > 0).sort((a, b) => b[was] - a[was]).slice(0, 5).map(x => ({ titel: GROSS(String(x.c.titel || 'Clip').replace(/\s*#\S+/g, '').trim() || 'Clip'), wert: x[was], bildUrl: x.c.bild || '' })) };
+    return { was: was === 'aufrufe' ? 'AUFRUFE' : 'LIKES', liste: alle.filter(x => x[was] > 0).sort((a, b) => b[was] - a[was]).slice(0, 5).map(x => ({ id: x.c.id, titel: GROSS(String(x.c.titel || 'Clip').replace(/\s*#\S+/g, '').trim() || 'Clip'), wert: x[was], bildUrl: x.c.bild || '' })) };
   }
   let KAR_LAEUFT = false;
   // ═══ 📅 Lücken füllen (NEU 20.11.2026): lieber jeden Tag ein Post als mehrere an einem Tag ═══
@@ -2091,7 +2091,9 @@
   const tagVon = ms => new Date(ms).toLocaleDateString('sv-SE', { timeZone: 'Europe/Berlin' });   // 2026-11-20
   const NEIN_KEY = 'k888_vorschlag_nein', neinListe = () => { try { return JSON.parse(localStorage.getItem(NEIN_KEY) || '[]'); } catch (e) { return []; } };
   const autoV = x => {   // Name und Zeichen eines automatischen Posts (auch für die Wochenansicht)
-    const q = String((x && x.quelle) || ''), b = x && (trailerV(x.vorlage) || karV(x.vorlage)); if (!b) return null;
+    const q = String((x && x.quelle) || '');
+    if (x && x.vorlage === 'top3' && /^top5:/.test(q)) return VORLAGEN.find(y => y.id === 'top3');   // 🏆 Top 3 der Woche als Video
+    const b = x && (trailerV(x.vorlage) || karV(x.vorlage)); if (!b) return null;
     return /^verpasst:/.test(q) ? { ...b, emoji: '▶', name: 'Stream verpasst?' } : /^morgen:/.test(q) ? { ...b, emoji: '🔴', name: 'Morgen live' } : /^woche:/.test(q) ? { ...b, emoji: '📅', name: 'Wochenvorschau' } : b;
   };
   function lueckenPlan(st, jetzt) {   // → 7 Tage: { tag, n (Posts an dem Tag), ms (Post-Zeit für einen Vorschlag), vorschlag }
@@ -2111,9 +2113,9 @@
         const gestern = alt.find(s => tagVon(s.liveMs) === tagVon(mitte - 86400000)), morgen = streams.find(s => tagVon(s.liveMs) === tagVon(mitte + 86400000)), woche = streams.filter(s => s.liveMs > ms && s.liveMs < ms + 7 * 86400000);
         e.vorschlag = [gestern && { art: 'verpasst', q: 'verpasst:' + gestern.rennKey, s: gestern, text: `▶ „Stream verpasst?“ · ${gestern.serie || gestern.titel}` },
           morgen && { art: 'morgen', q: 'morgen:' + morgen.rennKey, s: morgen, text: `🔴 „Morgen live“ · ${morgen.serie || morgen.titel}` },
-          topFrei && { art: 'top5', q: 'top5:' + tag, top, text: `🏆 Top ${top.liste.length} der Woche` },
+          topFrei && (top.liste.slice(0, 3).every(y => MERK_IDS.has(y.id)) ? { art: 'top3v', q: 'top5:' + tag, top, text: '🏆 Top 3 der Woche (Video)' } : { art: 'top5', q: 'top5:' + tag, top, text: `🏆 Top ${top.liste.length} der Woche` }),
           wocheFrei && woche.length >= 2 && { art: 'woche', q: 'woche:' + tag, liste: woche, text: `📅 Wochenvorschau · ${woche.length} Streams` }].filter(k => k && !nein.has(k.q) && !benutzt.has(k.q))[0] || null;
-        if (e.vorschlag && e.vorschlag.art === 'top5') topFrei = false;
+        if (e.vorschlag && (e.vorschlag.art === 'top5' || e.vorschlag.art === 'top3v')) topFrei = false;
         if (e.vorschlag && e.vorschlag.art === 'woche') wocheFrei = false;
       }
       tage.push(e);
@@ -2127,7 +2129,26 @@
     try {
       await schriften(); const m = MAT || await material(), strm = (st.streams || [])[0] || null;
       let h = 0; for (const ch of v.q) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
-      if (v.art === 'top5') {
+      if (v.art === 'top3v') {   // 🏆 Top 3 als Video: die drei besten Clips der Woche in der Vorlage „Top 3 der Woche“ (Platz 3 → 2 → 1)
+        const vl = VORLAGEN.find(y => y.id === 'top3'), quellen = [], urls = [];
+        for (const y of v.top.liste.slice(0, 3)) {
+          const r = await merkTx('c', 'readonly', o => o.get(y.id)), d = r && r.quellen && r.quellen[0] ? await merkTx('q', 'readonly', o => o.get(r.quellen[0])) : null;
+          if (!d) throw new Error('Ein Original-Clip fehlt in diesem Browser. Bitte neu laden, dann kommt der Vorschlag als Karussell.');
+          const ende = r.einst.ende || r.einst.dauer || 6, url = URL.createObjectURL(d); urls.push(url);
+          quellen.push({ datei: d, url, name: d.name || 'Clip', dauer: r.einst.dauer || ende, start: Math.max(r.einst.start || 0, ende - 6), ende, titel: y.titel });
+        }
+        const [p1, p2, p3] = quellen;   // quellen = bester zuerst · die Vorlage will Platz 3, 2, 1
+        const c = mitText({ id: Math.random().toString(36).slice(2), ...p3, vorlage: 'top3', ...spruecheNeu(vl), zeitlupe: false, modus: 'ganz', versatz: 0, farbe: vl.farbe, text: '', textEigen: false, look: 'neon', stil: stilNeu(''), folgeAn: false,
+          extra: [p2, p1], insta: true, tiktok: !!(st.tiktok && st.tiktok.verbunden), youtube: !!(st.youtube && st.youtube.verbunden), postMs: e.ms });
+        try {
+          arbeit('🏆 Video „Top 3 der Woche“ wird gebaut … 0 %');
+          const blob = await bauen(c, m, q => arbeit(`🏆 Video „Top 3 der Woche“ wird gebaut … ${Math.round(q * 100)} %`));
+          arbeit('⬆ Hochladen …');
+          const r = await UMG.igApi('POST', '/api/clip/neu', { vorlage: 'top3', auto: true, frei: true, quelle: v.q, titel: GROSS(c.hook), text: postText(c), postMs: e.ms, insta: true, tiktok: c.tiktok, youtube: c.youtube, test: false, thumbMs: 1300, dauer: blob.dauer });
+          try { await hochladen(r.id, blob); } catch (err) { try { await UMG.igApi('POST', `/api/clip/${r.id}/weg`, {}); } catch (z) { /* egal */ } throw err; }
+          try { const vb = await vorschaubild(c, m); if (vb) await senden(`/api/clip/${r.id}/bild`, vb); } catch (err) { /* Vorschaubild ist nur schön */ }
+        } finally { try { vidsWeg(urls); } catch (err) { /* egal */ } urls.forEach(u => URL.revokeObjectURL(u)); }
+      } else if (v.art === 'top5') {
         arbeit(`🏆 Karussell „Top ${v.top.liste.length} der Woche“ wird gebaut …`);
         for (const y of v.top.liste) { try { y.bild = y.bildUrl ? await bild(y.bildUrl) : null; } catch (err) { y.bild = null; } }
         await karHochladen(top5Seiten(m, v.top.liste, v.top.was, TR_FARBEN[h % TR_FARBEN.length], strm), { vorlage: 'kartop5', auto: true, frei: true, quelle: v.q, postMs: e.ms, titel: `TOP ${v.top.liste.length} DER WOCHE`,
@@ -2160,6 +2181,7 @@
   // ═══ ✏️ Geplantes wieder bearbeiten (NEU 20.11.2026) ═══
   // Beim Einplanen merkt sich der Browser die Einstellungen und die Videodatei (IndexedDB, nur auf diesem Gerät).
   // „✏️ Bearbeiten“ öffnet den Clip wieder im Editor wie einen neuen; beim Einplanen wird der alte geplante Post ersetzt.
+  let MERK_IDS = new Set();   // Clips, deren Original dieser Browser noch hat
   let MERK_DB = null, BEARBEITE = null;   // BEARBEITE = wartet auf die Videodatei (wenn sie auf diesem Gerät nicht gemerkt ist)
   function merkDb() { if (!MERK_DB) MERK_DB = new Promise((ok, nein) => { try { const r = indexedDB.open('k888_clips', 1); r.onupgradeneeded = () => { r.result.createObjectStore('q'); r.result.createObjectStore('c'); }; r.onsuccess = () => ok(r.result); r.onerror = () => nein(r.error); } catch (e) { nein(e); } }); return MERK_DB; }
   const merkTx = async (store, mode, fn) => { const db = await merkDb(); return new Promise((ok, nein) => { const tx = db.transaction(store, mode), r = fn(tx.objectStore(store)); tx.oncomplete = () => ok(r && r.result); tx.onerror = tx.onabort = () => nein(tx.error); }); };
@@ -2177,11 +2199,15 @@
   async function merkAufraeumen() {   // Gepostetes und Gelöschtes vergessen, unbenutzte Videodateien wegwerfen
     const st = stand(); if (!Array.isArray(st.clips)) return;
     try {
-      const da = new Set(st.clips.filter(x => !(x.gepostet || x.tt || x.yt)).map(x => x.id)), brauch = new Set();
+      // Originale bleiben bis 8 Tage nach dem Posten (für „Top 3 der Woche“ als Video), danach fliegen sie raus
+      const rausZeit = x => Math.max((x.gepostet && x.gepostet.zeit) || 0, (x.tt && x.tt.zeit) || 0, (x.yt && x.yt.zeit) || 0);
+      const da = new Set(st.clips.filter(x => !rausZeit(x) || rausZeit(x) > Date.now() - 8 * 86400000).map(x => x.id)), brauch = new Set(), bleibt = new Set();
       for (const id of await merkTx('c', 'readonly', o => o.getAllKeys())) {
         const r = await merkTx('c', 'readonly', o => o.get(id));
-        if (!da.has(id) && (!r || Date.now() - (r.zeit || 0) > 10 * 60000)) await merkTx('c', 'readwrite', o => o.delete(id)); else for (const k of (r && r.quellen) || []) brauch.add(k);
+        if (!da.has(id) && (!r || Date.now() - (r.zeit || 0) > 10 * 60000)) await merkTx('c', 'readwrite', o => o.delete(id)); else { bleibt.add(id); for (const k of (r && r.quellen) || []) brauch.add(k); }
       }
+      const neu = [...bleibt].sort().join('|') !== [...MERK_IDS].sort().join('|'); MERK_IDS = bleibt;
+      if (neu && !AUTO_ED && !CLIP_ED && !CLIPS.length && !ARBEIT) zeichnen();   // Vorschläge können sich ändern (Top 3 als Video)
       for (const k of await merkTx('q', 'readonly', o => o.getAllKeys())) if (!brauch.has(k)) await merkTx('q', 'readwrite', o => o.delete(k));
     } catch (e) { /* egal */ }
   }
@@ -2288,6 +2314,7 @@
     const st = stand(); let E = null;
     if (id) {
       const c = (st.clips || []).find(y => y.id === id); if (!c) return;
+      if (c.vorlage === 'top3') return bearbeiten(id);   // Top 3 als Video: Titel, Text, Zeit und Ziele im Schnell-Editor
       let e = null; try { e = c.einst ? JSON.parse(c.einst) : null; } catch (err) { e = null; }
       const q = String(c.quelle || ''), mt = TR_MUSTER.exec(c.vorlage || '');
       const typ = (e && e.typ) || (c.trailer ? 'trailer' : /^morgen:/.test(q) ? 'morgen' : /^verpasst:/.test(q) ? 'verpasst' : /^woche:/.test(q) ? 'woche' : c.vorlage === 'kartop5' ? 'top5' : '');
@@ -2407,7 +2434,7 @@
     };
     const tage = lueckenPlan(stand(), jetzt), tagName = t => new Date(t + 'T12:00:00').toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit' });
     const tagHtml = e => `<div class="kc-tagz ${e.n ? 'voll' : 'leer'}"><b>${esc(tagName(e.tag))}</b>${e.n ? `<span class="kc-tag-ok">✓ ${e.n} ${e.n === 1 ? 'Post' : 'Posts'}</span>`
-      : `<span class="kc-tag-leer">Lücke</span>${e.vorschlag ? `<span class="kc-vor">${esc(e.vorschlag.text)}</span><div class="kc-auto-kn"><button type="button" class="btn ki-k kc-frei" data-c="luecke-bauen" data-tag="${e.tag}" title="Bauen und für diesen Tag einplanen">✓ Bauen</button><button type="button" class="btn ki-k" data-c="luecke-bearb" data-tag="${e.tag}" title="Vorher ansehen und ändern">✏️</button><button type="button" class="btn ki-k" data-c="luecke-nein" data-tag="${e.tag}" title="Diesen Vorschlag nicht mehr zeigen">✕</button></div>` : '<span class="kc-dim">Hier fehlt ein Clip.</span>'}`}</div>`;
+      : `<span class="kc-tag-leer">Lücke</span>${e.vorschlag ? `<span class="kc-vor">${esc(e.vorschlag.text)}</span><div class="kc-auto-kn"><button type="button" class="btn ki-k kc-frei" data-c="luecke-bauen" data-tag="${e.tag}" title="Bauen und für diesen Tag einplanen">✓ Bauen</button>${e.vorschlag.art === 'top3v' ? '' : `<button type="button" class="btn ki-k" data-c="luecke-bearb" data-tag="${e.tag}" title="Vorher ansehen und ändern">✏️</button>`}<button type="button" class="btn ki-k" data-c="luecke-nein" data-tag="${e.tag}" title="Diesen Vorschlag nicht mehr zeigen">✕</button></div>` : '<span class="kc-dim">Hier fehlt ein Clip.</span>'}`}</div>`;
     const sw = (k, an, text, tip) => `<label class="kc-check" title="${esc(tip)}"><input type="checkbox" data-c="cfg-${k}" ${an ? 'checked' : ''}> <span><b>${text}</b></span></label>`;
     return `<div class="kc-auto"><h3 class="kc-h">🤖 Automatik <span class="kc-dim">${warten ? `${warten} ${warten === 1 ? 'wartet' : 'warten'} auf deine Freigabe` : ''}</span></h3>
       <div class="kc-dim">Das baut das Dashboard von selbst. ${noetig ? 'Ohne Freigabe geht nichts raus.' : 'Es geht ohne Freigabe von selbst raus.'}</div>
