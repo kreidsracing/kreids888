@@ -616,6 +616,7 @@
     return (pl === 'unten' || pl === 'geteilt') && !camStapel(c) ? 'ecke' : pl;
   }
   const camBox = c => ({ x: 0, y: 0, s: 1, ...(c.camBox || {}) });
+  const camStill = (c, qt) => Array.isArray(c.camAus) && qt != null && c.camAus.some(r => qt >= r.ab - 0.001 && qt < r.bis);   // Stelle im Clip, an der das Rennbild selbst die Cam zeigt (Toolbox: „Nur Cam“)
   const camBild = c => ({ x: 0, y: 0, z: 1, ...(c.camTf || {}) });
   function lage(c, tv) {
     const fe = c.fenster || {}, max = tv ? FENSTER_MAX.tv : FENSTER_MAX.neon, basis = tv ? 730 : 690, fw = kl(Math.round(fe.w || 1000), 360, 1040);
@@ -1080,7 +1081,7 @@
         else ecken(g, 34, 296, B - 68, 1258, f, 90);
         g.restore();
       }
-      if (camPl !== 'aus') camZeichnen(g, t, c, cam, f, zoom ? { fx: 34, fy: 690, fw: B - 68, fh: 600, L: L0, stapel: false } : { fx, fy, fw, fh, L: L0, stapel: true }, st);
+      if (camPl !== 'aus' && !camStill(c, p.quelle ? p.quelle(t) : null)) camZeichnen(g, t, c, cam, f, zoom ? { fx: 34, fy: 690, fw: B - 68, fh: 600, L: L0, stapel: false } : { fx, fy, fw, fh, L: L0, stapel: true }, st);
       const mx = B / 2, my = zoom ? 1000 : fy + fh / 2;   // Mitte des Clips
       if (v.ampel) ampelZeichnen(g, t, p, mx, my, Math.min(fw, 1000));
       if (ana) analyseOben(g, t, c, p, vid, R, f);
@@ -2278,11 +2279,13 @@
     c.datei = datei; c.name = datei.name; c.ablage = name; if (ms) c.postMs = ms;
     c.start = 0; c.ende = c.dauer;   // die Szene ist in der Toolbox schon zugeschnitten: ganz nehmen (auch der Hook am Anfang)
     if (e.camDatei) { try { camSetzen(c, await e.camDatei.getFile()); } catch (err) { /* dann ohne Cam */ } }   // 📷 die passend geschnittene Cam
-    const i = e.info, v0 = vorlage(c);
-    if (i.hochkant && Array.isArray(i.teile) && i.teile.length && !v0.mehr && !v0.nurTV) {   // 📐 Lage je Stück, wie am Rahmen in der Toolbox eingestellt
+    const i = e.info, v0 = vorlage(c), pl = i.cam_lage && i.cam_lage.platz, fenster = !!c.cam && (pl === 'unten' || pl === 'geteilt') && !v0.mehr && !v0.nurTV;   // 📷 Cam als eigenes Fenster unter dem Rennbild
+    if (fenster) { c.modus = 'ganz'; c.look = 'neon'; }   // dann das ganze Rennbild im Fenster (kein Hochkant-Ausschnitt)
+    else if (i.hochkant && Array.isArray(i.teile) && i.teile.length && !v0.mehr && !v0.nurTV) {   // 📐 Lage je Stück, wie am Rahmen in der Toolbox eingestellt
       c.hochkant = i.teile.map(t => ({ ab: +t.ab || 0, bis: +t.bis || 0, x: +t.x || 0, y: +t.y || 0, z: +t.z || 1 })); c.modus = 'zoom'; c.look = 'neon';
+      const still = i.teile.filter(t => t.nurCam).map(t => ({ ab: +t.ab || 0, bis: +t.bis || 0 })); if (still.length) c.camAus = still;   // 🎥 diese Stücke zeigen schon nur die Cam: dort kein kleines Cam-Bild dazu
     }
-    if (c.cam && i.cam_lage && ['aus', 'ecke', 'rund'].includes(i.cam_lage.platz)) { c.camPlatz = i.cam_lage.platz; c.camBox = { x: +i.cam_lage.x || 0, y: +i.cam_lage.y || 0, s: 1 }; }   // 📷 Platz der Cam aus der Toolbox
+    if (c.cam && i.cam_lage && CAM_PLAETZE.some(x => x[0] === pl)) { c.camPlatz = pl; c.camBox = { x: +i.cam_lage.x || 0, y: +i.cam_lage.y || 0, s: kl(+i.cam_lage.s || 1, 0.6, 1.8) }; }   // 📷 Platz und Größe der Cam aus der Toolbox
     CLIPS.push(c); zeichnen(); if (CLIPS.length === 1) nachOben();
     UMG.meldung(CLIPS.length > 1 ? 'Szene wartet hinter dem Clip, der gerade im Editor ist.' : 'Szene ist im Editor. Vorlage und Spruch passen schon, ändern geht immer.');
   }
@@ -4190,7 +4193,7 @@
   window.K888Clips = {
     oeffnen(id) { OEFFNE = String(id || ''); },   // der Wochenplan ruft das vor dem Wechsel in den Reiter „🎬 Clips“
     vorlageInfo: (id, c) => (c && autoV(c)) || trailerV(id) || karV(id) || VORLAGEN.find(y => y.id === id) || null,
-    VORLAGEN, STILE, bauen, zeitplan, zeichne, material, schriften, vorschaubild, stichwoerter, trailerZeichnen, trailerBauen, trailerPruefen, trailerTon, trailerWahl, TR_ARTEN, TR_FARBEN, top5Seiten, top5Liste, automatikHtml, karSeite, lueckenPlan, lueckeBauen, autoEdAuf, ablage: ABL, fotoSeite, camRahmen, camPlatz, lage, CAM_PLAETZE, _clips: CLIPS, _zoomTf: zoomTf, _bildRechteck: bildRechteck,
+    VORLAGEN, STILE, bauen, zeitplan, zeichne, material, schriften, vorschaubild, stichwoerter, trailerZeichnen, trailerBauen, trailerPruefen, trailerTon, trailerWahl, TR_ARTEN, TR_FARBEN, top5Seiten, top5Liste, automatikHtml, karSeite, lueckenPlan, lueckeBauen, autoEdAuf, ablage: ABL, fotoSeite, camStill, camRahmen, camPlatz, lage, CAM_PLAETZE, _clips: CLIPS, _zoomTf: zoomTf, _bildRechteck: bildRechteck,
     async start(box, umg) {
       UMG = umg;
       if (BOX !== box) {
