@@ -2114,11 +2114,17 @@
       }
     });
   }
-  function fotoSeite(m, f, nr, n, img) {   // 📸 ein Foto aus der Toolbox füllt die Seite: oben Logo, Kanal und Seite, unten YouTube
+  function fotoSeite(m, f, nr, n, img, o) {   // 📸 ein Foto aus der Toolbox füllt die Seite: oben Logo, Kanal und Seite, unten YouTube · o = Texte des Fotos { gross, klein, ort, look }
+    o = o || {};
     const c = leinwand(KB, KH), g = c.getContext('2d'), iw = img.naturalWidth || img.width, ih = img.naturalHeight || img.height, q = Math.max(KB / iw, KH / ih);
     g.fillStyle = '#000'; g.fillRect(0, 0, KB, KH); g.drawImage(img, (KB - iw * q) / 2, (KH - ih * q) / 2, iw * q, ih * q);
-    let v = g.createLinearGradient(0, 0, 0, 250); v.addColorStop(0, 'rgba(0,0,0,.78)'); v.addColorStop(1, 'rgba(0,0,0,0)'); g.fillStyle = v; g.fillRect(0, 0, KB, 250);
-    v = g.createLinearGradient(0, KH - 250, 0, KH); v.addColorStop(0, 'rgba(0,0,0,0)'); v.addColorStop(1, 'rgba(0,0,0,.82)'); g.fillStyle = v; g.fillRect(0, KH - 250, KB, 250);
+    if (o.look === 'ohne') return c;   // nur das Foto
+    const mitText = o.look !== 'logo', gross = mitText ? GROSS(String(o.gross || '').trim()) : '', klein = mitText ? GROSS(String(o.klein || '').trim()) : '', oben = o.ort === 'oben', text = !!(gross || klein);
+    const ho = text && oben ? 520 : 250, hu = text && !oben ? 520 : 250;   // unter dem Text dunkler, damit er lesbar bleibt
+    let v = g.createLinearGradient(0, 0, 0, ho); v.addColorStop(0, 'rgba(0,0,0,.78)'); if (ho > 250) v.addColorStop(0.6, 'rgba(0,0,0,.55)'); v.addColorStop(1, 'rgba(0,0,0,0)'); g.fillStyle = v; g.fillRect(0, 0, KB, ho);
+    v = g.createLinearGradient(0, KH - hu, 0, KH); v.addColorStop(0, 'rgba(0,0,0,0)'); if (hu > 250) v.addColorStop(0.4, 'rgba(0,0,0,.55)'); v.addColorStop(1, 'rgba(0,0,0,.82)'); g.fillStyle = v; g.fillRect(0, KH - hu, KB, hu);
+    if (gross) kNeon(g, gross, oben ? 338 : KH - (klein ? 258 : 190), 112, f);
+    if (klein) kMitte(g, klein, oben ? (gross ? 408 : 330) : KH - 182, 46, 700);
     logoRing(g, 104, 104, 54, f, m.logo, 0);
     g.save(); SA(g, 46, 800); g.fillStyle = '#fff'; g.textAlign = 'left'; g.shadowColor = 'rgba(0,0,0,.85)'; g.shadowBlur = 10; g.fillText(m.ytHandle || m.handle || '@Kreids888', 180, 120); g.restore();
     const st = `${nr}/${n}`; pille(g, st, KB - 60 - pillenBreite(g, st, 40), 72, f, 40, false);
@@ -2212,15 +2218,41 @@
   }
   const fotoOrt = name => String(name).replace(/\.[a-z]+$/i, '').replace(/^\d{4}-\d{2}-\d{2} \d{2}-\d{2}-\d{2} ?/, '').replace(/ \(\d+\)$/, '').replace(/ ?Foto$/, '').trim();   // „2026-11-21 16-20-05 Long Beach Foto.jpg“ → „Long Beach“
   const KAR_MAX = 10;
+  // 📸 Texte auf den Fotos (NEU 22.11.2026): pro Foto großer und kleiner Text, Platz (unten/oben) und Aussehen. Jede Seite steht als Vorschau im Formular, genau so, wie sie gepostet wird.
+  const KAR_SPRUCH = ['SEITE AN SEITE', 'VOLLGAS', 'KEIN ZENTIMETER PLATZ', 'DAS WAR KNAPP', 'RAD AN RAD', 'MITTENDRIN', 'ATTACKE', 'SO SIEHT RENNEN AUS', 'WELCHES IST DEIN FAVORIT?', 'BILD DES TAGES'];
+  const KAR_LOOK = [['neon', 'Logo, Kanal und Text'], ['logo', 'nur Logo und Kanal'], ['ohne', 'nur das Foto']];
+  function karFoto(name) {   // Einstellungen eines Fotos · das erste Foto bekommt den Ort als großen Text vorgeschlagen
+    const K = ABL.kar; if (!K) return { gross: '', klein: '', ort: 'unten', look: 'neon', w: -1 };
+    if (!K.seiten) K.seiten = {};
+    if (!K.seiten[name]) K.seiten[name] = { gross: ABL.fotoWahl[0] === name && !Object.keys(K.seiten).length ? GROSS(fotoOrt(name)) : '', klein: '', ort: 'unten', look: 'neon', w: -1 };
+    return K.seiten[name];
+  }
+  const karFarbe = name => { let h = 0; for (const ch of String(name || '')) h = (h * 31 + ch.charCodeAt(0)) >>> 0; return TR_FARBEN[h % TR_FARBEN.length]; };
+  let KAR_VS_T = 0;
+  async function ablKarVorschau(nur) {   // kleine Vorschau jeder Seite (nur = nur dieses Foto neu malen)
+    const K = ABL.kar; if (!K || !BOX) return;
+    const cs = [...BOX.querySelectorAll('canvas[data-abv]')]; if (!cs.length) return;
+    await schriften(); const m = MAT || await material(), strm = (stand().streams || [])[0] || null;
+    const namen = ABL.fotoWahl.slice(0, K.schluss ? KAR_MAX - 1 : KAR_MAX), ges = namen.length + (K.schluss ? 1 : 0), f = karFarbe(namen[0]);
+    for (const c of cs) {
+      const n = c.dataset.abv; if (nur && n !== nur) continue;
+      let seite = null;
+      if (n === '::schluss') seite = streamSeite(m, f, ges, ges, strm);
+      else { const i = namen.indexOf(n), img = i >= 0 ? await bild(ABL.fotoUrl.get(n)) : null; if (img) seite = fotoSeite(m, f, i + 1, ges, img, karFoto(n)); }
+      if (seite && c.isConnected) { const g = c.getContext('2d'); g.clearRect(0, 0, c.width, c.height); g.drawImage(seite, 0, 0, c.width, c.height); }
+    }
+  }
+  const ablKarVorschauBald = nur => { clearTimeout(KAR_VS_T); KAR_VS_T = setTimeout(() => ablKarVorschau(nur).catch(() => {}), 250); };
   function ablKarStart() {   // Vorschlag für Titel, Text und Zeit, sobald das erste Foto angehakt ist
     if (ABL.kar) return ABL.kar;
     const ort = fotoOrt(ABL.fotoWahl[0] || ''), plan = lueckenPlan(stand(), Date.now()), frei = plan.find(e => !e.n && e.ms), cfg = stand().clipcfg || {};
-    ABL.kar = { titel: GROSS(ort ? `${ort} · Bilder vom Rennen` : 'Bilder vom Rennen'), schluss: true, postMs: frei ? frei.ms : new Date(`${tagVon(Date.now() + 86400000)}T${cfg.zeit || '18:30'}:00`).getTime(),
+    ABL.kar = { seiten: {}, titel: GROSS(ort ? `${ort} · Bilder vom Rennen` : 'Bilder vom Rennen'), schluss: true, postMs: frei ? frei.ms : new Date(`${tagVon(Date.now() + 86400000)}T${cfg.zeit || '18:30'}:00`).getTime(),
       text: `📸 ${ort ? ort + ': ' : ''}Welches Bild ist dein Favorit? Schreib die Nummer in die Kommentare 👇\n\n#simracing #iracing #kreids888` };
     return ABL.kar;
   }
   function ablKarEingabe(t) {   // Tippen ändert nur die Werte (kein Neuzeichnen, sonst springt der Cursor)
     const K = ABL.kar, k = t.dataset.abk; if (!K) return;
+    if (k.startsWith('s:')) { karFoto(t.dataset.name)[k.slice(2)] = t.value; ablKarVorschauBald(t.dataset.name); return; }   // Text, Platz oder Aussehen eines Fotos
     if (k === 'schluss') { K.schluss = t.checked; zeichnen(); }
     else if (k === 'postMs') { const ms = new Date(t.value).getTime(); if (isFinite(ms)) K.postMs = ms; }
     else K[k] = t.value;
@@ -2234,11 +2266,10 @@
     try {
       await schriften(); const st = stand(), m = MAT || await material(), strm = (st.streams || [])[0] || null;
       arbeit('🖼 Karussell wird gebaut …');
-      let h = 0; for (const ch of namen[0]) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
-      const f = TR_FARBEN[h % TR_FARBEN.length], ges = namen.length + (K.schluss ? 1 : 0), seiten = [];
+      const f = karFarbe(namen[0]), ges = namen.length + (K.schluss ? 1 : 0), seiten = [];
       for (let i = 0; i < namen.length; i++) {
         const img = await bild(ABL.fotoUrl.get(namen[i])); if (!img) throw new Error(`„${namen[i]}“ lässt sich nicht lesen. Bitte „↻ Neu lesen“ drücken.`);
-        seiten.push(fotoSeite(m, f, i + 1, ges, img));
+        seiten.push(fotoSeite(m, f, i + 1, ges, img, karFoto(namen[i])));
       }
       if (K.schluss) seiten.push(streamSeite(m, f, ges, ges, strm));
       await karHochladen(seiten, { vorlage: 'karbilder', frei: true, quelle: 'fotos:' + namen[0], postMs: K.postMs, titel: String(K.titel || 'Bilder vom Rennen').slice(0, 80), text: K.text });
@@ -2334,6 +2365,18 @@
           <div class="kc-felder"><label class="kc-feld">Titel<input type="text" maxlength="80" value="${esc(K.titel)}" data-abk="titel"></label>
             <label class="kc-feld">Geht raus am<input type="datetime-local" value="${esc(lokal(K.postMs))}" data-abk="postMs"></label></div>
           <label class="kc-feld">Text zum Post<textarea rows="3" data-abk="text">${esc(K.text)}</textarea></label>
+          <div class="kc-kar-seiten"><b>Texte auf den Bildern <span class="kc-dim">Feld leer = kein Text. Das kleine Bild zeigt jede Seite so, wie sie gepostet wird.</span></b>
+            ${wahl.slice(0, K.schluss ? KAR_MAX - 1 : KAR_MAX).map((n, i, alle) => { const s = karFoto(n), d = `data-name="${esc(n)}"`; return `<div class="kc-kar-zeile">
+              <canvas class="kc-kar-vs" data-abv="${esc(n)}" width="432" height="540" title="Seite ${i + 1}: so wird sie gepostet"></canvas>
+              <div class="kc-kar-f"><b>Seite ${i + 1} <span class="kc-dim">${esc(fotoOrt(n) || n)}</span></b>
+                <div class="kc-felder"><label class="kc-feld">Text groß (Neon)<input type="text" maxlength="28" value="${esc(s.gross)}" data-abk="s:gross" ${d} placeholder="z. B. LONG BEACH"></label>
+                  <label class="kc-feld">Text klein<input type="text" maxlength="44" value="${esc(s.klein)}" data-abk="s:klein" ${d} placeholder="z. B. Runde 12 · Seite an Seite"></label></div>
+                <div class="kc-felder"><label class="kc-feld">Wo steht der Text?<select data-abk="s:ort" ${d}><option value="unten" ${s.ort === 'oben' ? '' : 'selected'}>unten</option><option value="oben" ${s.ort === 'oben' ? 'selected' : ''}>oben</option></select></label>
+                  <label class="kc-feld">Was kommt aufs Foto?<select data-abk="s:look" ${d}>${KAR_LOOK.map(([w, name]) => `<option value="${w}" ${s.look === w ? 'selected' : ''}>${name}</option>`).join('')}</select></label></div>
+                <div class="kc-auto-kn"><button type="button" class="btn ki-k" data-c="abl-kar-wuerfel" ${d} title="Setzt einen anderen Vorschlag als großen Text">🎲 Vorschlag</button><button type="button" class="btn ki-k" data-c="abl-kar-hoch" ${d} ${i ? '' : 'disabled'} title="Dieses Foto eine Seite nach vorn">▲ nach vorn</button><button type="button" class="btn ki-k" data-c="abl-kar-runter" ${d} ${i < alle.length - 1 ? '' : 'disabled'} title="Dieses Foto eine Seite nach hinten">▼ nach hinten</button></div>
+              </div></div>`; }).join('')}
+            ${K.schluss ? `<div class="kc-kar-zeile"><canvas class="kc-kar-vs" data-abv="::schluss" width="432" height="540" title="Letzte Seite: so wird sie gepostet"></canvas><div class="kc-kar-f"><b>Letzte Seite</b><span class="kc-dim">„Live auf YouTube“ mit dem nächsten Stream. Sie kommt von selbst und lässt sich unten mit dem Haken abschalten.</span></div></div>` : ''}
+          </div>
           <label class="kc-check"><input type="checkbox" data-abk="schluss" ${K.schluss ? 'checked' : ''}> <span>Letzte Seite „Live auf YouTube“ anhängen</span></label>
           <div class="kc-auto-kn"><button type="button" class="btn kc-frei" data-c="abl-kar" ${seiten < 2 || ARBEIT ? 'disabled' : ''}>🖼 Karussell bauen & einplanen (${seiten} ${seiten === 1 ? 'Seite' : 'Seiten'})</button>
             <button type="button" class="btn ki-k" data-c="abl-foto-leer">Auswahl leeren</button></div></div>` : ''}</div>`;
@@ -3869,6 +3912,7 @@
     BOX.innerHTML = html();
     vorschauStarten();
     ablBilder();
+    if (ABL.kar) ablKarVorschauBald();   // 📸 Vorschau der Karussell-Seiten
   }
   async function dateienRein(dateien) {
     let n = 0, mitCam = 0;
@@ -4009,6 +4053,16 @@
       zeichnen(); return;
     }
     if (a === 'abl-foto-leer') { ABL.fotoWahl = []; ABL.kar = null; zeichnen(); return; }
+    if (a === 'abl-kar-wuerfel') {   // 🎲 nächster Vorschlag für den großen Text (erst der Ort aus dem Dateinamen, dann die Sprüche)
+      const n = b.dataset.name, s = karFoto(n), liste = [GROSS(fotoOrt(n)), ...KAR_SPRUCH].filter(Boolean);
+      s.w = ((s.w == null ? -1 : s.w) + 1) % liste.length; if (liste[s.w] === s.gross) s.w = (s.w + 1) % liste.length;
+      s.gross = liste[s.w]; if (s.look !== 'neon') s.look = 'neon'; zeichnen(); return;
+    }
+    if (a === 'abl-kar-hoch' || a === 'abl-kar-runter') {   // Reihenfolge der Fotos ändern
+      const i = ABL.fotoWahl.indexOf(b.dataset.name), j = a === 'abl-kar-hoch' ? i - 1 : i + 1;
+      if (i >= 0 && j >= 0 && j < ABL.fotoWahl.length) { [ABL.fotoWahl[i], ABL.fotoWahl[j]] = [ABL.fotoWahl[j], ABL.fotoWahl[i]]; zeichnen(); }
+      return;
+    }
     if (a === 'abl-kar') { ablKarBauen(); return; }
     if (a === 'abl-auf') { ablOeffnen(b.dataset.name, 0); return; }
     if (a === 'luecke-bearb') { autoEdAuf('', b.dataset.tag); return; }
@@ -4377,6 +4431,13 @@
 .kc-app .kc-foto.an{border-color:#8dff5c;box-shadow:0 0 0 2px #8dff5c}.kc-app .kc-foto.an i{background:#8dff5c;border-color:#8dff5c;color:#000}
 .kc-app .kc-foto.benutzt{opacity:.55}.kc-app .kc-foto .kc-tag-ok{position:absolute;left:0;right:0;bottom:0;padding:3px 4px;background:rgba(0,0,0,.75);font-size:11px}
 .kc-app .kc-foto-form{display:flex;flex-direction:column;gap:10px;margin-top:12px;padding:12px;background:#101218;border:1px solid #2a2f36}
+.kc-app .kc-kar-seiten{display:flex;flex-direction:column;gap:10px}
+.kc-app .kc-kar-zeile{display:grid;grid-template-columns:132px minmax(0,1fr);gap:12px;align-items:start;padding:10px;background:#0b0d12;border:1px solid #2a2f36}
+.kc-app .kc-kar-vs{width:132px;height:165px;display:block;background:#07080b;border:1px solid #2a2f36}
+.kc-app .kc-kar-f{display:flex;flex-direction:column;gap:8px;min-width:0}
+.kc-app .kc-kar-f .kc-feld{flex:1 1 200px}
+.kc-app .kc-kar-f select{height:42px;background:#0b0c10;border:1px solid var(--line,#23262f);color:#fff;font:15px var(--body,inherit);padding:0 8px}
+@media (max-width:560px){.kc-app .kc-kar-zeile{grid-template-columns:96px minmax(0,1fr)}.kc-app .kc-kar-vs{width:96px;height:120px}}
 .kc-app .kc-tage{display:grid;grid-template-columns:repeat(auto-fill,minmax(124px,1fr));gap:8px;margin-top:8px}
 .kc-app .kc-tagz .kc-auto-kn{margin-top:auto;padding-top:6px}.kc-app .kc-tagz .kc-auto-kn .btn{padding:6px 9px;font-size:12px}
 .kc-app .kc-tagz{display:flex;flex-direction:column;gap:4px;padding:8px 10px;background:#101218;border:1px solid #2a2f36;font-size:13px;min-width:0}
