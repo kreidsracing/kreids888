@@ -423,6 +423,108 @@
     return BILDER.get(url);
   }
 
+  // ═══ 🏁 Team-Logo (NEU 22.11.2026): überall dazu wählbar – Clips, Trailer und Videos der Automatik, Karussells ═══
+  //   team = { d: Datei (kreids888 → team → bilder), x/y: Mitte des Logos (0–1 vom Bild), s: Größe (0–1 der Bildbreite) } · leer = ohne
+  //   Verschieben: Logo in der Vorschau mit der Maus ziehen (oder die Regler). Größe: Regler, im Clip-Editor auch Mausrad auf dem Logo.
+  //   Je Art merkt sich der Browser die letzte Einstellung: clip = Clips aus dem Editor · trailer = Trailer und Videos der Automatik · kar = Karussells.
+  //   Sie gilt für alles Neue dieser Art, auch für das, was sich von selbst baut.
+  const TEAM = [['f2f-logo.webp', 'F2F Logo', false], ['f2f-motto.webp', 'F2F Motto', true], ['f2f-g61.png', 'F2F G61', true]];   // true = schwarzer Hintergrund wird ausgeblendet
+  const TEAM_PLATZ = { clip: { x: 0.86, y: 0.075, s: 0.15 }, trailer: { x: 0.86, y: 0.075, s: 0.15 }, kar: { x: 0.594, y: 0.077, s: 0.125 } };   // Standardplatz je Art
+  const TEAM_MIN = 0.04, TEAM_MAX = 0.6, TEAM_KEY = 'k888_team', TEAM_IMG = new Map(), TEAM_LAEDT = new Map();
+  const teamUrl = d => site() + 'team/bilder/' + d, zahl01 = (v, ersatz) => (v != null && v !== '' && isFinite(+v) ? Math.round(kl(+v, 0, 1) * 10000) / 10000 : ersatz);
+  const teamOk = t => (t && TEAM.some(x => x[0] === t.d) ? { d: t.d, x: zahl01(t.x, 0.5), y: zahl01(t.y, 0.5), s: Math.round(kl(+t.s || 0.12, TEAM_MIN, TEAM_MAX) * 10000) / 10000 } : null);
+  let TEAM_STD = null;
+  const teamAlle = () => { if (!TEAM_STD) { try { TEAM_STD = JSON.parse(localStorage.getItem(TEAM_KEY) || '{}') || {}; } catch (e) { TEAM_STD = {}; } } return TEAM_STD; };
+  const teamStandard = art => teamOk(teamAlle()[art]);   // gemerktes Logo dieser Art (oder nichts)
+  const teamPlatz = art => { const a = teamAlle()[art]; return a && +a.s > 0 ? { x: zahl01(a.x, 0.5), y: zahl01(a.y, 0.5), s: kl(+a.s, TEAM_MIN, TEAM_MAX) } : { ...TEAM_PLATZ[art] }; };   // gemerkter Platz, sonst Standardplatz
+  function teamMerken(art, team) {   // letzte Einstellung dieser Art merken („Ohne“ behält Platz und Größe fürs nächste Mal)
+    const a = teamAlle(); a[art] = teamOk(team) || { ...teamPlatz(art), d: '' };
+    try { localStorage.setItem(TEAM_KEY, JSON.stringify(a)); } catch (e) { /* dann nur bis zum Neuladen */ }
+  }
+  function teamBild(datei) {   // lädt ein Team-Logo einmal (ohne schwarzen Hintergrund, wenn es so hinterlegt ist)
+    const e = TEAM.find(x => x[0] === datei); if (!e) return Promise.resolve(null);
+    if (!TEAM_LAEDT.has(datei)) TEAM_LAEDT.set(datei, new Promise(ok => { const i = new Image(); i.crossOrigin = 'anonymous'; i.onload = () => ok(i); i.onerror = () => ok(null); i.src = teamUrl(datei); }).then(img => {
+      if (!img) { TEAM_LAEDT.delete(datei); return null; }   // beim nächsten Mal neu versuchen
+      let fertig = img;
+      if (e[2]) { try { const c = leinwand(img.naturalWidth, img.naturalHeight), g = c.getContext('2d'); g.drawImage(img, 0, 0); const d = g.getImageData(0, 0, c.width, c.height), a = d.data;
+        for (let i = 0; i < a.length; i += 4) { const mx = Math.max(a[i], a[i + 1], a[i + 2]); if (mx < 70) a[i + 3] = Math.min(a[i + 3], Math.max(0, (mx - 18) * 5)); }
+        g.putImageData(d, 0, 0); fertig = c; } catch (err) { fertig = img; } }
+      TEAM_IMG.set(datei, fertig); return fertig;
+    }));
+    return TEAM_LAEDT.get(datei);
+  }
+  const teamLaden = () => Promise.all(TEAM.map(x => teamBild(x[0])));
+  async function teamPflicht(team) {   // vor dem Bauen: ein gewähltes Logo muss da sein – lieber abbrechen als ohne Logo posten
+    const t = teamOk(team); if (!t) return;
+    if (!(await teamBild(t.d))) throw new Error('Das Team-Logo lässt sich nicht laden. Bitte noch einmal versuchen oder bei „🏁 Team-Logo dazu“ auf „Ohne“ stellen.');
+  }
+  function teamRechteck(team, W, Hh) {   // wo das Logo im Bild liegt (W × Hh = Bildgröße) → { x, y, w, h, img }
+    const t = teamOk(team), img = t && TEAM_IMG.get(t.d); if (!img) return null;
+    const iw = img.naturalWidth || img.width, ih = img.naturalHeight || img.height; if (!iw || !ih) return null;
+    const k = t.s * W / Math.sqrt(iw * ih), w = iw * k, h = ih * k;   // Größe nach Fläche: ein breites Logo wirkt so groß wie ein rundes
+    return { x: t.x * W - w / 2, y: t.y * Hh - h / 2, w, h, img };
+  }
+  function teamZeichnen(g, team, W, Hh) {   // Logo über alles legen (mit weichem Schatten, damit es auf jedem Bild steht)
+    const r = teamRechteck(team, W, Hh); if (!r) return;
+    const sk = (g.getTransform && Math.abs(g.getTransform().a)) || 1;   // Schatten wächst mit der Vorschau-Größe mit
+    g.save(); g.globalAlpha = 1; g.globalCompositeOperation = 'source-over'; g.filter = 'none'; g.shadowColor = 'rgba(0,0,0,.8)'; g.shadowBlur = 18 * sk; g.shadowOffsetX = 0; g.shadowOffsetY = 3 * sk;
+    g.drawImage(r.img, r.x, r.y, r.w, r.h); g.restore();
+  }
+  const TEAM_ORT = {   // wo ein Team-Logo eingestellt wird · halter().team trägt die Einstellung
+    clip: { art: () => 'clip', halter: () => CLIPS[0] || null },                                          // Clip im Editor
+    ae: { art: () => (AUTO_ED && AUTO_ED.typ === 'top5' ? 'kar' : 'trailer'), halter: () => AUTO_ED },    // Editor für Automatisches (Trailer, Morgen live, Stream verpasst, Wochenvorschau, Top 5)
+    foto: { art: () => 'kar', halter: () => ABL.kar }                                                     // Karussell aus Fotos
+  };
+  const TEAM_TIPP = {
+    clip: 'Gilt für diesen Clip und wird gemerkt: Der nächste Clip (auch das Video „Top 3 der Woche“) bekommt das Logo wieder so.',
+    trailer: 'Gilt für dieses Video und wird gemerkt: Trailer und Videos, die sich von selbst bauen, bekommen das Logo ab jetzt genauso.',
+    kar: 'Das Logo steht auf jeder Seite an derselben Stelle. Die Einstellung wird gemerkt: Auch das Karussell „Top 5 der Woche“ bekommt es ab jetzt so.'
+  };
+  function teamPanel(ort) {   // Bedienfeld: Logo wählen, Größe, Platz
+    const o = TEAM_ORT[ort], h = o.halter(); if (!h) return '';
+    const t = teamOk(h.team);
+    const gross = ort === 'foto' ? (ABL.fotoWahl.slice(0, h.schluss ? KAR_MAX - 1 : KAR_MAX).find(n => karFoto(n).look !== 'ohne') || (h.schluss ? '::schluss' : '')) : '';   // 📸 Karussell: eine Seite größer zum Schieben (die kleinen Seitenbilder gehen auch)
+    return `<div class="kc-bildpanel kc-team" data-team="${ort}">
+      <div class="kc-bildkopf">🏁 Team-Logo dazu <span class="kc-dim">Logo anklicken = es kommt ins Bild. „Ohne“ = kein Team-Logo.</span></div>
+      <div class="kc-team-gal"><button type="button" class="${t ? '' : 'an'}" data-c="team-wahl" data-wert="" title="Kein Team-Logo im Bild"><i>Ohne</i></button>${TEAM.map(([d, name]) => `<button type="button" class="${t && t.d === d ? 'an' : ''}" data-c="team-wahl" data-wert="${esc(d)}" title="${esc(name)} ins Bild setzen"><img src="${esc(teamUrl(d))}" alt="${esc(name)}" loading="lazy"><i>${esc(name)}</i></button>`).join('')}</div>
+      ${t ? `<div class="kc-team-zwei">${gross ? `<canvas class="kc-team-vs mit-team" data-abv="${esc(gross)}" width="432" height="540" title="Mit der Maus ziehen = Team-Logo verschieben"></canvas>` : ''}
+      <div class="kc-team-regler"><div class="kc-dim">🖐 ${gross ? 'Logo im Bild daneben' : 'Logo in der Vorschau'} mit der Maus ziehen = an jede Stelle schieben.${ort === 'clip' ? ' Mausrad auf dem Logo = größer oder kleiner.' : ''}</div>
+      <label class="kc-feld">Logo-Größe <b data-c="team-s-wert">${Math.round(t.s * 100)} %</b><input type="range" min="${TEAM_MIN}" max="${TEAM_MAX}" step="0.005" value="${t.s}" data-c="team-s"></label>
+      <div class="kc-felder"><label class="kc-feld">Logo nach links ↔ rechts<input type="range" min="0" max="1" step="0.005" value="${t.x}" data-c="team-x"></label>
+        <label class="kc-feld">Logo nach oben ↕ unten<input type="range" min="0" max="1" step="0.005" value="${t.y}" data-c="team-y"></label></div>
+      <div class="kc-knoepfe"><button type="button" class="btn ki-k" data-c="team-reset" title="Setzt das Logo zurück an den Standardplatz und auf die Standardgröße">↺ Zurück an den Standardplatz</button></div></div></div>` : ''}
+      ${tipp(TEAM_TIPP[o.art()])}
+    </div>`;
+  }
+  function teamRegler(ort) {   // Regler an die Einstellung nachziehen (nach dem Ziehen mit der Maus oder dem Mausrad)
+    const p = BOX && BOX.querySelector(`[data-team="${ort}"]`), h = TEAM_ORT[ort].halter(), t = h && teamOk(h.team); if (!p || !t) return;
+    for (const k of ['s', 'x', 'y']) { const e = p.querySelector(`[data-c="team-${k}"]`); if (e) e.value = t[k]; }
+    const w = p.querySelector('[data-c="team-s-wert"]'); if (w) w.textContent = Math.round(t.s * 100) + ' %';
+  }
+  let TEAM_MALT = false;
+  function teamMalen(ort, nur) {   // Vorschau sofort nachziehen (Clip-Editor und Trailer malen ohnehin laufend)
+    if (ort === 'ae') { const cv = BOX && BOX.querySelector('canvas.kc-ae-vorschau'); if (cv) delete cv.dataset.fertig; }
+    if (ort === 'foto' && !TEAM_MALT) { TEAM_MALT = true; requestAnimationFrame(() => ablKarVorschau(nur || undefined).catch(() => {}).then(() => { TEAM_MALT = false; })); }
+  }
+  function teamSetzen(ort, aendern, fertig, nur) {   // Einstellung ändern (aendern bekommt die alte) · fertig = merken und alle Seiten nachziehen
+    const o = TEAM_ORT[ort], h = o && o.halter(); if (!h) return;
+    const alt = teamOk(h.team); if (!alt) return;
+    h.team = teamOk(aendern(alt)) || alt;
+    teamRegler(ort); teamMalen(ort, nur);
+    if (fertig) { teamMerken(o.art(), h.team); if (ort === 'foto') ablKarVorschauBald(); }
+  }
+  function teamZug(ev) {   // 🖐 Zeiger auf dem Logo (Clip-Editor) oder irgendwo auf einer kleinen Vorschau (Automatik, Karussell)? → Zug-Daten
+    if (ev.button > 0 || !ev.target.closest) return null;
+    let cv = ev.target.closest('canvas[data-c="vorschau"]'), ort = 'clip', W = B, Hh = H;
+    if (!cv) { cv = ev.target.closest('canvas.kc-ae-vorschau'); if (cv) { ort = 'ae'; if (AUTO_ED && AUTO_ED.typ === 'top5') { W = KB; Hh = KH; } } }
+    if (!cv) { cv = ev.target.closest('canvas[data-abv]'); if (cv) { ort = 'foto'; W = KB; Hh = KH; } }
+    if (!cv) return null;
+    const h = TEAM_ORT[ort].halter(), team = h && teamOk(h.team), r = team && teamRechteck(team, W, Hh); if (!r) return null;
+    const k = cv.getBoundingClientRect(), sx = W / k.width, sy = Hh / k.height, px = (ev.clientX - k.left) * sx, py = (ev.clientY - k.top) * sy;
+    if (ort === 'clip') { const rand = Math.max(14, (110 - Math.min(r.w, r.h)) / 2); if (px < r.x - rand || px > r.x + r.w + rand || py < r.y - rand || py > r.y + r.h + rand) return null; }   // im Editor nur auf dem Logo (sonst zieht man das Video)
+    return { team: ort, cv, id: ev.pointerId, x0: ev.clientX, y0: ev.clientY, sx, sy, W, Hh, t0: team, name: cv.dataset.abv || '', bewegt: false };
+  }
+
   // ─── Neon-Bausteine (einmal gezeichnet, dann nur noch kopiert) ───
   const CACHE = new Map();
   function merk(key, fn) { if (!CACHE.has(key)) { if (CACHE.size > 60) CACHE.clear(); CACHE.set(key, fn()); } return CACHE.get(key); }
@@ -1041,7 +1143,11 @@
     g.restore();
     if (zusatz) { g.save(); SA(g, 40, 900); g.textAlign = 'center'; g.fillStyle = zusatz.farbe; g.shadowColor = zusatz.farbe; g.shadowBlur = 14; g.fillText(zusatz.text, x + w / 2, y + h - 22); g.restore(); }
   }
-  function zeichne(g, t, c, p, m, vid, cam) {   // cam = Bild der Renn-Cam zur selben Stelle (oder nichts)
+  function zeichne(g, t, c, p, m, vid, cam) {   // ein Bild des Clips · das 🏁 Team-Logo liegt über allem (alle Vorlagen, Neon und TV-Sendung)
+    zeichneBild(g, t, c, p, m, vid, cam);
+    if (c.team) teamZeichnen(g, c.team, B, H);
+  }
+  function zeichneBild(g, t, c, p, m, vid, cam) {   // cam = Bild der Renn-Cam zur selben Stelle (oder nichts)
     if (p.mehr) return zeichneMehr(g, t, c, p, m, vid);
     if (c.look === 'tv') return zeichneTV(g, t, c, p, m, vid, cam);
     const v = vorlage(c), f = c.farbe || v.farbe, zoom = c.modus === 'zoom', st = stilVon(c), neon = st === 'neon';
@@ -1711,7 +1817,11 @@
     return { art: beste(arten, letzteA, a => a.id)[2], fi: beste(TR_FARBEN, letzteF, (w, i) => i)[3] };
   }
   let TR_TMP = null;
-  function trailerZeichnen(g, t, x, m, hg) {   // x = { art, farbe, serie, track, zeit, wort, tz, wann } · hg = Bild des Rennens (kann fehlen)
+  function trailerZeichnen(g, t, x, m, hg) {   // ein Bild des Trailers · 🏁 Team-Logo über allem: x.team (leer = ohne) · steht in x nichts, gilt die gemerkte Einstellung für Trailer
+    trailerBild(g, t, x, m, hg);
+    teamZeichnen(g, x.team === undefined ? teamStandard('trailer') : x.team, B, H);
+  }
+  function trailerBild(g, t, x, m, hg) {   // x = { art, farbe, serie, track, zeit, wort, tz, wann } · hg = Bild des Rennens (kann fehlen)
     const art = x.art || 'heute', f = x.farbe || TRAILER_V.farbe, zf = f === '#ffd400' || f === '#ff7a00' ? '#18e8ff' : '#ffd400', frei = art === 'liste' || art === 'plakat';
     const ein = (a, d) => eo(fp(t, a, a + (d || 0.35))), aus = (a, d) => 1 - fp(t, a, a + (d || 0.3)), knall = (a, d) => 1 + 0.8 * (1 - eob(fp(t, a, a + (d || 0.4))));
     const serie = GROSS(x.serie || 'SIMRACING'), strecke = GROSS(x.track || ''), wort = x.wort || 'HEUTE', tz = x.tz || 'HEUTE';
@@ -1983,7 +2093,7 @@
   }
   async function trailerBauen(x, m, hg, fortschritt) {
     if (!window.VideoEncoder) throw new Error('Dieser Browser kann keine Videos bauen. Bitte Chrome oder Edge nehmen.');
-    await Promise.all([muxerLaden(), schriften()]);
+    await Promise.all([muxerLaden(), schriften(), teamLaden()]);
     let vcfg = null;
     for (const hw of ['prefer-software', 'no-preference']) {
       for (const codec of ['avc1.640028', 'avc1.640032', 'avc1.4d0028', 'avc1.42e028']) {
@@ -2091,19 +2201,24 @@
     g.save(); g.lineWidth = 6; g.strokeStyle = f; g.shadowColor = f; g.shadowBlur = 30; g.beginPath(); g.roundRect(x, y, w, h, r); g.stroke(); g.restore();
   }
   function kKarte(g, x, y, w, h, f, stark) { g.save(); g.fillStyle = 'rgba(6,8,10,.82)'; g.beginPath(); g.roundRect(x, y, w, h, 22); g.fill(); g.lineWidth = stark ? 6 : 3; g.strokeStyle = f; g.shadowColor = f; g.shadowBlur = stark ? 30 : 14; g.stroke(); g.restore(); }
-  function karSeite(m, f, nr, n, mal) {   // eine Seite 1080×1350: Neon-Grund, Kopf (Logo, Kanal, Seite), Fuß (YouTube)
+  function karKopf(g, m, f, nr, n) {   // Kopf jeder Seite: Logo, Kanal, Seitenzahl
+    logoRing(g, 104, 104, 54, f, m.logo, 0);
+    const kanal = m.ytHandle || m.handle || '@Kreids888';
+    g.save(); SA(g, 46, 800); g.fillStyle = '#fff'; g.textAlign = 'left'; g.shadowColor = 'rgba(0,0,0,.85)'; g.shadowBlur = 10; g.fillText(kanal, 180, 120); g.restore();
+    const st = `${nr}/${n}`; pille(g, st, KB - 60 - pillenBreite(g, st, 40), 72, f, 40, false);
+  }
+  function karSeite(m, f, nr, n, mal, team) {   // eine Seite 1080×1350: Neon-Grund, Kopf (Logo, Kanal, Seite), Fuß (YouTube) · team = 🏁 Team-Logo über allem
     const c = leinwand(KB, KH), g = c.getContext('2d'), letzte = nr === n;
     g.drawImage(grund(f), 0, -(H - KH) / 2);
-    logoRing(g, 104, 104, 54, f, m.logo, 0);
-    g.save(); SA(g, 46, 800); g.fillStyle = '#fff'; g.textAlign = 'left'; g.shadowColor = 'rgba(0,0,0,.85)'; g.shadowBlur = 10; g.fillText(m.ytHandle || m.handle || '@Kreids888', 180, 120); g.restore();
-    const st = `${nr}/${n}`; pille(g, st, KB - 60 - pillenBreite(g, st, 40), 72, f, 40, false);
+    karKopf(g, m, f, nr, n);
     mal(g);
     pille(g, letzte ? 'JETZT ABONNIEREN' : 'LIVE AUF YOUTUBE', 60, KH - 132, f, 44, true);
     g.save(); SA(g, 46, 800); g.textAlign = 'right'; g.fillStyle = '#fff'; g.shadowColor = 'rgba(0,0,0,.85)'; g.shadowBlur = 10; g.fillText(letzte ? (m.ytHandle || '@Kreids888') : 'WISCHEN »', KB - 60, KH - 82); g.restore();
+    teamZeichnen(g, team, KB, KH);
     return c;
   }
   const zahlText = v => Number(v || 0).toLocaleString('de-DE');
-  function streamSeite(m, f, nr, n, s) {   // letzte Seite: nächster Stream oder einfach der Kanal
+  function streamSeite(m, f, nr, n, s, team) {   // letzte Seite: nächster Stream oder einfach der Kanal (team = 🏁 Team-Logo)
     return karSeite(m, f, nr, n, g => {
       if (s) {
         const d = new Date(s.liveMs), tag = GROSS(d.toLocaleDateString('de-DE', { timeZone: 'Europe/Berlin', weekday: 'long' })), dat = d.toLocaleDateString('de-DE', { timeZone: 'Europe/Berlin', day: '2-digit', month: '2-digit' }), uhr = d.toLocaleTimeString('de-DE', { timeZone: 'Europe/Berlin', hour: '2-digit', minute: '2-digit' });
@@ -2112,9 +2227,9 @@
       } else {
         kMitte(g, 'MEHR DAVON?', 400, 84); kChrom(g, 'LIVE AUF', 640, 190, f); kChrom(g, 'YOUTUBE', 850, 210, f); kNeon(g, m.ytHandle || '@Kreids888', 1010, 90, f);
       }
-    });
+    }, team);
   }
-  function fotoSeite(m, f, nr, n, img, o) {   // 📸 ein Foto aus der Toolbox füllt die Seite: oben Logo, Kanal und Seite, unten YouTube · o = Texte des Fotos { gross, klein, ort, look }
+  function fotoSeite(m, f, nr, n, img, o, team) {   // 📸 ein Foto aus der Toolbox füllt die Seite: oben Logo, Kanal und Seite, unten YouTube · o = Texte des Fotos { gross, klein, ort, look } · team = 🏁 Team-Logo über allem (nicht bei „nur das Foto“)
     o = o || {};
     const c = leinwand(KB, KH), g = c.getContext('2d'), iw = img.naturalWidth || img.width, ih = img.naturalHeight || img.height, q = Math.max(KB / iw, KH / ih);
     g.fillStyle = '#000'; g.fillRect(0, 0, KB, KH); g.drawImage(img, (KB - iw * q) / 2, (KH - ih * q) / 2, iw * q, ih * q);
@@ -2125,16 +2240,15 @@
     v = g.createLinearGradient(0, KH - hu, 0, KH); v.addColorStop(0, 'rgba(0,0,0,0)'); if (hu > 250) v.addColorStop(0.4, 'rgba(0,0,0,.55)'); v.addColorStop(1, 'rgba(0,0,0,.82)'); g.fillStyle = v; g.fillRect(0, KH - hu, KB, hu);
     if (gross) kNeon(g, gross, oben ? 338 : KH - (klein ? 258 : 190), 112, f);
     if (klein) kMitte(g, klein, oben ? (gross ? 408 : 330) : KH - 182, 46, 700);
-    logoRing(g, 104, 104, 54, f, m.logo, 0);
-    g.save(); SA(g, 46, 800); g.fillStyle = '#fff'; g.textAlign = 'left'; g.shadowColor = 'rgba(0,0,0,.85)'; g.shadowBlur = 10; g.fillText(m.ytHandle || m.handle || '@Kreids888', 180, 120); g.restore();
-    const st = `${nr}/${n}`; pille(g, st, KB - 60 - pillenBreite(g, st, 40), 72, f, 40, false);
+    karKopf(g, m, f, nr, n);
     pille(g, 'LIVE AUF YOUTUBE', 60, KH - 132, f, 44, true);
     if (nr < n) { g.save(); SA(g, 46, 800); g.textAlign = 'right'; g.fillStyle = '#fff'; g.shadowColor = 'rgba(0,0,0,.85)'; g.shadowBlur = 10; g.fillText('WISCHEN »', KB - 60, KH - 82); g.restore(); }
+    teamZeichnen(g, team, KB, KH);
     return c;
   }
   // 🏆 Top 5 der Woche · liste = [{ titel, wert, bild }] bester zuerst
-  function top5Seiten(m, liste, was, f, strm) {
-    const n = liste.length, ges = n + 2, aus = [];
+  function top5Seiten(m, liste, was, f, strm, team, nurErste) {   // team = 🏁 Team-Logo (leer = ohne) · nichts angegeben = die gemerkte Einstellung für Karussells · nurErste = nur die erste Seite (Vorschau)
+    const n = liste.length, ges = n + 2, aus = [], tm = team === undefined ? teamStandard('kar') : team;
     aus.push(karSeite(m, f, 1, ges, g => {
       kChrom(g, `TOP ${n}`, 420, 250, f); kNeon(g, 'DER WOCHE', 540, 104, f);
       const h = Math.min(118, 560 / n);
@@ -2142,14 +2256,15 @@
         g.save(); RU(g, 54); g.fillStyle = i ? '#fff' : f; g.textAlign = 'left'; g.fillText('#' + (i + 1), 100, y + (h - 14) / 2 + 20);
         const wt = zahlText(x.wert); RU(g, 46); g.textAlign = 'right'; g.fillStyle = GOLD; g.fillText(wt, 980, y + (h - 14) / 2 + 17); const ww = g.measureText(wt).width;
         passt(g, x.titel, 940 - 150 - ww - 60, 44, (gg, px) => SA(gg, px, 800), 24); g.textAlign = 'left'; g.fillStyle = '#fff'; g.fillText(x.titel, 215, y + (h - 14) / 2 + 15); g.restore(); });
-    }));
+    }, tm));
+    if (nurErste) return aus;
     for (let i = n - 1; i >= 0; i--) aus.push(karSeite(m, i ? f : GOLD, aus.length + 1, ges, g => {
       const x = liste[i], ff = i ? f : GOLD;
       kChrom(g, 'PLATZ ' + (i + 1), 330, 170, ff); kBild(g, x.bild, (KB - 382) / 2, 372, 382, 680, 22, ff, m);
       g.save(); passt(g, x.titel, 960, 54, (gg, px) => SA(gg, px, 800), 26); g.textAlign = 'center'; g.fillStyle = '#fff'; g.shadowColor = 'rgba(0,0,0,.85)'; g.shadowBlur = 10; g.fillText(x.titel, KB / 2, 1118); g.restore();
       kNeon(g, `${zahlText(x.wert)} ${was}`, 1186, 50, ff);
-    }));
-    aus.push(streamSeite(m, f, ges, ges, strm));
+    }, tm));
+    aus.push(streamSeite(m, f, ges, ges, strm, tm));
     return aus;
   }
   async function karHochladen(seiten, koerper) {   // Karussell anlegen, Bilder hochladen, kleines Vorschaubild dazu
@@ -2220,7 +2335,12 @@
   const KAR_MAX = 10;
   // 📸 Texte auf den Fotos (NEU 22.11.2026): pro Foto großer und kleiner Text, Platz (unten/oben) und Aussehen. Jede Seite steht als Vorschau im Formular, genau so, wie sie gepostet wird.
   const KAR_SPRUCH = ['SEITE AN SEITE', 'VOLLGAS', 'KEIN ZENTIMETER PLATZ', 'DAS WAR KNAPP', 'RAD AN RAD', 'MITTENDRIN', 'ATTACKE', 'SO SIEHT RENNEN AUS', 'WELCHES IST DEIN FAVORIT?', 'BILD DES TAGES'];
-  const KAR_LOOK = [['neon', 'Logo, Kanal und Text'], ['logo', 'nur Logo und Kanal'], ['ohne', 'nur das Foto']];
+  const KAR_LOOK = [['neon', 'Logo, Kanal und Text'], ['logo', 'nur Logo und Kanal'], ['ohne', 'nur das Foto (auch ohne Team-Logo)']];
+  const karSprueche = name => [...new Set([GROSS(fotoOrt(name)), ...KAR_SPRUCH].filter(Boolean))];   // Sprüche zum Anklicken: zuerst der Ort aus dem Dateinamen
+  function karSpruchAn(name) {   // markiert den Spruch, der gerade als großer Text auf dem Foto steht
+    if (!BOX) return; const jetzt = GROSS(String(karFoto(name).gross || '').trim());
+    BOX.querySelectorAll('[data-c="abl-kar-spruch"]').forEach(x => { if (x.dataset.name === name) x.classList.toggle('an', x.dataset.wert === jetzt); });
+  }
   function karFoto(name) {   // Einstellungen eines Fotos · das erste Foto bekommt den Ort als großen Text vorgeschlagen
     const K = ABL.kar; if (!K) return { gross: '', klein: '', ort: 'unten', look: 'neon', w: -1 };
     if (!K.seiten) K.seiten = {};
@@ -2232,13 +2352,13 @@
   async function ablKarVorschau(nur) {   // kleine Vorschau jeder Seite (nur = nur dieses Foto neu malen)
     const K = ABL.kar; if (!K || !BOX) return;
     const cs = [...BOX.querySelectorAll('canvas[data-abv]')]; if (!cs.length) return;
-    await schriften(); const m = MAT || await material(), strm = (stand().streams || [])[0] || null;
+    await schriften(); const m = MAT || await material(), strm = (stand().streams || [])[0] || null; await teamLaden(); const team = teamOk(K.team);
     const namen = ABL.fotoWahl.slice(0, K.schluss ? KAR_MAX - 1 : KAR_MAX), ges = namen.length + (K.schluss ? 1 : 0), f = karFarbe(namen[0]);
     for (const c of cs) {
       const n = c.dataset.abv; if (nur && n !== nur) continue;
       let seite = null;
-      if (n === '::schluss') seite = streamSeite(m, f, ges, ges, strm);
-      else { const i = namen.indexOf(n), img = i >= 0 ? await bild(ABL.fotoUrl.get(n)) : null; if (img) seite = fotoSeite(m, f, i + 1, ges, img, karFoto(n)); }
+      if (n === '::schluss') seite = streamSeite(m, f, ges, ges, strm, team);
+      else { const i = namen.indexOf(n), img = i >= 0 ? await bild(ABL.fotoUrl.get(n)) : null; if (img) seite = fotoSeite(m, f, i + 1, ges, img, karFoto(n), team); }
       if (seite && c.isConnected) { const g = c.getContext('2d'); g.clearRect(0, 0, c.width, c.height); g.drawImage(seite, 0, 0, c.width, c.height); }
     }
   }
@@ -2246,13 +2366,13 @@
   function ablKarStart() {   // Vorschlag für Titel, Text und Zeit, sobald das erste Foto angehakt ist
     if (ABL.kar) return ABL.kar;
     const ort = fotoOrt(ABL.fotoWahl[0] || ''), plan = lueckenPlan(stand(), Date.now()), frei = plan.find(e => !e.n && e.ms), cfg = stand().clipcfg || {};
-    ABL.kar = { seiten: {}, titel: GROSS(ort ? `${ort} · Bilder vom Rennen` : 'Bilder vom Rennen'), schluss: true, postMs: frei ? frei.ms : new Date(`${tagVon(Date.now() + 86400000)}T${cfg.zeit || '18:30'}:00`).getTime(),
+    ABL.kar = { seiten: {}, team: teamStandard('kar'), titel: GROSS(ort ? `${ort} · Bilder vom Rennen` : 'Bilder vom Rennen'), schluss: true, postMs: frei ? frei.ms : new Date(`${tagVon(Date.now() + 86400000)}T${cfg.zeit || '18:30'}:00`).getTime(),
       text: `📸 ${ort ? ort + ': ' : ''}Welches Bild ist dein Favorit? Schreib die Nummer in die Kommentare 👇\n\n#simracing #iracing #kreids888` };
     return ABL.kar;
   }
   function ablKarEingabe(t) {   // Tippen ändert nur die Werte (kein Neuzeichnen, sonst springt der Cursor)
     const K = ABL.kar, k = t.dataset.abk; if (!K) return;
-    if (k.startsWith('s:')) { karFoto(t.dataset.name)[k.slice(2)] = t.value; ablKarVorschauBald(t.dataset.name); return; }   // Text, Platz oder Aussehen eines Fotos
+    if (k.startsWith('s:')) { karFoto(t.dataset.name)[k.slice(2)] = t.value; if (k === 's:gross') karSpruchAn(t.dataset.name); ablKarVorschauBald(t.dataset.name); return; }   // Text, Platz oder Aussehen eines Fotos
     if (k === 'schluss') { K.schluss = t.checked; zeichnen(); }
     else if (k === 'postMs') { const ms = new Date(t.value).getTime(); if (isFinite(ms)) K.postMs = ms; }
     else K[k] = t.value;
@@ -2266,12 +2386,13 @@
     try {
       await schriften(); const st = stand(), m = MAT || await material(), strm = (st.streams || [])[0] || null;
       arbeit('🖼 Karussell wird gebaut …');
-      const f = karFarbe(namen[0]), ges = namen.length + (K.schluss ? 1 : 0), seiten = [];
+      const f = karFarbe(namen[0]), ges = namen.length + (K.schluss ? 1 : 0), seiten = [], team = teamOk(K.team);
+      await teamPflicht(team);
       for (let i = 0; i < namen.length; i++) {
         const img = await bild(ABL.fotoUrl.get(namen[i])); if (!img) throw new Error(`„${namen[i]}“ lässt sich nicht lesen. Bitte „↻ Neu lesen“ drücken.`);
-        seiten.push(fotoSeite(m, f, i + 1, ges, img, karFoto(namen[i])));
+        seiten.push(fotoSeite(m, f, i + 1, ges, img, karFoto(namen[i]), team));
       }
-      if (K.schluss) seiten.push(streamSeite(m, f, ges, ges, strm));
+      if (K.schluss) seiten.push(streamSeite(m, f, ges, ges, strm, team));
       await karHochladen(seiten, { vorlage: 'karbilder', frei: true, quelle: 'fotos:' + namen[0], postMs: K.postMs, titel: String(K.titel || 'Bilder vom Rennen').slice(0, 80), text: K.text });
       namen.forEach(n => ablMerken('foto:' + n)); ABL.fotoWahl = []; ABL.kar = null;
       ARBEIT = ''; UMG.meldung(`Eingeplant: ${zeit(K.postMs)} 🎉`); await UMG.laden();
@@ -2365,17 +2486,19 @@
           <div class="kc-felder"><label class="kc-feld">Titel<input type="text" maxlength="80" value="${esc(K.titel)}" data-abk="titel"></label>
             <label class="kc-feld">Geht raus am<input type="datetime-local" value="${esc(lokal(K.postMs))}" data-abk="postMs"></label></div>
           <label class="kc-feld">Text zum Post<textarea rows="3" data-abk="text">${esc(K.text)}</textarea></label>
+          ${teamPanel('foto')}
           <div class="kc-kar-seiten"><b>Texte auf den Bildern <span class="kc-dim">Feld leer = kein Text. Das kleine Bild zeigt jede Seite so, wie sie gepostet wird.</span></b>
             ${wahl.slice(0, K.schluss ? KAR_MAX - 1 : KAR_MAX).map((n, i, alle) => { const s = karFoto(n), d = `data-name="${esc(n)}"`; return `<div class="kc-kar-zeile">
-              <canvas class="kc-kar-vs" data-abv="${esc(n)}" width="432" height="540" title="Seite ${i + 1}: so wird sie gepostet"></canvas>
+              <canvas class="kc-kar-vs${teamOk(K.team) ? ' mit-team' : ''}" data-abv="${esc(n)}" width="432" height="540" title="Seite ${i + 1}: so wird sie gepostet${teamOk(K.team) ? ' · mit der Maus ziehen = Team-Logo verschieben' : ''}"></canvas>
               <div class="kc-kar-f"><b>Seite ${i + 1} <span class="kc-dim">${esc(fotoOrt(n) || n)}</span></b>
                 <div class="kc-felder"><label class="kc-feld">Text groß (Neon)<input type="text" maxlength="28" value="${esc(s.gross)}" data-abk="s:gross" ${d} placeholder="z. B. LONG BEACH"></label>
                   <label class="kc-feld">Text klein<input type="text" maxlength="44" value="${esc(s.klein)}" data-abk="s:klein" ${d} placeholder="z. B. Runde 12 · Seite an Seite"></label></div>
                 <div class="kc-felder"><label class="kc-feld">Wo steht der Text?<select data-abk="s:ort" ${d}><option value="unten" ${s.ort === 'oben' ? '' : 'selected'}>unten</option><option value="oben" ${s.ort === 'oben' ? 'selected' : ''}>oben</option></select></label>
                   <label class="kc-feld">Was kommt aufs Foto?<select data-abk="s:look" ${d}>${KAR_LOOK.map(([w, name]) => `<option value="${w}" ${s.look === w ? 'selected' : ''}>${name}</option>`).join('')}</select></label></div>
-                <div class="kc-auto-kn"><button type="button" class="btn ki-k" data-c="abl-kar-wuerfel" ${d} title="Setzt einen anderen Vorschlag als großen Text">🎲 Vorschlag</button><button type="button" class="btn ki-k" data-c="abl-kar-hoch" ${d} ${i ? '' : 'disabled'} title="Dieses Foto eine Seite nach vorn">▲ nach vorn</button><button type="button" class="btn ki-k" data-c="abl-kar-runter" ${d} ${i < alle.length - 1 ? '' : 'disabled'} title="Dieses Foto eine Seite nach hinten">▼ nach hinten</button></div>
+                <div class="kc-kar-spr"><span class="kc-dim">Spruch anklicken = großer Text (nochmal anklicken = wieder weg):</span>${karSprueche(n).map(w => `<button type="button" class="${GROSS(String(s.gross || '').trim()) === w ? 'an' : ''}" data-c="abl-kar-spruch" ${d} data-wert="${esc(w)}">${esc(w)}</button>`).join('')}</div>
+                <div class="kc-auto-kn"><button type="button" class="btn ki-k" data-c="abl-kar-hoch" ${d} ${i ? '' : 'disabled'} title="Dieses Foto eine Seite nach vorn">▲ nach vorn</button><button type="button" class="btn ki-k" data-c="abl-kar-runter" ${d} ${i < alle.length - 1 ? '' : 'disabled'} title="Dieses Foto eine Seite nach hinten">▼ nach hinten</button></div>
               </div></div>`; }).join('')}
-            ${K.schluss ? `<div class="kc-kar-zeile"><canvas class="kc-kar-vs" data-abv="::schluss" width="432" height="540" title="Letzte Seite: so wird sie gepostet"></canvas><div class="kc-kar-f"><b>Letzte Seite</b><span class="kc-dim">„Live auf YouTube“ mit dem nächsten Stream. Sie kommt von selbst und lässt sich unten mit dem Haken abschalten.</span></div></div>` : ''}
+            ${K.schluss ? `<div class="kc-kar-zeile"><canvas class="kc-kar-vs${teamOk(K.team) ? ' mit-team' : ''}" data-abv="::schluss" width="432" height="540" title="Letzte Seite: so wird sie gepostet"></canvas><div class="kc-kar-f"><b>Letzte Seite</b><span class="kc-dim">„Live auf YouTube“ mit dem nächsten Stream. Sie kommt von selbst und lässt sich unten mit dem Haken abschalten.</span></div></div>` : ''}
           </div>
           <label class="kc-check"><input type="checkbox" data-abk="schluss" ${K.schluss ? 'checked' : ''}> <span>Letzte Seite „Live auf YouTube“ anhängen</span></label>
           <div class="kc-auto-kn"><button type="button" class="btn kc-frei" data-c="abl-kar" ${seiten < 2 || ARBEIT ? 'disabled' : ''}>🖼 Karussell bauen & einplanen (${seiten} ${seiten === 1 ? 'Seite' : 'Seiten'})</button>
@@ -2428,7 +2551,7 @@
     if (!v || ARBEIT || TRAILER_LAEUFT || KAR_LAEUFT) return;
     KAR_LAEUFT = true;
     try {
-      await schriften(); const m = MAT || await material(), strm = (st.streams || [])[0] || null;
+      await schriften(); const m = MAT || await material(), strm = (st.streams || [])[0] || null; await teamLaden();   // 🏁 gemerktes Team-Logo (Karussell, Videos)
       let h = 0; for (const ch of v.q) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
       if (v.art === 'top3v') {   // 🏆 Top 3 als Video: die drei besten Clips der Woche in der Vorlage „Top 3 der Woche“ (Platz 3 → 2 → 1)
         const vl = VORLAGEN.find(y => y.id === 'top3'), quellen = [], urls = [];
@@ -2439,7 +2562,7 @@
           quellen.push({ datei: d, url, name: d.name || 'Clip', dauer: r.einst.dauer || ende, start: Math.max(r.einst.start || 0, ende - 6), ende, titel: y.titel });
         }
         const [p1, p2, p3] = quellen;   // quellen = bester zuerst · die Vorlage will Platz 3, 2, 1
-        const c = mitText({ id: Math.random().toString(36).slice(2), ...p3, vorlage: 'top3', ...spruecheNeu(vl), zeitlupe: false, modus: 'ganz', versatz: 0, farbe: vl.farbe, text: '', textEigen: false, look: 'neon', stil: stilNeu(''), folgeAn: false,
+        const c = mitText({ id: Math.random().toString(36).slice(2), ...p3, vorlage: 'top3', ...spruecheNeu(vl), zeitlupe: false, modus: 'ganz', versatz: 0, farbe: vl.farbe, text: '', textEigen: false, look: 'neon', stil: stilNeu(''), folgeAn: false, team: teamStandard('clip'),
           extra: [p2, p1], insta: true, tiktok: !!(st.tiktok && st.tiktok.verbunden), youtube: !!(st.youtube && st.youtube.verbunden), postMs: e.ms });
         try {
           arbeit('🏆 Video „Top 3 der Woche“ wird gebaut … 0 %');
@@ -2624,7 +2747,8 @@
       const typ = (e && e.typ) || (c.trailer ? 'trailer' : /^morgen:/.test(q) ? 'morgen' : /^verpasst:/.test(q) ? 'verpasst' : /^woche:/.test(q) ? 'woche' : c.vorlage === 'kartop5' ? 'top5' : '');
       const rk = c.trailer || q.split(':').slice(1).join(':'), s = [...(st.streams || []), ...(st.streamsAlt || [])].find(y => y.rennKey === rk) || null;
       E = { id, typ, art: e ? e.art : (mt && mt[1]) || 'heute', fi: e ? e.fi : mt ? Number(mt[2] || 0) % TR_FARBEN.length : 0, x: e ? e.x : typ ? autoX(typ, s, st, c.postMs) : null, hgUrl: e ? e.hgUrl : (s && s.hg) || '', hgAn: e ? e.hgAn : undefined, ton: e && e.ton ? e.ton : tonStandard(),
-        titel: c.titel || '', text: c.text || '', postMs: c.postMs, insta: !!c.insta, tiktok: !!c.tiktok, youtube: !!c.youtube, trailer: c.trailer || '', trailerLive: c.trailerLive || 0, quelle: q };
+        titel: c.titel || '', text: c.text || '', postMs: c.postMs, insta: !!c.insta, tiktok: !!c.tiktok, youtube: !!c.youtube, trailer: c.trailer || '', trailerLive: c.trailerLive || 0, quelle: q,
+        team: e && 'team' in e ? teamOk(e.team) : undefined, teamOffen: !(e && 'team' in e) };   // 🏁 Team-Logo, mit dem der Post gebaut wurde (nicht gemerkt = die Einstellung von jetzt)
     } else {
       const e = lueckenPlan(st, Date.now()).find(y => y.tag === tag), v = e && e.vorschlag; if (!v) return;
       const s = v.s || null, x = autoX(v.art, s, st, e.ms), w = trailerWahl(st.clips, v.q, !!(s && s.hg), []);
@@ -2633,12 +2757,14 @@
     }
     if (!E || !E.typ || !E.x) return UMG.meldung('Dieser Post lässt sich hier nicht bearbeiten (der Stream steht nicht mehr im Kalender).', 1);
     if (!MAT) await material();
+    await teamLaden(); if (E.team === undefined) E.team = teamStandard(E.typ === 'top5' ? 'kar' : 'trailer');
     E.hg = null; try { if (E.hgUrl && E.typ !== 'woche' && E.typ !== 'top5') E.hg = await bild(E.hgUrl); } catch (err) { E.hg = null; }
     if (E.hgAn === undefined) E.hgAn = !!E.hg;
     if (!E.hg && E.art === 'plakat') E.art = 'heute';
     if (E.typ === 'top5') { const t = top5Liste(st.clips, Date.now()); for (const y of t.liste) { try { y.bild = y.bildUrl ? await bild(y.bildUrl) : null; } catch (err) { y.bild = null; } } E.topListe = t.liste; E.topWas = t.was;
       if (t.liste.length < 3) return UMG.meldung('Für die Top der Woche braucht es mindestens 3 gepostete Clips mit Zahlen.', 1); }
-    E.name = AE_NAME[E.typ] || 'Post'; E.sicht0 = JSON.stringify([E.art, E.fi, E.x, E.hgAn, E.ton]);
+    E.name = AE_NAME[E.typ] || 'Post'; E.sicht0 = JSON.stringify([E.art, E.fi, E.x, E.hgAn, E.ton, E.team || null]);
+    if (E.id && E.teamOffen && E.team) E.sicht0 = '';   // nicht gemerkt, mit welchem Logo der Post gebaut wurde: beim Speichern neu bauen, damit er zur Vorschau passt
     CLIP_ED = null; BEARBEITE = null;   // immer nur ein Editor offen
     AUTO_ED = E; zeichnen(); autoEdLauf();
     try { BOX.querySelector('.kc-ae').scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch (err) { /* egal */ }
@@ -2649,10 +2775,10 @@
       const E = AUTO_ED; if (!E) return; AE_LAUF = requestAnimationFrame(lauf);
       if (!MAT) { if (!autoEdLauf.laedt) { autoEdLauf.laedt = true; material().catch(() => {}).then(() => { autoEdLauf.laedt = false; }); } return; }   // nach „Neu laden“ ist das Logo weg: neu holen
       const cv = BOX && BOX.querySelector('canvas.kc-ae-vorschau'); if (!cv) return;   // nur die Leinwand (der Schnell-Editor hat an der Stelle ein Video)
-      if (E.typ === 'top5') { if (cv.dataset.fertig) return; cv.getContext('2d').drawImage(top5Seiten(MAT, E.topListe, E.topWas, TR_FARBEN[E.fi], null)[0], 0, 0, cv.width, cv.height); cv.dataset.fertig = '1'; return; }
+      if (E.typ === 'top5') { if (cv.dataset.fertig) return; cv.getContext('2d').drawImage(top5Seiten(MAT, E.topListe, E.topWas, TR_FARBEN[E.fi], null, E.team || null, true)[0], 0, 0, cv.width, cv.height); cv.dataset.fertig = '1'; return; }
       if (jetzt - letzte < 66) return; letzte = jetzt;
       const g = cv.getContext('2d'); g.save(); g.scale(cv.width / B, cv.height / H);
-      try { trailerZeichnen(g, ((jetzt - t0) / 1000) % TRAILER_T, { ...E.x, art: E.art, farbe: TR_FARBEN[E.fi] }, MAT, E.hgAn ? E.hg : null); } catch (err) { /* nächstes Bild */ }
+      try { trailerZeichnen(g, ((jetzt - t0) / 1000) % TRAILER_T, { ...E.x, art: E.art, farbe: TR_FARBEN[E.fi], team: E.team || null }, MAT, E.hgAn ? E.hg : null); } catch (err) { /* nächstes Bild */ }
       g.restore();
     };
     AE_LAUF = requestAnimationFrame(lauf);
@@ -2670,7 +2796,7 @@
     const E = AUTO_ED; if (!E) return '';
     const video = E.typ !== 'top5', woche = E.x.modus === 'woche', feld = (k, label, wert, extra) => `<label class="kc-feld">${label}<input type="text" value="${esc(wert || '')}" data-ae="${k}" ${extra || ''}></label>`;
     return `<div class="kc-ae"><div class="kc-ae-kopf">✏️ ${esc(E.name)} bearbeiten</div>
-      <div class="kc-ae-innen"><canvas class="kc-ae-vorschau" width="270" height="${video ? 480 : 338}"></canvas>
+      <div class="kc-ae-innen"><canvas class="kc-ae-vorschau${teamOk(E.team) ? ' mit-team' : ''}" width="270" height="${video ? 480 : 338}"${teamOk(E.team) ? ' title="Mit der Maus ziehen = Team-Logo verschieben"' : ''}></canvas>
       <div class="kc-ae-felder">
         ${E.typ === 'trailer' || E.typ === 'morgen' ? `<div class="kc-ae-zeile"><span>Vorlage</span>${TR_ARTEN.filter(a => !a.bild || (E.hg && E.hgAn)).map(a => `<button type="button" class="kc-ae-chip${a.id === E.art ? ' an' : ''}" data-c="ae-art" data-wert="${a.id}">${esc(a.name)}</button>`).join('')}</div>` : ''}
         <div class="kc-ae-zeile"><span>Farbe</span>${TR_FARBEN.map((f, i) => `<button type="button" class="kc-ae-farbe${i === E.fi ? ' an' : ''}" style="--f:${f}" data-c="ae-farbe" data-wert="${i}" title="Farbe ${i + 1}"></button>`).join('')}</div>
@@ -2679,6 +2805,7 @@
         ${video && !woche ? `<div class="kc-felder">${feld('wort', 'Wort groß', E.x.wort)}${feld('tz', 'Zeile klein', E.x.tz)}${feld('serie', 'Serie', E.x.serie)}${feld('track', 'Strecke', E.x.track)}${E.x.modus === 'verpasst' ? '' : feld('zeit', 'Uhrzeit', E.x.zeit) + feld('wann', 'Tag', E.x.wann)}</div>` : ''}
         ${woche ? `<label class="kc-feld">Streams – eine Zeile pro Stream: Tag | Uhrzeit | Serie<textarea rows="5" data-ae="liste">${esc(E.x.liste.map(z => [z.tag, z.zeit, z.serie].join(' | ')).join('\n'))}</textarea></label>` : ''}
         ${video && E.hg ? `<label class="kc-check"><input type="checkbox" data-ae="hgAn" data-c="ae-neu" ${E.hgAn ? 'checked' : ''}> <span><b>Bild vom Rennen zeigen</b></span></label>` : ''}
+        ${teamPanel('ae')}
         ${feld('titel', 'Titel', E.titel, 'maxlength="80"')}
         <label class="kc-feld">Text unter dem Post<textarea rows="4" maxlength="2200" data-ae="text">${esc(E.text)}</textarea></label>
         <div class="kc-felder"><label class="kc-feld">Geht raus am<input type="datetime-local" value="${esc(lokal(E.postMs))}" data-ae="postMs"></label>
@@ -2692,18 +2819,18 @@
     if (video && !E.insta && !E.tiktok && !E.youtube) return UMG.meldung('Bitte YouTube, Instagram oder TikTok anhaken.', 1);
     if (!(E.postMs > Date.now())) return UMG.meldung('Die Zeit liegt in der Vergangenheit. Bitte „Geht raus am“ ändern.', 1);
     autoEdStill();
-    const nurText = !!E.id && JSON.stringify([E.art, E.fi, E.x, E.hgAn, E.ton]) === E.sicht0;   // Bild bleibt gleich: nur Text, Zeit und Ziele speichern
-    const kopf = { titel: String(E.titel || '').slice(0, 80), text: E.text, postMs: E.postMs, frei: true, aus: false, einst: JSON.stringify({ typ: E.typ, art: E.art, fi: E.fi, x: E.x, hgUrl: E.hgUrl, hgAn: E.hgAn, ton: E.ton }),
+    const nurText = !!E.id && JSON.stringify([E.art, E.fi, E.x, E.hgAn, E.ton, E.team || null]) === E.sicht0;   // Bild bleibt gleich: nur Text, Zeit und Ziele speichern
+    const kopf = { titel: String(E.titel || '').slice(0, 80), text: E.text, postMs: E.postMs, frei: true, aus: false, einst: JSON.stringify({ typ: E.typ, art: E.art, fi: E.fi, x: E.x, hgUrl: E.hgUrl, hgAn: E.hgAn, ton: E.ton, team: E.team || null }),
       ...(video ? { insta: E.insta, tiktok: E.tiktok, youtube: E.youtube } : {}) };
     KAR_LAEUFT = true;
     try {
       if (nurText) await UMG.igApi('POST', `/api/clip/${E.id}/aendern`, kopf);
       else {
-        const m = MAT || await material();
-        if (!video) { arbeit('🏆 Karussell wird gebaut …'); await karHochladen(top5Seiten(m, E.topListe, E.topWas, TR_FARBEN[E.fi], (st.streams || [])[0] || null), { ...kopf, vorlage: 'kartop5', auto: true, quelle: E.quelle }); }
+        const m = MAT || await material(); await teamPflicht(E.team);
+        if (!video) { arbeit('🏆 Karussell wird gebaut …'); await karHochladen(top5Seiten(m, E.topListe, E.topWas, TR_FARBEN[E.fi], (st.streams || [])[0] || null, E.team || null), { ...kopf, vorlage: 'kartop5', auto: true, quelle: E.quelle }); }
         else {
           try { localStorage.setItem('k888_trailer_ton', JSON.stringify(E.ton)); } catch (err) { /* egal */ }   // gilt ab jetzt auch für neue Trailer
-          const x = { ...E.x, art: E.art, farbe: TR_FARBEN[E.fi], ton: E.ton }, hg = E.hgAn ? E.hg : null, thumb = E.typ === 'trailer' || E.typ === 'morgen' ? (TR_ARTEN.find(a => a.id === E.art) || TR_ARTEN[0]).thumb : 3.4;
+          const x = { ...E.x, art: E.art, farbe: TR_FARBEN[E.fi], ton: E.ton, team: E.team || null }, hg = E.hgAn ? E.hg : null, thumb = E.typ === 'trailer' || E.typ === 'morgen' ? (TR_ARTEN.find(a => a.id === E.art) || TR_ARTEN[0]).thumb : 3.4;
           arbeit('🎬 Video wird gebaut …');
           const blob = await trailerBauen(x, m, hg, q => arbeit(`🎬 Video wird gebaut … ${Math.round(q * 100)} %`));
           arbeit('⬆ Hochladen …');
@@ -3358,7 +3485,7 @@
   }
   async function bauen(c, m, fortschritt) {
     if (!window.VideoEncoder) throw new Error('Dieser Browser kann keine Videos bauen. Bitte Chrome oder Edge nehmen.');
-    await Promise.all([muxerLaden(), schriften()]);
+    await Promise.all([muxerLaden(), schriften(), teamPflicht(c.team)]);
     const p = zeitplan(c), q = quellenVon(c);
     const quelle = p.mehr ? await Promise.all(p.slots.map(i => quellTon(q[i]))) : await quellTon(c), ton = await tonMischen(c, p, quelle);
     const lesers = [];
@@ -3426,7 +3553,7 @@
   }
   // Vorschaubild (für die Liste): Spruch steht, Clip läuft
   async function vorschaubild(c, m) {
-    await schriften();
+    await schriften(); await teamLaden();
     const p = zeitplan(c), t = Math.min(1.4, p.D * 0.5), q = quellenVon(c), vids = [];
     let bild;
     if (p.mehr) { bild = []; for (const sp of p.spur(t)) { const v = await videoElement(q[p.slots[sp.s]].url); await suchen(v, sp.t); bild[sp.s] = v; vids.push(v); } }
@@ -3450,7 +3577,7 @@
   async function material() {
     const st = stand(), d = st.design || {};
     const name = ((st.konto && st.konto.username) || 'kreids888');
-    const logo = await bild(d.logoBild || '');
+    const [logo] = await Promise.all([bild(d.logoBild || ''), teamLaden()]);   // 🏁 Team-Logos gleich mitladen (sie werden beim Zeichnen sofort gebraucht)
     const ytHandle = (String(d.liveText || (st.cfg || {}).liveText || '').match(/@[\w.\-]+/) || [])[0] || '@Kreids888';   // YouTube-Kanal für den Abspann
     MAT = { logo, name: GROSS(name), handle: '@' + GROSS(name), ytHandle };
     return MAT;
@@ -3461,7 +3588,7 @@
       v.onloadedmetadata = () => {
         const dauer = v.duration || 0, vl = VORLAGEN[0];
         ok(dauer >= 2 ? mitStich(mitText({ id: Math.random().toString(36).slice(2), datei, url, name: datei.name, dauer, start: Math.max(0, dauer - 15), ende: dauer,
-          vorlage: vl.id, ...spruecheNeu(vl), zeitlupe: vl.zl, modus: 'ganz', versatz: 0, farbe: vl.farbe, text: '', textEigen: false, look: LETZTER_LOOK, stil: stilNeu(''),
+          vorlage: vl.id, ...spruecheNeu(vl), zeitlupe: vl.zl, modus: 'ganz', versatz: 0, farbe: vl.farbe, text: '', textEigen: false, look: LETZTER_LOOK, stil: stilNeu(''), team: teamStandard('clip'),
           insta: true, tiktok: !!(stand().tiktok && stand().tiktok.verbunden), youtube: !!(stand().youtube && stand().youtube.verbunden), postMs: 0 })) : null);
       };
       v.onerror = () => ok(null);
@@ -3518,7 +3645,7 @@
   function clipAusQuelle(x) {   // Platz frei machen: Clip kommt zurück in die Warteschlange
     const vl = VORLAGEN[0];
     return mitStich(mitText({ id: Math.random().toString(36).slice(2), datei: x.datei, url: x.url, name: x.name, dauer: x.dauer, start: Math.max(0, x.dauer - 15), ende: x.dauer,
-      vorlage: vl.id, ...spruecheNeu(vl), zeitlupe: vl.zl, modus: 'ganz', versatz: 0, farbe: vl.farbe, text: '', textEigen: false, look: LETZTER_LOOK, stil: stilNeu(''),
+      vorlage: vl.id, ...spruecheNeu(vl), zeitlupe: vl.zl, modus: 'ganz', versatz: 0, farbe: vl.farbe, text: '', textEigen: false, look: LETZTER_LOOK, stil: stilNeu(''), team: teamStandard('clip'),
       insta: true, tiktok: !!(stand().tiktok && stand().tiktok.verbunden), youtube: !!(stand().youtube && stand().youtube.verbunden), postMs: 0 }));
   }
   const platzZahl = v => (v.plaetze ? v.plaetze.length : 1);
@@ -3646,6 +3773,7 @@
         ${v.analyse ? '<div class="kc-hinweis kc-mitte">🎯 Tipp ins Bild auf die Stelle, die eingekreist werden soll.</div>' : ''}
         ${bildPanel(c, v)}
         ${camPanel(c, v)}
+        ${teamPanel('clip')}
       </div>
       <div class="kc-rechts">
         <div class="kc-schritt">1 · Vorlage</div>
@@ -4053,10 +4181,19 @@
       zeichnen(); return;
     }
     if (a === 'abl-foto-leer') { ABL.fotoWahl = []; ABL.kar = null; zeichnen(); return; }
-    if (a === 'abl-kar-wuerfel') {   // 🎲 nächster Vorschlag für den großen Text (erst der Ort aus dem Dateinamen, dann die Sprüche)
-      const n = b.dataset.name, s = karFoto(n), liste = [GROSS(fotoOrt(n)), ...KAR_SPRUCH].filter(Boolean);
-      s.w = ((s.w == null ? -1 : s.w) + 1) % liste.length; if (liste[s.w] === s.gross) s.w = (s.w + 1) % liste.length;
-      s.gross = liste[s.w]; if (s.look !== 'neon') s.look = 'neon'; zeichnen(); return;
+    if (a === 'team-wahl' || a === 'team-reset') {   // 🏁 Team-Logo wählen („Ohne“ = keins) · ↺ zurück an den Standardplatz
+      const feld = b.closest('[data-team]'), ort = feld && feld.dataset.team, o = TEAM_ORT[ort], h = o && o.halter(); if (!h) return;
+      const art = o.art(), alt = teamOk(h.team), d = a === 'team-reset' ? (alt || {}).d : b.dataset.wert;
+      h.team = d ? teamOk({ ...(a === 'team-reset' ? TEAM_PLATZ[art] : alt || teamPlatz(art)), d }) : null;
+      teamMerken(art, h.team);
+      if (d && !(await teamBild(d))) UMG.meldung('Das Team-Logo lässt sich gerade nicht laden. Bitte noch einmal anklicken.', 1);
+      zeichnen(); return;
+    }
+    if (a === 'abl-kar-spruch') {   // Spruch anklicken = großer Text dieses Fotos (nochmal anklicken = wieder weg)
+      const n = b.dataset.name, s = karFoto(n), w = b.dataset.wert, feld = x => [...BOX.querySelectorAll(`[data-abk="${x}"]`)].find(e => e.dataset.name === n);
+      s.gross = GROSS(String(s.gross || '').trim()) === w ? '' : w; if (s.gross && s.look !== 'neon') s.look = 'neon';
+      const fg = feld('s:gross'), fl = feld('s:look'); if (fg) fg.value = s.gross; if (fl) fl.value = s.look;
+      karSpruchAn(n); ablKarVorschauBald(n); return;
     }
     if (a === 'abl-kar-hoch' || a === 'abl-kar-runter') {   // Reihenfolge der Fotos ändern
       const i = ABL.fotoWahl.indexOf(b.dataset.name), j = a === 'abl-kar-hoch' ? i - 1 : i + 1;
@@ -4107,7 +4244,13 @@
     if (v.mehr === 'aufholjagd') { const st = startPlatz(c); BOX.querySelectorAll('.kc-marken .kc-marke b').forEach((b, i) => { b.textContent = 'P' + Math.max(1, st - i - 1); }); }
     if (p.sektoren) { const el = BOX.querySelector('.kc-marke .kc-fuell'); if (el) el.textContent = zeitText(p.sektoren[p.sektoren.length - 1].zeit); }
   }
+  function teamEingabe(ev) {   // 🏁 Regler am Team-Logo: Größe, links/rechts, oben/unten → true = erledigt
+    const t = ev.target; if (!t || !t.dataset || !/^team-[sxy]$/.test(t.dataset.c || '') || !BOX.contains(t)) return false;
+    const feld = t.closest('[data-team]'), k = t.dataset.c.slice(5); if (feld) teamSetzen(feld.dataset.team, x => ({ ...x, [k]: +t.value }), true);
+    return true;
+  }
   function eingabe(ev) {
+    if (teamEingabe(ev)) return;
     if (ev.target && ev.target.dataset && ev.target.dataset.abk && BOX.contains(ev.target)) { if (ev.target.type !== 'checkbox') ablKarEingabe(ev.target); return; }   // 📸 Karussell aus Fotos
     if (ev.target && ev.target.dataset && ev.target.dataset.ce && BOX.contains(ev.target)) { clipEdEingabe(ev.target); return; }   // ✏️ Schnell-Editor für geplante Clips
     if (ev.target && ev.target.dataset && ev.target.dataset.ae && BOX.contains(ev.target)) { autoEdEingabe(ev.target); return; }   // ✏️ Editor für Automatisches
@@ -4156,6 +4299,7 @@
     }
   }
   function aenderung(ev) {
+    if (teamEingabe(ev)) return;
     if (ev.target && ev.target.dataset && ev.target.dataset.abk && BOX.contains(ev.target)) { ablKarEingabe(ev.target); return; }
     if (ev.target && ev.target.dataset && ev.target.dataset.ce && BOX.contains(ev.target)) { clipEdEingabe(ev.target); return; }
     if (ev.target && ev.target.dataset && ev.target.dataset.ae && BOX.contains(ev.target)) { autoEdEingabe(ev.target); if (ev.target.dataset.ae === 'hgAn') { if (AUTO_ED && !AUTO_ED.hgAn && AUTO_ED.art === 'plakat') AUTO_ED.art = 'heute'; zeichnen(); } return; }
@@ -4198,6 +4342,7 @@
     const L = lage(c, c.look === 'tv'); return { src: c, w: L.fw, h: L.fh };
   }
   function ziehenStart(ev) {
+    const tz = teamZug(ev); if (tz) { ZUG = tz; try { tz.cv.setPointerCapture(ev.pointerId); } catch (e) { /* egal */ } return; }   // 🏁 Team-Logo anfassen
     const cv = ev.target.closest && ev.target.closest('canvas[data-c="vorschau"]'), c = CLIPS[0]; if (!cv || !c || ev.button > 0) return;
     const pt = vorschauPunkt(cv, ev), u = quelleUnter(c, pt.x, pt.y), kr = camRahmen(c);
     if (kr && pt.x >= kr.x && pt.x <= kr.x + kr.w && pt.y >= kr.y && pt.y <= kr.y + kr.h) {   // 📷 auf der Cam: Rahmen (Ecke, Rund) oder Ausschnitt verschieben
@@ -4210,6 +4355,13 @@
   function ziehenBewegen(ev) {
     if (!ZUG || ev.pointerId !== ZUG.id) return;
     const dx = (ev.clientX - ZUG.x0) * ZUG.s, dy = (ev.clientY - ZUG.y0) * ZUG.s;
+    if (ZUG.team) {   // 🏁 Team-Logo verschieben (Mitte bleibt im Bild)
+      const tx = (ev.clientX - ZUG.x0) * ZUG.sx, ty = (ev.clientY - ZUG.y0) * ZUG.sy;
+      if (!ZUG.bewegt && Math.hypot(ev.clientX - ZUG.x0, ev.clientY - ZUG.y0) < 3) return;
+      ZUG.bewegt = true; ZUG.cv.classList.add('zieht');
+      teamSetzen(ZUG.team, () => ({ ...ZUG.t0, x: kl(ZUG.t0.x + tx / ZUG.W, 0, 1), y: kl(ZUG.t0.y + ty / ZUG.Hh, 0, 1) }), false, ZUG.name);
+      return;
+    }
     if (!ZUG.bewegt && Math.hypot(dx, dy) < 14) return;
     ZUG.bewegt = true; ZUG.cv.classList.add('zieht');
     if (ZUG.cam) {
@@ -4222,6 +4374,7 @@
   }
   function ziehenEnde(ev) {
     if (!ZUG || ev.pointerId !== ZUG.id) return;
+    if (ZUG.team && ZUG.bewegt) teamSetzen(ZUG.team, x => x, true);   // 🏁 neuen Platz merken, alle Seiten nachziehen
     if (ZUG.bewegt) VOR.gezogen = performance.now();
     if (ZUG.bewegt && ZUG.cam === 'rahmen' && CLIPS[0]) {   // über den Rand gezogen: Lage auf das zurückstellen, was man sieht
       const c = CLIPS[0], G = camGeo(c), r = camRahmen(c, G);
@@ -4232,6 +4385,8 @@
   function radZoom(ev) {
     const cv = ev.target.closest && ev.target.closest('canvas[data-c="vorschau"]'), c = CLIPS[0]; if (!cv || !c) return;
     ev.preventDefault();
+    const tr = c.team && teamRechteck(c.team, B, H), pw = vorschauPunkt(cv, ev);
+    if (tr && pw.x >= tr.x - 14 && pw.x <= tr.x + tr.w + 14 && pw.y >= tr.y - 14 && pw.y <= tr.y + tr.h + 14) { teamSetzen('clip', x => ({ ...x, s: x.s * Math.exp(-ev.deltaY * 0.0012) }), true); return; }   // 🏁 Mausrad auf dem Team-Logo: größer/kleiner
     const kr = camRahmen(c), pk = vorschauPunkt(cv, ev);
     if (kr && pk.x >= kr.x && pk.x <= kr.x + kr.w && pk.y >= kr.y && pk.y <= kr.y + kr.h) {   // 📷 Mausrad auf der Cam: Ausschnitt größer/kleiner
       const z = kl(Math.max(1, camBild(c).z) * Math.exp(-ev.deltaY * 0.0012), 1, 3); c.camTf = { ...camBild(c), z };
@@ -4432,6 +4587,23 @@
 .kc-app .kc-foto.benutzt{opacity:.55}.kc-app .kc-foto .kc-tag-ok{position:absolute;left:0;right:0;bottom:0;padding:3px 4px;background:rgba(0,0,0,.75);font-size:11px}
 .kc-app .kc-foto-form{display:flex;flex-direction:column;gap:10px;margin-top:12px;padding:12px;background:#101218;border:1px solid #2a2f36}
 .kc-app .kc-kar-seiten{display:flex;flex-direction:column;gap:10px}
+.kc-app .kc-team{border-color:rgba(141,255,92,.4)}
+.kc-app .kc-team-gal{display:flex;flex-wrap:wrap;gap:8px}
+.kc-app .kc-team-gal button{width:104px;height:88px;padding:6px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;background:#07080b;border:2px solid #2a2f36;color:#fff;cursor:pointer}
+.kc-app .kc-team-gal button img{max-width:100%;height:48px;object-fit:contain;display:block}
+.kc-app .kc-team-gal button i{font:700 11px var(--disp,inherit);font-style:normal;letter-spacing:.06em;text-transform:uppercase;color:#aeb4bd}
+.kc-app .kc-team-gal button:hover{border-color:#5a626d}
+.kc-app .kc-team-gal button.an{border-color:#8dff5c;box-shadow:0 0 0 2px #8dff5c}.kc-app .kc-team-gal button.an i{color:#8dff5c}
+.kc-app .kc-team .kc-feld input[type=range]{accent-color:#8dff5c}
+.kc-app .kc-team-zwei{display:flex;flex-wrap:wrap;gap:14px;align-items:flex-start}
+.kc-app .kc-team-regler{flex:1 1 260px;min-width:0;display:flex;flex-direction:column;gap:8px}
+.kc-app .kc-team-vs{flex:0 0 auto;width:216px;height:270px;display:block;background:#07080b;border:1px solid #2a2f36}
+.kc-app canvas.mit-team{touch-action:none;cursor:grab}.kc-app canvas.mit-team.zieht{cursor:grabbing}
+.kc-app .kc-kar-spr{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.kc-app .kc-kar-spr .kc-dim{flex:1 0 100%}
+.kc-app .kc-kar-spr button{padding:5px 9px;background:#07080b;border:1px solid #2a2f36;color:#d7dbe0;font:700 12px var(--disp,inherit);letter-spacing:.05em;cursor:pointer}
+.kc-app .kc-kar-spr button:hover{border-color:#5a626d;color:#fff}
+.kc-app .kc-kar-spr button.an{border-color:#8dff5c;color:#8dff5c;box-shadow:0 0 0 1px #8dff5c}
 .kc-app .kc-kar-zeile{display:grid;grid-template-columns:132px minmax(0,1fr);gap:12px;align-items:start;padding:10px;background:#0b0d12;border:1px solid #2a2f36}
 .kc-app .kc-kar-vs{width:132px;height:165px;display:block;background:#07080b;border:1px solid #2a2f36}
 .kc-app .kc-kar-f{display:flex;flex-direction:column;gap:8px;min-width:0}
