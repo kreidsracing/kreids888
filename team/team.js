@@ -148,7 +148,7 @@
         <div class="tm-ava" style="background-image:url('${esc(ME.user.avatar)}')"></div>
         <div class="tm-me-txt">
           <div class="tm-me-name">${esc(ME.user.name)}</div>
-          <div class="tm-me-sub">${ME.isAdmin ? "Admin" : ME.access ? "Teammitglied" : "Gast"}</div>
+          <div class="tm-me-sub">${ME.isAdmin ? "Admin" : ME.gast ? "Gastfahrer" : ME.access ? "Teammitglied" : "Gast"}</div>
         </div>
         <button class="tm-icon-btn" id="tm-logout" title="Abmelden" aria-label="Abmelden">${ICONS.logout}</button>
       </div>`;
@@ -453,7 +453,7 @@
     const aktiv = (EVLIVE || []).filter(r => r.aktiv).length;
     let h = lnk("stint", `${ICONS.calendar}<span>Events</span>`, id === "stint" || id === "stint/neu", "td-ev-top");
     h += lnk("spotting", `${ICONS.eye}<span>Spotting</span>${aktiv ? `<span class="td-live"><i></i>${aktiv} live</span>` : ""}`, id === "spotting" || id.startsWith("spotting/"), "td-ev-top");
-    h += lnk("abwesend", `${ICONS.clock}<span>Abwesenheiten</span>`, id === "abwesend", "td-ev-top");
+    if (!ME.gast) h += lnk("abwesend", `${ICONS.clock}<span>Abwesenheiten</span>`, id === "abwesend", "td-ev-top");   // Gastfahrer: nur Events und Spotting
     if (!EVNAV) h += '<div class="td-ev-leer">Lädt …</div>';
     else {
       const ende = (p) => Math.max(p.start, ...p.cars.map(c => c.start || p.start)) + (p.mode === "zeit" ? p.dauerMin * 60000 : 6 * 3600000);
@@ -548,6 +548,8 @@
     let id = location.hash.replace("#", "");
     const neu = id.startsWith("admin/") ? (DISCORD_TEILE.includes(id.slice(6)) ? "discord-posts/" : "team-zugang/") + id.slice(6) : ALT_ADR[id];
     if (neu) { id = neu; history.replaceState(null, "", "#" + id); }
+    const gast = !!ME.gast;   // 🎟 Gastfahrer (Verwaltung → Team & Zugang → Zugang → Gast-Rollen)
+    if (gast && !(id === "stint" || id.startsWith("stint/") || id === "spotting" || id.startsWith("spotting/"))) { id = "stint"; history.replaceState(null, "", "#stint"); }
     MAIN_IN = null;
     const tools = Object.keys(PANELS).filter(p => ME.panels[p] && p !== "garage61" && p !== "links" && p !== "stint");
     const link = (hid, icon, label) => `<a class="td-link${id === hid || (hid && id.startsWith(hid + "/")) ? " on" : ""}" href="#${hid}">${ICONS[icon]}<span>${esc(label)}</span></a>`;
@@ -557,11 +559,11 @@
       <div class="td">
         <aside class="td-side">
           <nav class="td-nav" aria-label="Team-Menü">
-            ${link("", "home", "Start")}
+            ${gast ? "" : link("", "home", "Start")}
             <div class="td-nav-h">Rennen</div>
             ${ME.panels.stint ? `<div class="td-evnav" id="td-evnav">${evNavHtml(id)}</div>` : link("abwesend", "clock", "Abwesenheiten")}
-            ${training ? `<div class="td-nav-h">Training</div>${training}` : ""}
-            <div class="td-nav-h">Team</div>${SECTIONS.map(s => link(s.id, s.icon, s.label)).join("")}${ME.panels.links ? link("links", "link", "Links") : ""}
+            ${training && !gast ? `<div class="td-nav-h">Training</div>${training}` : ""}
+            ${gast ? "" : `<div class="td-nav-h">Team</div>${SECTIONS.map(s => link(s.id, s.icon, s.label)).join("")}${ME.panels.links ? link("links", "link", "Links") : ""}`}
             ${ME.isAdmin ? `<div class="td-nav-h">Verwaltung</div>${VERW.map(([k, ic, t]) => link(k, ic, t)).join("")}<a class="td-link" href="https://kreids888-admin.kreids.workers.dev/" target="_blank" rel="noopener">${ICONS.ext}<span>kreids888-Dashboard</span></a>` : ""}
           </nav>
         </aside>
@@ -1901,6 +1903,7 @@
     const cfg = d.config;
     const sel = {
       teamRoles: new Set(cfg.teamRoles),
+      gastRoles: new Set(cfg.gastRoles || []),
       adminRoles: new Set(cfg.adminRoles),
       panels: Object.fromEntries(d.panels.map(id => [id, new Set(cfg.panels[id] || [])])),
     };
@@ -1942,6 +1945,9 @@
         <p class="hint">Wer darf den Team-Bereich überhaupt betreten? Fest eingetragene Admins (${d.adminIds.length}) kommen immer rein.</p>
         <div class="tm-row"><div class="lbl">Team-Rollen<small>dürfen sich einloggen</small></div>${picker("teamRoles")}</div>
         <div class="tm-row"><div class="lbl">Admin-Rollen<small>sehen alles + diese Seite</small></div>${picker("adminRoles")}</div>
+        ${Array.isArray(cfg.gastRoles) ? `<div class="tm-row"><div class="lbl">Gast-Rollen<small>Gastfahrer: sehen nur Events, Spotting und Stintplaner</small></div>${picker("gastRoles")}</div>
+        <p class="hint">Gastfahrer dürfen sich einloggen und im Stintplaner alles, was ein Fahrer darf. Sie sehen kein Start, Training, Team News, Mein Profil, Links und keine Abwesenheiten und stehen nicht bei den Fahrerprofilen. Wer auch eine Team-Rolle hat, zählt als Teammitglied.</p>`
+        : '<p class="hint">Gast-Rollen (Gastfahrer sehen nur Events, Spotting und Stintplaner) gibt es erst, wenn der Server „kreids888-team“ auf dem neuen Stand ist.</p>'}
       </div>
 
       <div class="tm-box">
@@ -2224,6 +2230,7 @@
       const body = {
         teamRoles: [...sel.teamRoles],
         adminRoles: [...sel.adminRoles],
+        ...(Array.isArray(cfg.gastRoles) ? { gastRoles: [...sel.gastRoles] } : {}),
         panels: Object.fromEntries(Object.entries(sel.panels).map(([k, v]) => [k, [...v]])),
         g61: {
           teamSlug: document.getElementById("g61-team").value,

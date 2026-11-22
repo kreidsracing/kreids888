@@ -703,7 +703,7 @@
               ${startFelder(c.start, "c" + i, ev)}
             </div>
             <div class="sp-chips">${c.drivers.map((d, di) => `<span class="sp-chipx">${ava(d.uid, 22)}${esc(memberName(d.uid))}<button type="button" data-rmd="${i}:${di}" title="Austragen">✕</button></span>`).join("")}
-              ${c.drivers.length < 8 ? `<select class="tm-select" data-addd="${i}"><option value="">+ Fahrer</option>${META.members.filter(mm => !c.drivers.some(d => d.uid === mm.id)).map(mm => `<option value="${mm.id}">${esc(mm.name)}</option>`).join("")}</select>` : ""}
+              ${c.drivers.length < 8 ? `<select class="tm-select" data-addd="${i}"><option value="">+ Fahrer</option>${META.members.filter(mm => !c.drivers.some(d => d.uid === mm.id)).map(mm => `<option value="${mm.id}">${esc(mm.name)}${mm.gast ? " (Gast)" : ""}</option>`).join("")}</select>` : ""}
             </div>
           </div>`).join("")}
         </div>
@@ -1311,7 +1311,7 @@
             <td><input class="tm-input" data-g="fuel" type="number" step="0.01" min="0" placeholder="3.20" value="${d.fuel || ""}"></td>
             <td><button type="button" class="sp-x" data-rmd="${di}" title="Aus dem Fahrzeug nehmen">✕</button></td></tr>`).join("") || '<tr><td colspan="5" class="tm-muted">Noch keine Fahrer.</td></tr>'}</tbody></table></div>
         <div class="sp-inline" style="margin-top:12px">
-          ${c.drivers.length < 8 ? `<select class="tm-select" id="sp-add"><option value="">+ Fahrer eintragen …</option>${META.members.filter(m => !c.drivers.some(d => d.uid === m.id)).map(m => { const b = S.plan.cars.find(x => x.key !== c.key && x.drivers.some(d => d.uid === m.id)); return `<option value="${m.id}">${esc(m.name)}${b ? " (schon in " + esc(b.name) + ")" : ""}</option>`; }).join("")}</select>` : ""}
+          ${c.drivers.length < 8 ? `<select class="tm-select" id="sp-add"><option value="">+ Fahrer eintragen …</option>${META.members.filter(m => !c.drivers.some(d => d.uid === m.id)).map(m => { const b = S.plan.cars.find(x => x.key !== c.key && x.drivers.some(d => d.uid === m.id)); return `<option value="${m.id}">${esc(m.name)}${m.gast ? " (Gast)" : ""}${b ? " (schon in " + esc(b.name) + ")" : ""}</option>`; }).join("")}</select>` : ""}
           ${C.btn("Werte aus Garage 61", "sm", `id="sp-g61" ${META.g61Ready ? "" : "disabled"}`)}
         </div>
         <div class="sp-g61info">${g61Info(c)}</div>
