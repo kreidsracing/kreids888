@@ -1348,9 +1348,9 @@
   // Spruch oben im jeweiligen Stil (gleiche Stelle wie beim Neon-Spruch)
   function stilSpruch(g, st, t, text, f, o) {
     o = o || {};
-    const zl = zweiZeilen(GROSS(text)), zwei = zl.length > 1, y0 = zwei ? (o.y2 || 428) : (o.y1 || 476);
+    const zl = zweiZeilen(GROSS(text)), zwei = zl.length > 1, y0 = zwei ? (o.y2 || 428) : (o.y1 || 476), kx = o.k || 1;   // kx = größer malen (Foto-Karussell: kurze Texte)
     if (st === 'kino') {
-      const px = zwei ? 104 : 124;
+      const px = (zwei ? 104 : 124) * kx;
       zl.forEach((z, i) => {
         const q = fp(t, 0.15 + i * 0.22, 0.8 + i * 0.22); if (q <= 0) return;
         g.save(); g.globalAlpha = q; SA(g, passt(g, z, 960, px, SAx(800)), 800); g.letterSpacing = '6px'; g.textAlign = 'center'; g.fillStyle = '#fff'; g.shadowColor = 'rgba(0,0,0,.9)'; g.shadowBlur = 24;
@@ -1360,7 +1360,7 @@
       return;
     }
     if (st === 'comic') {
-      const px = zwei ? 92 : 112;
+      const px = (zwei ? 92 : 112) * kx;
       zl.forEach((z, i) => {
         const q = fp(t, 0.12 + i * 0.14, 0.42 + i * 0.14); if (q <= 0) return;
         g.save(); RU(g, passt(g, z, 900, px, RU)); const w = g.measureText(z).width + 70, h = px * 1.25, cy = y0 + i * (h + 18) - h * 0.6;
@@ -1372,7 +1372,7 @@
       return;
     }
     if (st === 'glitch') {
-      const px = zwei ? 84 : 100, zeichen = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789#%&@';
+      const px = (zwei ? 84 : 100) * kx, zeichen = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789#%&@';
       zl.forEach((z, i) => {
         const t0 = 0.12 + i * 0.2, q = fp(t, t0, t0 + 0.7); if (q <= 0) return;
         const r = zufallR(Math.floor(t * 20) + i * 31), fertig = Math.floor(z.length * q);
@@ -1385,7 +1385,7 @@
       return;
     }
     if (st === 'sport') {
-      const px = zwei ? 92 : 108;
+      const px = (zwei ? 92 : 108) * kx;
       zl.forEach((z, i) => {
         const q = eo(fp(t, 0.12 + i * 0.16, 0.5 + i * 0.16)); if (q <= 0) return;
         g.save(); RU(g, passt(g, z, 900, px, RU)); const w = g.measureText(z).width + 90, h = px * 1.3, s = h * 0.35, x = B / 2 - w / 2 - (1 - q) * B, y = y0 + i * (h + 14) - h * 0.78;
@@ -1395,12 +1395,12 @@
       return;
     }
     // clean
-    const px = zwei ? 88 : 104;
+    const px = (zwei ? 88 : 104) * kx;
     zl.forEach((z, i) => {
       const q = eo(fp(t, 0.15 + i * 0.15, 0.6 + i * 0.15)); if (q <= 0) return;
       g.save(); g.globalAlpha = q; SA(g, passt(g, z, 960, px, SAx(800)), 800); g.textAlign = 'center'; g.fillStyle = '#fff'; g.fillText(z, B / 2, y0 + i * px * 1.02 + (1 - q) * 24); g.restore();
     });
-    const lq = eo(fp(t, 0.1, 0.5)); g.fillStyle = f; g.fillRect(B / 2 - 40 * lq, y0 - (zwei ? 120 : 140), 80 * lq, 8);
+    const lq = eo(fp(t, 0.1, 0.5)); g.fillStyle = f; g.fillRect(B / 2 - 40 * lq, y0 - (zwei ? 120 : 140) * kx, 80 * lq, 8);
   }
   // Frage unten im jeweiligen Stil (y = gleiche Höhe wie beim Neon-Band)
   function stilFrage(g, st, t, text, f, y) {
@@ -2229,17 +2229,49 @@
       }
     }, team);
   }
+  function karStilFoto(g, st, f, nr) {   // 🎨 Bild-Effekt je Stil wie bei den Clips (NEU 23.11.2026): liegt über dem Foto und unter Text, Kopf und Fuß
+    if (st === 'kino') {
+      const v = g.createRadialGradient(KB / 2, KH * 0.5, 320, KB / 2, KH * 0.5, 1000); v.addColorStop(0, 'rgba(0,0,0,0)'); v.addColorStop(1, 'rgba(0,0,0,.7)'); g.fillStyle = v; g.fillRect(0, 0, KB, KH);
+      g.fillStyle = '#000'; g.fillRect(0, 0, KB, 30); g.fillRect(0, KH - 30, KB, 30);
+      const r = zufallR(nr * 17 + 3); g.fillStyle = 'rgba(255,255,255,.06)'; for (let i = 0; i < 160; i++) g.fillRect(r() * KB, r() * KH, 1 + r() * 2, 1 + r() * 2);   // Filmkorn
+    } else if (st === 'comic') {
+      g.save(); g.fillStyle = hexA(f, 0.36);
+      for (let y = KH - 540, z = 0; y < KH; y += 24, z++) for (let x = z % 2 ? 12 : 0; x < KB; x += 24) { g.beginPath(); g.arc(x, y, 7.5 * (y - (KH - 540)) / 540, 0, Math.PI * 2); g.fill(); }   // Rasterpunkte unten
+      for (let y = 0, z = 0; y < 250; y += 24, z++) for (let x = z % 2 ? 12 : 0; x < KB; x += 24) { g.beginPath(); g.arc(x, y, 5.5 * (1 - y / 250), 0, Math.PI * 2); g.fill(); }
+      g.restore();
+      g.save(); g.lineWidth = 18; g.strokeStyle = '#000'; g.strokeRect(9, 9, KB - 18, KH - 18); g.lineWidth = 6; g.strokeStyle = f; g.strokeRect(24, 24, KB - 48, KH - 48); g.restore();
+    } else if (st === 'glitch') {
+      g.fillStyle = 'rgba(0,0,0,.2)'; for (let y = 0; y < KH; y += 6) g.fillRect(0, y, KB, 2);   // Zeilen
+      const r = zufallR(nr * 31 + 7);
+      for (let i = 0; i < 5; i++) { g.fillStyle = [hexA('#00ffff', 0.1), hexA('#ff00aa', 0.1), hexA(f, 0.12)][i % 3]; g.fillRect(0, 160 + r() * (KH - 320), KB, 8 + r() * 44); }
+      g.save(); g.lineWidth = 4; g.strokeStyle = 'rgba(0,255,255,.85)'; g.strokeRect(16, 18, KB - 44, KH - 44); g.strokeStyle = 'rgba(255,0,170,.85)'; g.strokeRect(28, 26, KB - 44, KH - 44); g.restore();
+    } else if (st === 'sport') {
+      g.save(); g.fillStyle = hexA(f, 0.95); g.fillRect(0, 0, 14, KH); g.fillStyle = 'rgba(255,255,255,.9)'; g.fillRect(22, 0, 4, KH); g.restore();   // Farbkante links
+      g.save(); g.transform(1, 0, -0.42, 1, 0, 0); [[KB + 420, 60, 0.5], [KB + 500, 22, 0.8]].forEach(([x, w, a]) => { g.fillStyle = hexA(f, a); g.fillRect(x, KH - 420, w, 420); }); g.restore();   // schräge Streifen unten rechts
+      const q = 28; for (let y = 0; y < 4; y++) for (let x = 0; x < 7; x++) if ((x + y) % 2 === 0) { g.fillStyle = 'rgba(255,255,255,.13)'; g.fillRect(KB - 60 - 7 * q + x * q, 176 + y * q, q, q); }   // Zielflagge
+    } else if (st === 'clean') { g.save(); g.lineWidth = 3; g.strokeStyle = hexA(f, 0.9); rr(g, 26, 26, KB - 52, KH - 52, 26); g.stroke(); g.restore(); }
+  }
+  const KAR_SCHRITT = { neon: 106, kino: 106, comic: 133, glitch: 94, sport: 134, clean: 90 };   // Abstand von Zeile zu Zeile je Stil
+  const KAR_PX = { neon: [112, 100], kino: [124, 104], comic: [112, 92], glitch: [100, 84], sport: [108, 92], clean: [104, 88] };   // Schriftgröße je Stil: [eine Zeile, zwei Zeilen] (wie stilSpruch)
   function fotoSeite(m, f, nr, n, img, o, team) {   // 📸 ein Foto aus der Toolbox füllt die Seite: oben Logo, Kanal und Seite, unten YouTube · o = Texte des Fotos { gross, klein, ort, look } · team = 🏁 Team-Logo über allem (nicht bei „nur das Foto“)
     o = o || {};
     const c = leinwand(KB, KH), g = c.getContext('2d'), iw = img.naturalWidth || img.width, ih = img.naturalHeight || img.height, q = Math.max(KB / iw, KH / ih);
     g.fillStyle = '#000'; g.fillRect(0, 0, KB, KH); g.drawImage(img, (KB - iw * q) / 2, (KH - ih * q) / 2, iw * q, ih * q);
     if (o.look === 'ohne') return c;   // nur das Foto
     const mitText = o.look !== 'logo', gross = mitText ? GROSS(String(o.gross || '').trim()) : '', klein = mitText ? GROSS(String(o.klein || '').trim()) : '', oben = o.ort === 'oben', text = !!(gross || klein);
-    const ho = text && oben ? 520 : 250, hu = text && !oben ? 520 : 250;   // unter dem Text dunkler, damit er lesbar bleibt
+    const st = STIL_IDS.includes(o.stil) ? o.stil : 'neon', zl = gross ? zweiZeilen(gross) : [], zwei = zl.length > 1, schritt = KAR_SCHRITT[st];   // 🎨 Stil wie bei den Clips · lange Texte in zwei Zeilen
+    karStilFoto(g, st, f, nr);
+    const ho = text && oben ? (zwei ? 640 : 520) : 250, hu = text && !oben ? (zwei ? 640 : 520) : 250;   // unter dem Text dunkler, damit er lesbar bleibt
     let v = g.createLinearGradient(0, 0, 0, ho); v.addColorStop(0, 'rgba(0,0,0,.78)'); if (ho > 250) v.addColorStop(0.6, 'rgba(0,0,0,.55)'); v.addColorStop(1, 'rgba(0,0,0,0)'); g.fillStyle = v; g.fillRect(0, 0, KB, ho);
     v = g.createLinearGradient(0, KH - hu, 0, KH); v.addColorStop(0, 'rgba(0,0,0,0)'); if (hu > 250) v.addColorStop(0.4, 'rgba(0,0,0,.55)'); v.addColorStop(1, 'rgba(0,0,0,.82)'); g.fillStyle = v; g.fillRect(0, KH - hu, KB, hu);
-    if (gross) kNeon(g, gross, oben ? 338 : KH - (klein ? 258 : 190), 112, f);
-    if (klein) kMitte(g, klein, oben ? (gross ? 408 : 330) : KH - 182, 46, 700);
+    const kz = gross && !zwei ? (gross.length <= 6 ? 1.5 : gross.length <= 8 ? 1.35 : gross.length <= 10 ? 1.2 : 1) : 1;   // kurze Texte („DUELL“, „AUTSCH“) werden größer gemalt
+    const px = KAR_PX[st][zwei ? 1 : 0] * kz;
+    const unter = { neon: px * 0.25, kino: 46, comic: px * 0.5 + 14, glitch: px * 0.22, sport: px * 0.3, clean: px * 0.2 }[st];   // so weit reicht der Stil unter die Grundlinie (Kasten, Linie, Leuchten)
+    const ueber = st === 'sport' ? px * 1.02 : px * 0.78;   // … und so weit darüber
+    const letzte = oben ? Math.max(338, 205 + ueber) + (zwei ? schritt : 0) : KH - (klein ? 236 : 158) - unter, erste = letzte - (zwei ? schritt : 0);   // Grundlinie der letzten und der ersten Zeile: immer Luft zu Kopf, kleinem Text und YouTube-Knopf
+    if (gross && st === 'neon') zl.forEach((z, i) => kNeon(g, z, erste + i * schritt, px, f));
+    else if (gross) stilSpruch(g, st, 99, gross, f, { y1: erste, y2: erste, k: kz });
+    if (klein) kMitte(g, klein, oben ? (gross ? letzte + unter + 46 : 330) : KH - 182, 46, 700);
     karKopf(g, m, f, nr, n);
     pille(g, 'LIVE AUF YOUTUBE', 60, KH - 132, f, 44, true);
     if (nr < n) { g.save(); SA(g, 46, 800); g.textAlign = 'right'; g.fillStyle = '#fff'; g.shadowColor = 'rgba(0,0,0,.85)'; g.shadowBlur = 10; g.fillText('WISCHEN »', KB - 60, KH - 82); g.restore(); }
@@ -2371,7 +2403,7 @@
     return i;
   }
   const karTextWahl = ok => { const w = { k: Math.random() }; for (const n of Object.keys(KT)) w[n] = ktZieh(n, ok ? i => ok(n, i) : null); return w; };
-  const karOrt = name => { const o = fotoOrt(name || ''); return /^\p{L}[\p{L}\p{N} .'’-]{2,39}$/u.test(o) && !/^(img|dsc|bild|foto|screenshot|unbenannt)/i.test(o) ? o : ''; };   // nur echte Ortsnamen, kein „IMG_1234“
+  function karOrt(name) { const o = streckeKurz(fotoTeile(name || '').strecke); return /^\p{L}[\p{L}\p{N} .'’-]{2,39}$/u.test(o) && !/^(img|dsc|bild|foto|screenshot|unbenannt)/i.test(o) ? o : ''; }   // Strecke kurz („Silverstone“), nur echte Namen, kein „IMG_1234“
   const karOrtTag = ort => { const t = String(ort || '').toLowerCase().replace(/ä/g, 'ae').replace(/ö/g, 'oe').replace(/ü/g, 'ue').replace(/ß/g, 'ss').normalize('NFD').replace(/[^a-z0-9]/g, ''); return t.length >= 3 && t.length <= 24 && /[a-z]/.test(t) ? '#' + t : ''; };
   function karKontext(K, w) {   // womit die Bausteine gefüllt werden: Ort, Zahl der Fotos, nächster Stream nach dem Post
     const namen = ABL.fotoWahl.slice(0, K.schluss ? KAR_MAX - 1 : KAR_MAX), n = namen.length, ort = karOrt(namen[0]);
@@ -2397,7 +2429,66 @@
     const ta = BOX.querySelector('[data-abk="text"]'), h = BOX.querySelector('[data-abk-hinweis]');
     if (ta && ta.value !== K.text) ta.value = K.text; if (h) h.textContent = KAR_TEXT_HINWEIS(K);
   }
-  const karSprueche = name => [...new Set([GROSS(fotoOrt(name)), ...KAR_SPRUCH].filter(Boolean))];   // Sprüche zum Anklicken: zuerst der Ort aus dem Dateinamen
+  // ═══ 🎲 Texte auf den Bildern von selbst (NEU 23.11.2026) ═══
+  // Die Fotos der Toolbox heißen „<Datum> <Strecke> Nr<k> <Moment> <Kamera> #<Auto>“. Daraus kommen Strecke und Moment, und zu jedem Moment
+  // gibt es passende Sprüche. K.textModus: 'auto' = jedes Bild bekommt einen eigenen Spruch · 'einer' = ein Text für alle Bilder · 'ohne' = kein Text.
+  // Wer ein Feld selbst ändert oder einen Spruch anklickt, behält seinen Text (auto = false), bis er wieder würfelt.
+  const FOTO_KAMERAS = ['Blimp (ganz hoch)', 'Heli von oben', 'Verfolger weit', 'Überrollbügel', 'TV-Kamera', 'Verfolger', 'Von vorn', 'Panorama', 'Getriebe', 'TV fest', 'Cockpit', 'Gyro', 'Nase'];   // wie fotoserie.py (längste zuerst)
+  function fotoTeile(name) {   // „Silverstone Circuit Nr9 Laut geworden TV-Kamera #888“ → Strecke, Moment, Kamera, Auto
+    const roh = fotoOrt(name), m = roh.match(/^(.*?)\s+Nr\.?\s?(\d+)\s+(.*)$/);
+    if (!m) return { strecke: roh, moment: '', kamera: '', auto: '' };
+    let rest = m[3].trim(), auto = '', kamera = '';
+    const a = rest.match(/\s*#(\w+)$/); if (a) { auto = a[1]; rest = rest.slice(0, a.index).trim(); }
+    for (const k of FOTO_KAMERAS) if (rest.toLowerCase().endsWith(k.toLowerCase())) { kamera = k; rest = rest.slice(0, rest.length - k.length).trim(); break; }
+    return { strecke: m[1].trim(), moment: rest, kamera, auto };
+  }
+  const streckeKurz = t => { const k = String(t || '').replace(/\s+-\s+.*$/, '').replace(/\b(Circuit de la|Circuit de|Circuito de|Autodromo Nazionale|Autodromo Internazionale|Autodromo|Motorsport Arena|International Raceway|International Speedway|Grand Prix Circuit|Street Circuit|International|Raceway|Speedway|Circuit)\b/gi, ' ').replace(/\s{2,}/g, ' ').trim(); return k || String(t || '').trim(); };
+  const KAR_MOMENT = [   // [woran man den Moment im Dateinamen erkennt, passende Sprüche]
+    [/laut geworden/i, ['DAS HAT GEKNALLT', 'PULS 180', 'KURZ GESCHRIEN', 'FUNK ZENSIERT', 'LAUT GEWORDEN', 'HERZ IN DER HOSE']],
+    [/rennstart|^start/i, ['LICHTER AUS', 'GRÜN!', 'UND AB DAFÜR', 'ALLE AUF EINMAL', 'CHAOS IN KURVE 1', 'VOLLGAS AB DER AMPEL']],
+    [/seite an seite|zweikampf/i, ['RAD AN RAD', 'SEITE AN SEITE', 'KEIN ZENTIMETER PLATZ', 'TÜR AN TÜR', 'WER ZUCKT ZUERST?', 'DUELL']],
+    [/überholt worden/i, ['DAS TAT WEH', 'ER WAR SCHNELLER', 'DEN HOLE ICH MIR WIEDER', 'TÜR ZU SPÄT ZU']],
+    [/überhol/i, ['VORBEI!', 'INNEN REIN', 'SPÄT GEBREMST', 'ATTACKE', 'PLATZ GEHOLT', 'UND TSCHÜSS']],
+    [/pulk/i, ['MITTENDRIN', 'DICHT AN DICHT', 'WINDSCHATTEN', 'DER ZUG ROLLT', 'VOLLES HAUS', 'KEINER GIBT NACH']],
+    [/ziel/i, ['ZIEL!', 'KARIERTE FLAGGE', 'GESCHAFFT', 'FOTOFINISH', 'ALLES GEGEBEN']],
+    [/unfall|einschlag|incident/i, ['AUTSCH', 'DAS WAR TEUER', 'KLEINHOLZ', 'DA WAR KEIN PLATZ', 'WER WAR SCHULD?', 'GELB!']],
+    [/dreher|quersteher|rutscher/i, ['DREHWURM', 'ZU VIEL GEWOLLT', 'QUER GEHT MEHR', 'GERADE NOCH GERETTET', 'KALTE REIFEN']],
+    [/abflug/i, ['AB INS GRÜNE', 'DAS KIESBETT RUFT', 'STRECKE ZU ENDE', 'RASEN MÄHEN']],
+    [/bestzeit/i, ['BESTZEIT', 'LILA SEKTOR', 'SCHNELLSTE RUNDE', 'DAS SASS']]
+  ];
+  const KAR_TITELTEXT = 'DIE BESTEN BILDER VOM RENNEN', KS_KEY = 'k888_karspruch', KAR_STIL_KEY = 'k888_karstil';
+  const karMomentPool = name => { const t = fotoTeile(name), m = KAR_MOMENT.find(([re]) => re.test(t.moment)); return m ? m[1] : []; };
+  function karSpruchZieh(name, belegt) {   // Spruch für ein Foto: passt zum Moment, steht noch auf keinem anderen Bild, war zuletzt nicht dran
+    let merk = []; try { merk = JSON.parse(localStorage.getItem(KS_KEY) || '[]') || []; } catch (e) { merk = []; }
+    const eigen = karMomentPool(name), allg = KAR_SPRUCH.filter(x => !/FAVORIT|BILD DES TAGES/.test(x)), frei = l => l.filter(x => !belegt.has(x));
+    const kand = [frei(eigen).filter(x => !merk.includes(x)), frei(eigen), frei(allg).filter(x => !merk.includes(x)), frei(allg), eigen, allg].find(l => l.length) || ['VOLLGAS'];
+    const w = kand[Math.floor(Math.random() * kand.length)];
+    try { localStorage.setItem(KS_KEY, JSON.stringify([...merk.filter(x => x !== w), w].slice(-14))); } catch (e) { /* ohne Merken geht es auch */ }
+    return w;
+  }
+  function karAutoTexte(K, alleNeu, nurName) {   // Texte der Bilder setzen, die auf „automatisch“ stehen · alleNeu = alle neu würfeln · nurName = nur dieses Bild neu
+    const namen = ABL.fotoWahl.slice(0, K.schluss ? KAR_MAX - 1 : KAR_MAX), modus = K.textModus || 'auto', belegt = new Set();
+    const strecke = GROSS(karOrt(namen[0]));
+    const titelWeg = s => { if (s.titel) { s.titel = false; if (s.klein === KAR_TITELTEXT) s.klein = ''; } };
+    for (const n of namen) { const s = karFoto(n); if (s.auto === false && s.gross) belegt.add(GROSS(String(s.gross).trim())); }
+    namen.forEach((n, i) => {
+      const s = karFoto(n); if (s.auto === false) return;
+      if (modus === 'einer') { titelWeg(s); s.gross = GROSS(String(K.einText || '').trim()).slice(0, 28); return; }
+      if (modus === 'ohne') { titelWeg(s); s.gross = ''; return; }
+      if (i === 0 && strecke && !s.ohneTitel) { s.gross = strecke.slice(0, 28); if (!s.klein || s.titel) s.klein = KAR_TITELTEXT; s.titel = true; belegt.add(s.gross); return; }   // Titelbild: die Strecke groß
+      const neu = alleNeu || n === nurName || !s.gross || s.titel || belegt.has(GROSS(s.gross));
+      titelWeg(s);
+      if (neu) s.gross = karSpruchZieh(n, belegt);
+      belegt.add(GROSS(s.gross));
+    });
+  }
+  function karFelderZeigen() {   // Eingabefelder und kleine Bilder nachziehen, ohne das Formular neu zu bauen (der Cursor bleibt, wo er ist)
+    if (!BOX || !ABL.kar) return;
+    BOX.querySelectorAll('[data-abk="s:gross"],[data-abk="s:klein"]').forEach(e => { const w = karFoto(e.dataset.name)[e.dataset.abk.slice(2)] || ''; if (e !== document.activeElement && e.value !== w) e.value = w; });
+    ABL.fotoWahl.forEach(n => karSpruchAn(n));
+    ablKarVorschauBald();
+  }
+  const karSprueche = name => { const t = fotoTeile(name); return [...new Set([GROSS(karOrt(name)), GROSS(t.moment), ...karMomentPool(name), ...KAR_SPRUCH].filter(x => x && x.length <= 28))].slice(0, 14); };   // Sprüche zum Anklicken: Strecke, Moment, passende Sprüche, dann die allgemeinen
   function karSpruchAn(name) {   // markiert den Spruch, der gerade als großer Text auf dem Foto steht
     if (!BOX) return; const jetzt = GROSS(String(karFoto(name).gross || '').trim());
     BOX.querySelectorAll('[data-c="abl-kar-spruch"]').forEach(x => { if (x.dataset.name === name) x.classList.toggle('an', x.dataset.wert === jetzt); });
@@ -2405,7 +2496,7 @@
   function karFoto(name) {   // Einstellungen eines Fotos · das erste Foto bekommt den Ort als großen Text vorgeschlagen
     const K = ABL.kar; if (!K) return { gross: '', klein: '', ort: 'unten', look: 'neon', w: -1 };
     if (!K.seiten) K.seiten = {};
-    if (!K.seiten[name]) K.seiten[name] = { gross: ABL.fotoWahl[0] === name && !Object.keys(K.seiten).length ? GROSS(fotoOrt(name)) : '', klein: '', ort: 'unten', look: 'neon', w: -1 };
+    if (!K.seiten[name]) K.seiten[name] = { gross: '', klein: '', ort: 'unten', look: 'neon', w: -1, auto: true };   // auto: Text kommt von selbst (karAutoTexte), bis man ihn selbst ändert
     return K.seiten[name];
   }
   const karFarbe = name => { let h = 0; for (const ch of String(name || '')) h = (h * 31 + ch.charCodeAt(0)) >>> 0; return TR_FARBEN[h % TR_FARBEN.length]; };
@@ -2419,22 +2510,29 @@
       const n = c.dataset.abv; if (nur && n !== nur) continue;
       let seite = null;
       if (n === '::schluss') seite = streamSeite(m, f, ges, ges, strm, team);
-      else { const i = namen.indexOf(n), img = i >= 0 ? await bild(ABL.fotoUrl.get(n)) : null; if (img) seite = fotoSeite(m, f, i + 1, ges, img, karFoto(n), team); }
+      else { const i = namen.indexOf(n), img = i >= 0 ? await bild(ABL.fotoUrl.get(n)) : null; if (img) seite = fotoSeite(m, f, i + 1, ges, img, { ...karFoto(n), stil: K.stil }, team); }
       if (seite && c.isConnected) { const g = c.getContext('2d'); g.clearRect(0, 0, c.width, c.height); g.drawImage(seite, 0, 0, c.width, c.height); }
     }
   }
   const ablKarVorschauBald = nur => { clearTimeout(KAR_VS_T); KAR_VS_T = setTimeout(() => ablKarVorschau(nur).catch(() => {}), 250); };
   function ablKarStart() {   // Vorschlag für Titel, Text und Zeit, sobald das erste Foto angehakt ist
     if (ABL.kar) return ABL.kar;
-    const ort = fotoOrt(ABL.fotoWahl[0] || ''), plan = lueckenPlan(stand(), Date.now()), frei = plan.find(e => !e.n && e.ms), cfg = stand().clipcfg || {};
+    const ort = karOrt(ABL.fotoWahl[0] || '') || fotoTeile(ABL.fotoWahl[0] || '').strecke, plan = lueckenPlan(stand(), Date.now()), frei = plan.find(e => !e.n && e.ms), cfg = stand().clipcfg || {};
+    let stil = 'neon'; try { stil = localStorage.getItem(KAR_STIL_KEY) || 'neon'; } catch (e) { stil = 'neon'; }
     ABL.kar = { seiten: {}, team: teamStandard('kar'), titel: GROSS(ort ? `${ort} · Bilder vom Rennen` : 'Bilder vom Rennen'), schluss: true, postMs: frei ? frei.ms : new Date(`${tagVon(Date.now() + 86400000)}T${cfg.zeit || '18:30'}:00`).getTime(),
-      text: '', textEigen: false, textWahl: null };
+      text: '', textEigen: false, textWahl: null, textModus: 'auto', einText: '', stil: STIL_IDS.includes(stil) ? stil : 'neon' };
+    karAutoTexte(ABL.kar);   // 🎲 Texte auf den Bildern von selbst (NEU 23.11.2026)
     karTextNeu(ABL.kar);   // ✍️ Text auf Knopfdruck (NEU 23.11.2026): jedes Karussell startet mit einem anderen Text
     return ABL.kar;
   }
   function ablKarEingabe(t) {   // Tippen ändert nur die Werte (kein Neuzeichnen, sonst springt der Cursor)
     const K = ABL.kar, k = t.dataset.abk; if (!K) return;
-    if (k.startsWith('s:')) { karFoto(t.dataset.name)[k.slice(2)] = t.value; if (k === 's:gross') karSpruchAn(t.dataset.name); ablKarVorschauBald(t.dataset.name); return; }   // Text, Platz oder Aussehen eines Fotos
+    if (k.startsWith('s:')) {   // Text, Platz oder Aussehen eines Fotos
+      const s = karFoto(t.dataset.name); s[k.slice(2)] = t.value;
+      if (k === 's:gross' || k === 's:klein') { s.auto = false; s.titel = false; }   // selbst getippt: bleibt so, bis wieder gewürfelt wird
+      if (k === 's:gross') karSpruchAn(t.dataset.name); ablKarVorschauBald(t.dataset.name); return;
+    }
+    if (k === 'einText') { K.einText = t.value; karAutoTexte(K); karFelderZeigen(); return; }   // ein Text für alle Bilder
     if (k === 'schluss') { K.schluss = t.checked; zeichnen(); }
     else if (k === 'postMs') { const ms = new Date(t.value).getTime(); if (isFinite(ms)) { K.postMs = ms; if (!K.textEigen) { K.text = karTextBau(K); karTextZeigen(); } } }   // anderer Tag: „Morgen um 20:00“ stimmt wieder
     else if (k === 'text') { K.text = t.value; if (!K.textEigen) { K.textEigen = true; karTextZeigen(); } }   // selbst getippt: bleibt so
@@ -2453,7 +2551,7 @@
       await teamPflicht(team);
       for (let i = 0; i < namen.length; i++) {
         const img = await bild(ABL.fotoUrl.get(namen[i])); if (!img) throw new Error(`„${namen[i]}“ lässt sich nicht lesen. Bitte „↻ Neu lesen“ drücken.`);
-        seiten.push(fotoSeite(m, f, i + 1, ges, img, karFoto(namen[i]), team));
+        seiten.push(fotoSeite(m, f, i + 1, ges, img, { ...karFoto(namen[i]), stil: K.stil }, team));
       }
       if (K.schluss) seiten.push(streamSeite(m, f, ges, ges, strm, team));
       await karHochladen(seiten, { vorlage: 'karbilder', frei: true, quelle: 'fotos:' + namen[0], postMs: K.postMs, titel: String(K.titel || 'Bilder vom Rennen').slice(0, 80), text: K.text });
@@ -2553,10 +2651,17 @@
             <span class="kc-dim" data-abk-hinweis>${esc(KAR_TEXT_HINWEIS(K))}</span></div>
           ${teamPanel('foto')}
           <div class="kc-kar-seiten"><b>Texte auf den Bildern <span class="kc-dim">Feld leer = kein Text. Das kleine Bild zeigt jede Seite so, wie sie gepostet wird.</span></b>
+            <div class="kc-kar-auto">
+              <div class="kc-feld">Woher kommt der große Text?<div class="kc-stile">${[['auto', '🎲 Automatisch je Bild', 'Jedes Bild bekommt von selbst einen eigenen Spruch, passend zum Moment (Start, Zweikampf, Unfall …). Das erste Bild zeigt die Strecke.'], ['einer', '✍️ Ein Text für alle', 'Du schreibst einen Text, er steht auf jedem Bild.'], ['ohne', '🚫 Ohne Text', 'Kein großer Text auf den Bildern.']].map(([w, t, tip]) => `<button type="button" class="${(K.textModus || 'auto') === w ? 'an' : ''}" data-c="abl-kar-modus" data-wert="${w}" title="${esc(tip)}">${t}</button>`).join('')}
+                ${(K.textModus || 'auto') === 'auto' ? '<button type="button" data-c="abl-kar-wuerfeln" title="Würfelt für alle Bilder neue Sprüche. Auch selbst geschriebene Texte werden ersetzt.">🎲 Alle neu würfeln</button>' : ''}</div></div>
+              ${K.textModus === 'einer' ? `<label class="kc-feld">Text für alle Bilder<input type="text" maxlength="28" value="${esc(K.einText || '')}" data-abk="einText" placeholder="z. B. RENNABEND IN SILVERSTONE"></label>` : ''}
+              <div class="kc-feld">Aussehen der Texte (wie bei den Clips)<div class="kc-stile">${STILE.map(([k, name]) => `<button type="button" class="${K.stil === k ? 'an' : ''}" data-c="abl-kar-stil" data-wert="${k}" title="Schrift und Bild-Effekt für alle Seiten dieses Karussells">${name}</button>`).join('')}<button type="button" data-c="abl-kar-stil" data-wert="?" title="Anderes Aussehen würfeln">🎲</button></div></div>
+              <span class="kc-dim">${(K.textModus || 'auto') === 'auto' ? 'Automatisch: Tippst du in ein Feld oder klickst einen Spruch an, bleibt dieser Text stehen. „🎲“ an einer Seite würfelt nur dort neu.' : K.textModus === 'einer' ? 'Ein Text für alle: Änderst du danach ein einzelnes Feld, gilt das nur für diese Seite.' : 'Ohne Text: Einzelne Seiten kannst du trotzdem von Hand beschriften.'} Das Aussehen wird gemerkt.</span>
+            </div>
             ${wahl.slice(0, K.schluss ? KAR_MAX - 1 : KAR_MAX).map((n, i, alle) => { const s = karFoto(n), d = `data-name="${esc(n)}"`; return `<div class="kc-kar-zeile">
               <canvas class="kc-kar-vs${teamOk(K.team) ? ' mit-team' : ''}" data-abv="${esc(n)}" width="432" height="540" title="Seite ${i + 1}: so wird sie gepostet${teamOk(K.team) ? ' · mit der Maus ziehen = Team-Logo verschieben' : ''}"></canvas>
               <div class="kc-kar-f"><b>Seite ${i + 1} <span class="kc-dim">${esc(fotoOrt(n) || n)}</span></b>
-                <div class="kc-felder"><label class="kc-feld">Text groß (Neon)<input type="text" maxlength="28" value="${esc(s.gross)}" data-abk="s:gross" ${d} placeholder="z. B. LONG BEACH"></label>
+                <div class="kc-felder"><label class="kc-feld">Text groß<div class="kc-zeile"><input type="text" maxlength="28" value="${esc(s.gross)}" data-abk="s:gross" ${d} placeholder="z. B. RAD AN RAD"><button type="button" class="kc-kar-w" data-c="abl-kar-neu" ${d} title="Anderer Spruch nur für dieses Bild, passend zum Moment">🎲</button></div></label>
                   <label class="kc-feld">Text klein<input type="text" maxlength="44" value="${esc(s.klein)}" data-abk="s:klein" ${d} placeholder="z. B. Runde 12 · Seite an Seite"></label></div>
                 <div class="kc-felder"><label class="kc-feld">Wo steht der Text?<select data-abk="s:ort" ${d}><option value="unten" ${s.ort === 'oben' ? '' : 'selected'}>unten</option><option value="oben" ${s.ort === 'oben' ? 'selected' : ''}>oben</option></select></label>
                   <label class="kc-feld">Was kommt aufs Foto?<select data-abk="s:look" ${d}>${KAR_LOOK.map(([w, name]) => `<option value="${w}" ${s.look === w ? 'selected' : ''}>${name}</option>`).join('')}</select></label></div>
@@ -4243,11 +4348,30 @@
       const n = b.dataset.name, i = ABL.fotoWahl.indexOf(n);
       if (i >= 0) ABL.fotoWahl.splice(i, 1); else if (ABL.fotoWahl.length >= KAR_MAX) return UMG.meldung(`Mehr als ${KAR_MAX} Bilder gehen nicht in ein Karussell.`, 1); else ABL.fotoWahl.push(n);
       if (ABL.fotoWahl.length) ablKarStart(); else ABL.kar = null;
+      if (ABL.kar) karAutoTexte(ABL.kar);   // neues Bild bekommt seinen Spruch, das erste Bild die Strecke
       if (ABL.kar && !ABL.kar.textEigen) ABL.kar.text = karTextBau(ABL.kar);   // Zahl der Bilder oder Ort geändert: automatischer Text zieht mit
       zeichnen(); return;
     }
     if (a === 'abl-foto-leer') { ABL.fotoWahl = []; ABL.kar = null; zeichnen(); return; }
     if (a === 'abl-kar-text') { if (ABL.kar) { karTextNeu(ABL.kar); karTextZeigen(); } return; }   // 🎲 neuer Text auf Knopfdruck
+    if (a === 'abl-kar-modus' || a === 'abl-kar-wuerfeln') {   // 🎲 Texte auf den Bildern: Modus wechseln bzw. alle neu würfeln · danach gilt wieder „automatisch“ für jede Seite
+      const K = ABL.kar; if (!K) return;
+      if (a === 'abl-kar-modus') K.textModus = b.dataset.wert;
+      Object.values(K.seiten || {}).forEach(x => { x.auto = true; x.ohneTitel = false; });
+      karAutoTexte(K, true); zeichnen(); return;
+    }
+    if (a === 'abl-kar-neu') {   // 🎲 anderer Spruch nur für dieses Bild
+      const K = ABL.kar; if (!K) return; const n = b.dataset.name, x = karFoto(n);
+      x.auto = true; if (ABL.fotoWahl[0] === n) x.ohneTitel = true; if (x.look !== 'neon') x.look = 'neon';
+      if ((K.textModus || 'auto') !== 'auto') { x.gross = karSpruchZieh(n, new Set(Object.values(K.seiten).map(y => GROSS(y.gross || '')))); x.auto = false; x.titel = false; } else karAutoTexte(K, false, n);
+      karFelderZeigen(); const fl = [...BOX.querySelectorAll('[data-abk="s:look"]')].find(e => e.dataset.name === n); if (fl) fl.value = x.look; return;
+    }
+    if (a === 'abl-kar-stil') {   // 🎨 Aussehen der Texte wie bei den Clips (für das ganze Karussell, wird gemerkt)
+      const K = ABL.kar; if (!K) return;
+      K.stil = b.dataset.wert === '?' ? stilNeu(K.stil) : b.dataset.wert; if (!STIL_IDS.includes(K.stil)) K.stil = 'neon';
+      try { localStorage.setItem(KAR_STIL_KEY, K.stil); } catch (e) { /* egal */ }
+      zeichnen(); return;
+    }
     if (a === 'team-wahl' || a === 'team-reset') {   // 🏁 Team-Logo wählen („Ohne“ = keins) · ↺ zurück an den Standardplatz
       const feld = b.closest('[data-team]'), ort = feld && feld.dataset.team, o = TEAM_ORT[ort], h = o && o.halter(); if (!h) return;
       const art = o.art(), alt = teamOk(h.team), d = a === 'team-reset' ? (alt || {}).d : b.dataset.wert;
@@ -4259,12 +4383,13 @@
     if (a === 'abl-kar-spruch') {   // Spruch anklicken = großer Text dieses Fotos (nochmal anklicken = wieder weg)
       const n = b.dataset.name, s = karFoto(n), w = b.dataset.wert, feld = x => [...BOX.querySelectorAll(`[data-abk="${x}"]`)].find(e => e.dataset.name === n);
       s.gross = GROSS(String(s.gross || '').trim()) === w ? '' : w; if (s.gross && s.look !== 'neon') s.look = 'neon';
+      s.auto = false; s.titel = false;   // selbst gewählt: bleibt so
       const fg = feld('s:gross'), fl = feld('s:look'); if (fg) fg.value = s.gross; if (fl) fl.value = s.look;
       karSpruchAn(n); ablKarVorschauBald(n); return;
     }
     if (a === 'abl-kar-hoch' || a === 'abl-kar-runter') {   // Reihenfolge der Fotos ändern
       const i = ABL.fotoWahl.indexOf(b.dataset.name), j = a === 'abl-kar-hoch' ? i - 1 : i + 1;
-      if (i >= 0 && j >= 0 && j < ABL.fotoWahl.length) { [ABL.fotoWahl[i], ABL.fotoWahl[j]] = [ABL.fotoWahl[j], ABL.fotoWahl[i]]; if (ABL.kar && !ABL.kar.textEigen) ABL.kar.text = karTextBau(ABL.kar); zeichnen(); }
+      if (i >= 0 && j >= 0 && j < ABL.fotoWahl.length) { [ABL.fotoWahl[i], ABL.fotoWahl[j]] = [ABL.fotoWahl[j], ABL.fotoWahl[i]]; if (ABL.kar) karAutoTexte(ABL.kar); if (ABL.kar && !ABL.kar.textEigen) ABL.kar.text = karTextBau(ABL.kar); zeichnen(); }
       return;
     }
     if (a === 'abl-kar') { ablKarBauen(); return; }
@@ -4621,6 +4746,8 @@
 .kc-app .kc-auto-status.gelb{color:#f5c518;border-color:rgba(245,197,24,.5);background:rgba(245,197,24,.12)}.kc-app .kc-auto-status.gruen{color:#8dff5c;border-color:rgba(92,255,31,.5);background:rgba(92,255,31,.1)}
 .kc-app .kc-auto-status.rot{color:#ff6b75;border-color:rgba(225,19,36,.5)}.kc-app .kc-auto-status.grau{color:#9aa3ad;border-color:#3a4048}
 .kc-app .kc-auto-kn{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.kc-app .kc-kar-auto{display:grid;gap:10px;padding:12px;margin:10px 0 4px;border:1px solid rgba(24,232,255,.3);background:rgba(24,232,255,.04)}
+.kc-app .kc-kar-w{flex:0 0 auto;background:#0b0c10;border:1px solid var(--line,#23262f);color:#fff;font-size:18px;line-height:1;padding:0 12px;cursor:pointer}.kc-app .kc-kar-w:hover{border-color:#5cff1f}
 .kc-app .kc-kar-text{align-items:center;gap:10px;margin-top:6px}.kc-app .kc-kar-text .kc-dim{flex:1 1 260px}
 .kc-app .kc-auto-kn .btn,.kc-app .kc-auto-schalter .btn{padding:7px 12px;font-size:13px;min-height:0;line-height:1.2;white-space:nowrap}
 .kc-app .kc-auto-kn .kc-frei{background:#5cff1f;color:#06080a;border-color:#5cff1f;font-weight:800}
