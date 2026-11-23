@@ -2500,12 +2500,14 @@
     return K.seiten[name];
   }
   const karFarbe = name => { let h = 0; for (const ch of String(name || '')) h = (h * 31 + ch.charCodeAt(0)) >>> 0; return TR_FARBEN[h % TR_FARBEN.length]; };
+  const KAR_FARBE_KEY = 'k888_karfarbe';
+  const karFarbeWahl = (K, name) => (K && /^#[0-9a-f]{6}$/i.test(K.farbe || '') ? K.farbe : karFarbe(name));   // 🎨 Farbe selbst gewählt (NEU 23.11.2026) · leer = automatisch aus dem ersten Foto wie bisher
   let KAR_VS_T = 0;
   async function ablKarVorschau(nur) {   // kleine Vorschau jeder Seite (nur = nur dieses Foto neu malen)
     const K = ABL.kar; if (!K || !BOX) return;
     const cs = [...BOX.querySelectorAll('canvas[data-abv]')]; if (!cs.length) return;
     await schriften(); const m = MAT || await material(), strm = (stand().streams || [])[0] || null; await teamLaden(); const team = teamOk(K.team);
-    const namen = ABL.fotoWahl.slice(0, K.schluss ? KAR_MAX - 1 : KAR_MAX), ges = namen.length + (K.schluss ? 1 : 0), f = karFarbe(namen[0]);
+    const namen = ABL.fotoWahl.slice(0, K.schluss ? KAR_MAX - 1 : KAR_MAX), ges = namen.length + (K.schluss ? 1 : 0), f = karFarbeWahl(K, namen[0]);
     for (const c of cs) {
       const n = c.dataset.abv; if (nur && n !== nur) continue;
       let seite = null;
@@ -2518,9 +2520,9 @@
   function ablKarStart() {   // Vorschlag für Titel, Text und Zeit, sobald das erste Foto angehakt ist
     if (ABL.kar) return ABL.kar;
     const ort = karOrt(ABL.fotoWahl[0] || '') || fotoTeile(ABL.fotoWahl[0] || '').strecke, plan = lueckenPlan(stand(), Date.now()), frei = plan.find(e => !e.n && e.ms), cfg = stand().clipcfg || {};
-    let stil = 'neon'; try { stil = localStorage.getItem(KAR_STIL_KEY) || 'neon'; } catch (e) { stil = 'neon'; }
+    let stil = 'neon', farbe = ''; try { stil = localStorage.getItem(KAR_STIL_KEY) || 'neon'; farbe = localStorage.getItem(KAR_FARBE_KEY) || ''; } catch (e) { stil = 'neon'; farbe = ''; }
     ABL.kar = { seiten: {}, team: teamStandard('kar'), titel: GROSS(ort ? `${ort} · Bilder vom Rennen` : 'Bilder vom Rennen'), schluss: true, postMs: frei ? frei.ms : new Date(`${tagVon(Date.now() + 86400000)}T${cfg.zeit || '18:30'}:00`).getTime(),
-      text: '', textEigen: false, textWahl: null, textModus: 'auto', einText: '', stil: STIL_IDS.includes(stil) ? stil : 'neon' };
+      text: '', textEigen: false, textWahl: null, textModus: 'auto', einText: '', stil: STIL_IDS.includes(stil) ? stil : 'neon', farbe: FARBEN.includes(farbe) ? farbe : '' };
     karAutoTexte(ABL.kar);   // 🎲 Texte auf den Bildern von selbst (NEU 23.11.2026)
     karTextNeu(ABL.kar);   // ✍️ Text auf Knopfdruck (NEU 23.11.2026): jedes Karussell startet mit einem anderen Text
     return ABL.kar;
@@ -2547,7 +2549,7 @@
     try {
       await schriften(); const st = stand(), m = MAT || await material(), strm = (st.streams || [])[0] || null;
       arbeit('🖼 Karussell wird gebaut …');
-      const f = karFarbe(namen[0]), ges = namen.length + (K.schluss ? 1 : 0), seiten = [], team = teamOk(K.team);
+      const f = karFarbeWahl(K, namen[0]), ges = namen.length + (K.schluss ? 1 : 0), seiten = [], team = teamOk(K.team);
       await teamPflicht(team);
       for (let i = 0; i < namen.length; i++) {
         const img = await bild(ABL.fotoUrl.get(namen[i])); if (!img) throw new Error(`„${namen[i]}“ lässt sich nicht lesen. Bitte „↻ Neu lesen“ drücken.`);
@@ -2656,7 +2658,8 @@
                 ${(K.textModus || 'auto') === 'auto' ? '<button type="button" data-c="abl-kar-wuerfeln" title="Würfelt für alle Bilder neue Sprüche. Auch selbst geschriebene Texte werden ersetzt.">🎲 Alle neu würfeln</button>' : ''}</div></div>
               ${K.textModus === 'einer' ? `<label class="kc-feld">Text für alle Bilder<input type="text" maxlength="28" value="${esc(K.einText || '')}" data-abk="einText" placeholder="z. B. RENNABEND IN SILVERSTONE"></label>` : ''}
               <div class="kc-feld">Aussehen der Texte (wie bei den Clips)<div class="kc-stile">${STILE.map(([k, name]) => `<button type="button" class="${K.stil === k ? 'an' : ''}" data-c="abl-kar-stil" data-wert="${k}" title="Schrift und Bild-Effekt für alle Seiten dieses Karussells">${name}</button>`).join('')}<button type="button" data-c="abl-kar-stil" data-wert="?" title="Anderes Aussehen würfeln">🎲</button></div></div>
-              <span class="kc-dim">${(K.textModus || 'auto') === 'auto' ? 'Automatisch: Tippst du in ein Feld oder klickst einen Spruch an, bleibt dieser Text stehen. „🎲“ an einer Seite würfelt nur dort neu.' : K.textModus === 'einer' ? 'Ein Text für alle: Änderst du danach ein einzelnes Feld, gilt das nur für diese Seite.' : 'Ohne Text: Einzelne Seiten kannst du trotzdem von Hand beschriften.'} Das Aussehen wird gemerkt.</span>
+              <div class="kc-feld">Farbe von Text, Rahmen und Knöpfen<div class="kc-farben"><div class="kc-stile" style="margin:0"><button type="button" class="${K.farbe ? '' : 'an'}" data-c="abl-kar-farbe" data-wert="" title="Die Farbe wird aus dem ersten Foto bestimmt (wie bisher)">Automatisch</button></div>${FARBEN.map(f => `<button type="button" class="kc-farbe${f === K.farbe ? ' an' : ''}" style="--f:${f}" data-c="abl-kar-farbe" data-wert="${f}" title="Diese Farbe für alle Seiten dieses Karussells" aria-label="Farbe ${f}"></button>`).join('')}</div></div>
+              <span class="kc-dim">${(K.textModus || 'auto') === 'auto' ? 'Automatisch: Tippst du in ein Feld oder klickst einen Spruch an, bleibt dieser Text stehen. „🎲“ an einer Seite würfelt nur dort neu.' : K.textModus === 'einer' ? 'Ein Text für alle: Änderst du danach ein einzelnes Feld, gilt das nur für diese Seite.' : 'Ohne Text: Einzelne Seiten kannst du trotzdem von Hand beschriften.'} Aussehen und Farbe werden gemerkt.</span>
             </div>
             ${wahl.slice(0, K.schluss ? KAR_MAX - 1 : KAR_MAX).map((n, i, alle) => { const s = karFoto(n), d = `data-name="${esc(n)}"`; return `<div class="kc-kar-zeile">
               <canvas class="kc-kar-vs${teamOk(K.team) ? ' mit-team' : ''}" data-abv="${esc(n)}" width="432" height="540" title="Seite ${i + 1}: so wird sie gepostet${teamOk(K.team) ? ' · mit der Maus ziehen = Team-Logo verschieben' : ''}"></canvas>
@@ -4365,6 +4368,12 @@
       x.auto = true; if (ABL.fotoWahl[0] === n) x.ohneTitel = true; if (x.look !== 'neon') x.look = 'neon';
       if ((K.textModus || 'auto') !== 'auto') { x.gross = karSpruchZieh(n, new Set(Object.values(K.seiten).map(y => GROSS(y.gross || '')))); x.auto = false; x.titel = false; } else karAutoTexte(K, false, n);
       karFelderZeigen(); const fl = [...BOX.querySelectorAll('[data-abk="s:look"]')].find(e => e.dataset.name === n); if (fl) fl.value = x.look; return;
+    }
+    if (a === 'abl-kar-farbe') {   // 🎨 Farbe für das ganze Karussell (leer = automatisch), wird gemerkt
+      const K = ABL.kar; if (!K) return;
+      K.farbe = FARBEN.includes(b.dataset.wert) ? b.dataset.wert : '';
+      try { localStorage.setItem(KAR_FARBE_KEY, K.farbe); } catch (e) { /* egal */ }
+      zeichnen(); return;
     }
     if (a === 'abl-kar-stil') {   // 🎨 Aussehen der Texte wie bei den Clips (für das ganze Karussell, wird gemerkt)
       const K = ABL.kar; if (!K) return;
