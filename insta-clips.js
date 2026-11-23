@@ -2336,6 +2336,67 @@
   // 📸 Texte auf den Fotos (NEU 22.11.2026): pro Foto großer und kleiner Text, Platz (unten/oben) und Aussehen. Jede Seite steht als Vorschau im Formular, genau so, wie sie gepostet wird.
   const KAR_SPRUCH = ['SEITE AN SEITE', 'VOLLGAS', 'KEIN ZENTIMETER PLATZ', 'DAS WAR KNAPP', 'RAD AN RAD', 'MITTENDRIN', 'ATTACKE', 'SO SIEHT RENNEN AUS', 'WELCHES IST DEIN FAVORIT?', 'BILD DES TAGES'];
   const KAR_LOOK = [['neon', 'Logo, Kanal und Text'], ['logo', 'nur Logo und Kanal'], ['ohne', 'nur das Foto (auch ohne Team-Logo)']];
+  // ═══ ✍️ Text zum Karussell auf Knopfdruck (NEU 23.11.2026) ═══
+  // Jeder Text hat vier Teile: Einstieg · Satz · Frage (bringt Kommentare) · Hinweis auf YouTube. Jeder Teil kommt aus einer eigenen Liste,
+  // „🎲 Anderer Text“ mischt neu. Der Browser merkt sich, was zuletzt dran war: nichts wiederholt sich direkt.
+  // {ort} = Ort aus dem Dateinamen · {n} = Zahl der Fotos · {k} = ein Bild davon · {tag}/{uhr} = nächster Stream.
+  // Die vier Pflicht-Hashtags hängt der Worker an die erste Zeile, darum steht hier nur noch einer am Ende (Instagram nimmt fünf).
+  const KT = {
+    hookOrt: ['{ort} hat geliefert 🔥', '{n} Bilder aus {ort}, eins wilder als das andere 📸', 'So sah {ort} aus dem Cockpit aus 🏁', '{ort}: Rad an Rad und kein Zentimeter Platz ⚔️',
+      'Rennabend in {ort}. Das sind die besten Momente 📸', '{ort} in {n} Bildern 🔥', 'Das war {ort}. Und es war eng 😅', 'Vollgas in {ort} 💨', 'Kein Rennen in {ort} ohne Drama 🍿',
+      'Momente aus {ort}, die im Rennen zu schnell vorbei waren ⏱', '{ort} von seiner schönsten Seite 😍', 'Wer in {ort} lupft, verliert 😤'],
+    hook: ['{n} Bilder, eins wilder als das andere 📸', 'Die besten Momente vom Rennabend 🏁', 'Rad an Rad und kein Zentimeter Platz ⚔️', 'So sieht Simracing aus dem Cockpit aus 🔥', 'Kein Rennen ohne Drama 🍿',
+      'Momente, die im Rennen zu schnell vorbei waren ⏱', 'Vollgas, Windschatten, Vollkontakt 💨', 'Einmal durchwischen bitte 👉', 'Wer lupft, verliert 😤', 'Der Rennabend in {n} Bildern 📸'],
+    body: ['Wisch dich durch 👉 Bild {k} ist mein Favorit.', 'Windschatten, Spätbremser, Tür an Tür. Alles dabei.', 'Genau dafür sitzt man stundenlang im Rig.', 'Sauber gefahren? Sagen wir: meistens 😇',
+      'Findest du den Moment, in dem es fast gekracht hätte?', 'GT3 am Limit und manchmal knapp drüber.', 'Bei jedem Bild ging der Puls hoch 💓', 'Direkt aus iRacing, nichts gestellt.',
+      'So viel Action passt eigentlich nicht in {n} Bilder.', 'Reifen warm, Puls auch.', 'Erst wischen, dann abstimmen 👉', 'Man riecht fast den Gummi.'],
+    frage: ['Welches Bild ist dein Favorit? Schreib die Nummer in die Kommentare 👇', '1 bis {n}: Welches Bild kommt an die Wand? 👇', 'Welches Bild würdest du als Hintergrund nehmen? Nummer in die Kommentare 👇',
+      'Bei welchem Bild hättest du gelupft? 😏 Schreib die Nummer 👇', 'Welche Nummer ist das Bild des Abends? 👇', 'Team Windschatten oder Team Spätbremser? Schreib es in die Kommentare 👇',
+      'Welches Auto gefällt dir am besten? 👇', 'Reinstechen oder abwarten? Was hättest du gemacht? 👇', 'Welches Bild soll ich als Nächstes groß posten? 👇', 'Gib jedem Bild eine Note von 1 bis 10. Welches gewinnt? 👇'],
+    einHookOrt: ['{ort} hat geliefert 🔥', 'So sah {ort} aus dem Cockpit aus 🏁', 'Vollgas in {ort} 💨', '{ort} von seiner schönsten Seite 😍'],
+    einHook: ['So sieht Simracing aus dem Cockpit aus 🔥', 'Bild des Tages 📸', 'Rad an Rad und kein Zentimeter Platz ⚔️', 'Wer lupft, verliert 😤'],
+    einBody: ['Genau dafür sitzt man stundenlang im Rig.', 'Direkt aus iRacing, nichts gestellt.', 'GT3 am Limit und manchmal knapp drüber.', 'Reifen warm, Puls auch.'],
+    einFrage: ['Hintergrund oder nicht? Sag es in den Kommentaren 👇', 'Welches Auto gefällt dir am besten? 👇', 'Reinstechen oder abwarten? Was hättest du gemacht? 👇', 'Note von 1 bis 10 für das Bild? 👇'],
+    ytStream: ['🔴 Nächster Stream: {tag} um {uhr} Uhr live auf YouTube. Link im Profil.', '🔴 Live dabei sein? {tag}, {uhr} Uhr auf YouTube. Link im Profil.', '🔴 {tag} um {uhr} Uhr geht es weiter, live auf YouTube: kreids888.'],
+    yt: ['▶️ Die ganzen Rennen gibt es live auf YouTube: kreids888. Link im Profil.', '🔴 Mehr davon live auf YouTube. Link im Profil.', '▶️ Ganze Rennen und Onboards auf YouTube: kreids888.', '🔴 Live mitfiebern? YouTube: kreids888. Link im Profil.']
+  };
+  const KT_KEY = 'k888_kartext';
+  const ktMerk = () => { try { return JSON.parse(localStorage.getItem(KT_KEY) || '{}') || {}; } catch (e) { return {}; } };
+  function ktZieh(name, ok) {   // Baustein ziehen, der zuletzt nicht dran war (gemerkt wird gut die Hälfte der Liste) · ok(i) = dieser Baustein ist erlaubt
+    const pool = KT[name], m = ktMerk(), alt = (Array.isArray(m[name]) ? m[name] : []).filter(i => i >= 0 && i < pool.length), alle = pool.map((_, i) => i), darf = ok ? alle.filter(ok) : alle;
+    const stufen = [darf.filter(i => !alt.includes(i)), darf.filter(i => i !== alt[alt.length - 1]), darf, alle.filter(i => !alt.includes(i)), alle], kand = stufen.find(l => l.length) || [0];
+    const i = kand[Math.floor(Math.random() * kand.length)];
+    m[name] = [...alt, i].slice(-Math.max(1, Math.ceil(pool.length * 0.6)));
+    try { localStorage.setItem(KT_KEY, JSON.stringify(m)); } catch (e) { /* ohne Merken geht es auch */ }
+    return i;
+  }
+  const karTextWahl = ok => { const w = { k: Math.random() }; for (const n of Object.keys(KT)) w[n] = ktZieh(n, ok ? i => ok(n, i) : null); return w; };
+  const karOrt = name => { const o = fotoOrt(name || ''); return /^\p{L}[\p{L}\p{N} .'’-]{2,39}$/u.test(o) && !/^(img|dsc|bild|foto|screenshot|unbenannt)/i.test(o) ? o : ''; };   // nur echte Ortsnamen, kein „IMG_1234“
+  const karOrtTag = ort => { const t = String(ort || '').toLowerCase().replace(/ä/g, 'ae').replace(/ö/g, 'oe').replace(/ü/g, 'ue').replace(/ß/g, 'ss').normalize('NFD').replace(/[^a-z0-9]/g, ''); return t.length >= 3 && t.length <= 24 && /[a-z]/.test(t) ? '#' + t : ''; };
+  function karKontext(K, w) {   // womit die Bausteine gefüllt werden: Ort, Zahl der Fotos, nächster Stream nach dem Post
+    const namen = ABL.fotoWahl.slice(0, K.schluss ? KAR_MAX - 1 : KAR_MAX), n = namen.length, ort = karOrt(namen[0]);
+    const ab = Math.max(Date.now(), K.postMs || 0), strm = (stand().streams || []).find(x => x.liveMs > ab && x.liveMs < ab + 7 * 86400000) || null;
+    const tage = strm ? Math.round((new Date(tagVon(strm.liveMs) + 'T12:00:00Z') - new Date(tagVon(ab) + 'T12:00:00Z')) / 86400000) : 0;
+    const tag = strm ? (tage === 0 ? 'Heute' : tage === 1 ? 'Morgen' : new Date(strm.liveMs).toLocaleDateString('de-DE', { timeZone: 'Europe/Berlin', weekday: 'long' })) : '';
+    const uhr = strm ? new Date(strm.liveMs).toLocaleTimeString('de-DE', { timeZone: 'Europe/Berlin', hour: '2-digit', minute: '2-digit' }) : '';
+    return { n, ort, strm, ein: n < 2, fuell: t => String(t).replace(/\{ort\}/g, ort).replace(/\{n\}/g, n).replace(/\{k\}/g, 1 + Math.floor(((w && w.k) || 0) * Math.max(1, n))).replace(/\{tag\}/g, tag).replace(/\{uhr\}/g, uhr) };
+  }
+  function karTextBau(K) {   // Text aus der gezogenen Auswahl bauen · passt sich an Ort, Zahl der Fotos und den nächsten Stream an
+    const w = K.textWahl || (K.textWahl = karTextWahl()), x = karKontext(K, w), teil = name => x.fuell(KT[name][(w[name] || 0) % KT[name].length]);
+    return [teil(x.ein ? (x.ort ? 'einHookOrt' : 'einHook') : x.ort ? 'hookOrt' : 'hook'), '', teil(x.ein ? 'einBody' : 'body'), teil(x.ein ? 'einFrage' : 'frage'), '', teil(x.strm ? 'ytStream' : 'yt'), '', karOrtTag(x.ort) || '#kreids888'].join('\n');
+  }
+  function karTextNeu(K) {   // 🎲 neuer Text · ein Einstieg, der schon in einem vorhandenen Post steht, kommt nicht nochmal (keine Wiederholungen)
+    const alt = (stand().clips || []).map(c => String(c.text || '')).filter(Boolean), x = karKontext(K, null);
+    K.textWahl = karTextWahl((name, i) => !/hook/i.test(name) || !alt.some(t => t.includes(x.fuell(KT[name][i]))));
+    K.text = karTextBau(K); K.textEigen = false;
+    return K.text;
+  }
+  const KAR_TEXT_HINWEIS = K => (K.textEigen ? 'Eigener Text. „🎲 Anderer Text“ schreibt wieder einen automatischen.' : 'Automatischer Text: passt zu Ort, Zahl der Bilder und nächstem Stream. Tippst du selbst, bleibt dein Text. #simracing #iracing #gt3 #crash kommen von selbst dazu.');
+  function karTextZeigen() {   // Textfeld und Hinweis nachziehen, ohne alles neu zu zeichnen
+    const K = ABL.kar; if (!K || !BOX) return;
+    const ta = BOX.querySelector('[data-abk="text"]'), h = BOX.querySelector('[data-abk-hinweis]');
+    if (ta && ta.value !== K.text) ta.value = K.text; if (h) h.textContent = KAR_TEXT_HINWEIS(K);
+  }
   const karSprueche = name => [...new Set([GROSS(fotoOrt(name)), ...KAR_SPRUCH].filter(Boolean))];   // Sprüche zum Anklicken: zuerst der Ort aus dem Dateinamen
   function karSpruchAn(name) {   // markiert den Spruch, der gerade als großer Text auf dem Foto steht
     if (!BOX) return; const jetzt = GROSS(String(karFoto(name).gross || '').trim());
@@ -2367,14 +2428,16 @@
     if (ABL.kar) return ABL.kar;
     const ort = fotoOrt(ABL.fotoWahl[0] || ''), plan = lueckenPlan(stand(), Date.now()), frei = plan.find(e => !e.n && e.ms), cfg = stand().clipcfg || {};
     ABL.kar = { seiten: {}, team: teamStandard('kar'), titel: GROSS(ort ? `${ort} · Bilder vom Rennen` : 'Bilder vom Rennen'), schluss: true, postMs: frei ? frei.ms : new Date(`${tagVon(Date.now() + 86400000)}T${cfg.zeit || '18:30'}:00`).getTime(),
-      text: `📸 ${ort ? ort + ': ' : ''}Welches Bild ist dein Favorit? Schreib die Nummer in die Kommentare 👇\n\n#simracing #iracing #kreids888` };
+      text: '', textEigen: false, textWahl: null };
+    karTextNeu(ABL.kar);   // ✍️ Text auf Knopfdruck (NEU 23.11.2026): jedes Karussell startet mit einem anderen Text
     return ABL.kar;
   }
   function ablKarEingabe(t) {   // Tippen ändert nur die Werte (kein Neuzeichnen, sonst springt der Cursor)
     const K = ABL.kar, k = t.dataset.abk; if (!K) return;
     if (k.startsWith('s:')) { karFoto(t.dataset.name)[k.slice(2)] = t.value; if (k === 's:gross') karSpruchAn(t.dataset.name); ablKarVorschauBald(t.dataset.name); return; }   // Text, Platz oder Aussehen eines Fotos
     if (k === 'schluss') { K.schluss = t.checked; zeichnen(); }
-    else if (k === 'postMs') { const ms = new Date(t.value).getTime(); if (isFinite(ms)) K.postMs = ms; }
+    else if (k === 'postMs') { const ms = new Date(t.value).getTime(); if (isFinite(ms)) { K.postMs = ms; if (!K.textEigen) { K.text = karTextBau(K); karTextZeigen(); } } }   // anderer Tag: „Morgen um 20:00“ stimmt wieder
+    else if (k === 'text') { K.text = t.value; if (!K.textEigen) { K.textEigen = true; karTextZeigen(); } }   // selbst getippt: bleibt so
     else K[k] = t.value;
   }
   async function ablKarBauen() {   // 📸 Karussell aus den angehakten Fotos bauen, hochladen und einplanen (nur Instagram)
@@ -2485,7 +2548,9 @@
         ${K && wahl.length ? `<div class="kc-foto-form">
           <div class="kc-felder"><label class="kc-feld">Titel<input type="text" maxlength="80" value="${esc(K.titel)}" data-abk="titel"></label>
             <label class="kc-feld">Geht raus am<input type="datetime-local" value="${esc(lokal(K.postMs))}" data-abk="postMs"></label></div>
-          <label class="kc-feld">Text zum Post<textarea rows="3" data-abk="text">${esc(K.text)}</textarea></label>
+          <label class="kc-feld">Text zum Post<textarea rows="8" maxlength="2200" data-abk="text">${esc(K.text)}</textarea></label>
+          <div class="kc-auto-kn kc-kar-text"><button type="button" class="btn kc-frei" data-c="abl-kar-text" title="Schreibt auf Knopfdruck einen neuen Text: anderer Einstieg, anderer Satz, andere Frage. Die Texte wechseln von selbst und wiederholen sich nicht.">🎲 Anderer Text</button>
+            <span class="kc-dim" data-abk-hinweis>${esc(KAR_TEXT_HINWEIS(K))}</span></div>
           ${teamPanel('foto')}
           <div class="kc-kar-seiten"><b>Texte auf den Bildern <span class="kc-dim">Feld leer = kein Text. Das kleine Bild zeigt jede Seite so, wie sie gepostet wird.</span></b>
             ${wahl.slice(0, K.schluss ? KAR_MAX - 1 : KAR_MAX).map((n, i, alle) => { const s = karFoto(n), d = `data-name="${esc(n)}"`; return `<div class="kc-kar-zeile">
@@ -4178,9 +4243,11 @@
       const n = b.dataset.name, i = ABL.fotoWahl.indexOf(n);
       if (i >= 0) ABL.fotoWahl.splice(i, 1); else if (ABL.fotoWahl.length >= KAR_MAX) return UMG.meldung(`Mehr als ${KAR_MAX} Bilder gehen nicht in ein Karussell.`, 1); else ABL.fotoWahl.push(n);
       if (ABL.fotoWahl.length) ablKarStart(); else ABL.kar = null;
+      if (ABL.kar && !ABL.kar.textEigen) ABL.kar.text = karTextBau(ABL.kar);   // Zahl der Bilder oder Ort geändert: automatischer Text zieht mit
       zeichnen(); return;
     }
     if (a === 'abl-foto-leer') { ABL.fotoWahl = []; ABL.kar = null; zeichnen(); return; }
+    if (a === 'abl-kar-text') { if (ABL.kar) { karTextNeu(ABL.kar); karTextZeigen(); } return; }   // 🎲 neuer Text auf Knopfdruck
     if (a === 'team-wahl' || a === 'team-reset') {   // 🏁 Team-Logo wählen („Ohne“ = keins) · ↺ zurück an den Standardplatz
       const feld = b.closest('[data-team]'), ort = feld && feld.dataset.team, o = TEAM_ORT[ort], h = o && o.halter(); if (!h) return;
       const art = o.art(), alt = teamOk(h.team), d = a === 'team-reset' ? (alt || {}).d : b.dataset.wert;
@@ -4197,7 +4264,7 @@
     }
     if (a === 'abl-kar-hoch' || a === 'abl-kar-runter') {   // Reihenfolge der Fotos ändern
       const i = ABL.fotoWahl.indexOf(b.dataset.name), j = a === 'abl-kar-hoch' ? i - 1 : i + 1;
-      if (i >= 0 && j >= 0 && j < ABL.fotoWahl.length) { [ABL.fotoWahl[i], ABL.fotoWahl[j]] = [ABL.fotoWahl[j], ABL.fotoWahl[i]]; zeichnen(); }
+      if (i >= 0 && j >= 0 && j < ABL.fotoWahl.length) { [ABL.fotoWahl[i], ABL.fotoWahl[j]] = [ABL.fotoWahl[j], ABL.fotoWahl[i]]; if (ABL.kar && !ABL.kar.textEigen) ABL.kar.text = karTextBau(ABL.kar); zeichnen(); }
       return;
     }
     if (a === 'abl-kar') { ablKarBauen(); return; }
@@ -4554,6 +4621,7 @@
 .kc-app .kc-auto-status.gelb{color:#f5c518;border-color:rgba(245,197,24,.5);background:rgba(245,197,24,.12)}.kc-app .kc-auto-status.gruen{color:#8dff5c;border-color:rgba(92,255,31,.5);background:rgba(92,255,31,.1)}
 .kc-app .kc-auto-status.rot{color:#ff6b75;border-color:rgba(225,19,36,.5)}.kc-app .kc-auto-status.grau{color:#9aa3ad;border-color:#3a4048}
 .kc-app .kc-auto-kn{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.kc-app .kc-kar-text{align-items:center;gap:10px;margin-top:6px}.kc-app .kc-kar-text .kc-dim{flex:1 1 260px}
 .kc-app .kc-auto-kn .btn,.kc-app .kc-auto-schalter .btn{padding:7px 12px;font-size:13px;min-height:0;line-height:1.2;white-space:nowrap}
 .kc-app .kc-auto-kn .kc-frei{background:#5cff1f;color:#06080a;border-color:#5cff1f;font-weight:800}
 .kc-app .kc-ae{margin:12px 0;padding:12px 14px;background:#0d0f13;border:1px solid rgba(24,232,255,.6);box-shadow:0 0 18px rgba(24,232,255,.12)}
