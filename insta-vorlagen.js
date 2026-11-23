@@ -141,17 +141,18 @@
     const tage = p.tage || 0;
     const countdown = p.typ === 'erg' ? 'ERGEBNIS' : p.typ === 'woche' ? 'DIESE WOCHE' : p.typ === 'story' || tage <= 0 ? 'HEUTE' : tage === 1 ? 'MORGEN' : `IN ${tage} TAGEN`;
     const delta = e && e.start && e.ziel ? e.start - e.ziel : null;
+    // 🏆 Saisonfinale (NEU 23.11.2026): statt „Runde 7“ steht bei {runde} „Saisonfinale“ · {finale} ist außerhalb des Finales leer
     return {
       spruch: (p.spruch || '').trim() || (window.K888Bilder ? window.K888Bilder.ersatzSpruch(p) : ''),
       strecke: p.track || p.titel || p.art || 'Rennen', layout: p.layout || '', serie: p.serie || p.titel || '', titel: p.titel || '',
-      runde: p.nr ? 'Runde ' + p.nr : '', nr: p.nr ? String(p.nr) : '', datum: s.tag, wochentag: s.wochentag || '', tag: s.wt || '',
+      runde: p.finale ? 'Saisonfinale' : p.nr ? 'Runde ' + p.nr : '', finale: p.finale ? 'Saisonfinale' : '', nr: p.nr ? String(p.nr) : '', datum: s.tag, wochentag: s.wochentag || '', tag: s.wt || '',
       zeit: l.zeit, live: 'Live ab ' + l.zeit + ' Uhr', countdown, livezeile: design.liveText || '', web: 'kreids888.com',
       platz: e ? (e.ziel ? 'P' + e.ziel : (e.status || 'DNF')) : '', startplatz: e && e.start ? 'P' + e.start : '',
       delta: delta == null ? '' : delta > 0 ? '+' + delta : String(delta), punkte: e && e.punkte ? e.punkte + ' Punkte' : '',
       klassen: (p.klassen || []).join(' · '), woche: wochenText(p.datum, p.bisDatum)
     };
   }
-  const PLATZHALTER = '{spruch} {strecke} {layout} {serie} {titel} {runde} {datum} {wochentag} {tag} {zeit} {live} {countdown} {livezeile} {web} {platz} {startplatz} {delta} {punkte} {klassen} {woche}';
+  const PLATZHALTER = '{spruch} {strecke} {layout} {serie} {titel} {runde} {finale} {datum} {wochentag} {tag} {zeit} {live} {countdown} {livezeile} {web} {platz} {startplatz} {delta} {punkte} {klassen} {woche}';
   const fuellen = (t, w) => String(t || '').replace(/\{(\w+)\}/g, (m, k) => (k in w ? w[k] : m))
     .replace(/(\s*·\s*){2,}/g, ' · ').replace(/^\s*·\s*|\s*·\s*$/g, '').trim();
   function beispielWoche() {
@@ -628,10 +629,45 @@
     g.restore();
   }
 
+  // 🏆 Saisonfinale (NEU 23.11.2026): goldenes Schild wie im Kreids-Design. Steht in der Vorlage {runde} oder {finale}, zeigt schon der Text
+  // „Saisonfinale“ (werte). Sonst kommt das Schild von selbst dazu (oben links bzw. an der ersten freien Stelle), damit das Finale auf jedem Bild zu sehen ist.
+  const FINALE_ARTEN = ['ank', 'story', 'erg'];
+  const FINALE_RE = /\{(runde|finale)\}/;
+  function finaleFehlt(v, els, p) {
+    if (!(p && p.finale) || !FINALE_ARTEN.includes(p.typ)) return false;
+    const hg = v.hg || {};
+    if (hg.quelle === 'kreids') return false;   // Kreids-Design als Hintergrund: das Schild ist dort schon drauf (insta-bilder.js)
+    if (hg.quelle === 'social' && Object.values({ ...SOZ_TEXT_STD, ...(hg.texte || {}) }).some(t => FINALE_RE.test(String(t || '')))) return false;   // Social-Design: steht in seinen Texten
+    return !els.some(e => e.typ === 'text' && FINALE_RE.test(String(e.inhalt || '')));
+  }
+  // Freie Stelle fürs Schild: oben links, sonst die erste Stelle, an der kein Text und kein Bild der Vorlage steht (Story: unter der Leiste von Instagram)
+  function finalePlatz(g, v, els, H) {
+    g.save(); g.font = font('saira', 900, 40); try { g.letterSpacing = '4px'; } catch (e) { /* ohne Sperrung */ }
+    const w = g.measureText('SAISONFINALE').width + 2 * 26 + 64 * 0.21, h = 64; g.restore();
+    const story = v.format === 'story', r = story ? 64 : 48, oben = story ? 236 : 44, unten = story ? 1470 : H - 44 - h;
+    const kand = [[r, oben], [B - r - w, oben], [(B - w) / 2, oben]];
+    for (let y = oben + 100; y < unten; y += 100) kand.push([r, y], [B - r - w, y]);
+    kand.push([r, unten], [B - r - w, unten], [(B - w) / 2, unten]);
+    const belegt = ([x, y]) => els.some(e => e._box && (e.typ === 'text' || e.typ === 'bild' || e.typ === 'termine') && x < e._box.x + e._box.w + 14 && x + w + 14 > e._box.x && y < e._box.y + e._box.h + 14 && y + h + 14 > e._box.y);
+    return kand.find(k => !belegt(k)) || kand[0];
+  }
+  function finaleSchild(g, x, y) {
+    const h = 64, px = 40, pad = 26, sch = h * 0.21, text = 'SAISONFINALE';
+    g.save(); g.font = font('saira', 900, px); try { g.letterSpacing = '4px'; } catch (e) { /* älterer Browser: ohne Sperrung */ }
+    const w = g.measureText(text).width + 2 * pad;
+    g.beginPath(); g.moveTo(x, y + h); g.lineTo(x + sch, y); g.lineTo(x + w + sch, y); g.lineTo(x + w, y + h); g.closePath();
+    g.shadowColor = 'rgba(0,0,0,.6)'; g.shadowBlur = 14; g.shadowOffsetY = 4; g.fillStyle = '#f5c518'; g.fill();
+    g.shadowColor = 'transparent'; g.shadowBlur = 0; g.shadowOffsetY = 0; g.lineWidth = 3; g.strokeStyle = '#05070a'; g.stroke();
+    g.fillStyle = '#05070a'; g.textAlign = 'left'; g.textBaseline = 'alphabetic'; g.fillText(text, x + pad + sch / 2, y + h / 2 + px * 0.36);
+    g.restore();
+  }
+
   // v: Vorlage · p: Post (aus dem Stand) · design: Stand-Design · umg: { stand() } · opt: { auswahl, zeit (Sekunden, null = Standbild), video, editor }
   async function zeichnen(canvas, v, p, design, umg, opt = {}) {
     const H = HOEHE[v.format] || 1350;
     const els = (v.elemente || []).filter(e => e.an !== false);
+    const schild = finaleFehlt(v, els, p);
+    if (schild) await schriftLaden('saira', 900);
     await Promise.all(els.filter(e => e.typ === 'text' || e.typ === 'termine' || (e.typ === 'animation' && e.art === 'countdown')).flatMap(e => e.typ === 'termine' ? [schriftLaden(e.schrift, 600), schriftLaden(e.schrift, 800), schriftLaden(e.schrift, 900)] : [schriftLaden(e.schrift || 'anton', e.gewicht || 900)]));
     const bilder = await Promise.all(els.map(e => (e.typ === 'bild' ? bild(bildUrl(e, umg)) : null)));
     if (canvas.width !== B || canvas.height !== H) { canvas.width = B; canvas.height = H; }
@@ -648,6 +684,7 @@
       else if (el.typ === 'animation') animationZeichnen(g, el, t, H, opt.editor);
       g.restore();
     });
+    if (schild) { const [fx, fy] = finalePlatz(g, v, els, H); finaleSchild(g, fx, fy); }
     const sel = opt.auswahl && els.find(e => e.id === opt.auswahl);
     if (sel && sel._box) { g.save(); g.setLineDash([18, 10]); g.lineWidth = 4; g.strokeStyle = '#ffd400'; g.strokeRect(sel._box.x - 6, sel._box.y - 6, sel._box.w + 12, sel._box.h + 12); g.restore(); }
     return info;

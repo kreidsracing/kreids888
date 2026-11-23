@@ -178,7 +178,7 @@
   const MONATSNAME = m => { const [j, n] = String(m || '').split('-').map(Number); return n ? new Date(Date.UTC(j, n - 1, 15)).toLocaleDateString('de-DE', { month: 'long', year: 'numeric', timeZone: 'UTC' }) : ''; };
   const datumKurz = d => String(d || '').split('-').reverse().slice(0, 2).join('.') + '.';
   const titel = p => p.typ === 'woche' ? esc(`Woche ${datumKurz(p.datum)} – ${datumKurz(p.bisDatum)}`) : p.typ === 'monat' ? esc('Monatsbilanz ' + (MONATSNAME(p.monat) || ''))
-    : [p.serie || p.titel, p.nr ? 'R' + p.nr : '', [p.track, p.layout].filter(Boolean).join(' – ')].filter(Boolean).map(esc).join(' · ');
+    : [p.serie || p.titel, p.nr ? 'R' + p.nr : '', [p.track, p.layout].filter(Boolean).join(' – '), p.finale && ['ank', 'story', 'erg'].includes(p.typ) ? '🏆 Saisonfinale' : ''].filter(Boolean).map(esc).join(' · ');   // 🏆 letztes Rennen der Serie (erkennt der Worker)
 
   // ▶ YouTube-Thumbnail 1920×1080 (pro Rennen): kleine Vorschau aus der Vorlage
   const thumbFeld = p => `<div class="ki-stream">
@@ -481,7 +481,8 @@
   function textPanel(cfg) {
     return `<div class="ki-panel"><h3>✍ Texte unter den Posts</h3>
       <div class="ki-fg"><label for="ki-text">Ankündigung</label><textarea id="ki-text" rows="8">${esc(cfg.text)}</textarea></div>
-      <div class="ki-dim">Platzhalter: {countdown} {serie} {titel} {runde} {strecke} {wochentag} {datum} {start} {live} {livezeile} {klassen}</div>
+      <div class="ki-dim">Platzhalter: {countdown} {serie} {titel} {runde} {strecke} {wochentag} {datum} {start} {live} {livezeile} {klassen} {finale}</div>
+      <div class="ki-dim">🏆 Saisonfinale: Beim letzten Rennen einer SPR-Serie steht bei Ankündigung und Rennergebnis von selbst „🏆 SAISONFINALE 🏆“ vorn in der ersten Zeile (oder dort, wo du {finale} hinschreibst). Auf dem Bild kommt das goldene Schild „SAISONFINALE“ dazu.</div>
       <div class="ki-fg"><label for="ki-text-erg">Rennergebnis</label><textarea id="ki-text-erg" rows="7">${esc(cfg.textErgebnis)}</textarea></div>
       <div class="ki-dim">Platzhalter: {platz} {startplatz} {ziel} {delta} {punkte} {serie} {strecke} {datum}. Eine Zeile mit leerem Platzhalter fällt weg. Storys haben bei Instagram keinen Text.</div>
       <div class="ki-fg"><label for="ki-text-tab">Tabellenstand</label><textarea id="ki-text-tab" rows="6">${esc(cfg.textTabelle || '')}</textarea></div>

@@ -101,6 +101,18 @@
       `<text x="${x + pad + schraeg / 2}" y="${y + h / 2 + g * 0.34}" ${SCHRIFT.xbold} font-size="${g}" letter-spacing="2" fill="#ffffff">${RG_TEXT}</text>`;
   }
 
+  // Passt das Reverse-Grid-Schild rechts neben das Band? (sonst steht es über dem Band)
+  const rgRechts = (x0, rechts) => { const platz = rechts - x0 - 2 * 22 - 58 * 0.21, g = passend(RG_TEXT, 'xbold', platz, 34, 22, 2); return !(g < 26 || breite(RG_TEXT, 'xbold', g, 2) > platz); };
+  // 🏆 Saisonfinale (NEU 23.11.2026): goldenes Schild „SAISONFINALE“ auf Ankündigung, Raceday-Story und Ergebnis.
+  // post.finale setzt der Worker (plan.js): letztes Rennen der SPR-Serie.
+  const FINALE_TEXT = 'SAISONFINALE', FINALE_H = 64;
+  const finaleBreite = () => breite(FINALE_TEXT, 'black', 40, 4) + 2 * 26 + FINALE_H * 0.21;
+  function finaleSchild(x, y) {
+    const g = 40, pad = 26, schraeg = FINALE_H * 0.21, w = breite(FINALE_TEXT, 'black', g, 4) + 2 * pad;
+    return `<polygon points="${x},${y + FINALE_H} ${x + schraeg},${y} ${x + w + schraeg},${y} ${x + w},${y + FINALE_H}" fill="#f5c518" stroke="#05070a" stroke-width="3"/>` +
+      `<text x="${x + pad + schraeg / 2}" y="${y + FINALE_H / 2 + g * 0.36}" ${SCHRIFT.black} font-size="${g}" letter-spacing="4" fill="#05070a">${FINALE_TEXT}</text>`;
+  }
+
   function hintergrund(b, h, bg, farbe1) {
     if (bg) return `<image href="${daten(bg)}" x="0" y="0" width="${b}" height="${h}" preserveAspectRatio="xMidYMid slice"/>`;
     // Ohne KI-Bild: dunkler Grund mit schrägen Streifen in der Serienfarbe
@@ -229,6 +241,8 @@
     s += band(-40, bandOben, cdB + R + 72, bandH, f1) + streifen(cdB + R + 56, bandOben, bandH, f1, f2);
     s += `<text x="${R}" y="${bandOben + bandH * 0.76}" ${SCHRIFT.black} font-size="${cdG}" letter-spacing="2" fill="${textAuf(f1)}">${esc(countdown)}</text>`;
     if (post.reverseGrid) s += rgSchild(cdB + R + 140, R, bandOben, bandH, B - R, f1);
+    // 🏆 Saisonfinale: Schild über dem Countdown-Band (steht dort schon das Reverse-Grid-Schild: darüber)
+    if (post.finale) s += finaleSchild(R, bandOben - FINALE_H - 18 - (post.reverseGrid && !rgRechts(cdB + R + 140, B - R) ? 58 + 16 : 0));
     const sz = serienZeile(post);
     s += `<g filter="url(#schatten)">`;
     s += `<text x="${R + 2}" y="${serieY}" ${SCHRIFT.semi} font-size="${passend(sz, 'semi', B - 2 * R, 36, 22, 3)}" letter-spacing="3" fill="${akzent}">${esc(sz)}</text>`;
@@ -267,11 +281,16 @@
 
     function baue(rdG) {
       const teile = [];
-      let y = 0;
       const bandH = 92, cdB = breite(cd, 'black', 72, 2);
-      teile.push(o => band(-40, o, cdB + R + 72, bandH, f1) + streifen(cdB + R + 56, o, bandH, f1, f2) +
-        `<text x="${R}" y="${o + bandH * 0.76}" ${SCHRIFT.black} font-size="72" letter-spacing="2" fill="${textAuf(f1)}">${cd}</text>`);
-      if (post.reverseGrid) teile.push(o => rgSchild(cdB + R + 140, R, o, bandH, B - R, f1));
+      const rgOben = post.reverseGrid && !rgRechts(cdB + R + 140, B - R);
+      // 🏆 Saisonfinale: Schild rechts neben dem Band. Steht dort das Reverse-Grid-Schild (oder passt es nicht), kommt es über das Band.
+      const finRechts = !!post.finale && !post.reverseGrid && cdB + R + 140 + finaleBreite() <= B - R;
+      const y0 = post.finale && !finRechts ? FINALE_H + 18 + (rgOben ? 58 + 16 : 0) : 0;
+      let y = y0;
+      if (post.finale) teile.push(o => (finRechts ? finaleSchild(cdB + R + 140, o + (bandH - FINALE_H) / 2) : finaleSchild(R, o)));
+      teile.push(o => band(-40, o + y0, cdB + R + 72, bandH, f1) + streifen(cdB + R + 56, o + y0, bandH, f1, f2) +
+        `<text x="${R}" y="${o + y0 + bandH * 0.76}" ${SCHRIFT.black} font-size="72" letter-spacing="2" fill="${textAuf(f1)}">${cd}</text>`);
+      if (post.reverseGrid) teile.push(o => rgSchild(cdB + R + 140, R, o + y0, bandH, B - R, f1));
       y += bandH + 12;
       const rdY = y + rdG * 0.74;
       teile.push(o => `<text x="${R - 8}" y="${o + rdY}" ${SCHRIFT.black} font-size="${rdG}" fill="#ffffff">${wort}</text>`);
@@ -347,6 +366,8 @@
     s += kopf(B, 48, logo, { b: 760, h: 230 }).svg;
     s += band(-40, bandOben, tB + R + 72, bandH, f1) + streifen(tB + R + 56, bandOben, bandH, f1, f2);
     s += `<text x="${R}" y="${bandOben + bandH * 0.76}" ${SCHRIFT.black} font-size="${tG}" letter-spacing="2" fill="${textAuf(f1)}">${titel}</text>`;
+    // 🏆 Saisonfinale: Schild rechts neben dem Band (passt es dort nicht: darüber)
+    if (post.finale) { const fx = tB + R + 140; s += fx + finaleBreite() <= B - R ? finaleSchild(fx, bandOben + (bandH - FINALE_H) / 2) : finaleSchild(R, bandOben - FINALE_H - 18); }
     s += `<g filter="url(#schatten)">`;
     s += `<text x="${R - 10}" y="${platzY}" ${SCHRIFT.black} font-size="${pG}" fill="${platzFarbe}">${esc(platz)}</text>`;
     // Positionen gutgemacht/verloren als Schild neben dem Platz
