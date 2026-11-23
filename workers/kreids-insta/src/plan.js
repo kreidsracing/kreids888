@@ -4,6 +4,9 @@
 //   /api/results  → Rennergebnisse von SPR (über die iRacing-ID, nur finale Rennen)
 // Posts: Ankündigung (Feed) X Tage vorher, Raceday-Story am Renntag, Ergebnis (Feed),
 // Tabellenstand (Feed), Monatsbilanz (Feed), Meilenstein (Feed), Jetzt live (Story, sobald der Stream läuft).
+// NEU (23.11.2026) 🏆 Saisonfinale: Das letzte Rennen einer SPR-Serie wird erkannt (post.finale). Ankündigung, Raceday-Story und Ergebnis
+//   bekommen dann das goldene Schild „SAISONFINALE“ (zeichnet insta-bilder.js), der Text beginnt mit „🏆 SAISONFINALE 🏆“.
+//   Die Zahl der Rennen je Serie kommt von SPR (api.snailpaceracing.org) und wird 6 Stunden gemerkt (Speicher: sprsaison).
 // ═══════════════════════════════════════════════════════════
 import { berlinZuMs, tageZurueck, minuten, berlin } from './zeit.js';
 import { textMitTags } from './tags.js';
@@ -27,6 +30,58 @@ export async function ladeDaten() {
   };
 }
 
+// ─── 🏆 Saisonfinale ────────────────────────────────────────
+export const SPR_API = 'https://api.snailpaceracing.org';
+const SAISON_FRISCH = 6 * 3600000, SAISON_PAUSE = 10 * 60000, SAISON_MAX = 12;
+const normName = t => String(t || '').toLowerCase().replace(/[^a-z0-9äöüß]+/g, ' ').trim();
+// Serie eines Kalender-Eintrags: aus der Kennung „spr~<Serie>~<Runde>“ (passt zum Ergebnis), sonst ein eigenes Feld
+export const ligaIdVon = e => { const m = String((e && e.uid) || '').match(/^spr~([A-Za-z0-9_-]{1,60})~\d+$/); return m ? m[1] : String((e && (e.ligaId || e.ligaID || e.liga)) || '').replace(/[^A-Za-z0-9_-]/g, '').slice(0, 60); };
+const istReverse = k => !!k && (k.reverse != null ? !!k.reverse : /reverse/i.test(String(k.track || '') + ' ' + String(k.layout || '')));
+// Aus den SPR-Daten einer Serie nur das merken, was fürs Finale gebraucht wird
+export function saisonKlein(d) {
+  const l = (d && d.liga) || {}, kal = ((d && d.kalender) || []).filter(k => k && k.nr != null);
+  const st = l.startseite, art = st && st.art ? String(st.art) : kal.filter(k => k.dateRace).length === 1 ? 'event' : 'serie';
+  return { id: String(l.id || ''), name: String(l.name || ''), numR: Number(l.numR) || 0, art, kal: kal.map(k => ({ nr: Number(k.nr), tag: String(k.dateRace || '').slice(0, 10), rev: istReverse(k) })) };
+}
+// Ist dieses Rennen das Saisonfinale? = letztes Rennen der Serie (bei Reverse Grid zählt der ganze letzte Abend). Events (ein einzelnes Rennen) haben kein Finale.
+export function istFinale(saison, ligaId, nr, name, datum) {
+  const n = Number(nr) || 0, alle = saison || {};
+  if (!n) return false;
+  let l = ligaId ? alle[ligaId] : null;
+  if (!l && !ligaId) {   // ohne Kennung: über den Namen der Serie, und das Rennen muss an diesem Tag in ihrem Kalender stehen
+    const pass = Object.values(alle).filter(x => x && normName(x.name) === normName(name) && x.kal.some(k => k.nr === n && k.tag === datum));
+    if (pass.length === 1) l = pass[0];
+  }
+  if (!l || l.art === 'event' || !(l.numR > 1)) return false;
+  if (n === l.numR) return true;
+  const ich = l.kal.find(k => k.nr === n), folge = l.kal.find(k => k.nr === n + 1);
+  return n + 1 === l.numR && !!folge && folge.rev && !!ich && !!ich.tag && folge.tag === ich.tag;
+}
+// Saison-Daten der Serien holen, die gerade im Kalender oder bei den frischen Ergebnissen vorkommen. Gemerkt für 6 Stunden;
+// klappt die Abfrage nicht, bleibt der letzte Stand (und es wird frühestens nach 10 Minuten wieder gefragt).
+export async function ladeSaison(s, daten, jetzt = Date.now()) {
+  const alt = (await s.lies('sprsaison')) || {}, ligen = { ...(alt.ligen || {}) };
+  const ids = new Set(); let ohne = false;
+  for (const e of daten.eintraege || []) { if (!e || e.source !== 'spr') continue; const id = ligaIdVon(e); if (id) ids.add(id); else ohne = true; }
+  for (const r of daten.ergebnisse || []) { if (!r || !r.ligaId || !r.date) continue; const t = berlinZuMs(String(r.date).slice(0, 10), '12:00'); if (isFinite(t) && t > jetzt - (ERG_TAGE + 2) * 86400000) ids.add(String(r.ligaId)); }
+  const frisch = jetzt - (alt.zeit || 0) < SAISON_FRISCH, fehlt = [...ids].some(id => !ligen[id]) || (ohne && !alt.alle);
+  if ((frisch && !fehlt) || jetzt - (alt.versucht || 0) < SAISON_PAUSE || (!ids.size && !ohne)) return ligen;
+  const holen = async pfad => { const r = await fetch(SPR_API + pfad, { headers: { Accept: 'application/json' }, signal: AbortSignal.timeout(8000) }); if (!r.ok) throw new Error(pfad + ' → ' + r.status); return r.json(); };
+  let alle = false;
+  if (ohne) {   // Einträge ohne Kennung: alle laufenden Serien von SPR (für den Vergleich über den Namen)
+    try { for (const l of ((await holen('/api/index')).ligen || [])) if (l && l.id && !l.archiviert) ids.add(String(l.id)); alle = true; } catch (e) { /* bleibt beim alten Stand */ }
+  }
+  const liste = [...ids].slice(0, SAISON_MAX);
+  let ok = 0;
+  await Promise.all(liste.map(async id => {
+    try { const d = await holen('/api/liga/' + encodeURIComponent(id)); if (d && d.liga) { ligen[id] = saisonKlein(d); ok++; } } catch (e) { /* bleibt beim alten Stand */ }
+  }));
+  for (const id of Object.keys(ligen)) if (!ids.has(id)) delete ligen[id];   // was nicht mehr gebraucht wird, fliegt raus
+  const voll = ok === liste.length && (!ohne || alle);
+  await s.schreib('sprsaison', { zeit: voll ? jetzt : (alt.zeit || 0), versucht: jetzt, alle: ohne ? (alle || !!alt.alle) : false, ligen });
+  return ligen;
+}
+
 const sicher = s => String(s).replace(/[^A-Za-z0-9_-]/g, '_');
 // Schlüssel eines Rennens: SPR-Rennen über Serie + Runde + Tag (passt zum Ergebnis), sonst über den Eintrag
 export const rennSchluessel = (uid, datum) => sicher(`${uid}~${datum}`);
@@ -39,6 +94,7 @@ export const ERG_TAGE = 5;
 export function bauePlan(daten, cfg, jetzt) {
   const posts = [];
   const bis = jetzt + 28 * 86400000;
+  const finale = (ligaId, nr, name, datum) => istFinale(daten.saison, ligaId, nr, name, datum);   // 🏆 Saisonfinale (nur SPR-Serien)
   for (const e of daten.eintraege) {
     if (!e || e.racing === false || !e.date || !e.time) continue;
     const art = e.type || 'Rennen';
@@ -55,7 +111,8 @@ export function bauePlan(daten, cfg, jetzt) {
     const basis = {
       key, art, spr, titel: e.title || '', serie: e.series || '', nr: spr ? Number(e.nr) || 0 : 0,
       track: e.track || '', layout: e.layout || '', datum, startMs, qualiMs, rennMs, liveMs,
-      klassen: Array.isArray(e.klassen) ? e.klassen : [], kalenderBild: e.image || '', reverseGrid: !!e.reverseGrid
+      klassen: Array.isArray(e.klassen) ? e.klassen : [], kalenderBild: e.image || '', reverseGrid: !!e.reverseGrid,
+      finale: spr && finale(ligaIdVon(e), e.nr, e.series, datum)
     };
     if (cfg.ankuendigung.aktiv) {
       const tage = Math.max(0, cfg.ankuendigung.tage | 0);
@@ -92,7 +149,7 @@ export function bauePlan(daten, cfg, jetzt) {
       if (!r || !r.date) continue;
       const datum = String(r.date).slice(0, 10);
       const key = r.ligaId && r.nr ? rennSchluessel(`spr~${r.ligaId}~${r.nr}`, datum) : rennSchluessel(`erg~${r.track}`, datum);
-      ergPost(key, datum, r, {});
+      ergPost(key, datum, r, r.ligaId && r.nr && finale(String(r.ligaId), r.nr, r.serie, datum) ? { finale: true } : {});
     }
     // Von Hand eingetragene Ergebnisse (eigene Rennen aus dem Streamkalender)
     for (const x of daten.eigene || []) {
@@ -219,10 +276,13 @@ export function eigeneRennen(daten, jetzt) {
 // ZEICHEN_VERSION hochzählen, wenn sich das Aussehen der Bilder (insta-bilder.js) ändert.
 const ZEICHEN_VERSION = 2;
 export const NEUE_ARTEN = ['tab', 'monat', 'meilen', 'live'];
+export const FINALE_ARTEN = ['ank', 'story', 'erg'];   // 🏆 diese Posts zeigen das Saisonfinale
+export const FINALE_ZEILE = '🏆 SAISONFINALE 🏆';
 export function inhaltSchluessel(post, design, cfg, bgv = 0) {
   return JSON.stringify([bgv, bgv ? '' : post.kalenderBild, post.typ, post.art, post.serie, post.nr, post.track, post.layout, post.titel, post.datum, post.liveMs, post.tage,
     post.klassen, post.reverseGrid, post.ergebnis || null, design.farbe1, design.farbe2, design.logoVersion || 0, design.liveText, design.team, design.teamSchwarz, design.logoAn, design.teamAn, design.spruchAn, design.layout || null, post.spruch || '', cfg.liveAb, post.liste || null, post.pose || null, ZEICHEN_VERSION,
-    ...(NEUE_ARTEN.includes(post.typ) ? [post.ligaId || '', post.werte || null, post.bestes || null, post.monat || '', post.zahl || 0, post.wort || '', post.zusatz || ''] : [])]);
+    ...(NEUE_ARTEN.includes(post.typ) ? [post.ligaId || '', post.werte || null, post.bestes || null, post.monat || '', post.zahl || 0, post.wort || '', post.zusatz || ''] : []),
+    ...(post.finale && FINALE_ARTEN.includes(post.typ) ? ['finale'] : [])]);
 }
 // Kurzer Hash (FNV-1a) für Links mit ?h=
 export function kurzHash(t) {
@@ -288,7 +348,8 @@ export function bildtext(post, cfg, design, tw, edit) {
     startplatz: erg && erg.start ? 'P' + erg.start : '',
     ziel: erg && erg.ziel ? 'P' + erg.ziel : '',
     delta: deltaText(erg),
-    punkte: erg && erg.punkte ? String(erg.punkte) : ''
+    punkte: erg && erg.punkte ? String(erg.punkte) : '',
+    finale: post.finale && FINALE_ARTEN.includes(post.typ) ? FINALE_ZEILE : ''
   };
   if (post.typ === 'tab') {
     const t = tw || {};
@@ -303,10 +364,15 @@ export function bildtext(post, cfg, design, tw, edit) {
   }
   if (post.typ === 'meilen') w.meilenstein = `${post.zahl}. ${post.wort}${post.zusatz ? ' ' + post.zusatz : ''}`;
   const eigen = edit && typeof edit.text === 'string' && edit.text.trim() ? edit.text : '';   // eigener Text für diesen Post
-  const vorlage = eigen || { erg: cfg.textErgebnis, tab: cfg.textTabelle, monat: cfg.textMonat, meilen: cfg.textMeilen }[post.typ] || cfg.text;
-  return textMitTags(String(vorlage || '').split('\n').map(z => {
-    let leer = false;
-    const r = z.replace(/\{(\w+)\}/g, (m, k) => { if (!(k in w)) return m; if (!w[k]) leer = true; return w[k]; });
-    return leer ? null : r;
+  let vorlage = String(eigen || { erg: cfg.textErgebnis, tab: cfg.textTabelle, monat: cfg.textMonat, meilen: cfg.textMeilen }[post.typ] || cfg.text || '');
+  // 🏆 Saisonfinale: steht vorn in der ersten Zeile, außer die Vorlage hat {finale}, nennt das Saisonfinale schon selbst oder es ist ein eigener Text für diesen Post
+  if (w.finale && !eigen && !/\{finale\}|saisonfinale/i.test(vorlage)) vorlage = vorlage.replace(/^(\s*)/, '$1{finale} ');
+  return textMitTags(vorlage.split('\n').map(z => {
+    let leer = false, fin = false;
+    const r = z.replace(/\{(\w+)\}/g, (m, k) => { if (!(k in w)) return m; if (k === 'finale') fin = true; else if (!w[k]) leer = true; return w[k]; });   // {finale} ist außerhalb des Finales einfach leer, die Zeile bleibt
+    if (leer) return null;
+    if (!fin) return r;
+    const sauber = r.replace(/[ \t]{2,}/g, ' ').trim();
+    return sauber ? sauber : null;   // stand in der Zeile nur {finale} und es ist kein Finale: die Zeile fällt weg
   }).filter(z => z !== null).join('\n').replace(/\n{3,}/g, '\n\n').trim()).slice(0, 2200);
 }

@@ -12,7 +12,7 @@
 // Routen: GET /bild/:id/:v.jpg · GET /hintergrund/:rennen · GET /logo.png · GET /cvideo/:id/:v.mp4 · GET /cbild/:id.jpg · /api/* (Bearer-Token)
 // ═══════════════════════════════════════════════════════════
 import { DurableObject } from 'cloudflare:workers';
-import { ADMIN, ERG_TAGE, LIVE_VOR, LOOKS, EDIT_FELDER, NEUE_ARTEN, ladeDaten, bauePlan, eigeneRennen, rennKey, inhaltSchluessel, kurzHash, bildtext, platzText } from './plan.js';
+import { ADMIN, ERG_TAGE, LIVE_VOR, LOOKS, EDIT_FELDER, NEUE_ARTEN, ladeDaten, ladeSaison, bauePlan, eigeneRennen, rennKey, inhaltSchluessel, kurzHash, bildtext, platzText } from './plan.js';
 import { kiBild, sprueche, STIMMUNGEN, KAMERAS, autos } from './ki.js';
 import { konto, posten, pruefen, tokenVerlaengern, verlaengerbar, zahlen, karussellPosten } from './insta.js';
 import { istUhrzeit, berlin, berlinZuMs, tageZurueck } from './zeit.js';
@@ -189,6 +189,7 @@ const farbeOk = f => /^#[0-9a-f]{6}$/i.test(String(f || ''));
 // von Hand eingetragene Ergebnisse liegen unter merg:<rennen>.
 async function datenLaden(s, jetzt = Date.now()) {
   const daten = await ladeDaten();
+  try { daten.saison = await ladeSaison(s, daten, jetzt); } catch (e) { daten.saison = {}; }   // 🏆 Saisonfinale: Zahl der Rennen je SPR-Serie (ohne sie gibt es nur kein Finale-Schild)
   const [gemerkt, ergebnisse] = await Promise.all([s.liste('renn:'), s.liste('merg:')]);
   for (const [rk, r] of Object.entries(eigeneRennen(daten, jetzt))) {
     if (JSON.stringify(gemerkt['renn:' + rk] || null) !== JSON.stringify(r)) { await s.schreib('renn:' + rk, r); gemerkt['renn:' + rk] = r; }
@@ -946,7 +947,7 @@ async function stand(env, s) {
     return {
       id: p.id, typ: p.typ, art: p.art, spr: p.spr, titel: p.titel, serie: p.serie, nr: p.nr, track: p.track, layout: p.layout, datum: p.datum,
       postMs: p.postMs, startMs: p.startMs, qualiMs: p.qualiMs || p.startMs, rennMs: p.rennMs || p.startMs, liveMs: p.liveMs, tage: p.tage || 0,
-      klassen: p.klassen, reverseGrid: p.reverseGrid, spruch, liste: p.liste || null, bisDatum: p.bisDatum || '', pose: p.pose || '',
+      klassen: p.klassen, reverseGrid: p.reverseGrid, finale: !!p.finale, spruch, liste: p.liste || null, bisDatum: p.bisDatum || '', pose: p.pose || '',
       ergebnis: p.ergebnis || null, platz: p.ergebnis ? platzText(p.ergebnis) : '', eigenesErgebnis: !!p.eigenesErgebnis,
       ligaId: p.ligaId || '', werte: p.werte || null, bestes: p.bestes || null, monat: p.monat || '', zahl: p.zahl || 0, wort: p.wort || '', zusatz: p.zusatz || '',
       liveBisMs: p.liveBisMs || 0, tab: z.werte || null,
