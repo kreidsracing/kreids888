@@ -56,11 +56,11 @@ export async function ttKonto(zugang) {
   return { name: (d.user && d.user.display_name) || '' };
 }
 
-// Foto als Entwurf in die TikTok-Inbox
+// Foto als Entwurf in die TikTok-Inbox. bildUrl: ein Link oder eine Liste (Karussell, bis 35 Bilder, JPG)
 export async function ttEntwurf(zugang, bildUrl, titel, text) {
   const d = await tt(zugang, '/post/publish/content/init/', {
     post_info: { title: String(titel || '').slice(0, 90), description: String(text || '').slice(0, 4000) },
-    source_info: { source: 'PULL_FROM_URL', photo_cover_index: 0, photo_images: [bildUrl] },
+    source_info: { source: 'PULL_FROM_URL', photo_cover_index: 0, photo_images: (Array.isArray(bildUrl) ? bildUrl : [bildUrl]).slice(0, 35) },
     post_mode: 'MEDIA_UPLOAD', media_type: 'PHOTO'
   });
   return d.publish_id || '';

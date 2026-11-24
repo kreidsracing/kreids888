@@ -505,9 +505,9 @@ function clipPruefen(c, b) {
   if (typeof b.trailer === 'string') n.trailer = b.trailer.replace(/[^A-Za-z0-9_-]/g, '').slice(0, 160);   // 🔴 Stream-Trailer: gehört zu diesem Rennen
   if (b.trailerLive !== undefined) n.trailerLive = Math.max(0, Number(b.trailerLive) || 0);                 // … und nennt diese „Live ab“-Zeit
   if (typeof b.quelle === 'string') n.quelle = b.quelle.replace(/[^A-Za-z0-9_:.-]/g, '').slice(0, 160);      // woraus der Post gebaut ist (gegen Doppelte): top5:…, abend:…, tag2:…, bilder:…
-  if (b.kar !== undefined) n.kar = b.kar === true;                                                           // 🖼 Karussell (Bilder statt Video, nur Instagram)
+  if (b.kar !== undefined) n.kar = b.kar === true;                                                           // 🖼 Karussell (Bilder statt Video): Instagram, auf Wunsch auch TikTok (Foto-Entwurf)
   if (b.nr !== undefined) n.nr = Math.max(0, Math.min(99999, Math.round(Number(b.nr) || 0)));                // 🔢 Folge in der Reihe
-  if (n.kar) { n.tiktok = false; n.youtube = false; n.test = false; }
+  if (n.kar) { n.youtube = false; n.test = false; }   // NEU 24.11.2026: Karussell darf auch zu TikTok (Foto-Entwurf), YouTube kann keine Bilder
   for (const k of ['auto', 'frei', 'aus']) if (b[k] !== undefined) n[k] = b[k] === true;
   if (typeof b.einst === 'string') n.einst = b.einst.slice(0, 6000);                                         // ✏️ Einstellungen eines automatischen Posts (zum Bearbeiten)                     // 🤖 von selbst gebaut · ✓ freigegeben · ✕ nicht posten
   return n;
@@ -594,7 +594,12 @@ async function clipPosten(env, s, id, opt = {}) {
     } catch (e) { c.fehler = String((e && e.message) || e).slice(0, 400); c.versuche = (c.versuche || 0) + 1; }
   }
   if (c.tiktok && !c.tt && opt.tiktok !== false && ttEingerichtet(env) && await s.lies('tt:token')) {
-    try { c.tt = { zeit: Date.now(), publishId: await ttVideoEntwurf(await ttZugang(env, s), videoUrl) }; c.ttFehler = ''; }
+    try {
+      const zugang = await ttZugang(env, s);
+      // 🖼 Karussell → Foto-Beitrag mit allen Bildern als Entwurf (Musik in der TikTok-App), sonst das Video
+      const publishId = c.karussell ? await ttEntwurf(zugang, karUrls(env, c), textTeile(text).titel || c.titel || '', textIg) : await ttVideoEntwurf(zugang, videoUrl);
+      c.tt = { zeit: Date.now(), publishId }; c.ttFehler = '';
+    }
     catch (e) { c.ttFehler = String((e && e.message) || e).slice(0, 300); c.ttVersuche = (c.ttVersuche || 0) + 1; }
   }
   if (c.youtube && !c.yt && opt.youtube !== false && ytEingerichtet(env) && await s.lies('yt:token')) {
@@ -1078,7 +1083,7 @@ async function api(req, env, url) {
     return antwort({ ok: true, id, postMs: c.postMs, teil: TEIL });
   }
   if (pfad === '/api/clips/platz' && req.method === 'GET') return antwort({ postMs: await naechsterClipPlatz(s) });
-  const cp = pfad.match(/^\/api\/clip\/([a-z0-9]{1,40})\/(videoteil|videofertig|bild|aendern|weg|jetzt|kbild|kfertig)(?:\/(\d{1,3}))?$/);
+  const cp = pfad.match(/^\/api\/clip\/([a-z0-9]{1,40})\/(videoteil|videofertig|bild|aendern|weg|jetzt|kbild|kfertig|tiktok)(?:\/(\d{1,3}))?$/);
   if (cp && req.method === 'POST') {
     const [, id, was, nr] = cp;
     const c = await s.lies('clip:' + id);
@@ -1111,7 +1116,7 @@ async function api(req, env, url) {
       const da = n >= 2 && n <= 10 ? await s.vorhanden(`ckar:${id}:${v}:`, n) : 0;
       if (!v || da !== n) return fehler(`Karussell unvollständig (${da} von ${n}).`);
       const alt = c.karussell;
-      c.karussell = { v, n, zeit: Date.now() }; c.kar = true; c.tiktok = false; c.youtube = false; c.test = false; c.fehler = '';
+      c.karussell = { v, n, zeit: Date.now() }; c.kar = true; c.youtube = false; c.test = false; c.fehler = '';   // TikTok bleibt, wie im Dashboard gewählt
       await s.schreib('clip:' + id, c);
       if (alt && alt.v !== v) await s.loesch(clipTeile({ id, karussell: alt }));
       return antwort({ ok: true });
@@ -1131,6 +1136,15 @@ async function api(req, env, url) {
       return antwort({ ok: true });
     }
     if (was === 'weg') { await s.loesch(['clip:' + id, 'cbild:' + id, ...clipTeile(c)]); return antwort({ ok: true }); }
+    if (was === 'tiktok') {   // NEU 24.11.2026: schon geposteten Clip/Karussell nachträglich als Entwurf an TikTok
+      if (c.tt) return fehler('Ist schon als Entwurf bei TikTok.');
+      if (!c.video && !c.karussell) return fehler(c.kar ? 'Die Bilder sind schon aufgeräumt (1 Tag nach dem Posten).' : 'Das Video ist schon aufgeräumt (1 Tag nach dem Posten).');
+      if (!ttEingerichtet(env) || !(await s.lies('tt:token'))) return fehler('TikTok ist nicht verbunden.');
+      c.tiktok = true; c.ttVersuche = 0; c.ttFehler = ''; c.laeuft = 0; await s.schreib('clip:' + id, c);
+      const r = await clipPosten(env, s, id, { insta: false, youtube: false });
+      if (!r.tt) return fehler('TikTok: ' + (r.ttFehler || 'ging nicht'), 502);
+      return antwort({ ok: true, tiktok: true });
+    }
     if (was === 'jetzt') {
       if (clipDraussen(c)) return fehler('Dieser Clip ist schon gepostet.');
       c.versuche = 0; c.ttVersuche = 0; c.ytVersuche = 0; c.laeuft = 0; await s.schreib('clip:' + id, c);
