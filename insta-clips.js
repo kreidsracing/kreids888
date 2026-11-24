@@ -5,6 +5,8 @@
 //   Zeitlupe vom Ende, Abspann „Folg mir“. Ton = Clip-Ton + eigene Effekt-Sounds. MP4 H.264 + AAC.
 // • Hochladen in Stücken zum Worker kreids-insta. Der postet zur geplanten Zeit (ein Clip pro Tag):
 //   Instagram-Reel (auf Wunsch als Test-Reel) und TikTok-Entwurf (Musik in der TikTok-App dazu).
+//   NEU 24.11.2026: Foto-Karussells gehen auf Wunsch auch als TikTok-Foto-Entwurf raus (Schalter im Bearbeiten, Standard: an, wenn TikTok verbunden).
+//   Schon gepostete Karussells/Clips: Knopf „📱 An TikTok“ (solange die Dateien noch da sind, 1 Tag nach dem Posten).
 // Wird vom Instagram-Reiter geladen: K888Clips.start(box, umg)
 // ═══════════════════════════════════════════════════════════
 (function () {
@@ -2185,7 +2187,7 @@
     finally { TRAILER_LAEUFT = false; }
   }
 
-  // ═══ 🖼 Karussells (NEU 20.11.2026): Bilder zum Wischen (nur Instagram). Bauen sich von selbst, wenn der Reiter „🎬 Clips“ offen ist ═══
+  // ═══ 🖼 Karussells (NEU 20.11.2026): Bilder zum Wischen (Instagram, auf Wunsch auch TikTok als Foto-Entwurf). Bauen sich von selbst, wenn der Reiter „🎬 Clips“ offen ist ═══
   //   🏆 Top 5 der Woche: die Clips mit den meisten Aufrufen. (Rennabend und „Tag 2/Tag 3“ sind wieder raus: keine Wiederholungen.)
   const KB = 1080, KH = 1350, GOLD = '#ffd400';
   const KAR_V = { kartop5: { emoji: '🏆', name: 'Top 5 der Woche', farbe: GOLD }, karabend: { emoji: '🏁', name: 'Rennabend', farbe: '#5cff1f' }, karbilder: { emoji: '📸', name: 'Fotos', farbe: '#18e8ff' } };
@@ -2300,7 +2302,7 @@
     return aus;
   }
   async function karHochladen(seiten, koerper) {   // Karussell anlegen, Bilder hochladen, kleines Vorschaubild dazu
-    const r = await UMG.igApi('POST', '/api/clip/neu', { ...koerper, kar: true, insta: true, tiktok: false, youtube: false, test: false });
+    const r = await UMG.igApi('POST', '/api/clip/neu', { ...koerper, kar: true, insta: true, tiktok: !!(stand().tiktok && stand().tiktok.verbunden), youtube: false, test: false });   // TikTok: Foto-Entwurf
     try {
       const v = Date.now();
       for (let i = 0; i < seiten.length; i++) { const b = await new Promise(ok => seiten[i].toBlob(ok, 'image/jpeg', 0.9)); await senden(`/api/clip/${r.id}/kbild/${i}?v=${v}`, b); arbeit(`⬆ Bilder hochladen … ${i + 1} von ${seiten.length}`); }
@@ -2540,7 +2542,7 @@
     else if (k === 'text') { K.text = t.value; if (!K.textEigen) { K.textEigen = true; karTextZeigen(); } }   // selbst getippt: bleibt so
     else K[k] = t.value;
   }
-  async function ablKarBauen() {   // 📸 Karussell aus den angehakten Fotos bauen, hochladen und einplanen (nur Instagram)
+  async function ablKarBauen() {   // 📸 Karussell aus den angehakten Fotos bauen, hochladen und einplanen (Instagram + TikTok-Entwurf, wenn verbunden)
     const K = ABL.kar, namen = ABL.fotoWahl.slice(0, K && K.schluss ? KAR_MAX - 1 : KAR_MAX);
     if (!K || !namen.length || ARBEIT || TRAILER_LAEUFT || KAR_LAEUFT) return;
     if (namen.length + (K.schluss ? 1 : 0) < 2) return UMG.meldung('Ein Karussell braucht mindestens zwei Seiten: noch ein Foto anhaken oder die letzte Seite „Live auf YouTube“ anlassen.', 1);
@@ -2643,7 +2645,7 @@
     const K = ABL.kar, wahl = ABL.fotoWahl, seiten = wahl.length + (K && K.schluss ? 1 : 0);
     const foto = x => { const nr = wahl.indexOf(x.name) + 1, benutzt = b.has('foto:' + x.name);
       return `<button type="button" class="kc-foto${nr ? ' an' : ''}${benutzt ? ' benutzt' : ''}" data-c="abl-foto" data-name="${esc(x.name)}" title="${esc(x.name)}${nr ? ' · anklicken = wieder raus' : ' · anklicken = ins Karussell'}"><img src="${ABL.fotoUrl.get(x.name) || ''}" alt=""><i>${nr || '+'}</i>${benutzt ? '<span class="kc-tag-ok">✓ verwendet</span>' : ''}</button>`; };
-    const fotosHtml = !ABL.fotos.length ? '' : `<div class="kc-abl-fotos"><b>📸 Fotos <span class="kc-dim">${ABL.fotos.length} · für ein Karussell anhaken (nur Instagram). Die Zahl ist die Reihenfolge.</span></b>
+    const fotosHtml = !ABL.fotos.length ? '' : `<div class="kc-abl-fotos"><b>📸 Fotos <span class="kc-dim">${ABL.fotos.length} · für ein Karussell anhaken (Instagram, dazu TikTok-Entwurf, wenn verbunden). Die Zahl ist die Reihenfolge.</span></b>
         <div class="kc-foto-reihe">${[...ABL.fotos.filter(x => !b.has('foto:' + x.name)), ...ABL.fotos.filter(x => b.has('foto:' + x.name))].map(foto).join('')}</div>
         ${K && wahl.length ? `<div class="kc-foto-form">
           <div class="kc-felder"><label class="kc-feld">Titel<input type="text" maxlength="80" value="${esc(K.titel)}" data-abk="titel"></label>
@@ -2821,7 +2823,7 @@
         <label class="kc-feld">Titel<input type="text" maxlength="80" value="${esc(E.titel)}" data-ce="titel"></label>
         <label class="kc-feld">Text unter dem Post<textarea rows="5" maxlength="2200" data-ce="text">${esc(E.text)}</textarea></label>
         <div class="kc-felder"><label class="kc-feld">Geht raus am<input type="datetime-local" value="${esc(lokal(E.postMs))}" data-ce="postMs"></label>
-          ${x.kar ? '<span class="kc-dim">Karussell: geht nur zu Instagram.</span>' : `<div class="kc-ziele">${haken('insta', 'Instagram', true)}${haken('tiktok', 'TikTok', !!tk.verbunden)}${haken('youtube', 'YouTube', !!yt.verbunden)}</div>`}</div>
+          ${x.kar ? `<div class="kc-ziele"><span class="kc-dim">Karussell: Instagram</span>${haken('tiktok', 'Auch an TikTok (Entwurf, Musik in der App)', !!tk.verbunden)}</div>` : `<div class="kc-ziele">${haken('insta', 'Instagram', true)}${haken('tiktok', 'TikTok', !!tk.verbunden)}${haken('youtube', 'YouTube', !!yt.verbunden)}</div>`}</div>
         <div class="kc-knoepfe"><button type="button" class="btn ki-k kc-frei" data-c="ce-speichern">✓ Speichern</button><button type="button" class="btn ki-k" data-c="ce-ab">Abbrechen</button></div>
         ${x.kar ? '' : '<div class="kc-hinweis kc-bearb">🎬 Auch das Video ändern (Vorlage, Spruch, Schnitt)? Zieh die Videodatei unten bei „Clip hier reinziehen“ rein. Sie öffnet sich im großen Editor und ersetzt diesen Post.</div>'}
       </div></div></div>`;
@@ -2833,7 +2835,7 @@
     if (x && !x.kar && !E.insta && !E.tiktok && !E.youtube) return UMG.meldung('Bitte Instagram, TikTok oder YouTube anhaken.', 1);
     if (!(E.postMs > Date.now())) return UMG.meldung('Die Zeit liegt in der Vergangenheit. Bitte „Geht raus am“ ändern.', 1);
     try {
-      await UMG.igApi('POST', `/api/clip/${E.id}/aendern`, { titel: String(E.titel || '').slice(0, 80), text: E.text, postMs: E.postMs, ...(x && x.kar ? {} : { insta: E.insta, tiktok: E.tiktok, youtube: E.youtube }) });
+      await UMG.igApi('POST', `/api/clip/${E.id}/aendern`, { titel: String(E.titel || '').slice(0, 80), text: E.text, postMs: E.postMs, ...(x && x.kar ? { tiktok: E.tiktok } : { insta: E.insta, tiktok: E.tiktok, youtube: E.youtube }) });
       CLIP_ED = null; BEARBEITE = null; UMG.meldung(`Gespeichert: ${zeit(E.postMs)}`); await UMG.laden();
     } catch (e) { UMG.meldung(e.message || String(e), 1); }
   }
@@ -4081,6 +4083,7 @@
         <div class="kc-knoepfe">
           ${x.gepostet && x.gepostet.link ? `<a class="btn ki-k" href="${esc(x.gepostet.link)}" target="_blank" rel="noopener">↗ Auf Instagram</a>` : ''}
           ${x.yt && x.yt.link ? `<a class="btn ki-k" href="${esc(x.yt.link)}" target="_blank" rel="noopener">↗ Auf YouTube</a>` : ''}
+          ${raus && !x.tt && !x.weg && (x.karussell || x.video) && (stand().tiktok || {}).verbunden ? `<button type="button" class="btn ki-k" data-c="tiktok" title="Schickt ${x.kar ? 'die Bilder als Foto-Beitrag' : 'das Video'} als Entwurf in deine TikTok-App. Dort Musik drauf und posten.">📱 An TikTok</button>` : ''}
           ${!raus ? `<button type="button" class="btn ki-k" data-c="jetzt">🚀 Jetzt posten</button>
             <input type="datetime-local" value="${esc(lokal(x.postMs))}" data-c="zeitwert"><button type="button" class="btn ki-k" data-c="zeit">🕒 Zeit</button>` : ''}
           ${!raus && !(x.gepostet || x.tt || x.yt) ? '<button type="button" class="btn ki-k" data-c="bearbeiten" title="Titel, Text, Zeit und Ziele ändern. Mit der Videodatei auch das Video selbst.">✏️ Bearbeiten</button>' : ''}
@@ -4432,6 +4435,12 @@
         b.disabled = true; b.textContent = '⏳ …';
         const r = await UMG.igApi('POST', `/api/clip/${id}/jetzt`, {});
         UMG.meldung([r.gepostet ? 'Instagram ✓' : '', r.tiktok ? 'TikTok-Entwurf ✓' : '', r.youtube ? 'YouTube ✓' : '', r.ttFehler ? 'TikTok ging nicht: ' + r.ttFehler : '', r.ytFehler ? 'YouTube ging nicht: ' + r.ytFehler : ''].filter(Boolean).join(' · ') || 'Gesendet.', (!!r.ttFehler || !!r.ytFehler) && !r.gepostet);
+        await UMG.laden();
+      }
+      if (a === 'tiktok') {   // schon gepostet → nachträglich als Entwurf an TikTok
+        b.disabled = true; b.textContent = '⏳ …';
+        await UMG.igApi('POST', `/api/clip/${id}/tiktok`, {});
+        UMG.meldung('TikTok-Entwurf ✓ Schau in deine TikTok-Inbox, dort Musik drauf und posten.');
         await UMG.laden();
       }
       if (a === 'zeit') { const v = z.querySelector('[data-c="zeitwert"]').value; await UMG.igApi('POST', `/api/clip/${id}/aendern`, { postMs: new Date(v).getTime() }); UMG.meldung('Zeit gespeichert.'); await UMG.laden(); }
