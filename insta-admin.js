@@ -615,17 +615,18 @@
   const uhrzeit = ms => new Date(ms).toLocaleTimeString('de-DE', { timeZone: 'Europe/Berlin', hour: '2-digit', minute: '2-digit' });
   const istFertig = p => p.status === 'gepostet' || p.status === 'uebersprungen';
   // Welcher Clip ist das? Name und Zeichen der Vorlage (auch Stream-Trailer und Karussells)
-  const clipInfo = c => (window.K888Clips && window.K888Clips.vorlageInfo && window.K888Clips.vorlageInfo(c.vorlage, c)) || { emoji: '🎬', name: 'Clip' };
+  const clipInfo = c => (c && c.quer ? { emoji: '▶', name: 'YouTube-Video' } : null) || (window.K888Clips && window.K888Clips.vorlageInfo && window.K888Clips.vorlageInfo(c.vorlage, c)) || { emoji: '🎬', name: 'Clip' };
   const clipName = c => clipInfo(c).name || 'Clip';
-  const clipWartet = c => !!c.auto && !c.frei && (STAND.clipcfg || {}).freigabe !== false;   // 🤖 Automatik wartet auf Freigabe (Reiter „🎬 Clips“)
+  const clipWartet = c => (!!c.auto || (!!c.quer && !c.yt && !c.aus)) && !c.frei && (STAND.clipcfg || {}).freigabe !== false;   // 🤖 Automatik und ▶ YouTube-Videos quer warten auf Freigabe (Reiter „🎬 Clips“)
+  const clipRaus = c => (c.quer ? !!c.yt : !!c.gepostet);   // ✓ draußen: quer = auf YouTube öffentlich
 
   function planer(cfg) {
     const heute = bTag(Date.now()), mo0 = montagVon(heute), modus = cfg.modus;
     const alle = [
       ...STAND.posts.map(p => ({ p, ms: p.postMs, tag: bTag(p.postMs) })),
-      ...(STAND.clips || []).filter(c => c.postMs && (c.insta || c.tiktok)).map(c => ({ c, ms: c.postMs, tag: bTag(c.postMs) }))
+      ...(STAND.clips || []).filter(c => c.postMs && (c.insta || c.tiktok || (c.quer && c.ytq))).map(c => ({ c, ms: c.postMs, tag: bTag(c.postMs) }))   // ▶ quer: sobald es privat auf YouTube liegt
     ].sort((a, b) => a.ms - b.ms);
-    const offen = e => e.p ? !istFertig(e.p) : !((!e.c.insta || e.c.gepostet) && (!e.c.tiktok || e.c.tt));
+    const offen = e => e.p ? !istFertig(e.p) : e.c.quer ? !e.c.yt && !e.c.aus : !((!e.c.insta || e.c.gepostet) && (!e.c.tiktok || e.c.tt));
     const liegen = alle.filter(e => e.tag < mo0 && offen(e));
     const wochen = [0, 1, 2, 3].map(w => { const von = tagPlus(mo0, 7 * w), bis = tagPlus(von, 6); return { w, von, bis, liste: alle.filter(e => e.tag >= von && e.tag <= bis) }; });
     const w0 = wochen[0].liste, warten0 = w0.filter(e => e.p && e.p.status === 'wartet').length;
@@ -723,14 +724,14 @@
     </div>`;
   }
   function kpClipZeile(c) {
-    const st = c.gepostet ? ['Gepostet', 'gruen'] : c.aus ? ['Wird nicht gepostet', 'grau'] : c.fehler ? ['Fehler', 'rot'] : clipWartet(c) ? ['Wartet auf Freigabe', 'gelb'] : ['Geplant', 'blau'];
+    const st = clipRaus(c) ? [c.quer ? 'Öffentlich' : 'Gepostet', 'gruen'] : c.aus ? ['Wird nicht gepostet', 'grau'] : (c.fehler || (c.quer && c.ytFehler)) ? ['Fehler', 'rot'] : clipWartet(c) ? ['Wartet auf Freigabe', 'gelb'] : ['Geplant', 'blau'];
     const wohin = clipZiele(c);
-    return `<div class="kp-zeile clip${c.gepostet ? ' fertig' : ''}" style="--f:${ART_FARBE.clip}">
+    return `<div class="kp-zeile clip${clipRaus(c) ? ' fertig' : ''}" style="--f:${ART_FARBE.clip}">
       <div class="kp-zeit">${esc(uhrzeit(c.postMs))}</div>
-      ${kpMini(c.bild, true, '🎬')}
-      <div class="kp-was"><b>${clipInfo(c).emoji || '🎬'} ${c.kar ? 'Karussell' : 'Reel'} · ${esc(clipName(c))}</b><span>${esc(c.titel || '')}${wohin ? ' · ' + wohin : ''}</span></div>
+      ${kpMini(c.bild, !c.quer, '🎬')}
+      <div class="kp-was"><b>${clipInfo(c).emoji || '🎬'} ${c.quer ? 'Video quer' : c.kar ? 'Karussell' : 'Reel'} · ${esc(clipName(c))}</b><span>${esc(c.titel || '')}${wohin ? ' · ' + wohin : ''}</span></div>
       <span class="ki-chip ${st[1]}">${st[0]}</span>
-      <div class="kp-knoepfe"><button class="btn btn-ghost ki-k" data-aktion="reiter" data-wert="clips" data-clip="${esc(c.id)}"><span>${c.gepostet ? '→ Clips' : '✎ Bearbeiten'}</span></button></div>
+      <div class="kp-knoepfe"><button class="btn btn-ghost ki-k" data-aktion="reiter" data-wert="clips" data-clip="${esc(c.id)}"><span>${clipRaus(c) ? '→ Clips' : c.quer ? '✓ Freigabe' : '✎ Bearbeiten'}</span></button></div>
     </div>`;
   }
   function kpKalender(von, liste, heute) {
@@ -738,7 +739,7 @@
       const t = tagPlus(von, i), hier = liste.filter(e => e.tag === t);
       return `<div class="kp-kt${t === heute ? ' heute' : ''}${t < heute ? ' vorbei' : ''}"><div class="kp-ktkopf"><b>${wtag(t)}</b> ${tagMon(t)}</div>
         ${hier.map(e => {
-          if (e.c) return `<button type="button" class="kp-karte" style="--f:${ART_FARBE.clip}" data-aktion="reiter" data-wert="clips" data-clip="${esc(e.c.id)}" title="${esc(clipName(e.c) + (e.c.titel ? ' · ' + e.c.titel : ''))}">${e.c.bild ? `<img src="${esc(e.c.bild)}" alt="" loading="lazy" class="${e.c.kar ? '' : 'hoch'}">` : ''}<span class="kp-kzeit">${esc(uhrzeit(e.ms))}</span><span class="kp-ktext">${clipInfo(e.c).emoji || '🎬'} ${esc(clipName(e.c))}</span>${e.c.titel ? `<span class="kp-ktitel">${esc(e.c.titel)}</span>` : ''}<span class="kp-kziel">${clipZiele(e.c)}</span><i class="kp-dot ${e.c.gepostet ? 'gruen' : clipWartet(e.c) ? 'gelb' : 'blau'}"${clipWartet(e.c) ? ' title="Wartet auf Freigabe"' : ''}></i></button>`;
+          if (e.c) return `<button type="button" class="kp-karte" style="--f:${ART_FARBE.clip}" data-aktion="reiter" data-wert="clips" data-clip="${esc(e.c.id)}" title="${esc(clipName(e.c) + (e.c.titel ? ' · ' + e.c.titel : ''))}">${e.c.bild ? `<img src="${esc(e.c.bild)}" alt="" loading="lazy" class="${e.c.kar || e.c.quer ? '' : 'hoch'}">` : ''}<span class="kp-kzeit">${esc(uhrzeit(e.ms))}</span><span class="kp-ktext">${clipInfo(e.c).emoji || '🎬'} ${esc(clipName(e.c))}</span>${e.c.titel ? `<span class="kp-ktitel">${esc(e.c.titel)}</span>` : ''}<span class="kp-kziel">${clipZiele(e.c)}</span><i class="kp-dot ${clipRaus(e.c) ? 'gruen' : clipWartet(e.c) ? 'gelb' : 'blau'}"${clipWartet(e.c) ? ' title="Wartet auf Freigabe"' : ''}></i></button>`;
           const p = e.p, [st, fa] = kpStatus(p);
           return `<button type="button" class="kp-karte${p.id === OFFEN_ID ? ' offen' : ''}${istFertig(p) ? ' fertig' : ''}" style="--f:${ART_FARBE[p.typ] || '#888'}" data-aktion="kp-auf" data-id="${esc(p.id)}" title="${esc((TYP[p.typ] || '') + ' · ' + st)}">
             ${p.bild ? `<img src="${esc(p.bild)}" alt="" loading="lazy" class="${istStoryArt(p.typ, p) ? 'hoch' : ''}">` : ''}
@@ -953,7 +954,8 @@
       ${REITER === 'kanaele' ? `<div class="ki-grid">${youtubePanel()}${tiktokPanel()}${discordPanel()}</div>` : ''}
       ${REITER === 'vorlagen' ? '<div class="ki-vorlagenbox"></div>' : ''}
       ${REITER === 'zuteilung' ? '<div class="ki-zuteilungbox"></div>' : ''}
-      ${REITER === 'clips' ? '<div class="ki-clipsbox"></div>' : ''}`;
+      ${REITER === 'clips' ? '<div class="ki-ytquerbox"></div><div class="ki-clipsbox"></div>' : ''}`;
+    if (REITER === 'clips' && window.K888YtQuer) window.K888YtQuer.start(BOX.querySelector('.ki-ytquerbox'), CLIP_UMG);   // ▶ YouTube-Videos quer (Toolbox-Ordner „youtube“)
     if (REITER === 'clips' && window.K888Clips) window.K888Clips.start(BOX.querySelector('.ki-clipsbox'), CLIP_UMG);
     if (REITER === 'kanaele') { streamsLaden(); ytListeLaden(); const b = BOX.querySelector('.ki-ytbeschr'); if (b) b.innerHTML = ytBeschrHtml(); }
     if (REITER === 'vorlagen' && window.K888Vorlagen) window.K888Vorlagen.editor(BOX.querySelector('.ki-vorlagenbox'), VORLAGEN_UMG);
@@ -1598,7 +1600,7 @@
   // Zeichnen (insta-bilder.js) und Thumbnail-Editor (insta-thumb.js) nachladen
   let SKRIPTE = null;
   function skripte() {
-    if (!SKRIPTE) SKRIPTE = Promise.all(['insta-bilder.js', 'insta-thumb.js', 'insta-vorlagen.js', 'insta-clips.js', 'insta-tabelle.js'].map(n => new Promise((ok, nein) => {
+    if (!SKRIPTE) SKRIPTE = Promise.all(['insta-bilder.js', 'insta-thumb.js', 'insta-vorlagen.js', 'insta-clips.js', 'insta-tabelle.js', 'insta-ytquer.js'].map(n => new Promise((ok, nein) => {
       const s = document.createElement('script'); s.src = BASIS + n + '?v=' + Date.now();
       s.onload = ok; s.onerror = () => nein(new Error('Konnte ' + n + ' nicht laden'));
       document.head.appendChild(s);

@@ -2314,7 +2314,7 @@
   const clipWert = c => { const z = c.zahlen || {}; return { aufrufe: ((z.ig && z.ig.aufrufe) || 0) + ((z.yt && z.yt.aufrufe) || 0), likes: ((z.ig && z.ig.likes) || 0) + ((z.yt && z.yt.likes) || 0) }; };
   function top5Liste(clips, jetzt) {   // gepostete Clips der letzten 7 Tage, die meisten Aufrufe zuerst (ohne Aufrufe: Likes)
     const raus = c => Math.max((c.gepostet && c.gepostet.zeit) || 0, (c.yt && c.yt.zeit) || 0);
-    const alle = (clips || []).filter(c => !/^(trailer|kar)/.test(c.vorlage || '') && raus(c) > jetzt - 7 * 86400000 && c.zahlen).map(c => ({ c, ...clipWert(c) }));
+    const alle = (clips || []).filter(c => !c.quer && !/^(trailer|kar)/.test(c.vorlage || '') && raus(c) > jetzt - 7 * 86400000 && c.zahlen).map(c => ({ c, ...clipWert(c) }));
     const was = alle.some(x => x.aufrufe > 0) ? 'aufrufe' : 'likes';
     return { was: was === 'aufrufe' ? 'AUFRUFE' : 'LIKES', liste: alle.filter(x => x[was] > 0).sort((a, b) => b[was] - a[was]).slice(0, 5).map(x => ({ id: x.c.id, titel: GROSS(String(x.c.titel || 'Clip').replace(/\s*#\S+/g, '').trim() || 'Clip'), wert: x[was], bildUrl: x.c.bild || '' })) };
   }
@@ -2887,6 +2887,7 @@
   function oeffneJetzt() {
     const id = OEFFNE; OEFFNE = ''; if (!id || !BOX) return;
     const x = (stand().clips || []).find(y => y.id === id); if (!x) return;
+    if (x.quer) { if (window.K888YtQuer) window.K888YtQuer.zeigen(id); return; }   // ▶ YouTube-Video quer: im Bereich darüber
     if (x.gepostet || x.tt || x.yt) { const z = BOX.querySelector(`.kc-post[data-id="${id}"]`); if (z) { const d = z.closest('details'); if (d) d.open = true; z.scrollIntoView({ behavior: 'smooth', block: 'center' }); } return; }   // schon draußen: nur hinspringen
     if (x.auto) autoEdAuf(id); else bearbeiten(id);
   }
@@ -3658,6 +3659,10 @@
       v.src = url;
     });
   }
+  // 📏 Video-Bitrate (NEU 25.11.2026): bis gut 45 s volle Qualität (9 Mbit/s), danach so viel, dass das Video sicher unter
+  // VIDEO_MAX bleibt (Ziel 52 MB inkl. Ton, Platz für Schwankungen des Encoders). Beispiel: 63 s → knapp 6,4 Mbit/s.
+  const VIDEO_MAX = 60e6, VIDEO_ZIEL = 52e6;
+  const videoBitrate = T => Math.round(Math.max(2500000, Math.min(9000000, VIDEO_ZIEL * 8 / Math.max(1, T || 1) - 200000)));
   async function bauen(c, m, fortschritt) {
     if (!window.VideoEncoder) throw new Error('Dieser Browser kann keine Videos bauen. Bitte Chrome oder Edge nehmen.');
     await Promise.all([muxerLaden(), schriften(), teamPflicht(c.team)]);
@@ -3669,9 +3674,10 @@
     for (const i of (p.mehr ? p.slots : [0])) lesers.push(await leser(q[i]));
     if (!p.mehr && camPlatz(c) !== 'aus') camL = await leser(c.cam);   // 📷 Cam läuft Bild für Bild mit (gleiche Stelle wie der Clip)
     let vcfg = null;
+    const vbit = videoBitrate(p.T);   // 📏 NEU 25.11.2026: lange Videos etwas kleiner, damit sie unter 60 MB bleiben (sonst nimmt der Worker sie nicht)
     for (const hw of ['prefer-software', 'no-preference']) {   // erst ohne Grafikkarte (hängt nicht), sonst mit
       for (const codec of ['avc1.640028', 'avc1.640032', 'avc1.4d0028', 'avc1.42e028']) {
-        const k = { codec, width: B, height: H, bitrate: 9000000, framerate: FPS, latencyMode: 'quality', avc: { format: 'avc' }, hardwareAcceleration: hw };
+        const k = { codec, width: B, height: H, bitrate: vbit, framerate: FPS, latencyMode: 'quality', avc: { format: 'avc' }, hardwareAcceleration: hw };
         try { if ((await VideoEncoder.isConfigSupported(k)).supported) { vcfg = k; break; } } catch (e) { /* weiter */ }
       }
       if (vcfg) break;
@@ -3903,7 +3909,7 @@
   function html() {
     const st = stand(), c = CLIPS[0], liste = (st.clips || []), cfg = st.clipcfg || { zeit: '18:30', test: true };
     const draussen = x => (!x.insta || !!x.gepostet) && (!x.tiktok || !!x.tt) && (!x.youtube || !!x.yt);
-    const offen = liste.filter(x => !draussen(x) && !x.auto), raus = liste.filter(draussen).reverse();   // Automatisches steht oben in der Leiste „🤖 Automatik“
+    const offen = liste.filter(x => !draussen(x) && !x.auto && !x.quer), raus = liste.filter(x => draussen(x) && !x.quer).reverse();   // Automatisches steht oben in der Leiste „🤖 Automatik“, ▶ YouTube-Videos quer in ihrem eigenen Bereich
     const tk = st.tiktok || {};
     return `<div class="kc-app">
       <details class="kc-so" ${(OFFEN['kc-so'] ?? !(CLIPS.length || liste.length)) ? 'open' : ''}><summary>💡 So geht’s (in 3 Schritten)</summary>
@@ -4246,7 +4252,7 @@
   }
   async function hochladen(id, blob) {
     const v = Date.now(), TEIL = 1900000, teile = Math.ceil(blob.size / TEIL);
-    if (teile > 39) throw new Error('Video ist zu lang/groß. Bitte kürzer schneiden.');
+    if (blob.size > VIDEO_MAX || teile > 39) throw new Error(`Video ist zu groß (${Math.round(blob.size / 1e6)} MB, höchstens ${VIDEO_MAX / 1e6} MB). Bitte kürzer schneiden.`);
     for (let i = 0; i < teile; i++) { await senden(`/api/clip/${id}/videoteil/${i}?v=${v}`, blob.slice(i * TEIL, (i + 1) * TEIL, 'application/octet-stream')); arbeit(`⬆ Hochladen … ${Math.round((i + 1) / teile * 100)} %`); }
     await UMG.igApi('POST', `/api/clip/${id}/videofertig?v=${v}`, { teile, groesse: blob.size });
   }
