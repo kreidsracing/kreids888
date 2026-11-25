@@ -7,6 +7,9 @@
 // • Klicken = auswählen, Ziehen = verschieben, Mausrad = Größe, freie Fläche ziehen = Hintergrund verschieben
 // • Spruch pro Rennen, Clickbait-Vorschläge per Cloudflare-KI (Worker /api/sprueche)
 // • Download: PNG unter 2 MB, sonst JPG
+// • NEU 25.11.2026 (für die YouTube-Videos quer, insta-ytquer.js): Hintergrund auch als fertige Leinwand (r.hgBild),
+//   Vignette, leuchtende Schrift (leuchten), Ebenen „bild“ (eigenes Bild), „pfeil“ und „kreis“. Für die Renn-Thumbnails
+//   ändert sich nichts, solange diese Felder fehlen.
 // ═══════════════════════════════════════════════════════════
 (function () {
   'use strict';
@@ -170,8 +173,9 @@
   function hgZeichnen(g, img, hg, farbe1, info) {
     g.fillStyle = '#0a0b0e'; g.fillRect(0, 0, B, H);
     if (img) {
-      const f = Math.max(B / img.naturalWidth, H / img.naturalHeight) * Math.max(1, hg.zoom || 1);
-      const w = img.naturalWidth * f, h = img.naturalHeight * f;
+      const nw = img.naturalWidth || img.width, nh = img.naturalHeight || img.height;   // Bild oder fertige Leinwand
+      const f = Math.max(B / nw, H / nh) * Math.max(1, hg.zoom || 1);
+      const w = nw * f, h = nh * f;
       g.drawImage(img, (B - w) * (hg.x ?? 0.5), (H - h) * (hg.y ?? 0.35), w, h);
       info.w = w; info.h = h;
     } else {
@@ -187,6 +191,11 @@
       const gr = hg.seite === 'rechts' ? g.createLinearGradient(B, 0, 0, 0) : g.createLinearGradient(0, 0, B, 0);
       gr.addColorStop(0, `rgba(5,7,10,${hg.links})`); gr.addColorStop(0.45, `rgba(5,7,10,${hg.links * 0.7})`); gr.addColorStop(0.75, 'rgba(5,7,10,0)');
       g.fillStyle = gr; g.fillRect(0, 0, B, H);
+    }
+    if (hg.vignette) {   // NEU: Ränder dunkler, der Blick geht in die Mitte
+      const v = g.createRadialGradient(B / 2, H / 2, H * 0.32, B / 2, H / 2, H * 1.05);
+      v.addColorStop(0, 'rgba(0,0,0,0)'); v.addColorStop(1, `rgba(0,0,0,${Math.min(0.9, hg.vignette)})`);
+      g.fillStyle = v; g.fillRect(0, 0, B, H);
     }
   }
 
@@ -210,12 +219,13 @@
     if (!text) { el._box = null; return; }
     if (el.gross !== false) text = gross(text);
     let size = el.groesse || 100;
-    const font = s => `${el.gewicht || 900} ${s}px ${FAMILIE}`;
+    // NEU: el.schrift = 'anton' (sehr fett, für die YouTube-Videos quer; die Schrift lädt insta-ytquer.js)
+    const font = s => el.schrift === 'anton' ? `400 ${s}px K8QAnton, Impact, sans-serif` : `${el.gewicht || 900} ${s}px ${FAMILIE}`;
     g.font = font(size);
     let zeilen = textZeilen(g, el, text);
     const maxB = el.maxB || 1800;
     while (size > 16 && Math.max(...zeilen.map(t => g.measureText(t).width)) > maxB) { size -= 3; g.font = font(size); zeilen = textZeilen(g, el, text); }
-    const lh = size * 0.94, cap = size * 0.74;
+    const lh = size * 0.94, cap = el.schrift ? (g.measureText('H').actualBoundingBoxAscent || size * 0.74) : size * 0.74;
     const w = Math.max(...zeilen.map(t => g.measureText(t).width)), h = lh * (zeilen.length - 1) + cap;
     const pad = el.box && el.box !== 'kein' ? size * 0.2 : 0;
     const sk = el.schraeg ? 0.18 : 0;
@@ -238,6 +248,12 @@
       const y = cap + i * lh;
       if (el.randB > 0) { g.lineWidth = el.randB * 2; g.strokeStyle = el.rand || '#000'; g.strokeText(z, 0, y); }
     });
+    if (el.leuchten) {   // NEU: Leuchten in Farbe, zweimal für mehr Kraft
+      g.save(); g.shadowColor = el.leuchtFarbe || '#ff1a1a'; g.fillStyle = el.leuchtFarbe || '#ff1a1a';
+      for (const k of [0.55, 0.25]) { g.shadowBlur = size * k * (el.leuchtStaerke || 1); zeilen.forEach((z, i) => g.fillText(z, 0, cap + i * lh)); }
+      g.restore();
+      if (el.randB > 0) { g.lineWidth = el.randB * 2; g.strokeStyle = el.rand || '#000'; zeilen.forEach((z, i) => g.strokeText(z, 0, cap + i * lh)); }
+    }
     if (el.schatten) { g.shadowColor = 'rgba(0,0,0,.75)'; g.shadowBlur = size * 0.14; g.shadowOffsetY = size * 0.04; }
     if (el.verlauf) { const gr = g.createLinearGradient(0, 0, 0, h); gr.addColorStop(0, el.farbe || '#fff'); gr.addColorStop(1, el.farbe2 || '#ffd400'); g.fillStyle = gr; }
     else g.fillStyle = el.farbe || '#fff';
@@ -259,12 +275,38 @@
     el._box = { x, y: el.y, w: b, h };
   }
 
+  // NEU: Pfeil (Spitze bei x/y, Länge, Winkel in Grad) und Kreis (Mitte x/y, Halbachsen rx/ry) mit Rand und Leuchten
+  function formZeichnen(g, el) {
+    const farbe = el.farbe || '#ff1a1a', dicke = el.dicke || 16;
+    const strich = (pfad, breit) => {
+      if (el.leuchten) { g.save(); g.shadowColor = el.leuchtFarbe || farbe; g.shadowBlur = dicke * 2.2; g.strokeStyle = farbe; g.lineWidth = breit; pfad(); g.stroke(); g.restore(); }
+      if (el.rand) { g.strokeStyle = el.rand; g.lineWidth = breit + (el.randB || 8) * 2; pfad(); g.stroke(); }
+      g.strokeStyle = farbe; g.lineWidth = breit; pfad(); g.stroke();
+    };
+    g.save(); g.lineCap = 'round'; g.lineJoin = 'round';
+    if (el.typ === 'kreis') {
+      const rx = el.rx || 160, ry = el.ry || 120;
+      strich(() => { g.beginPath(); g.ellipse(el.x, el.y, rx, ry, (el.drehung || 0) * Math.PI / 180, 0, Math.PI * 2); }, dicke);
+      el._box = { x: el.x - rx - dicke, y: el.y - ry - dicke, w: (rx + dicke) * 2, h: (ry + dicke) * 2 };
+    } else {
+      const L = el.laenge || 320, w = (el.winkel || 0) * Math.PI / 180, kx = Math.cos(w), ky = Math.sin(w);
+      const sx = el.x - kx * L, sy = el.y - ky * L, k = Math.max(40, dicke * 3.4), bx = el.x - kx * k * 0.8, by = el.y - ky * k * 0.8;
+      const spitze = () => { g.beginPath(); g.moveTo(el.x, el.y); g.lineTo(bx - ky * k * 0.7, by + kx * k * 0.7); g.moveTo(el.x, el.y); g.lineTo(bx + ky * k * 0.7, by - kx * k * 0.7); };
+      strich(() => { g.beginPath(); g.moveTo(sx, sy); g.lineTo(el.x - kx * dicke * 0.3, el.y - ky * dicke * 0.3); }, dicke);
+      strich(spitze, dicke);
+      const x0 = Math.min(sx, el.x) - k, y0 = Math.min(sy, el.y) - k;
+      el._box = { x: x0, y: y0, w: Math.abs(el.x - sx) + 2 * k, h: Math.abs(el.y - sy) + 2 * k };
+    }
+    g.restore();
+  }
+
   // canvas: Ziel · v: Vorlage · r: Rennen ({…post, hg, spruch}) · design: { farbe1, logoBild } · opt: { auswahl }
+  // NEU: r.hgBild = fertiges Hintergrundbild (Bild oder Leinwand), dann wird r.hg nicht geladen
   async function zeichnen(canvas, v, r, design, opt = {}) {
     await fonts().catch(() => {});
     const els = v.elemente.filter(e => e.an !== false);
-    const [hgBild, logo, ...rest] = await Promise.all([bild(r.hg), bild(design.logoBild),
-      ...els.map(e => e.typ === 'pers' ? bild(posenUrl(e.bild)) : e.typ === 'team' ? bild(teamUrl(e.bild)) : Promise.resolve(null))]);
+    const [hgBild, logo, ...rest] = await Promise.all([r.hgBild ? Promise.resolve(r.hgBild) : bild(r.hg), bild(design.logoBild),
+      ...els.map(e => e.typ === 'pers' ? bild(posenUrl(e.bild)) : e.typ === 'team' ? bild(teamUrl(e.bild)) : e.typ === 'bild' ? bild(e.url) : Promise.resolve(null))]);
     const g = canvas.getContext('2d');
     g.setTransform(canvas.width / B, 0, 0, canvas.height / H, 0, 0);
     const info = {};
@@ -279,6 +321,8 @@
         if (img) bildZeichnen(g, el, el.schwarzWeg ? ohneSchwarz(img) : img, b, b * img.naturalHeight / img.naturalWidth, {});
         else el._box = null;
       }
+      else if (el.typ === 'bild') { const img = rest[i], b = el.b || 500; if (img) bildZeichnen(g, el, img, b, b * img.naturalHeight / img.naturalWidth, el); else el._box = null; }   // NEU: eigenes Bild
+      else if (el.typ === 'pfeil' || el.typ === 'kreis') formZeichnen(g, el);   // NEU: Markierung
     });
     if (v.hg.leiste !== false) { g.fillStyle = v.hg.leisteFarbe || design.farbe1 || '#e11324'; g.fillRect(0, H - 14, B, 14); }
     const sel = opt.auswahl && v.elemente.find(e => e.id === opt.auswahl);
@@ -649,5 +693,6 @@
 #instaApp .kt-rechts input[type=range]{padding:0;accent-color:var(--red)}`;
   document.head.appendChild(css);
 
-  window.K888Thumb = { editor, vorschau, laden, datei, vorlageAus, fuerRennen, variante, STANDARD, POSEN, posenUrl };
+  window.K888Thumb = { editor, vorschau, laden, datei, vorlageAus, fuerRennen, variante, STANDARD, POSEN, posenUrl,
+    zeichnen, TEAM, teamUrl, bild, fonts, kopie };   // NEU 25.11.2026: auch für den Thumbnail-Editor der YouTube-Videos quer
 })();

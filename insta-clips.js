@@ -2618,8 +2618,9 @@
           const v = document.createElement('video'); v.muted = true; v.preload = 'auto'; v.playsInline = true;
           await new Promise((ok, nein) => { v.onloadeddata = ok; v.onerror = nein; setTimeout(nein, 8000); v.src = url; });
           await new Promise(ok => { v.onseeked = ok; setTimeout(ok, 3000); v.currentTime = Math.min((v.duration || 2) / 2, 3); });
-          const cv = leinwand(240, 135), q = Math.max(240 / (v.videoWidth || 240), 135 / (v.videoHeight || 135)), w = (v.videoWidth || 240) * q, h = (v.videoHeight || 135) * q;
-          cv.getContext('2d').drawImage(v, (240 - w) / 2, (135 - h) / 2, w, h); src = cv.toDataURL('image/jpeg', 0.7);
+          const hk = (v.videoHeight || 0) > (v.videoWidth || 0), KB = hk ? 135 : 240, KH = hk ? 240 : 135;   // 📐 9:16-Szene (Toolbox seit 25.11.2026): Kachel hochkant
+          const cv = leinwand(KB, KH), q = Math.max(KB / (v.videoWidth || KB), KH / (v.videoHeight || KH)), w = (v.videoWidth || KB) * q, h = (v.videoHeight || KH) * q;
+          cv.getContext('2d').drawImage(v, (KB - w) / 2, (KH - h) / 2, w, h); src = cv.toDataURL('image/jpeg', 0.75);
           v.removeAttribute('src'); v.load();
         } catch (err) { src = ''; }
         if (url) URL.revokeObjectURL(url);
@@ -2636,9 +2637,10 @@
     const b = new Set(ablBenutzt()), frei = ABL.liste.filter(x => !b.has(x.name)), datum = ms => new Date(ms).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' });
     const kachel = x => {
       const benutzt = b.has(x.name), drin = CLIPS.some(c => c.ablage === x.name), k = x.name + '|' + x.zeit, src = ABL.bilder.get(k);
-      return `<div class="kc-abl-k${benutzt ? ' benutzt' : ''}"><div class="kc-abl-bild" data-k="${esc(k)}">${src ? `<img src="${src}" alt="">` : '🎬'}</div>
+      const hk = x.info.format === '9:16';   // 📐 von der Toolbox schon hochkant gebaut (seit 25.11.2026)
+      return `<div class="kc-abl-k${benutzt ? ' benutzt' : ''}"><div class="kc-abl-bild${hk ? ' hoch' : ''}" data-k="${esc(k)}">${src ? `<img src="${src}" alt="">` : '🎬'}</div>
         <b title="${esc(x.name)}">${esc(ablTitel(x))}</b>
-        <span class="kc-dim">${[x.info.dauer ? sek(x.info.dauer) : '', x.info.ansichten > 1 ? x.info.ansichten + ' Ansichten' : '', x.info.hook ? 'mit Hook' : '', x.cam ? 'mit Cam' : '', datum(x.zeit)].filter(Boolean).join(' · ')}</span>
+        <span class="kc-dim">${[hk ? 'hochkant 9:16' : '', x.info.dauer ? sek(x.info.dauer) : '', x.info.ansichten > 1 ? x.info.ansichten + ' Ansichten' : '', x.info.hook ? 'mit Hook' : '', x.cam ? 'mit Cam' : x.info.cam_drin ? 'Cam im Video' : '', datum(x.zeit)].filter(Boolean).join(' · ')}</span>
         ${benutzt ? '<span class="kc-tag-ok">✓ verwendet</span>' : ''}
         <button type="button" class="btn ki-k${benutzt || drin ? '' : ' kc-frei'}" data-c="abl-auf" data-name="${esc(x.name)}" ${drin ? 'disabled' : ''}>${drin ? 'Ist im Editor' : benutzt ? '↩ Nochmal' : '✏️ In den Editor'}</button></div>`;
     };
@@ -4797,6 +4799,7 @@
 .kc-app .kc-abl-k.benutzt{opacity:.6}
 .kc-app .kc-abl-bild{aspect-ratio:16/9;background:#07080b;display:flex;align-items:center;justify-content:center;font-size:26px;overflow:hidden}
 .kc-app .kc-abl-bild img{width:100%;height:100%;object-fit:cover;display:block}
+.kc-app .kc-abl-bild.hoch{aspect-ratio:9/16;width:58%;align-self:center}
 .kc-app .kc-abl-fotos{margin-top:14px;padding-top:12px;border-top:1px solid rgba(24,232,255,.25)}.kc-app .kc-abl-fotos>b{display:block;color:#fff}.kc-app .kc-abl-fotos>b .kc-dim{font-weight:400}
 .kc-app .kc-foto-reihe{display:grid;grid-template-columns:repeat(auto-fill,minmax(112px,1fr));gap:8px;margin-top:10px}
 .kc-app .kc-foto{position:relative;aspect-ratio:4/5;padding:0;border:2px solid #2a2f36;background:#07080b;cursor:pointer;overflow:hidden}
