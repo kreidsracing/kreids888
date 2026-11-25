@@ -16,7 +16,7 @@ import { ADMIN, ERG_TAGE, LIVE_VOR, LOOKS, EDIT_FELDER, NEUE_ARTEN, ladeDaten, l
 import { kiBild, sprueche, STIMMUNGEN, KAMERAS, autos } from './ki.js';
 import { konto, posten, pruefen, tokenVerlaengern, verlaengerbar, zahlen, karussellPosten } from './insta.js';
 import { istUhrzeit, berlin, berlinZuMs, tageZurueck } from './zeit.js';
-import { ytEingerichtet, ytAnmeldeLink, ytCodeTauschen, ytZugang, ytKanal, ytStreams, ytPlanen, ytThumbnail, ytTexte, ytLetzteBeschreibung, ytInfos, ytShortHochladen, ytZahlen, ytTitelSetzen } from './youtube.js';
+import { ytEingerichtet, ytAnmeldeLink, ytCodeTauschen, ytZugang, ytKanal, ytStreams, ytPlanen, ytThumbnail, ytTexte, ytLetzteBeschreibung, ytInfos, ytShortHochladen, ytZahlen, ytTitelSetzen, ytQuerMeta, ytOeffentlich } from './youtube.js';
 import { ttEingerichtet, ttAnmeldeLink, ttCodeTauschen, ttZugang, ttKonto, ttEntwurf, ttVideoEntwurf } from './tiktok.js';
 import { discordEingerichtet, discordMelden, textTeile, ART_NAME, FARBE } from './discord.js';
 import { textMitTags, titelMitTags } from './tags.js';
@@ -483,6 +483,8 @@ async function ttSenden(env, s, post, cfg, design) {
 // ─── 🎬 Clips (Clip-Fabrik) ─────────────────────────────────
 // Das Dashboard baut aus einem Clip ein fertiges Neon-Video (MP4) und lädt es in Stücken hoch.
 // clip:<id> = { id, vorlage, titel, text, postMs, insta, tiktok, test, thumbMs, video, gepostet, tt, fehler, versuche }
+// ▶ quer (NEU 25.11.2026): YouTube-Video 16:9 aus der Toolbox. Liegt schon privat auf YouTube (ytq = { id }), kein Video hier im Speicher.
+//   Zum Termin und nach der Freigabe schaltet der Zeitplan es öffentlich (dann yt = { id }).
 // cvteil:<id>:<v>:<n> = Video-Stücke · cbild:<id> = Vorschaubild · clipcfg = { zeit, test }
 const CLIP_STANDARD = { zeit: '18:30', test: true };
 async function ladeClipCfg(s) {
@@ -501,13 +503,15 @@ function clipPruefen(c, b) {
   if (b.postMs !== undefined) { const t = Number(b.postMs); if (t > Date.now() - 60000 && t < Date.now() + 120 * 86400000) n.postMs = t; }
   for (const k of ['insta', 'tiktok', 'youtube', 'test']) if (b[k] !== undefined) n[k] = b[k] !== false;
   if (b.thumbMs !== undefined) n.thumbMs = Math.max(0, Math.min(90000, Math.round(Number(b.thumbMs) || 0)));
-  if (b.dauer !== undefined) n.dauer = Math.max(0, Math.min(180, Number(b.dauer) || 0));
+  if (b.quer !== undefined && !c.ytq) n.quer = b.quer === true;                                               // ▶ YouTube-Video quer (nur YouTube)
+  if (b.dauer !== undefined) n.dauer = Math.max(0, Math.min(n.quer ? 43200 : 180, Number(b.dauer) || 0));
   if (typeof b.trailer === 'string') n.trailer = b.trailer.replace(/[^A-Za-z0-9_-]/g, '').slice(0, 160);   // 🔴 Stream-Trailer: gehört zu diesem Rennen
   if (b.trailerLive !== undefined) n.trailerLive = Math.max(0, Number(b.trailerLive) || 0);                 // … und nennt diese „Live ab“-Zeit
   if (typeof b.quelle === 'string') n.quelle = b.quelle.replace(/[^A-Za-z0-9_:.-]/g, '').slice(0, 160);      // woraus der Post gebaut ist (gegen Doppelte): top5:…, abend:…, tag2:…, bilder:…
   if (b.kar !== undefined) n.kar = b.kar === true;                                                           // 🖼 Karussell (Bilder statt Video): Instagram, auf Wunsch auch TikTok (Foto-Entwurf)
   if (b.nr !== undefined) n.nr = Math.max(0, Math.min(99999, Math.round(Number(b.nr) || 0)));                // 🔢 Folge in der Reihe
   if (n.kar) { n.youtube = false; n.test = false; }   // NEU 24.11.2026: Karussell darf auch zu TikTok (Foto-Entwurf), YouTube kann keine Bilder
+  if (n.quer) { n.insta = false; n.tiktok = false; n.youtube = true; n.test = false; n.kar = false; }   // ▶ quer geht nur zu YouTube
   for (const k of ['auto', 'frei', 'aus']) if (b[k] !== undefined) n[k] = b[k] === true;
   if (typeof b.einst === 'string') n.einst = b.einst.slice(0, 6000);                                         // ✏️ Einstellungen eines automatischen Posts (zum Bearbeiten)                     // 🤖 von selbst gebaut · ✓ freigegeben · ✕ nicht posten
   return n;
@@ -618,6 +622,20 @@ async function clipPosten(env, s, id, opt = {}) {
   await s.schreib('clip:' + id, c);
   return c;
 }
+async function querOeffentlich(env, s, id) {
+  const c = await s.lies('clip:' + id);
+  if (!c || !c.quer || !c.ytq || c.yt) return c;
+  try {
+    const sichtbar = await ytOeffentlich(await ytZugang(env, s), c.ytq.id);
+    c.yt = { zeit: Date.now(), id: c.ytq.id, privat: sichtbar !== 'public', tags: true };   // Titel hat die Pflicht-Hashtags schon seit dem Hochladen
+    c.ytFehler = '';
+    const t = textTeile(textMitTags(c.text || ''));
+    if (!c.yt.privat) await dcMelden(s, () => discordMelden(env, { text: '▶ Neues Video auf YouTube', titel: c.titel || t.titel || 'Neues Video', link: 'https://youtu.be/' + c.ytq.id,
+      beschreibung: t.rest, bild: `${env.ORIGIN}/cbild/${id}.jpg`, farbe: FARBE.youtube, fuss: 'YouTube · Video' }));
+  } catch (e) { c.ytFehler = String((e && e.message) || e).slice(0, 300); c.ytVersuche = (c.ytVersuche || 0) + 1; }
+  await s.schreib('clip:' + id, c);
+  return c;
+}
 async function clipsListe(env, s) {
   const roh = await s.liste('clip:');
   return Object.values(roh).filter(c => c && c.id).sort((a, b) => (a.postMs || 0) - (b.postMs || 0)).map(c => ({
@@ -626,7 +644,8 @@ async function clipsListe(env, s) {
     video: c.video ? `${env.ORIGIN}/cvideo/${c.id}/${c.video.v}.mp4` : '', bild: c.bild ? `${env.ORIGIN}/cbild/${c.id}.jpg?v=${c.bild}` : '',
     gepostet: c.gepostet ? { zeit: c.gepostet.zeit || 0, link: c.gepostet.link || '', test: !!c.gepostet.test } : null,
     tt: c.tt ? { zeit: c.tt.zeit || 0 } : null, fehler: c.fehler || '', ttFehler: c.ttFehler || '', versuche: c.versuche || 0,
-    youtube: !!c.youtube, yt: c.yt ? { zeit: c.yt.zeit || 0, link: 'https://youtube.com/shorts/' + c.yt.id, privat: !!c.yt.privat } : null, ytFehler: c.ytFehler || '', weg: !!c.weg,
+    youtube: !!c.youtube, yt: c.yt ? { zeit: c.yt.zeit || 0, link: (c.quer ? 'https://youtu.be/' : 'https://youtube.com/shorts/') + c.yt.id, privat: !!c.yt.privat } : null, ytFehler: c.ytFehler || '', weg: !!c.weg,
+    quer: !!c.quer, ytq: c.ytq ? { id: c.ytq.id, zeit: c.ytq.zeit || 0, studio: 'https://studio.youtube.com/video/' + c.ytq.id + '/edit', bild: !!c.ytq.bild } : null,
     zahlen: c.zahlen || null, trailer: c.trailer || '', trailerLive: c.trailerLive || 0, quelle: c.quelle || '', nr: c.nr || 0,
     auto: istAuto(c), frei: !!c.frei, aus: !!c.aus, einst: c.einst || '',
     kar: !!c.kar, karussell: c.karussell ? c.karussell.n : 0, kbilder: c.karussell && !c.weg ? karUrls(env, c) : []
@@ -706,6 +725,12 @@ async function zyklus(env) {
       const yt = ytOk && c.youtube && !c.yt && (c.ytVersuche || 0) < 3 && ytFrei > 0;
       if (yt) ytFrei--;
       if (insta || tt || yt) await clipPosten(env, s, c.id, { insta, tiktok: tt, youtube: yt });
+    }
+    // ▶ YouTube-Videos quer: liegen schon privat auf YouTube. Zum Termin (und nach der Freigabe) öffentlich schalten.
+    if (ytOk) for (const c of clips) {
+      if (!c.quer || !c.ytq || c.yt || c.aus || !c.postMs || c.postMs > jetzt || (c.ytVersuche || 0) >= 3) continue;
+      if (freigabeNoetig && !c.frei) continue;   // wartet auf Freigabe (auch nach dem Termin: dann geht es gleich nach der Freigabe raus)
+      await querOeffentlich(env, s, c.id);
     }
   } catch (e) { /* nächster Lauf */ }
   // 1b3. 📈 Zahlen der Clips (Aufrufe, Likes, Kommentare): in den ersten 3 Tagen alle 3 Std., danach einmal am Tag, nach 30 Tagen nicht mehr.
@@ -1083,7 +1108,7 @@ async function api(req, env, url) {
     return antwort({ ok: true, id, postMs: c.postMs, teil: TEIL });
   }
   if (pfad === '/api/clips/platz' && req.method === 'GET') return antwort({ postMs: await naechsterClipPlatz(s) });
-  const cp = pfad.match(/^\/api\/clip\/([a-z0-9]{1,40})\/(videoteil|videofertig|bild|aendern|weg|jetzt|kbild|kfertig|tiktok)(?:\/(\d{1,3}))?$/);
+  const cp = pfad.match(/^\/api\/clip\/([a-z0-9]{1,40})\/(videoteil|videofertig|bild|aendern|weg|jetzt|kbild|kfertig|tiktok|ytstart|ytfertig)(?:\/(\d{1,3}))?$/);
   if (cp && req.method === 'POST') {
     const [, id, was, nr] = cp;
     const c = await s.lies('clip:' + id);
@@ -1097,7 +1122,8 @@ async function api(req, env, url) {
     if (was === 'videofertig') {
       const v = Number(url.searchParams.get('v')) || 0, b = await json(), teile = Number(b.teile) || 0, groesse = Number(b.groesse) || 0;
       const da = await s.vorhanden(`cvteil:${id}:${v}:`, teile);
-      if (!v || !teile || da !== teile || groesse > VIDEO_MAX) return fehler(`Video unvollständig (${da} von ${teile}).`);
+      if (groesse > VIDEO_MAX) return fehler(`Video zu groß (${Math.round(groesse / 1e6)} MB, höchstens ${Math.round(VIDEO_MAX / 1e6)} MB) – bitte kürzer schneiden.`);
+      if (!v || !teile || da !== teile) return fehler(`Video unvollständig (${da} von ${teile}).`);
       const alt = c.video;
       c.video = { v, teile, groesse, zeit: Date.now() };
       if (c.fehler && /Video fehlt/.test(c.fehler)) c.fehler = '';
@@ -1136,6 +1162,31 @@ async function api(req, env, url) {
       return antwort({ ok: true });
     }
     if (was === 'weg') { await s.loesch(['clip:' + id, 'cbild:' + id, ...clipTeile(c)]); return antwort({ ok: true }); }
+    // ▶ YouTube-Video quer: Zugang und Daten für den Upload holen (das Dashboard lädt die Datei selbst privat zu YouTube) …
+    if (was === 'ytstart') {
+      if (!c.quer) return fehler('Das ist kein YouTube-Video (quer).');
+      if (c.ytq) return fehler('Das Video ist schon auf YouTube.');
+      if (!ytEingerichtet(env) || !(await s.lies('yt:token'))) return fehler('YouTube ist nicht verbunden (Reiter „YouTube · TikTok · Discord“).');
+      const text = textMitTags(c.text || '');
+      const tags = [...new Set([...(text.match(/#[\p{L}\d_]+/gu) || []).map(x => x.slice(1).toLowerCase()), 'simracing', 'iracing', 'gt3', 'crash'])];
+      const beschreibung = `${text.trim()}\n\n▶ Kanal abonnieren: ${YT_KANAL}?sub_confirmation=1`;
+      return antwort({ ok: true, zugang: await ytZugang(env, s), meta: ytQuerMeta({ titel: titelMitTags(c.titel || 'Simracing', 100), beschreibung, tags }) });
+    }
+    // … und danach melden: Video ist privat auf YouTube. Das Thumbnail (Vorschaubild dieses Clips) kommt gleich mit drauf.
+    if (was === 'ytfertig') {
+      if (!c.quer) return fehler('Das ist kein YouTube-Video (quer).');
+      const vid = String((await json()).videoId || '');
+      if (!/^[A-Za-z0-9_-]{6,20}$/.test(vid)) return fehler('YouTube-Video-ID ungültig.');
+      c.ytq = { id: vid, zeit: Date.now(), bild: false }; c.ytFehler = ''; c.ytVersuche = 0;
+      const u8 = await s.liesGross('cbild:' + id);
+      if (u8) {
+        try { await ytThumbnail(await ytZugang(env, s), vid, u8, bildTyp(u8) || 'image/jpeg'); c.ytq.bild = true; }
+        catch (e) { c.ytFehler = 'Thumbnail: ' + String((e && e.message) || e).slice(0, 250); }
+      }
+      await s.schreib('clip:' + id, c);
+      return antwort({ ok: true, thumbnail: c.ytq.bild, fehler: c.ytFehler || '' });
+    }
+    if (c.quer && (was === 'jetzt' || was === 'tiktok' || was === 'videoteil' || was === 'videofertig')) return fehler('Bei YouTube-Videos (quer): freigeben, dann geht es zum Termin raus.');
     if (was === 'tiktok') {   // NEU 24.11.2026: schon geposteten Clip/Karussell nachträglich als Entwurf an TikTok
       if (c.tt) return fehler('Ist schon als Entwurf bei TikTok.');
       if (!c.video && !c.karussell) return fehler(c.kar ? 'Die Bilder sind schon aufgeräumt (1 Tag nach dem Posten).' : 'Das Video ist schon aufgeräumt (1 Tag nach dem Posten).');

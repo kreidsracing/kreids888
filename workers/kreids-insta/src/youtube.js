@@ -195,6 +195,28 @@ export async function ytShortHochladen(zugang, { titel, beschreibung, tags, body
   return { id: d.id, sichtbar: (d.status && d.status.privacyStatus) || '' };
 }
 
+// ▶ YouTube-Video quer 16:9 (NEU 25.11.2026): Das Dashboard lädt die Datei aus dem Toolbox-Ordner „youtube“ selbst hoch
+// (privat, direkt zu YouTube, egal wie groß). Hier nur: was in den Upload kommt, und später öffentlich schalten.
+// Kein „#shorts“: quer ist ein normales Video. Der Hinweis auf den nächsten Stream fehlt, weil er beim Hochladen schon veraltet sein kann.
+export function ytQuerMeta({ titel, beschreibung, tags }) {
+  return {
+    snippet: { title: ytSauber(titel).slice(0, 100) || 'Simracing', description: ytSauber(beschreibung).slice(0, 4900), categoryId: '20', tags: (tags || []).slice(0, 15), defaultLanguage: 'de', defaultAudioLanguage: 'de' },
+    status: { privacyStatus: 'private', selfDeclaredMadeForKids: false, containsSyntheticMedia: false, embeddable: true }
+  };
+}
+// Privat hochgeladenes Video öffentlich schalten (zum Termin, nach der Freigabe). Status erst lesen, damit nichts anderes verloren geht.
+export async function ytOeffentlich(zugang, id) {
+  const d = await yt(zugang, '/videos?part=status&id=' + encodeURIComponent(id));
+  const v = (d.items || [])[0];
+  if (!v) throw new Error('YouTube: Video nicht gefunden (videoNotFound)');
+  const st = v.status || {};
+  if (st.privacyStatus === 'public') return 'public';
+  if (st.uploadStatus && !['uploaded', 'processed'].includes(st.uploadStatus)) throw new Error('YouTube: Das Video ist noch nicht fertig verarbeitet (' + st.uploadStatus + ').');
+  const neu = { privacyStatus: 'public', embeddable: st.embeddable !== false, license: st.license || 'youtube', publicStatsViewable: st.publicStatsViewable !== false, selfDeclaredMadeForKids: false };
+  const r = await yt(zugang, '/videos?part=status', { method: 'PUT', json: { id, status: neu } });
+  return (r.status && r.status.privacyStatus) || 'public';
+}
+
 // Titel eines schon hochgeladenen Videos (Short): Pflicht-Hashtags dazu. Snippet holen, nur Titel (und Tags) tauschen, Rest bleibt
 export async function ytTitelSetzen(zugang, id, neuTitel) {
   const d = await yt(zugang, '/videos?part=snippet&id=' + encodeURIComponent(id));
