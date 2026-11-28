@@ -10,7 +10,7 @@
   let C = null, root = null, META = null, ABS = null;
   let alive = 0;
   const S = { id: null, plan: null, av: {}, me: null, canDelete: false, key: null, draft: null, dirty: false, step: "verf", evTab: "autos", live: null, liveAt: 0, liveT: null, g61: {} };
-  const LIVE_MS = 5 * 60 * 1000;
+  const LIVE_MS = 60 * 1000;   // Live alle Minute neu (Spotting), Garage 61 kommt vom Server höchstens alle 5 Min. neu
   const VCOL = { 2: "ja", 1: "evtl", 0: "nein" };
   const VTXT = { 2: "Verfügbar", 1: "Vielleicht", 0: "Nicht verfügbar" };
   const PIT_STD = { tank: 100, reserve: 0.5, rate: 2.5, lane: 60, reifen: 20, wechsel: 0, reifenAlle: 1, parallel: true };
@@ -88,8 +88,24 @@
   }
 
   /* ---------------- Berechnung ---------------- */
-  function carStart(car) { return car.start || S.plan.start; }
+  // NEU (28.11.2026): Serverstart = Zeitfenster (Server geht auf, Training/Quali). Gerechnet wird ab dem Rennstart:
+  // echter Start aus dem Spotting (grüne Flagge), sonst Serverstart + „Rennstart nach Serverstart“ vom Event
+  function serverStart(car) { return car.start || S.plan.start; }
+  function spotFuer(car) { const a = S.live && S.live.spot && S.live.spot.autos && S.live.spot.autos[car.key]; return a || null; }
+  function carStart(car) { const sp = spotFuer(car); return sp && sp.rennstart ? sp.rennstart : serverStart(car) + (S.plan.vorlauf || 0) * 60000; }
   function raceEnd(car) { return S.plan.mode === "zeit" ? carStart(car) + S.plan.dauerMin * 60000 : null; }
+  // iRacing-Name aus dem Spotting → Fahrer im Plan (über Garage 61 oder den Namen; Zahlen am Ende wie „Millar2“ egal)
+  function uidVonName(car, name) {
+    const teile = (x) => norm(x).split(" ").map(w => w.replace(/\d+$/, "")).filter(w => w.length >= 2);
+    const t = teile(name);
+    if (!t.length) return "";
+    const g = META && META.g61drivers.find(x => teile(x.name).join(" ") === t.join(" "));
+    const dg = g && car.drivers.find(d => d.g61 === g.slug);
+    if (dg) return dg.uid;
+    const passt = (x) => { const u = teile(x); return u.length && (u.join(" ") === t.join(" ") || (t.length >= 2 && t.every(w => u.includes(w))) || (u.length >= 2 && u.every(w => t.includes(w)))); };
+    const d = car.drivers.find(d => passt(memberName(d.uid)) || passt(d.name));
+    return d ? d.uid : "";
+  }
 
   // live = echte Stints aus Garage 61 für dieses Auto (oder null); sonst zählen von Hand eingetragene Stopps
   function rechne(car, live) {
@@ -132,11 +148,11 @@
 
     let quelle = "", laufend = null;
     if (live && live.stints && live.stints.length) {
-      quelle = "g61";
+      quelle = live.quelle || "g61";
       for (const s of live.stints) {
-        const uid = uidVonG61(s.g61);
+        const uid = s.uid !== undefined ? s.uid : uidVonG61(s.g61);
         if (s.fertig) {
-          rows.push({ i: rows.length, uid, name: uid ? memberName(uid) : s.name, von: s.von, bis: s.bis, laps: s.laps, pace: s.pace, fuel: s.fuel, real: "fertig" });
+          rows.push({ i: rows.length, uid, name: uid ? memberName(uid) : s.name, von: s.von, bis: s.bis, laps: s.laps, pace: s.pace, fuel: s.fuel > 0 ? s.fuel : s.laps * werte(uid).fuel, real: "fertig" });
           rest -= s.laps;
         } else laufend = { ...s, uid };
       }
@@ -210,7 +226,7 @@
 
   /* ---------------- Verfügbarkeit ---------------- */
   function fenster(car) {
-    const s = carStart(car);
+    const s = serverStart(car);   // verfügbar ab Serverstart (Training/Quali gehören dazu)
     let e = raceEnd(car);
     if (e === null) { const r = rechne(car, null).rows; e = r.length ? r[r.length - 1].bis : s + 3 * 3600000; }
     return { von: s, bis: Math.max(e, s + 1800000) };
@@ -328,7 +344,12 @@
     return konflikte.length ? ["arbeit", "In Arbeit", konflikte] : ["ok", "Plan vollständig", []];
   }
   const statusListe = (st) => st[2] && st[2].length ? `<ul class="sp-was">${st[2].slice(0, 6).map(x => `<li>${esc(x)}</li>`).join("")}${st[2].length > 6 ? `<li>… und ${st[2].length - 6} weitere</li>` : ""}</ul>` : "";
-  const liveFuer = (c) => S.live && S.live.status === "live" && S.live.autos ? S.live.autos[c.key] : null;
+  // Live: zuerst die echten Stints aus dem Spotting (Toolbox / F2F Overlay), sonst Garage 61 (NEU 28.11.2026)
+  function liveFuer(c) {
+    const sp = spotFuer(c);
+    if (sp && sp.stints && sp.stints.length) return { quelle: "spot", stints: sp.stints.map(x => ({ ...x, uid: uidVonName(c, x.name), pace: x.laps > 0 ? Math.round((x.bis - x.von) / x.laps) / 1000 : 0, fuel: 0 })) };
+    return S.live && S.live.status === "live" && S.live.autos ? S.live.autos[c.key] : null;
+  }
 
   /* ---------------- Mount / Laden ---------------- */
   async function mount(el, ctx, sub) {
@@ -369,7 +390,7 @@
     S.id = d.plan.id; S.plan = normalisiere(d.plan); S.av = d.av || {}; S.me = d.me; S.canDelete = d.canDelete;
     return true;
   }
-  function istLive(c) { const now = Date.now(), s = carStart(c), e = raceEnd(c) || s + 48 * 3600000; return now > s - 1800000 && now < e + 2 * 3600000; }
+  function istLive(c) { const now = Date.now(), s = serverStart(c), e = raceEnd(c) || s + 48 * 3600000; return now > s - 1800000 && now < e + 2 * 3600000; }
   window.addEventListener("beforeunload", (e) => { if (S.dirty && root && document.body.contains(root)) { flush(); e.preventDefault(); e.returnValue = ""; } });
   window.addEventListener("hashchange", () => { if (S.dirty) flush(); });
   function weg(e) { if (S.dirty && !confirm("Ungespeicherte Änderungen am Fahrzeug verwerfen?")) { e.preventDefault(); return; } S.dirty = false; }
@@ -383,7 +404,7 @@
     try { d = await C.api("/stint/list"); } catch (e) { return fehler(e.message); }
     if (mine !== alive) return;
     const now = Date.now(), meinId = C.ME.user.id;
-    const ende = (p) => Math.max(p.start, ...p.cars.map(c => c.start || p.start)) + (p.mode === "zeit" ? p.dauerMin * 60000 : 6 * 3600000);
+    const ende = (p) => Math.max(p.start, ...p.cars.map(c => c.start || p.start)) + (p.vorlauf || 0) * 60000 + (p.mode === "zeit" ? p.dauerMin * 60000 : 6 * 3600000);
     const karte = (p) => {
       const ich = p.cars.some(c => c.drivers.includes(meinId));
       const laenge = p.mode === "runden" ? p.runden + " Runden" : dauer(p.dauerMin * 60000);
@@ -496,7 +517,9 @@
         <div class="sp-inline"><div class="sp-seg" id="ev-mode"><button type="button" data-m="zeit" class="${ev.mode === "zeit" ? "on" : ""}">Zeit</button><button type="button" data-m="runden" class="${ev.mode === "runden" ? "on" : ""}">Runden</button></div>
         ${ev.mode === "zeit"
           ? `<input class="tm-input sp-num" id="ev-h" type="number" min="0" max="48" value="${h}"><span>Std.</span><input class="tm-input sp-num" id="ev-m" type="number" min="0" max="59" step="5" value="${m}"><span>Min.</span>`
-          : `<input class="tm-input sp-num" id="ev-runden" type="number" min="1" max="5000" value="${ev.runden}"><span>Runden</span>`}</div></div>`;
+          : `<input class="tm-input sp-num" id="ev-runden" type="number" min="1" max="5000" value="${ev.runden}"><span>Runden</span>`}</div></div>
+      <div class="tm-row"><div class="lbl">Rennstart<small>Training + Quali davor, 0 = Rennen beginnt sofort</small></div>
+        <div class="sp-inline"><input class="tm-input sp-num" id="ev-vorlauf" type="number" min="0" max="600" step="5" value="${ev.vorlauf || 0}"><span>Min. nach Serverstart</span></div></div>`;
   }
   function wannFelder(ev) {
     if ((ev.slots || []).length) return `
@@ -518,6 +541,7 @@
     ev.name = v("ev-name").value;
     if (v("ev-h")) ev.dauerMin = Math.max(10, Math.round(num(v("ev-h").value) * 60 + num(v("ev-m").value)));
     if (v("ev-runden")) ev.runden = Math.max(1, Math.round(num(v("ev-runden").value, 100)));
+    if (v("ev-vorlauf")) ev.vorlauf = Math.max(0, Math.min(600, Math.round(num(v("ev-vorlauf").value, 0))));
     const tv = v("ev-track").value.trim();
     const t = META.tracks.find(x => x.name === tv) || META.tracks.find(x => norm(x.name) === norm(tv));
     ev.trackName = t ? t.name : tv; ev.trackId = t ? t.id : 0;
@@ -540,7 +564,7 @@
   function eventWizard() {
     // Standard-Notiz für neue Events (kann im Assistenten angepasst werden)
     const STANDARD_NOTIZ = "Das nächste Event ist im Teamdashboard unter Rennen → Events angelegt! Schaut mal rein und meldet euch schon mal bei einem Fahrzeug an.\n\nDie Verfügbarkeit hat noch Zeit, die könnt ihr später in Ruhe eintragen. Der Bot erinnert euch rechtzeitig.\n\nKonstanz bis ins Ziel! 🏁";
-    const w = { schritt: 1, name: "", trackId: 0, trackName: "", mode: "zeit", dauerMin: 360, runden: 100, notiz: STANDARD_NOTIZ, channel: "", von: datumWert(Date.now() + 7 * 864e5), bis: "", zeiten: ["14:00"], slots: [], teams: [], carId: 0, carName: "", starts: {}, ich: "" };
+    const w = { schritt: 1, name: "", trackId: 0, trackName: "", mode: "zeit", dauerMin: 360, runden: 100, vorlauf: 0, notiz: STANDARD_NOTIZ, channel: "", von: datumWert(Date.now() + 7 * 864e5), bis: "", zeiten: ["14:00"], slots: [], teams: [], carId: 0, carName: "", starts: {}, ich: "" };
     const teams = META.teams || [];
     const startVon = (n) => w.starts[n] || startAnpassen(fromLocalInput(w.von + "T" + (w.zeiten[0] || "14:00")), w, true);
     const zeichne = () => {
@@ -616,7 +640,7 @@
         const b = v("wz-done"); b.disabled = true;
         try {
           const ersterStart = w.teams.length ? Math.min(...w.teams.map(startVon)) : w.slots.length ? w.slots[0] : fromLocalInput(w.von + "T" + w.zeiten[0]);
-          const r = await C.api("/stint/event", { method: "POST", body: { event: { name: w.name, trackId: w.trackId, trackName: w.trackName, mode: w.mode, dauerMin: w.dauerMin, runden: w.runden, notiz: w.notiz, channel: w.channel, von: w.von, bis: w.bis || w.von, zeiten: w.zeiten, slots: w.slots, start: ersterStart } } });
+          const r = await C.api("/stint/event", { method: "POST", body: { event: { name: w.name, trackId: w.trackId, trackName: w.trackName, mode: w.mode, dauerMin: w.dauerMin, runden: w.runden, vorlauf: w.vorlauf || 0, notiz: w.notiz, channel: w.channel, von: w.von, bis: w.bis || w.von, zeiten: w.zeiten, slots: w.slots, start: ersterStart } } });
           for (const n of w.teams) {
             await C.api("/stint/car", { method: "POST", body: { id: r.id, car: { name: n, carId: w.carId, carName: w.carName, start: startVon(n), pit: { ...PIT_STD }, drivers: w.ich === n ? [{ uid: S.me || C.ME.user.id, name: C.ME.user.name, g61: g61Vorschlag(C.ME.user.id, C.ME.user.name), pace: 0, fuel: 0 }] : [], stints: [] } } }).catch(x => C.toast(n + ": " + x.message));
           }
@@ -632,7 +656,7 @@
 
   // Event bearbeiten: alles auf einer Seite, speichert automatisch
   function eventForm(p) {
-    const ev = { name: p.name, trackId: p.trackId, trackName: p.trackName, mode: p.mode, dauerMin: p.dauerMin, runden: p.runden, notiz: p.notiz || "", channel: p.channel || "", von: p.von || "", bis: p.bis || "", zeiten: [...(p.zeiten || [])], slots: [...(p.slots || [])] };
+    const ev = { name: p.name, trackId: p.trackId, trackName: p.trackName, mode: p.mode, dauerMin: p.dauerMin, runden: p.runden, vorlauf: p.vorlauf || 0, notiz: p.notiz || "", channel: p.channel || "", von: p.von || "", bis: p.bis || "", zeiten: [...(p.zeiten || [])], slots: [...(p.slots || [])] };
     const sig = (c) => JSON.stringify({ ...c, schedule: undefined, crev: undefined });
     const orig = {};
     let cars = p.cars.map(c => { orig[c.key] = sig(c); return kopie(c); });
@@ -663,6 +687,8 @@
       if (new Set(cars.map(c => c.name)).size !== cars.length) return status("Ein Team ist doppelt", "err");
       laeuft = true;
       try {
+        // Rennstart oder Renndauer geändert: Stintzeiten (für die Erinnerungen) bei allen Fahrzeugen neu rechnen
+        const altEv = JSON.parse(evSig), zeitNeu = ["vorlauf", "mode", "dauerMin", "runden"].some(k => ev[k] !== altEv[k]);
         if (JSON.stringify(ev) !== evSig) {
           await C.api("/stint/event", { method: "POST", body: { id: p.id, event: { ...ev, start: cars.length ? Math.min(...cars.map(c => c.start)) : fromLocalInput((ev.von || datumWert(Date.now())) + "T" + (ev.zeiten[0] || "14:00")) } } });
           evSig = JSON.stringify(ev);
@@ -670,7 +696,7 @@
         const altPlan = S.plan;
         S.plan = { ...p, ...ev, cars };
         for (const c of cars) {
-          if (orig[c.key] === sig(c)) continue;
+          if (orig[c.key] === sig(c) && !zeitNeu) continue;
           c.schedule = rechne(c, null).rows.filter(x => !x.real).map(x => ({ i: x.i, u: x.uid, v: Math.round(x.von) }));
           const r = await C.api("/stint/car", { method: "POST", body: { id: p.id, crev: c.crev || 0, car: c } });
           c.crev = r.crev; orig[c.key] = sig(c);
@@ -804,7 +830,7 @@
         <div class="sp-vc-kopf">
           <div class="sp-vcard-pic">${silhouette(c.name)}</div>
           <div class="sp-vc-titel"><b title="${esc(c.name)}">${esc(c.name)}</b>
-            <div class="sp-vc-fakten"><span>${C.ICONS.car}${esc(c.carName || "Fahrzeug offen")}</span><span>${C.ICONS.clock}${tagUhr(carStart(c))}</span></div></div>
+            <div class="sp-vc-fakten"><span>${C.ICONS.car}${esc(c.carName || "Fahrzeug offen")}</span><span>${C.ICONS.clock}${p.vorlauf ? "Server " + tagUhr(serverStart(c)) + " · Rennstart " + uhr(carStart(c)) : tagUhr(carStart(c))}</span></div></div>
           <span class="sp-st ${st[0]}">${st[1]}</span>
           <div class="sp-vcard-go">›</div>
         </div>
@@ -834,7 +860,7 @@
           <h3>${esc(p.name)} <a class="sp-pen" href="#stint/${esc(p.id)}/bearbeiten" title="Event bearbeiten">✎</a></h3>
           <div class="sp-hero-facts">
             <span>${C.ICONS.calendar}${zeitraumText(p) || datumLang(p.start)}</span>
-            <span>${C.ICONS.clock}${(p.zeiten || []).length ? "Startzeiten: " + p.zeiten.join(", ") + " Uhr" : uhr(p.start) + " Uhr (Start)"}</span>
+            <span>${C.ICONS.clock}${(p.zeiten || []).length ? "Startzeiten: " + p.zeiten.join(", ") + " Uhr" : uhr(p.start) + " Uhr (Start)"}${p.vorlauf ? " · Rennstart " + p.vorlauf + " Min. nach Serverstart" : ""}</span>
             <span>${C.ICONS.flag}${laenge}</span>
             <span>${C.ICONS.pin}${esc(p.trackName || "Strecke offen")}</span>
             <span>${C.ICONS.car}${modelle.length ? esc(modelle.join(", ")) : "Fahrzeuge offen"}</span>
@@ -913,7 +939,7 @@
     const po = $("#sp-post");
     if (po) po.onclick = async () => {
       po.disabled = true;
-      const cars = infos.map(({ c, r }) => ({ name: c.name + (c.carName ? " · " + c.carName : "") + " · Start " + tagUhr(carStart(c)), lines: r.rows.map(s => `${s.i + 1}. ${uhr(s.von)} bis ${uhr(s.bis)} · ${s.name} · ${s.laps} Rd.`) }));
+      const cars = infos.map(({ c, r }) => ({ name: c.name + (c.carName ? " · " + c.carName : "") + " · Rennstart " + tagUhr(carStart(c)), lines: r.rows.map(s => `${s.i + 1}. ${uhr(s.von)} bis ${uhr(s.bis)} · ${s.name} · ${s.laps} Rd.`) }));
       try { const x = await C.api("/stint/post", { method: "POST", body: { id: p.id, cars } }); C.toast(x.info, true); }
       catch (x) { C.toast(x.message); }
       po.disabled = false;
@@ -950,7 +976,7 @@
         <div class="tm-row"><label for="cf-team">Team<small>vergebene Teams sind gesperrt</small></label>
           <div>${teams.length ? `<select class="tm-select" id="cf-team">${teams.map(n => `<option value="${esc(n)}" ${n === c.name ? "selected" : ""} ${vergeben(n) ? "disabled" : ""}>${esc(n)}${vergeben(n) ? " (schon vergeben)" : ""}</option>`).join("")}</select>` : '<p class="tm-muted">Keine Teams angelegt (Verwaltung → Team &amp; Zugang → Stintplaner → Teams).</p>'}</div></div>
         <div class="tm-row"><label for="cf-car">Fahrzeug<small>aus Garage 61</small></label><div>${autoAuswahl(c)}</div></div>
-        <div class="tm-row"><div class="lbl">Start<small>deine Ortszeit</small></div>
+        <div class="tm-row"><div class="lbl">Serverstart<small>deine Ortszeit</small></div>
           <div class="sp-grid" id="cf-start">${startFelder(c.start, "cf", p)}</div></div>
         ${car ? "" : `<div class="tm-row"><div class="lbl">Fahrer</div><label class="sp-check" style="margin-top:4px"><input type="checkbox" id="cf-ich" checked> Ich fahre selbst mit</label></div>`}
         <div class="tm-actions">${C.btn(car ? "Speichern" : "Fahrzeug anlegen", "red", 'id="cf-save"')}${car && (S.canDelete || car.by === S.me || META.isAdmin) ? C.btn("Fahrzeug löschen", "sm", 'id="cf-del"') : ""}</div>
@@ -1053,7 +1079,7 @@
       ? `<div class="sp-tasks">${tasks.map((t, i) => `<div class="sp-task ${t.ich ? "ich" : ""}"><i class="sp-task-dot ${t.ich ? "" : "info"}"></i><span>${esc(t.t)}</span>${t.b ? `<button type="button" class="tm-btn ${t.ich ? "red" : ""} sm" data-task="${i}"><span>${esc(t.b)} →</span></button>` : ""}</div>`).join("")}</div>`
       : `<div class="sp-tasks"><div class="sp-task ok"><i class="sp-task-dot ok"></i><span>Alles erledigt, der Plan steht.</span></div></div>`;
     $("#sp-stepper").innerHTML = STEPS.map(([k, l], i) => {
-      const ok = { verf: c.drivers.length && c.drivers.every(d => fahrerAv(d.uid, c) !== "fehlt"), werte: c.drivers.length && c.drivers.every(d => d.pace > 0 && d.fuel > 0), plan: st[0] === "ok", live: r.quelle === "g61" || r.quelle === "hand" }[k];
+      const ok = { verf: c.drivers.length && c.drivers.every(d => fahrerAv(d.uid, c) !== "fehlt"), werte: c.drivers.length && c.drivers.every(d => d.pace > 0 && d.fuel > 0), plan: st[0] === "ok", live: r.quelle === "spot" || r.quelle === "g61" || r.quelle === "hand" }[k];
       return `<button type="button" data-step="${k}" class="sp-stp ${S.step === k ? "on" : ""} ${ok ? "done" : ""}"><span class="sp-stp-n">${ok ? "✓" : i + 1}</span><span class="sp-stp-l">${l}</span></button>`;
     }).join('<i class="sp-stp-line"></i>');
     // direkt bearbeiten: Team, Fahrzeug, Tag, Uhrzeit
@@ -1690,17 +1716,22 @@
   /* ---------- Schritt 4: Live (Garage 61) + Boxenstopp von Hand ---------- */
   async function stepLive(body) {
     const c = S.draft, mine = alive;
+    // NEU (28.11.2026): zuerst Spotting (Toolbox / F2F Overlay), sonst Garage 61; jede Minute und per Knopf
     const kopf = () => {
-      const l = S.live;
+      const l = S.live, sp = spotFuer(c);
       let txt = "Lädt …", live = false;
-      if (l) {
-        if (l.status === "live") { live = true; const n = l.autos && l.autos[c.key] ? l.autos[c.key].laps : 0; txt = `Stand ${uhr(l.at)} · ${n} Runden von Garage 61 · nächste Aktualisierung ${uhr(S.liveAt + LIVE_MS)}`; }
-        else txt = l.info || l.status;
+      if (sp && sp.stints && sp.stints.length) {
+        live = true;
+        txt = `Aus dem Spotting · Stand ${uhr(sp.at)} · ${sp.stints.length} ${sp.stints.length === 1 ? "Stint" : "Stints"}` + (sp.rennstart ? ` · Rennstart ${uhr(sp.rennstart)} (grüne Flagge)` : "");
+      } else if (l) {
+        if (l.status === "live") { live = true; const n = l.autos && l.autos[c.key] ? l.autos[c.key].laps : 0; txt = `Kein Spotting für dieses Fahrzeug · ${n} Runden aus Garage 61, Stand ${uhr(l.at)}`; }
+        else txt = "Kein Spotting für dieses Fahrzeug. " + (l.info || l.status);
       }
-      return `<div class="tm-box sp-livebox"><h5>Live aus Garage 61 <span class="tm-badge ${live ? "live" : "grey"}">${live ? "Live" : "Info"}</span></h5>
+      return `<div class="tm-box sp-livebox"><h5>Live <span class="tm-badge ${live ? "live" : "grey"}">${live ? "Live" : "Info"}</span></h5>
         <p class="hint">${esc(txt)}</p>
-        <p class="sp-kurz">Holt im Rennen alle 5 Min. die echten Runden. Gefahrene Stints werden markiert, der Rest neu gerechnet.</p>
-        <div class="tm-actions">${C.btn("Jetzt aktualisieren", "sm", 'id="sp-lv"')}</div></div>`;
+        ${sp && sp.spaet && sp.stints && sp.stints.length ? `<p class="hint">Das Spotting lief erst ab ${uhr(sp.stints[0].von)}, die Stints davor fehlen.</p>` : ""}
+        <p class="sp-kurz">Holt jede Minute die echten Stints aus dem Spotting (Toolbox / F2F Overlay), sonst aus Garage 61. Gefahrene Stints werden markiert, der Rest ab jetzt neu gerechnet. Nächste Aktualisierung ${S.liveAt ? uhr(S.liveAt + LIVE_MS) : "gleich"}.</p>
+        <div class="tm-actions">${C.btn("↻ Jetzt aktualisieren", "red sm", 'id="sp-lv"')}</div></div>`;
     };
     const handBox = () => {
       const stops = c.stops || [];
@@ -1721,7 +1752,7 @@
       if (mine !== alive || S.step !== "live" || !document.body.contains(body)) return;
       const lc = liveFuer(c);
       const r = rechne(c, lc);
-      const quelle = r.quelle === "g61" ? '<p class="tm-muted sp-quelle">Grundlage: echte Runden aus Garage 61</p>' : r.quelle === "hand" ? '<p class="tm-muted sp-quelle">Grundlage: von Hand eingetragene Boxenstopps</p>' : "";
+      const quelle = r.quelle === "spot" ? '<p class="tm-muted sp-quelle">Grundlage: echte Stints aus dem Spotting</p>' : r.quelle === "g61" ? '<p class="tm-muted sp-quelle">Grundlage: echte Runden aus Garage 61</p>' : r.quelle === "hand" ? '<p class="tm-muted sp-quelle">Grundlage: von Hand eingetragene Boxenstopps</p>' : "";
       body.innerHTML = kopf() + quelle + stintTabelle(c, r, true) + handBox();
       const lv = $("#sp-lv");
       if (lv) lv.onclick = () => holen(true);
@@ -1751,7 +1782,7 @@
       const fokus = document.activeElement;
       if (!manuell && fokus && fokus.closest && fokus.closest(".sp-hand")) return;
       zeichne();
-      if (manuell && S.live && S.live.status !== "live") C.toast(S.live.info || "Keine Live-Daten");
+      if (manuell) { const sp = spotFuer(c); if (sp && sp.stints && sp.stints.length) C.toast("Aktualisiert", true); else if (S.live && S.live.status !== "live") C.toast("Kein Spotting. " + (S.live.info || "Keine Live-Daten")); else C.toast("Aktualisiert (Garage 61)", true); }
     };
     zeichne();
     if (!S.live || Date.now() - S.liveAt > LIVE_MS - 5000) await holen(false);
