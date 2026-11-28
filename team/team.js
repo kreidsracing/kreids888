@@ -746,7 +746,7 @@
     }).catch(() => { const z = document.getElementById("hm-stint"); if (z) z.innerHTML = '<span class="tm-muted">–</span>'; });
   }
 
-  // Startseite „Live jetzt": wer gerade mit FF Overlay/Toolbox fährt (aus der Spotting-Liste)
+  // Startseite „Live jetzt": wer gerade mit F2F Overlay/Toolbox fährt (aus der Spotting-Liste)
   const LIVE_TYP = { "Race": "Rennen", "Lone Qualify": "Quali", "Open Qualify": "Quali", "Qualify": "Quali", "Practice": "Training", "Lone Practice": "Training", "Warmup": "Warm-up", "Offline Testing": "Testfahrt" };
   function zeichneLive(liste) {
     const el = document.getElementById("w-live");
@@ -757,7 +757,7 @@
       <b>${esc(x.von || "?")} · ${esc(x.strecke || "Rennen " + x.sub)}</b>
       <small>${x.aktiv ? esc([LIVE_TYP[x.typ] || x.typ, (x.teams || []).join(", "), x.autos ? x.autos + " Autos" : ""].filter(Boolean).join(" · "))
         : "Beendet vor " + Math.max(1, Math.round((Date.now() - x.zuletzt) / 6e4)) + " Min. · verschwindet nach 15 Min."}</small><em>Ansehen →</em></a>`).join("")}</div>`
-      : '<div class="tp-widget-f">Gerade fährt niemand. Wer mit FF Overlay oder der Toolbox fährt, erscheint hier.</div>');
+      : '<div class="tp-widget-f">Gerade fährt niemand. Wer mit F2F Overlay oder der Toolbox fährt, erscheint hier.</div>');
   }
 
   const fmtDay = (iso) => new Date(iso).toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit" });
@@ -1913,7 +1913,7 @@
       ? `<div class="tm-roles" data-pick="${key}">${d.roles.map(r => `<button type="button" class="tm-chip" data-role="${r.id}"><i style="${r.color ? "background:" + hex(r.color) : ""}"></i>${esc(r.name)}</button>`).join("")}</div>`
       : '<span class="tm-err">Keine Rollen geladen – ist der Bot auf dem Server?</span>';
 
-    // Fahrer-Schalter: alle mit Team-Rolle plus wer FF Overlay oder die Toolbox verbunden hat; gespeichert wird, wer aus ist
+    // Fahrer-Schalter: alle mit Team-Rolle plus wer F2F Overlay oder die Toolbox verbunden hat; gespeichert wird, wer aus ist
     const FA_ARTEN = [["spot", "Spotting"], ["offline", "Offline"], ["erg", "Rennergebnis"]];
     const fahrerAus = Object.fromEntries(FA_ARTEN.map(([k]) => [k, new Set((cfg.fahrerAus || {})[k] || [])]));
     const appFahrer = d.appFahrer || [];
@@ -2074,7 +2074,7 @@
 
       <div class="tm-box">
         <h5>Rennergebnisse</h5>
-        <p class="hint">Nach einem Rennen schicken FF Overlay bzw. die Toolbox das offizielle Ergebnis, der Bot postet es hier. Dafür einmal im Programm „Mit F2F verbinden" klicken. Fahren mehrere im selben Rennen, kommt nur ein Post, der um weitere Autos ergänzt wird.</p>
+        <p class="hint">Nach einem Rennen schicken F2F Overlay bzw. die Toolbox das offizielle Ergebnis, der Bot postet es hier. Dafür einmal im Programm „Mit F2F verbinden" klicken. Fahren mehrere im selben Rennen, kommt nur ein Post, der um weitere Autos ergänzt wird.</p>
         <div class="tm-row"><div class="lbl">Posten</div>
           <div class="tm-actions"><label class="tm-switch"><input type="checkbox" id="er-an" ${(cfg.ergebnisse || {}).an ? "checked" : ""}><span class="s"></span>An</label></div></div>
         <div class="tm-row"><label for="er-ch">Discord-Kanal<small>für Teamrennen und als Standard</small></label>
@@ -2083,7 +2083,7 @@
           <div style="display:flex;flex-direction:column;gap:12px">
             <label class="tm-switch"><input type="checkbox" id="er-team" ${(cfg.ergebnisse || {}).team !== false ? "checked" : ""}><span class="s"></span>Teamrennen und Special Events (F2F-Teams)</label>
             <label class="tm-switch"><input type="checkbox" id="er-alle" ${(cfg.ergebnisse || {}).alle || (cfg.ergebnisse || {}).nur === "alle" ? "checked" : ""}><span class="s"></span>Alle anderen offiziellen Rennen von Teammitgliedern</label>
-            <label class="tm-switch"><input type="checkbox" id="er-ov" ${(cfg.ergebnisse || {}).overlay ? "checked" : ""}><span class="s"></span>Rennen von allen, die FF Overlay nutzen (auch ohne Team-Rolle)</label>
+            <label class="tm-switch"><input type="checkbox" id="er-ov" ${(cfg.ergebnisse || {}).overlay ? "checked" : ""}><span class="s"></span>Rennen von allen, die F2F Overlay nutzen (auch ohne Team-Rolle)</label>
           </div></div>
         <div class="tm-row"><label for="er-ch-alle">Kanal für andere Rennen<small>Teammitglieder, leer = wie oben</small></label>
           <div><select class="tm-select" id="er-ch-alle"><option value="">wie oben</option>${(d.channels || []).map(c => `<option value="${c.id}" ${c.id === (cfg.ergebnisse || {}).kanalAlle ? "selected" : ""}># ${esc(c.name)}</option>`).join("")}</select></div></div>
@@ -2096,7 +2096,7 @@
 
       <div class="tm-box">
         <h5>Spotting · Live-Meldung</h5>
-        <p class="hint">Geht jemand mit FF Overlay bzw. der Toolbox live, postet der Bot eine Meldung mit Strecke, Session, Team, Auto, Startnummer und Klassen-SOF und einem Knopf zum Live-Spotting. Wechselt die Session (Training → Rennen), wird der Post angepasst, am Ende steht „Beendet" dran. Welche Sessions überhaupt ins Spotting kommen, steht unter Team &amp; Zugang → Spotting.</p>
+        <p class="hint">Geht jemand mit F2F Overlay bzw. der Toolbox live, postet der Bot eine Meldung mit Strecke, Session, Team, Auto, Startnummer und Klassen-SOF und einem Knopf zum Live-Spotting. Wechselt die Session (Training → Rennen), wird der Post angepasst, am Ende steht „Beendet" dran. Welche Sessions überhaupt ins Spotting kommen, steht unter Team &amp; Zugang → Spotting.</p>
         <div class="tm-row"><div class="lbl">Live-Meldung</div>
           <div class="tm-actions"><label class="tm-switch"><input type="checkbox" id="spl-an" ${(cfg.spotting || {}).an ? "checked" : ""}><span class="s"></span>An</label></div></div>
         <div class="tm-row"><div class="lbl">Wann<small>mehrere möglich · wechselt die Session (Training → Rennen), wird neu geprüft</small></div>
@@ -2115,7 +2115,7 @@
 
       <div class="tm-box">
         <h5>Spotting</h5>
-        <p class="hint">Hier legst du fest, was FF Overlay und die Toolbox ins Spotting schicken dürfen. Spotting ist die Live-Seite im Dashboard, dazu kommt die Live-Meldung im Discord. Was hier nicht durchkommt, ist nirgends live zu sehen und bekommt auch keine Live-Meldung. Rennergebnisse laufen getrennt davon, hier wirkt nur der Fahrer-Schalter „Rennergebnis“. Die Anordnung der Fenster stellst du direkt auf der Spotting-Seite ein, sie gilt dann für alle.</p>
+        <p class="hint">Hier legst du fest, was F2F Overlay und die Toolbox ins Spotting schicken dürfen. Spotting ist die Live-Seite im Dashboard, dazu kommt die Live-Meldung im Discord. Was hier nicht durchkommt, ist nirgends live zu sehen und bekommt auch keine Live-Meldung. Rennergebnisse laufen getrennt davon, hier wirkt nur der Fahrer-Schalter „Rennergebnis“. Die Anordnung der Fenster stellst du direkt auf der Spotting-Seite ein, sie gilt dann für alle.</p>
         <div class="tm-row"><div class="lbl">Im Spotting zeigen<small>gilt für alle Fahrer, mehrere möglich</small></div>
           <div style="display:flex;flex-direction:column;gap:14px">
             <label class="tm-switch spz-sw"><input type="checkbox" id="spl-team" ${(cfg.spotting || {}).team !== false ? "checked" : ""}><span class="s"></span><span>Teamrennen und Special Events<small>Jede Session mit Team, auch Training und Quali vor dem Rennen. Aus: Teamrennen sind nicht live zu sehen und es kommt keine Live-Meldung.</small></span></label>
@@ -2128,7 +2128,7 @@
             <label class="fa-grenze">Training und Einzelrennen pausieren ab <input class="tm-input" type="number" id="sps-einzel" min="5" max="100" step="5" value="${Number(sz.einzel) || 80}"> %</label>
             <span class="tm-muted">${doh && doh.ready ? `Heute verbraucht: <b>${String(doh.max).replace(".", ",")} %</b> (Stand ${new Date(doh.at).toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" })} Uhr, setzt sich um 1 Uhr nachts zurück) · Details unter Auswertung → Cloudflare-Limits` : "Verbrauch gerade nicht abrufbar, dann wird nichts pausiert."}</span>
           </div></div>
-        <div class="tm-row"><div class="lbl">Fahrer<small>alle mit Team-Rolle, dazu wer schon mit FF Overlay oder Toolbox verbunden war. Live geht nur, was oben UND hier an ist.</small></div>
+        <div class="tm-row"><div class="lbl">Fahrer<small>alle mit Team-Rolle, dazu wer schon mit F2F Overlay oder Toolbox verbunden war. Live geht nur, was oben UND hier an ist.</small></div>
           <div><div class="fa-legende">
             <div><b>Spotting</b>Aus: Von diesem Fahrer geht nichts live, auch keine Teamrennen und keine Offline-Testfahrten. Ein Teamrennen kann trotzdem live sein, wenn ein Teamkollege im selben Rennen verbunden ist.</div>
             <div><b>Offline</b>Aus: Nur seine Offline-Testfahrten gehen nicht live. Rennen, Training und Quali laufen normal.</div>

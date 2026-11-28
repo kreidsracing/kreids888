@@ -2097,7 +2097,7 @@ body:has(.td)::after{content:"";position:fixed;inset:0;z-index:-1;pointer-events
 .spt-quelle i.an{background:#2ecc71;box-shadow:0 0 8px #2ecc71}
 .spt-werkzeug{display:flex;gap:8px;align-items:center}
 .spt-werkzeug .tm-select{width:auto;padding:6px 10px}
-.spt-gitter{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));grid-auto-rows:46px;gap:12px;user-select:none}
+.spt-gitter{display:grid;grid-template-columns:repeat(24,minmax(0,1fr));grid-auto-rows:17px;gap:12px;user-select:none}
 .spt-f{display:flex;flex-direction:column;min-width:0;min-height:0;position:relative;border:1px solid var(--sp-bd,rgba(255,255,255,.08));border-radius:14px;background:var(--sp-glass,rgba(20,22,28,.75));overflow:hidden}
 .spt-f[hidden]{display:none}
 .spt-fh{display:flex;align-items:center;gap:8px;padding:8px 10px 8px 12px;border-bottom:1px solid rgba(255,255,255,.06);cursor:grab;touch-action:none}
@@ -2112,7 +2112,7 @@ body:has(.td)::after{content:"";position:fixed;inset:0;z-index:-1;pointer-events
 .spt-gitter.mobil{display:flex;flex-direction:column}
 .spt-gitter.mobil .spt-f{min-height:120px}
 .spt-gitter.mobil .spt-fb{max-height:70vh}
-.spt-gitter.mobil .spt-ecke,.spt-gitter.mobil .spt-griff{display:none}
+.spt-gitter.mobil .spt-ecke,.spt-gitter.mobil .spt-griff,.spt-gitter.mobil .spt-rand{display:none}
 .spt-gitter.mobil .spt-fh{cursor:default}
 .spt-kacheln{display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:8px}
 .spt-k{padding:8px 10px;border:1px solid var(--sp-bd,rgba(255,255,255,.07));border-radius:10px;background:var(--sp-glass2,rgba(32,36,46,.6));min-width:0}
@@ -2462,3 +2462,30 @@ body:has(.td)::after{content:"";position:fixed;inset:0;z-index:-1;pointer-events
 
 /* Trainer · Garage-61-Listen: Fehler mit Knopf „Nochmal versuchen" */
 .gf-g61-fehler{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+
+/* NEU (28.11.2026): Spotting – Größe an allen Seiten, Flaggen pro Auto, alle im Server auf der Karte */
+.spt-rand{position:absolute;z-index:3;touch-action:none}
+.spt-rand.n,.spt-rand.s{left:14px;right:14px;height:8px;cursor:ns-resize}
+.spt-rand.n{top:0}.spt-rand.s{bottom:0}
+.spt-rand.o,.spt-rand.w{top:14px;bottom:14px;width:8px;cursor:ew-resize}
+.spt-rand.o{right:0}.spt-rand.w{left:0}
+.spt-rand.no,.spt-rand.nw,.spt-rand.so,.spt-rand.sw{width:14px;height:14px}
+.spt-rand.no{top:0;right:0;cursor:nesw-resize}.spt-rand.sw{bottom:0;left:0;cursor:nesw-resize}
+.spt-rand.nw{top:0;left:0;cursor:nwse-resize}
+.spt-rand.so{bottom:0;right:0;cursor:nwse-resize;background:linear-gradient(135deg,transparent 50%,rgba(255,255,255,.25) 50%);border-radius:0 0 10px 0}
+.spt-gitter:not(.fest) .spt-f:hover .spt-rand.n,.spt-gitter:not(.fest) .spt-f:hover .spt-rand.s{background:linear-gradient(90deg,transparent 30%,rgba(255,255,255,.18) 30% 70%,transparent 70%) center/100% 2px no-repeat}
+.spt-gitter:not(.fest) .spt-f:hover .spt-rand.o,.spt-gitter:not(.fest) .spt-f:hover .spt-rand.w{background:linear-gradient(180deg,transparent 30%,rgba(255,255,255,.18) 30% 70%,transparent 70%) center/2px 100% no-repeat}
+.spt-fl{display:inline-block;width:16px;height:11px;margin-left:6px;vertical-align:-1px;border-radius:2px;position:relative;box-shadow:0 0 0 1px rgba(255,255,255,.18);font-style:normal}
+.spt-fl.gelb{background:#ffd400}
+.spt-fl.blau{background:#1f6fff}
+.spt-fl.schwarz{background:#000}
+.spt-fl.repair{background:#000}.spt-fl.repair::after{content:"";position:absolute;left:4px;top:1.5px;width:8px;height:8px;border-radius:50%;background:#ff8a00}
+.spt-fl.dq{background:#000;color:#fff;font:900 7px/11px system-ui,sans-serif;text-align:center;letter-spacing:0}
+.spt-fl.ziel{background:conic-gradient(#fff 25%,#111 0 50%,#fff 0 75%,#111 0) 0 0/6px 6px}
+.spt-fl-legende{display:flex;flex-wrap:wrap;gap:4px 14px}
+.spt-fl-legende span{display:inline-flex;align-items:center;gap:6px}
+.spt-fl-legende .spt-fl{margin-left:0}
+.sp-card-drv.spt-im{align-items:center}
+.sp-card-drv.spt-im span.sendet{border-color:#2ecc71}
+.sp-card-drv.spt-im span.sendet i{width:8px;height:8px;border-radius:50%;background:#2ecc71;box-shadow:0 0 7px #2ecc71}
+.sp-card-drv.spt-im small{color:var(--steel);font-size:11.5px}

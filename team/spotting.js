@@ -1,11 +1,11 @@
 /* ===========================================================
    SPOTTING  Flag to Flag Motorsport
-   Live-Ansicht laufender Rennen. Die Daten schicken FF Overlay bzw.
+   Live-Ansicht laufender Rennen. Die Daten schicken F2F Overlay bzw.
    die kreids888 Toolbox (spotting.py) alle 2 s über den Worker
    (Durable Object pro Rennen). Jeder wählt selbst, welches Rennen er
    ansieht – drei Leute in drei Rennen = drei Einträge.
-   Live-Ansicht aus Fenstern: am Titel ziehen = verschieben, Ecke unten
-   rechts = Größe; die anderen weichen aus. Anordnung pro Person im
+   Live-Ansicht aus Fenstern: am Titel ziehen = verschieben, an jedem Rand
+   = Größe; Fenster bleiben, wo man sie loslässt (NEU 28.11.2026). Anordnung pro Person im
    Browser gemerkt; auf dem Handy untereinander.
    Hash: #spotting · #spotting/<SubSessionID>
    Wird von team.js eingebunden (window.F2FSpotting.mount).
@@ -18,12 +18,16 @@
   const zeit = (s) => { if (!(s > 0)) return "–"; const m = Math.floor(s / 60), r = s - m * 60; return m + ":" + (r < 10 ? "0" : "") + r.toFixed(3); };
   const dauer = (s) => { if (s == null || s < 0) return "–"; s = Math.round(s); const h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60); return h ? h + ":" + pad(m) + ":" + pad(s % 60) : m + ":" + pad(s % 60); };
   const uhr = (ms) => new Date(ms).toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" });
+  // Flaggen pro Auto (CarIdxSessionFlags, kommen von Toolbox / F2F Overlay ab 28.11.2026 als „flg“) – NEU (28.11.2026)
+  const FLAGGEN_AUTO = [[0x0008 | 0x0100, "gelb", "Gelb"], [0x0020, "blau", "Blau (wird überrundet)"], [0x10000, "schwarz", "Schwarz (Strafe)"],
+    [0x100000, "repair", "Reparatur"], [0x20000, "dq", "DQ (disqualifiziert)"], [0x0001, "ziel", "Im Ziel"]];
+  const flaggen = (x) => { const f = Number(x && x.flg) || 0; return f ? FLAGGEN_AUTO.filter(([b]) => f & b).map(([, k, t]) => `<i class="spt-fl ${k}" title="${esc(t)}">${k === "dq" ? "DQ" : ""}</i>`).join("") : ""; };
   const norm = (s) => String(s || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9]+/g, " ").trim();
   // F2F-Auto: Auto des Senders, eigenes Team, F2F im Teamnamen oder (vom Server am Fahrernamen erkannt) ein anderer F2F-Fahrer im Rennen
   const istF2F = (a, st) => !!a && ((st.ich && a.i === st.ich.idx) || (Array.isArray(st.f2f) && st.f2f.includes(a.i)) || (st.session.meineTeams || []).includes(a.team) || /\bf2f\b|flag ?to ?flag/i.test(a.team || ""));
   const TYP = { "Race": "Rennen", "Lone Qualify": "Quali", "Open Qualify": "Quali", "Qualify": "Quali", "Practice": "Training", "Lone Practice": "Training", "Warmup": "Warm-up", "Offline Testing": "Testfahrt" };
 
-  const HINWEIS = `<div class="spt-hinweis"><b>So kommen Rennen hierher:</b> Wer fährt, braucht <b>FF Overlay</b> (oder die kreids888 Toolbox) offen und oben rechts mit <b>„Mit F2F verbinden"</b> angemeldet. Dann erscheint die Session hier automatisch, auch wenn mehrere von euch gleichzeitig in verschiedenen Rennen sind. Sprit und Strategie sieht man nur, wenn der Fahrer am Steuer das Programm laufen hat. Welche Sessions hier erscheinen (Teamrennen, Einzelrennen, Offline-Testfahrten), legt der Admin fest.</div>`;
+  const HINWEIS = `<div class="spt-hinweis"><b>So kommen Rennen hierher:</b> Wer fährt, braucht <b>F2F Overlay</b> (oder die kreids888 Toolbox) offen und oben rechts mit <b>„Mit F2F verbinden"</b> angemeldet. Dann erscheint die Session hier automatisch, auch wenn mehrere von euch gleichzeitig in verschiedenen Rennen sind. Sprit und Strategie sieht man nur, wenn der Fahrer am Steuer das Programm laufen hat. Welche Sessions hier erscheinen (Teamrennen, Einzelrennen, Offline-Testfahrten), legt der Admin fest.</div>`;
 
   /* ---------------- Fenster und Anordnung ---------------- */
   const FENSTER = [
@@ -31,23 +35,25 @@
     { id: "strategie", titel: "Strategie" }, { id: "gegner", titel: "Gegner deiner Klasse" }, { id: "feld", titel: "Feld" },
     { id: "relativ", titel: "Relativ" }, { id: "rl", titel: "Rennleitung" },
   ];
-  // 12 Spalten, Zeilen à 46 px
+  // 24 Spalten, Zeilen à 17 px (NEU 28.11.2026: doppelt so fein wie vorher 12 × 46 px; alte Anordnungen werden umgerechnet)
   const STANDARD = {
-    karte: { x: 0, y: 0, w: 4, h: 10 }, rl: { x: 4, y: 0, w: 2, h: 10 }, feld: { x: 6, y: 0, w: 6, h: 26 },
-    auto: { x: 0, y: 10, w: 3, h: 10 }, duell: { x: 3, y: 10, w: 3, h: 4 }, strategie: { x: 3, y: 14, w: 3, h: 7 },
-    gegner: { x: 0, y: 20, w: 3, h: 6 }, relativ: { x: 3, y: 21, w: 3, h: 5 },
+    karte: { x: 0, y: 0, w: 8, h: 20 }, rl: { x: 8, y: 0, w: 4, h: 20 }, feld: { x: 12, y: 0, w: 12, h: 52 },
+    auto: { x: 0, y: 20, w: 6, h: 20 }, duell: { x: 6, y: 20, w: 6, h: 8 }, strategie: { x: 6, y: 28, w: 6, h: 14 },
+    gegner: { x: 0, y: 40, w: 6, h: 12 }, relativ: { x: 6, y: 42, w: 6, h: 10 },
   };
-  const SPALTEN = 12, ZEILE = 46, LUECKE = 12;
+  const SPALTEN = 24, ZEILE = 17, LUECKE = 12, MIN_W = 3, MIN_H = 4, MAX_H = 80;
   // Anordnung kommt vom Server und gilt für alle; ändern (schieben, Größe, aus-/einblenden) darf nur ein Admin
   let LAYOUT = null, LAYOUT_SERVER = null, ADMIN = false, speichernT = null;
   function layoutLaden() {
     const l = LAYOUT_SERVER;
     const out = {};
     for (const f of FENSTER) {
-      const s = { ...STANDARD[f.id] }, x = l && l[f.id];
-      const px = x && Number.isFinite(x.x) ? klemm(x.x, 0, SPALTEN - 2) : 0;
-      // Breite so klemmen, dass das Fenster nicht über Spalte 12 hinausragt (x + w <= 12)
-      out[f.id] = x && Number.isFinite(x.x) ? { x: px, y: Math.max(0, x.y | 0), w: klemm(x.w, 2, SPALTEN - px), h: klemm(x.h, 3, 30), aus: !!x.aus } : s;
+      const s = { ...STANDARD[f.id] }, roh = l && l[f.id];
+      // alte Anordnung (12 Spalten × 46 px) auf das neue Raster umrechnen: alles mal 2
+      const x = roh && l.v !== 2 ? { ...roh, x: roh.x * 2, y: roh.y * 2, w: roh.w * 2, h: roh.h * 2 } : roh;
+      const px = x && Number.isFinite(x.x) ? klemm(x.x, 0, SPALTEN - MIN_W) : 0;
+      // Breite so klemmen, dass das Fenster nicht über die letzte Spalte hinausragt (x + w <= 24)
+      out[f.id] = x && Number.isFinite(x.x) ? { x: px, y: Math.max(0, x.y | 0), w: klemm(x.w, MIN_W, SPALTEN - px), h: klemm(x.h, MIN_H, MAX_H), aus: !!x.aus } : s;
     }
     LAYOUT = out;
     kompakt();
@@ -56,7 +62,7 @@
   // Admin: 1,5 s nach der letzten Änderung für alle speichern (null = zurück auf Standard)
   function layoutSpeichern(standard) {
     if (!ADMIN) return;
-    LAYOUT_SERVER = standard ? null : JSON.parse(JSON.stringify(LAYOUT));
+    LAYOUT_SERVER = standard ? null : { v: 2, ...JSON.parse(JSON.stringify(LAYOUT)) };
     clearTimeout(speichernT);
     speichernT = setTimeout(async () => {
       try { await C.api("/spotting/layout", { method: "POST", body: { layout: LAYOUT_SERVER } }); if (C.toast) C.toast("Anordnung für alle gespeichert", true); }
@@ -65,7 +71,7 @@
   }
   const sichtbar = () => FENSTER.filter(f => !LAYOUT[f.id].aus).map(f => f.id);
   const ueber = (a, b) => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
-  // überlappende Fenster nach unten schieben, dann alles nach oben zusammenrücken
+  // überlappende Fenster nach unten schieben (NEU 28.11.2026: nichts rutscht mehr von selbst nach oben, Lücken bleiben)
   function schieben(id) {
     const a = LAYOUT[id];
     for (const o of sichtbar()) if (o !== id && ueber(a, LAYOUT[o])) { LAYOUT[o].y = a.y + a.h; schieben(o); }
@@ -77,12 +83,13 @@
     for (const id of ids) {
       if (id === fest) continue;
       const it = LAYOUT[id];
-      while (it.y > 0 && !fertig.some(o => ueber({ ...it, y: it.y - 1 }, LAYOUT[o]))) it.y--;
       while (fertig.some(o => ueber(it, LAYOUT[o]))) it.y++;
       fertig.push(id);
     }
   }
   const handy = () => window.matchMedia("(max-width: 900px)").matches;
+  // Griffe zum Größe ändern an allen vier Seiten und Ecken (nur Admin)
+  const RAENDER = ["n", "s", "o", "w", "no", "nw", "so", "sw"].map(r => `<i class="spt-rand ${r}" data-r="${r}" title="Größe ändern"></i>`).join("");
 
   function aufraeumen() {
     alive++; // noch laufende live()/liste()/planLaden() erkennen daran, dass ihre Ansicht weg ist
@@ -114,8 +121,9 @@
         <a class="sp-card spt-karte${x.aktiv ? "" : " aus"}" href="#spotting/${esc(x.sub)}">
           <div class="sp-card-h"><b>${esc(x.strecke || "Rennen " + x.sub)}</b>${x.aktiv ? '<span class="tm-badge live">Live</span>' : '<span class="tm-badge grey">Beendet</span>'}</div>
           <div class="sp-card-m">${esc([TYP[x.typ] || x.typ, x.variante].filter(Boolean).join(" · "))}</div>
-          <div class="sp-card-f"><span>${C.ICONS.helmet || ""}${esc(x.von || "?")}</span>${(x.teams || []).length ? `<span>${C.ICONS.car}${esc(x.teams.join(", "))}</span>` : ""}<span>${x.autos} Autos</span></div>
-        </a>`).join("")}</div>` : '<div class="tm-box"><p class="tm-muted">Gerade fährt niemand mit verbundenem FF Overlay. Sobald jemand in einer Online-Session ist, taucht das Rennen hier auf.</p></div>';
+          <div class="sp-card-f">${Array.isArray(x.fahrer) && x.fahrer.length ? "" : `<span>${C.ICONS.helmet || ""}${esc(x.von || "?")}</span>`}${(x.teams || []).length ? `<span>${C.ICONS.car}${esc(x.teams.join(", "))}</span>` : ""}<span>${x.autos} Autos</span></div>
+          ${Array.isArray(x.fahrer) && x.fahrer.length ? `<div class="sp-card-drv spt-im"><em>Im Server:</em>${x.fahrer.map(f => `<span class="${f.s ? "sendet" : ""}">${f.s ? "<i></i>" : ""}${esc(f.n)}${f.s ? "<small>sendet</small>" : ""}</span>`).join("")}</div>` : ""}
+        </a>`).join("")}</div>` : '<div class="tm-box"><p class="tm-muted">Gerade fährt niemand mit verbundenem F2F Overlay. Sobald jemand in einer Online-Session ist, taucht das Rennen hier auf.</p></div>';
     };
     await zeichne();
     if (mine !== alive) return; // inzwischen weg: keinen Zeitgeber mehr starten
@@ -131,7 +139,7 @@
     root.innerHTML = `<a class="sp-back" href="#spotting">← Alle Rennen</a><div id="spt-kopf"></div>
       <div class="spt-gitter${ADMIN ? "" : " fest"}" id="spt-gitter">${FENSTER.map(f => `
         <section class="spt-f" data-f="${f.id}"><header class="spt-fh">${ADMIN ? '<span class="spt-griff">⠿</span>' : ""}<b>${f.titel}</b>${ADMIN ? `<button type="button" class="spt-fx" data-zu="${f.id}" title="Fenster für alle ausblenden">✕</button>` : ""}</header>
-          <div class="spt-fb" id="spt-f-${f.id}"></div>${ADMIN ? '<i class="spt-ecke" title="Größe ändern"></i>' : ""}</section>`).join("")}</div>
+          <div class="spt-fb" id="spt-f-${f.id}"></div>${ADMIN ? RAENDER : ""}</section>`).join("")}</div>
       <div class="spt-fuss">${HINWEIS}</div>`;
     setzeFenster();
     bindeFenster();
@@ -172,17 +180,25 @@
     g.addEventListener("click", (e) => { const b = e.target.closest("[data-zu]"); if (b) { LAYOUT[b.dataset.zu].aus = true; kompakt(); layoutSpeichern(); setzeFenster(); kopf(); } });
     g.addEventListener("pointerdown", (e) => {
       if (handy() || e.button !== 0 || e.target.closest("[data-zu]")) return;
-      const ecke = e.target.closest(".spt-ecke"), kopfteil = e.target.closest(".spt-fh");
-      if (!ecke && !kopfteil) return;
+      const rand = e.target.closest(".spt-rand"), kopfteil = e.target.closest(".spt-fh");
+      if (!rand && !kopfteil) return;
+      const r0 = rand ? rand.dataset.r : "";
       const el = e.target.closest(".spt-f"), id = el.dataset.f, l = LAYOUT[id];
       const r = g.getBoundingClientRect(), spalte = (r.width + LUECKE) / SPALTEN, zeile = ZEILE + LUECKE;
-      const start = { x: e.clientX, y: e.clientY, l: { ...l } };
+      const start = { x: e.clientX, y: e.clientY, l: { ...l }, alle: JSON.parse(JSON.stringify(LAYOUT)) };
       el.classList.add("zieht"); g.classList.add("ordnen");
       e.preventDefault();
       const zug = (ev) => {
         const dx = Math.round((ev.clientX - start.x) / spalte), dy = Math.round((ev.clientY - start.y) / zeile);
-        if (ecke) { l.w = klemm(start.l.w + dx, 2, SPALTEN - l.x); l.h = klemm(start.l.h + dy, 3, 30); }
-        else { l.x = klemm(start.l.x + dx, 0, SPALTEN - l.w); l.y = Math.max(0, start.l.y + dy); }
+        const a = start.l;
+        if (rand) {
+          if (r0.includes("o")) l.w = klemm(a.w + dx, MIN_W, SPALTEN - a.x);
+          if (r0.includes("w")) { l.x = klemm(a.x + dx, 0, a.x + a.w - MIN_W); l.w = a.x + a.w - l.x; }
+          if (r0.includes("s")) l.h = klemm(a.h + dy, MIN_H, MAX_H);
+          if (r0.includes("n")) { l.y = klemm(a.y + dy, 0, a.y + a.h - MIN_H); l.h = a.y + a.h - l.y; }
+        } else { l.x = klemm(a.x + dx, 0, SPALTEN - l.w); l.y = Math.max(0, a.y + dy); }
+        // die anderen Fenster jedes Mal von ihrer Startstelle aus ausweichen lassen (nur solange es sein muss)
+        for (const o of sichtbar()) if (o !== id) LAYOUT[o].y = start.alle[o].y;
         schieben(id); kompakt(id); setzeFenster();
       };
       const los = () => {
@@ -404,7 +420,7 @@
       ${s ? `<span class="tm-badge live">${esc(TYP[s.typ] || s.typ || "Session")}</span>${nass ? `<span class="spt-wx ${nass.toLowerCase()}">${nass}</span>` : ""}<h3>${esc(titel[0])}${titel[1] ? ` <small>${esc(titel[1])}</small>` : ""}</h3>
         <span class="spt-meta">${[laenge, st.autos.length + " Teilnehmer", "Klassen " + (s.klassen || []).map(k => esc(k.name)).join(", "), esc(wetter)].filter(Boolean).join(" · ")}</span>
         ${unsere.length ? `<div class="spt-unsere">${unsereKl.map(k => `<span class="spt-kl" style="--k:${klFarbe(k)}">${esc(klName(k))}</span>`).join("")}<small>= unsere Autos</small><b>${unsere.length} F2F-${unsere.length === 1 ? "Auto" : "Autos"} in dieser Session</b></div>` : ""}` : "<h3>Verbinde …</h3>"}
-      <span class="spt-quelle"><i class="${S.verbunden ? "an" : ""}"></i>${st ? `Daten von ${esc(sender ? sender.name : st.von || "?")} · <span id="spt-alter"></span>` : S.verbunden ? "verbunden, warte auf Daten" : "getrennt"}</span>
+      <span class="spt-quelle"><i class="${S.verbunden ? "an" : ""}"></i>${st ? `Daten von ${esc(sender ? sender.name : st.von || "?")}${st.uebernahme && st.uebernahme.von ? ` · übernommen von ${esc(st.uebernahme.von)} um ${uhr(st.uebernahme.w)}, Zahlen laufen weiter` : ""} · <span id="spt-alter"></span>` : S.verbunden ? "verbunden, warte auf Daten" : "getrennt"}</span>
       ${ADMIN ? `<span class="spt-werkzeug"><small class="spt-admin-hinweis">Admin: Anordnung gilt für alle</small>${aus.length ? `<select class="tm-select" id="spt-wieder"><option value="">+ Fenster (${aus.length})</option>${aus.map(f => `<option value="${f.id}">${esc(f.titel)}</option>`).join("")}</select>` : ""}${C.btn("Standard", "sm", 'id="spt-std" title="Fenster für alle wieder wie am Anfang anordnen"')}</span>` : ""}
     </div>`;
     const alter = box.querySelector("#spt-alter");
@@ -414,7 +430,7 @@
     box.innerHTML = html;
     if (st) box.querySelector("#spt-alter").textContent = alterText();
     const w = box.querySelector("#spt-wieder");
-    if (w) w.onchange = () => { if (!w.value) return; LAYOUT[w.value].aus = false; LAYOUT[w.value].y = 999; kompakt(); layoutSpeichern(); setzeFenster(); kopf(); zeichne(); };
+    if (w) w.onchange = () => { if (!w.value) return; LAYOUT[w.value].aus = false; LAYOUT[w.value].y = Math.max(0, ...sichtbar().filter(o => o !== w.value).map(o => LAYOUT[o].y + LAYOUT[o].h)); kompakt(); layoutSpeichern(); setzeFenster(); kopf(); zeichne(); };
     const std = box.querySelector("#spt-std");
     if (std) std.onclick = () => { layoutSpeichern(true); layoutLaden(); setzeFenster(); kopf(); zeichne(); };
   }
@@ -505,7 +521,7 @@
       const pm = plusMinus(x, felder[x.k] || [], st), wer = [x.team, x.fahrer].filter(Boolean).join(" · ");
       return `<tr class="${istF2F(x, st) ? "unser" : ""}${x.box ? " inbox" : ""}">
       <td class="spt-pos"><b>${(alle ? x.pos : x.kpos) || "–"}</b></td>${alle ? `<td><span class="spt-kl" style="--k:${farbe(x.k)}">${esc(kl(x.k).name)}</span> <small class="spt-klpos">P${x.kpos || "–"}</small></td>` : ""}<td class="spt-nr">${esc(x.nr)}</td>
-      <td class="spt-name" title="${esc(wer)}">${x.team ? `<b>${esc(x.team)}</b><small>${esc(x.fahrer)}</small>` : `<b>${esc(x.fahrer)}</b>`}</td><td class="z">${x.runde ?? "–"}</td>
+      <td class="spt-name" title="${esc(wer)}">${x.team ? `<b>${esc(x.team)}${flaggen(x)}</b><small>${esc(x.fahrer)}</small>` : `<b>${esc(x.fahrer)}${flaggen(x)}</b>`}</td><td class="z">${x.runde ?? "–"}</td>
       <td class="g z">${esc(alle ? x._gapG : x._gap)}</td><td class="z">${esc(alle ? x._intG : x._int)}</td><td class="z spt-rel">${zuUns(x)}</td>
       <td class="g z">${zeit(x.last)}</td><td class="z">${zeit(x.o5)}</td><td class="z">${zeit(x.best)}</td>
       <td class="g z">${pmZahl(pm.vorne, false)}</td><td class="z">${pmZahl(pm.hinten, true)}</td>
@@ -520,6 +536,7 @@
         <tr class="spt-gr"><th colspan="${alle ? 5 : 4}">Position</th><th colspan="3" class="g">Abstände</th><th colspan="3" class="g">Rundenzeiten</th><th colspan="2" class="g" title="Sekunden pro Runde über etwa 2 Runden">Trend</th><th colspan="4" class="g">Reifen &amp; Stint</th><th class="g">Incidents</th><th></th></tr>
         <tr class="spt-sp"><th class="spt-pos">Pos</th>${alle ? "<th>Kl.</th>" : ""}<th class="spt-nr">#</th><th>Team / Fahrer</th><th class="z">Rd.</th><th class="g z">${alle ? "Abstand" : "Abst. Kl."}</th><th class="z">Intervall</th><th class="z">Relativ</th><th class="g z">Letzte</th><th class="z" title="Schnitt der letzten 5 sauberen Runden">Ø 5 Rd.</th><th class="z">Beste</th><th class="g z" title="Abstand zum Vordermann, Sekunden pro Runde (minus = holt auf)">± Vorne</th><th class="z" title="Abstand zum Hintermann, Sekunden pro Runde (plus = baut aus)">± Hinten</th><th class="g">Reifen</th><th class="z">Start</th><th class="z">Stint</th><th class="z">Stopps</th><th class="g z" title="Incident-Punkte (Teamrennen: ganzes Team)">Inc.</th><th></th></tr></thead>
       <tbody>${klListe.map(fz).join("")}</tbody></table>
+      <p class="tm-muted spt-klein spt-fl-legende">Flaggen neben dem Namen: ${FLAGGEN_AUTO.map(([, k, t]) => `<span><i class="spt-fl ${k}">${k === "dq" ? "DQ" : ""}</i>${t}</span>`).join("")}</p>
       <p class="tm-muted spt-klein">Ø 5 Rd. = letzte 5 saubere Runden (ohne Box, Abflug, Start, Ausreißer). ± in Sekunden pro Runde über etwa 2 Runden. Schaden gibt iRacing für andere Autos nicht heraus.</p>`);
     root.querySelectorAll("[data-kl]").forEach(b => b.onclick = () => { S.klasse = b.dataset.kl; zeichne(); });
 
@@ -606,7 +623,7 @@
         <div class="spt-k"><small>Nächster Stopp</small><b>${bisLeer != null && sp.runde != null ? "Rd. " + (sp.runde + bisLeer) : "–"}</b></div>`;
       notizen += `${alt > 20 ? `<p class="tm-muted spt-klein">Spritstand von vor ${dauer(alt)}, der Fahrer am Steuer sendet gerade nicht.</p>` : ""}`;
     } else {
-      notizen += `<p class="tm-muted spt-klein">Sprit und Verbrauch kommen nur, wenn der Fahrer am Steuer FF Overlay bzw. die Toolbox laufen hat und sendet.</p>`;
+      notizen += `<p class="tm-muted spt-klein">Sprit und Verbrauch kommen nur, wenn der Fahrer am Steuer F2F Overlay bzw. die Toolbox laufen hat und sendet.</p>`;
     }
     // alle Werte in einem Raster nebeneinander, Erklärungen darunter
     html += (kacheln ? `<div class="spt-kacheln">${kacheln}</div>` : "") + notizen;
@@ -667,7 +684,7 @@
         const a = ANIM.get(x.i), [px, py] = pos(a ? animPos(a, jetzt) : x.pct), u = istF2F(x, st), links = px > mitteX;
         return `<g data-i="${x.i}" class="${u ? "unser" : ""}${x.box ? " box" : ""}" transform="translate(${px.toFixed(2)} ${py.toFixed(2)})">${x.kpos === 1 ? `<circle r="${(u ? 2.3 : 1.8) * groesse}" class="spt-spitze" style="stroke:${farbe(x.k)};stroke-width:${groesse * 0.35}"/>` : ""}<circle r="${(u ? 1.5 : 1) * groesse}" style="fill:${u ? "#e11324" : farbe(x.k)}"/>${x.pos === 1 ? `<text class="spt-krone" y="${(-groesse * 2.2).toFixed(2)}" text-anchor="middle" style="font-size:${groesse * 2.6}px">♛</text>` : ""}${u ? `<text class="spt-lbl" x="${((links ? -2 : 2) * groesse).toFixed(2)}" y="${(groesse * 0.6).toFixed(2)}" text-anchor="${links ? "end" : "start"}" style="font-size:${groesse * 2.6}px">${esc((x.team || x.fahrer).split(" ").pop())}${x.nr ? " #" + esc(x.nr) : ""}</text>` : ""}</g>`;
       }).join("")}
-    </svg><div class="spt-map-warn" id="spt-map-warn" hidden></div>${legende}${pkt ? "" : '<p class="tm-muted spt-klein">Streckenform wird geladen. Gibt es für diese Strecke noch keine, schickt sie das FF Overlay (ab 5.1) des Fahrers aus seiner Telemetriedatei, spätestens nach dem ersten Boxenstopp.</p>'}`;
+    </svg><div class="spt-map-warn" id="spt-map-warn" hidden></div>${legende}${pkt ? "" : '<p class="tm-muted spt-klein">Streckenform wird geladen. Gibt es für diese Strecke noch keine, schickt sie das F2F Overlay (ab 5.1) des Fahrers aus seiner Telemetriedatei, spätestens nach dem ersten Boxenstopp.</p>'}`;
     const svg = box.querySelector("svg");
     KARTE = { svg, pos, mitteX, groesse: Number(g), els: new Map([...svg.querySelectorAll("g[data-i]")].map(el => { const txt = el.querySelector(".spt-lbl"); return [Number(el.dataset.i), { g: el, txt, links: txt ? txt.getAttribute("text-anchor") === "end" : false }]; })) };
     animLauf();
